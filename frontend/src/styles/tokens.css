@@ -1,48 +1,49 @@
-/* Tubcal — "Midnight Newsroom" design tokens.
-   Night Edition (default): warm ink, cream type, ember signals.
-   Day Edition: true newsprint — cream paper, ink type. */
+/* Tubcal — "Lamplit Den" design tokens.
+   Night Edition (default): walnut & espresso surfaces, parchment type, a single
+   honey-amber lamp. Day Edition: toasted-oat paper, cocoa ink, roasted amber.
+   Warm, low-contrast, soft-cornered — built to feel comfortable, not crisp. */
 
 :root {
-  /* canvas */
-  --ink: #100e0b;
-  --ink-2: #171410;
-  --ink-3: #1f1b15;
-  --paper: #ede5d3;
-  --paper-dim: #b3a890;
-  --paper-faint: #786f5c;
-  --rule: rgba(237, 229, 211, 0.14);
-  --rule-strong: rgba(237, 229, 211, 0.32);
+  /* canvas — warm browns, not neutral black */
+  --ink: #1a130c;
+  --ink-2: #221913;
+  --ink-3: #2b2017;
+  --paper: #efe3ce;
+  --paper-dim: #b9a888;
+  --paper-faint: #8a7860;
+  --rule: rgba(239, 227, 206, 0.12);
+  --rule-strong: rgba(239, 227, 206, 0.26);
   --bg-base: var(--ink);
-  --surface: rgba(237, 229, 211, 0.04);
-  --surface-hover: rgba(237, 229, 211, 0.08);
-  --surface-input: rgba(237, 229, 211, 0.05);
-  --backdrop: rgba(10, 8, 5, 0.78);
-  --shadow-modal: 0 30px 90px rgba(0, 0, 0, 0.65);
+  --surface: rgba(239, 227, 206, 0.045);
+  --surface-hover: rgba(239, 227, 206, 0.085);
+  --surface-input: rgba(239, 227, 206, 0.06);
+  --backdrop: rgba(18, 12, 6, 0.78);
+  --shadow-modal: 0 28px 70px rgba(20, 12, 4, 0.62);
   --glow-strength: 1;
-  --grain-opacity: 0.05;
+  --grain-opacity: 0.04;
 
-  /* signals */
-  --signal: #ff5c1f;
-  --signal-soft: rgba(255, 92, 31, 0.16);
-  --c-youtube: #ff4242;
-  --c-reddit: #ff8a3d;
-  --c-hn: #ffc53d;
-  --c-foryou: #ff5c1f;
-  --success: #7bc97e;
-  --danger: #ff6b5e;
+  /* signals — the lamp is honey amber; platforms are earthy, not neon */
+  --signal: #e2a85c;
+  --signal-soft: rgba(226, 168, 92, 0.16);
+  --c-youtube: #d65a44;
+  --c-reddit: #cf7b3c;
+  --c-hn: #d6a34a;
+  --c-foryou: #e2a85c;
+  --success: #9bbf7e;
+  --danger: #d9694f;
 
-  /* aliases used by older components */
+  /* aliases used across components */
   --text-primary: var(--paper);
   --text-secondary: var(--paper-dim);
   --text-muted: var(--paper-faint);
   --accent: var(--signal);
-  --accent-strong: #ff7a45;
-  --accent-glow: rgba(255, 92, 31, 0.3);
+  --accent-strong: #cf8a5a;
+  --accent-glow: rgba(226, 168, 92, 0.3);
   --surface-glass: var(--surface);
   --surface-glass-hover: var(--surface-hover);
   --border-glass: var(--rule);
   --border-glass-strong: var(--rule-strong);
-  --shadow-card: 0 10px 40px rgba(0, 0, 0, 0.35);
+  --shadow-card: 0 12px 34px rgba(20, 12, 4, 0.38);
 
   /* type */
   --font-display: 'Fraunces Variable', georgia, serif;
@@ -59,47 +60,47 @@
   --space-7: 48px;
   --space-8: 64px;
 
-  /* radii — editorial: mostly sharp, soft only on media */
-  --r-card: 4px;
-  --r-media: 8px;
-  --r-modal: 10px;
+  /* radii — softened for a comfortable, tactile feel */
+  --r-card: 14px;
+  --r-media: 14px;
+  --r-modal: 18px;
   --r-pill: 999px;
-  --r-input: 4px;
+  --r-input: 10px;
 
-  /* comment rails */
-  --rail-0: #ff5c1f;
-  --rail-1: #ffc53d;
-  --rail-2: #7bc97e;
-  --rail-3: #6fa8dc;
-  --rail-4: #ff8a3d;
+  /* comment rails — all warm hues so threads stay cozy */
+  --rail-0: #e2a85c;
+  --rail-1: #d6a34a;
+  --rail-2: #9bbf7e;
+  --rail-3: #c98f6b;
+  --rail-4: #cf7b3c;
 }
 
 [data-theme='light'] {
-  --ink: #f3edde;
-  --ink-2: #ece4d2;
-  --ink-3: #e3dac5;
-  --paper: #1c1812;
-  --paper-dim: #564e3f;
-  --paper-faint: #8d8270;
-  --rule: rgba(28, 24, 18, 0.16);
-  --rule-strong: rgba(28, 24, 18, 0.42);
-  --surface: rgba(28, 24, 18, 0.035);
-  --surface-hover: rgba(28, 24, 18, 0.07);
-  --surface-input: rgba(255, 255, 255, 0.55);
-  --backdrop: rgba(60, 52, 38, 0.45);
-  --shadow-modal: 0 30px 90px rgba(60, 50, 30, 0.35);
-  --glow-strength: 0.35;
-  --grain-opacity: 0.045;
+  --ink: #ece1cd;
+  --ink-2: #e4d8c0;
+  --ink-3: #dccdb0;
+  --paper: #2a2017;
+  --paper-dim: #6b5c48;
+  --paper-faint: #9a8a72;
+  --rule: rgba(42, 32, 23, 0.16);
+  --rule-strong: rgba(42, 32, 23, 0.4);
+  --surface: rgba(42, 32, 23, 0.04);
+  --surface-hover: rgba(42, 32, 23, 0.075);
+  --surface-input: rgba(255, 250, 240, 0.6);
+  --backdrop: rgba(70, 52, 32, 0.42);
+  --shadow-modal: 0 28px 70px rgba(80, 58, 32, 0.3);
+  --glow-strength: 0.4;
+  --grain-opacity: 0.04;
 
-  --signal: #d8430f;
-  --signal-soft: rgba(216, 67, 15, 0.12);
-  --c-youtube: #c92f2f;
-  --c-reddit: #c45d12;
-  --c-hn: #a8730a;
-  --success: #3e7a41;
+  --signal: #b9742f;
+  --signal-soft: rgba(185, 116, 47, 0.12);
+  --c-youtube: #c14a34;
+  --c-reddit: #b4631f;
+  --c-hn: #a8761f;
+  --success: #5a7d3f;
   --danger: #b3361f;
 
-  --accent-strong: #b53a0d;
-  --accent-glow: rgba(216, 67, 15, 0.22);
-  --shadow-card: 0 10px 30px rgba(80, 65, 40, 0.12);
+  --accent-strong: #a85f2a;
+  --accent-glow: rgba(185, 116, 47, 0.22);
+  --shadow-card: 0 10px 28px rgba(90, 66, 38, 0.14);
 }

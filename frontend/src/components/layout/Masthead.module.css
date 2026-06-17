@@ -9,7 +9,7 @@
   justify-content: space-between;
   font-family: var(--font-mono);
   font-size: 11px;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--paper-faint);
   padding-bottom: var(--space-2);
@@ -30,7 +30,7 @@
   border-radius: 50%;
   background: var(--signal);
   box-shadow: 0 0 10px var(--signal);
-  animation: pulse 2.4s ease-in-out infinite;
+  animation: pulse 3.6s ease-in-out infinite;
 }
 
 .titleRow {

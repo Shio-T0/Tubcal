@@ -1,7 +1,7 @@
 .thread {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-4);
 }
 
 .comment {
@@ -11,7 +11,7 @@
 
 .rail {
   flex: none;
-  width: 3px;
+  width: 4px;
   border-radius: 3px;
   background: color-mix(in srgb, var(--rail-c) 55%, transparent);
   cursor: pointer;

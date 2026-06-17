@@ -26,10 +26,10 @@ export default function Masthead() {
     <header className={s.masthead}>
       <div className={s.topline}>
         <span>{todayLine()}</span>
-        <span>{theme === 'dark' ? 'Night Edition' : 'Day Edition'}</span>
+        <span>{theme === 'dark' ? 'Lamplit' : 'Daylight'}</span>
         <span className={s.onair}>
           <span className={s.onairDot} />
-          on air · local only
+          lamp on · private
         </span>
       </div>
 
@@ -40,7 +40,7 @@ export default function Masthead() {
         <div className={s.actions}>
           <button
             className={s.actionBtn}
-            title={theme === 'dark' ? 'Day Edition' : 'Night Edition'}
+            title={theme === 'dark' ? 'Switch to Daylight' : 'Switch to Lamplit'}
             onClick={() => updateSettings({ theme: theme === 'dark' ? 'light' : 'dark' })}
           >
             {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
