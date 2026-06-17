@@ -1,0 +1,88 @@
+/* Broadcast-station backdrop: warm ember glow, concentric transmission
+   rings, and a film-grain overlay on deep ink. Transform/opacity only. */
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.backdrop__ember {
+  position: absolute;
+  width: 110vmax;
+  height: 110vmax;
+  top: -65vmax;
+  left: -35vmax;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 92, 31, 0.32) 0%, rgba(255, 92, 31, 0.06) 38%, transparent 64%);
+  opacity: var(--glow-strength);
+  animation: emberBreathe 18s ease-in-out infinite alternate;
+  will-change: transform, opacity;
+}
+
+.backdrop__ember--2 {
+  top: auto;
+  left: auto;
+  bottom: -70vmax;
+  right: -45vmax;
+  background: radial-gradient(circle, rgba(255, 197, 61, 0.16) 0%, rgba(255, 197, 61, 0.04) 40%, transparent 64%);
+  animation-duration: 26s;
+  animation-delay: -9s;
+}
+
+@keyframes emberBreathe {
+  from {
+    transform: scale(1) translate3d(0, 0, 0);
+  }
+
+  to {
+    transform: scale(1.12) translate3d(4vw, 2vh, 0);
+  }
+}
+
+/* concentric transmission rings, very faint */
+.backdrop__rings {
+  position: absolute;
+  width: 160vmax;
+  height: 160vmax;
+  bottom: -110vmax;
+  right: -70vmax;
+  border-radius: 50%;
+  background: repeating-radial-gradient(
+    circle at center,
+    transparent 0,
+    transparent 56px,
+    var(--rule) 56px,
+    var(--rule) 57px
+  );
+  opacity: 0.5;
+  -webkit-mask-image: radial-gradient(circle at center, black 0%, transparent 62%);
+  mask-image: radial-gradient(circle at center, black 0%, transparent 62%);
+}
+
+.backdrop__grain {
+  position: absolute;
+  inset: 0;
+  opacity: var(--grain-opacity);
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* soft vignette pulls focus to the page column */
+.backdrop__vignette {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 120% 90% at 50% 8%, transparent 55%, rgba(0, 0, 0, 0.32) 100%);
+}
+
+[data-theme='light'] .backdrop__vignette {
+  background: radial-gradient(ellipse 120% 90% at 50% 8%, transparent 60%, rgba(96, 80, 50, 0.14) 100%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .backdrop__ember {
+    animation: none;
+  }
+}

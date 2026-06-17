@@ -1,0 +1,152 @@
+/* The Dispatch — broadsheet letters page: ruled columns, serif headlines */
+
+.sheet {
+  border-top: 3px double var(--rule-strong);
+  padding-top: var(--space-5);
+  columns: 2 340px;
+  column-gap: var(--space-7);
+  column-rule: 1px solid var(--rule);
+}
+
+.entry {
+  break-inside: avoid;
+  padding-bottom: var(--space-5);
+  margin-bottom: var(--space-5);
+  border-bottom: 1px solid var(--rule);
+  cursor: pointer;
+  animation: fadeUp 0.45s ease both;
+  animation-delay: calc(min(var(--i, 0), 10) * 40ms);
+}
+
+.entry:hover .headline {
+  color: var(--c-reddit);
+}
+
+.lead {
+  column-span: all;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--space-6);
+  align-items: start;
+}
+
+.tagRow {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  margin-bottom: var(--space-2);
+}
+
+.subTag {
+  color: var(--c-reddit);
+  font-weight: 500;
+}
+
+.tagMeta {
+  color: var(--paper-faint);
+}
+
+.headline {
+  font-size: 20px;
+  font-variation-settings: 'opsz' 60;
+  font-weight: 560;
+  line-height: 1.22;
+  transition: color 0.15s ease;
+  margin-bottom: var(--space-2);
+}
+
+.lead .headline {
+  font-size: clamp(26px, 3.6vw, 38px);
+  font-variation-settings: 'opsz' 110;
+  max-width: 30ch;
+}
+
+.excerpt {
+  font-size: 13.5px;
+  color: var(--paper-dim);
+  line-height: 1.55;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin-bottom: var(--space-2);
+}
+
+.lead .excerpt {
+  -webkit-line-clamp: 4;
+  font-size: 14.5px;
+  max-width: 64ch;
+}
+
+.entryFoot {
+  display: flex;
+  gap: var(--space-4);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--paper-faint);
+}
+
+.stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.thumb {
+  width: 100%;
+  max-height: 180px;
+  object-fit: cover;
+  border-radius: var(--r-card);
+  border: 1px solid var(--rule);
+  margin-bottom: var(--space-2);
+  filter: saturate(0.92);
+}
+
+.leadThumb {
+  width: clamp(200px, 26vw, 340px);
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: var(--r-card);
+  border: 1px solid var(--rule);
+  filter: saturate(0.92);
+}
+
+.linkOut {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--paper-faint);
+  margin-bottom: var(--space-2);
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.subHead {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  margin-bottom: var(--space-5);
+  animation: fadeUp 0.4s ease both;
+}
+
+.subTitle {
+  font-size: clamp(26px, 4vw, 38px);
+}
+
+@media (max-width: 700px) {
+  .lead {
+    grid-template-columns: 1fr;
+  }
+
+  .leadThumb {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+  }
+}

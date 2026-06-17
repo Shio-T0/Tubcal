@@ -1,0 +1,105 @@
+/* Tubcal — "Midnight Newsroom" design tokens.
+   Night Edition (default): warm ink, cream type, ember signals.
+   Day Edition: true newsprint — cream paper, ink type. */
+
+:root {
+  /* canvas */
+  --ink: #100e0b;
+  --ink-2: #171410;
+  --ink-3: #1f1b15;
+  --paper: #ede5d3;
+  --paper-dim: #b3a890;
+  --paper-faint: #786f5c;
+  --rule: rgba(237, 229, 211, 0.14);
+  --rule-strong: rgba(237, 229, 211, 0.32);
+  --bg-base: var(--ink);
+  --surface: rgba(237, 229, 211, 0.04);
+  --surface-hover: rgba(237, 229, 211, 0.08);
+  --surface-input: rgba(237, 229, 211, 0.05);
+  --backdrop: rgba(10, 8, 5, 0.78);
+  --shadow-modal: 0 30px 90px rgba(0, 0, 0, 0.65);
+  --glow-strength: 1;
+  --grain-opacity: 0.05;
+
+  /* signals */
+  --signal: #ff5c1f;
+  --signal-soft: rgba(255, 92, 31, 0.16);
+  --c-youtube: #ff4242;
+  --c-reddit: #ff8a3d;
+  --c-hn: #ffc53d;
+  --c-foryou: #ff5c1f;
+  --success: #7bc97e;
+  --danger: #ff6b5e;
+
+  /* aliases used by older components */
+  --text-primary: var(--paper);
+  --text-secondary: var(--paper-dim);
+  --text-muted: var(--paper-faint);
+  --accent: var(--signal);
+  --accent-strong: #ff7a45;
+  --accent-glow: rgba(255, 92, 31, 0.3);
+  --surface-glass: var(--surface);
+  --surface-glass-hover: var(--surface-hover);
+  --border-glass: var(--rule);
+  --border-glass-strong: var(--rule-strong);
+  --shadow-card: 0 10px 40px rgba(0, 0, 0, 0.35);
+
+  /* type */
+  --font-display: 'Fraunces Variable', georgia, serif;
+  --font-body: 'Schibsted Grotesk Variable', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+
+  /* spacing */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+
+  /* radii — editorial: mostly sharp, soft only on media */
+  --r-card: 4px;
+  --r-media: 8px;
+  --r-modal: 10px;
+  --r-pill: 999px;
+  --r-input: 4px;
+
+  /* comment rails */
+  --rail-0: #ff5c1f;
+  --rail-1: #ffc53d;
+  --rail-2: #7bc97e;
+  --rail-3: #6fa8dc;
+  --rail-4: #ff8a3d;
+}
+
+[data-theme='light'] {
+  --ink: #f3edde;
+  --ink-2: #ece4d2;
+  --ink-3: #e3dac5;
+  --paper: #1c1812;
+  --paper-dim: #564e3f;
+  --paper-faint: #8d8270;
+  --rule: rgba(28, 24, 18, 0.16);
+  --rule-strong: rgba(28, 24, 18, 0.42);
+  --surface: rgba(28, 24, 18, 0.035);
+  --surface-hover: rgba(28, 24, 18, 0.07);
+  --surface-input: rgba(255, 255, 255, 0.55);
+  --backdrop: rgba(60, 52, 38, 0.45);
+  --shadow-modal: 0 30px 90px rgba(60, 50, 30, 0.35);
+  --glow-strength: 0.35;
+  --grain-opacity: 0.045;
+
+  --signal: #d8430f;
+  --signal-soft: rgba(216, 67, 15, 0.12);
+  --c-youtube: #c92f2f;
+  --c-reddit: #c45d12;
+  --c-hn: #a8730a;
+  --success: #3e7a41;
+  --danger: #b3361f;
+
+  --accent-strong: #b53a0d;
+  --accent-glow: rgba(216, 67, 15, 0.22);
+  --shadow-card: 0 10px 30px rgba(80, 65, 40, 0.12);
+}

@@ -1,0 +1,11 @@
+[project]
+name = "tubcal"
+version = "0.1.0"
+description = "Private all-in-one social media hub (YouTube + Reddit + Hacker News) on localhost"
+requires-python = ">=3.12"
+dependencies = [
+    "flask>=3.0",
+    "requests>=2.32",
+    "feedparser>=6.0",
+    "python-dotenv>=1.0",
+]

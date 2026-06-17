@@ -1,0 +1,141 @@
+/* The Wire — teletype board: dense ranked rows, amber signals, scanlines */
+
+.board {
+  border: 1px solid var(--rule);
+  border-radius: var(--r-card);
+  background:
+    repeating-linear-gradient(to bottom, transparent 0, transparent 3px, rgba(0, 0, 0, 0.12) 3px, rgba(0, 0, 0, 0.12) 4px),
+    var(--surface);
+  overflow: hidden;
+  animation: fadeUp 0.45s ease 0.1s both;
+}
+
+[data-theme='light'] .board {
+  background:
+    repeating-linear-gradient(to bottom, transparent 0, transparent 3px, rgba(120, 100, 60, 0.05) 3px, rgba(120, 100, 60, 0.05) 4px),
+    var(--surface);
+}
+
+.boardHead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: 10px var(--space-4);
+  border-bottom: 1px solid var(--rule);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--c-hn);
+}
+
+.boardHead::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--c-hn);
+  box-shadow: 0 0 10px var(--c-hn);
+  animation: pulse 1.8s ease-in-out infinite;
+}
+
+.boardHeadMeta {
+  margin-left: auto;
+  color: var(--paper-faint);
+  letter-spacing: 0.1em;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 52px 1fr auto;
+  align-items: baseline;
+  gap: var(--space-4);
+  padding: 13px var(--space-4);
+  border-bottom: 1px solid var(--rule);
+  cursor: pointer;
+  transition: background 0.15s ease;
+  animation: fadeUp 0.35s ease both;
+  animation-delay: calc(min(var(--i, 0), 14) * 28ms);
+}
+
+.row:last-child {
+  border-bottom: none;
+}
+
+.row:hover {
+  background: color-mix(in srgb, var(--c-hn) 7%, transparent);
+}
+
+.rank {
+  font-family: var(--font-mono);
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--c-hn);
+  text-align: right;
+}
+
+.rowMain {
+  min-width: 0;
+}
+
+.rowTitle {
+  font-family: var(--font-body);
+  font-size: 14.5px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.rowTitle a:hover {
+  color: var(--c-hn);
+}
+
+.domain {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--paper-faint);
+  margin-left: var(--space-2);
+}
+
+.rowMeta {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--paper-faint);
+  margin-top: 3px;
+}
+
+.stats {
+  display: flex;
+  gap: var(--space-4);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.points {
+  color: var(--c-hn);
+}
+
+.comments {
+  color: var(--paper-dim);
+}
+
+.comments:hover {
+  color: var(--c-hn);
+}
+
+.more {
+  display: flex;
+  justify-content: center;
+  padding: var(--space-5) 0;
+}
+
+@media (max-width: 640px) {
+  .row {
+    grid-template-columns: 36px 1fr;
+  }
+
+  .stats {
+    grid-column: 2;
+    margin-top: 4px;
+  }
+}

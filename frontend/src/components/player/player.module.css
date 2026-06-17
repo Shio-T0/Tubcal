@@ -1,0 +1,170 @@
+/* Backdrop behind the expanded video. */
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: var(--backdrop);
+  backdrop-filter: blur(8px);
+  animation: backdropIn 0.18s ease both;
+}
+
+@keyframes backdropIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+/* One card per active video. Position is driven by inline styles (computed in
+   JS): expanded = centered via left/top/transform; docked = right/bottom corner.
+   The same element is just restyled between the two — the iframe never remounts.
+   Only `bottom` transitions, so reordering the corner stack animates smoothly
+   while switching expanded<->docked is instant. */
+.card {
+  position: fixed;
+  border-radius: var(--r-card);
+  overflow: hidden;
+  background: color-mix(in srgb, var(--bg-base) 86%, transparent);
+  border: 1px solid var(--border-glass-strong);
+  box-shadow: var(--shadow-modal);
+  backdrop-filter: blur(18px) saturate(1.3);
+  outline: 2px solid transparent;
+  outline-offset: -2px;
+  transition: bottom 0.2s ease, outline-color 0.15s ease;
+}
+
+.cardExpanded {
+  z-index: 51;
+  max-width: calc(100vw - 2 * var(--space-5));
+}
+
+.cardDocked {
+  z-index: 45;
+  max-width: 80vw;
+  animation: dockIn 0.2s ease both;
+}
+
+@keyframes dockIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.97);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.cardOver {
+  outline-color: var(--c-youtube);
+}
+
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 34px;
+  padding: 0 6px 0 2px;
+  background: var(--surface-glass);
+  border-bottom: 1px solid var(--border-glass);
+}
+
+.cardDocked .bar {
+  cursor: grab;
+}
+
+.cardDocked .bar:active {
+  cursor: grabbing;
+}
+
+.grip {
+  display: grid;
+  place-items: center;
+  color: var(--text-muted);
+  flex: none;
+}
+
+.title {
+  flex: 1;
+  min-width: 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+  text-decoration: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+a.title:hover {
+  color: var(--c-youtube);
+}
+
+.btn {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn:hover {
+  background: var(--surface-glass-hover);
+  color: var(--text-primary);
+}
+
+.frameWrap {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  background: #000;
+}
+
+.frame {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
+/* While dragging, iframes must not swallow the dragover/drop events. */
+.frameNoPointer {
+  pointer-events: none;
+}
+
+.meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  padding: var(--space-3) var(--space-4);
+  font-size: 12.5px;
+}
+
+.metaChannel {
+  font-weight: 600;
+  color: var(--text-primary);
+  text-decoration: none;
+}
+
+a.metaChannel:hover {
+  color: var(--c-youtube);
+}
+
+.metaLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+}

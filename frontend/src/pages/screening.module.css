@@ -1,0 +1,455 @@
+/* Screening Room — cinematic: letterboxed hero, horizontal shelves */
+
+.hero {
+  position: relative;
+  border-radius: var(--r-media);
+  overflow: hidden;
+  cursor: pointer;
+  margin-bottom: var(--space-7);
+  border: 1px solid var(--rule);
+  animation: fadeUp 0.5s ease 0.12s both;
+  background: #000;
+}
+
+.heroThumb {
+  width: 100%;
+  aspect-ratio: 21 / 9;
+  object-fit: cover;
+  opacity: 0.85;
+  transition: transform 0.6s ease, opacity 0.3s ease;
+}
+
+.hero:hover .heroThumb {
+  transform: scale(1.025);
+  opacity: 1;
+}
+
+.heroScrim {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(8, 6, 4, 0.92) 0%, rgba(8, 6, 4, 0.25) 45%, transparent 70%);
+}
+
+.heroText {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: var(--space-5) var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.heroKicker {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--c-youtube);
+}
+
+.heroTitle {
+  font-size: clamp(22px, 3.4vw, 36px);
+  font-variation-settings: 'opsz' 110;
+  color: #f4ecdc;
+  max-width: 26ch;
+}
+
+.heroMeta {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: rgba(237, 229, 211, 0.65);
+}
+
+.heroPlay {
+  position: absolute;
+  top: var(--space-5);
+  right: var(--space-5);
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  color: #fff;
+  background: rgba(255, 66, 66, 0.9);
+  box-shadow: 0 0 34px rgba(255, 66, 66, 0.55);
+  opacity: 0;
+  transform: scale(0.85);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.hero:hover .heroPlay {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* shelves */
+.shelf {
+  margin-bottom: var(--space-7);
+  animation: fadeUp 0.45s ease both;
+}
+
+.shelfHead {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--rule);
+  margin-bottom: var(--space-4);
+}
+
+.shelfTitle {
+  font-size: 19px;
+  font-weight: 560;
+}
+
+.shelfCount {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--paper-faint);
+}
+
+.shelfAll {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--paper-faint);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+/* A second .shelfAll (e.g. reshuffle next to view-all) shouldn't claim the
+   auto margin too — only the first pushes to the right. */
+.shelfAll ~ .shelfAll {
+  margin-left: var(--space-3);
+}
+
+.shelfAll:hover {
+  color: var(--c-youtube);
+}
+
+.spin {
+  animation: shelf-spin 0.8s linear infinite;
+}
+
+@keyframes shelf-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.shelfRow {
+  display: flex;
+  gap: var(--space-4);
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  padding-bottom: var(--space-3);
+}
+
+/* tiles */
+.tile {
+  flex: none;
+  width: 270px;
+  cursor: pointer;
+  scroll-snap-align: start;
+}
+
+.tileThumbWrap {
+  position: relative;
+  border-radius: var(--r-media);
+  overflow: hidden;
+  background: #000;
+  border: 1px solid var(--rule);
+  margin-bottom: var(--space-2);
+}
+
+.tileThumb {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  transition: transform 0.4s ease, opacity 0.25s ease;
+  opacity: 0.92;
+}
+
+.tile:hover .tileThumb {
+  transform: scale(1.05);
+  opacity: 1;
+}
+
+/* Watch-progress bar pinned to the bottom of the thumbnail. Full + green once
+   the video has been finished. */
+.tileProgress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 4px;
+  background: rgba(8, 6, 4, 0.55);
+  z-index: 2;
+}
+
+.tileProgressFill {
+  height: 100%;
+  background: var(--c-youtube);
+  box-shadow: 0 0 8px rgba(255, 66, 66, 0.6);
+  transition: width 0.3s ease;
+}
+
+.tileProgressDone {
+  background: #3fb950;
+  box-shadow: 0 0 8px rgba(63, 185, 80, 0.6);
+}
+
+.tilePlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: rgba(8, 6, 4, 0.35);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.tile:hover .tilePlay {
+  opacity: 1;
+}
+
+.tilePlay span {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(255, 66, 66, 0.9);
+  box-shadow: 0 0 26px rgba(255, 66, 66, 0.5);
+}
+
+.tileTitle {
+  font-family: var(--font-body);
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.tileMeta {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--paper-faint);
+  margin-top: 3px;
+}
+
+/* clickable channel name inside a tile's meta line */
+.metaLink {
+  color: inherit;
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+.metaLink:hover {
+  color: var(--c-youtube);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* grid (search results, channel page) */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: var(--space-5) var(--space-4);
+}
+
+.grid .tile {
+  width: auto;
+}
+
+/* channel page header */
+.channelHead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
+  animation: fadeUp 0.4s ease both;
+}
+
+.channelAvatar {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--c-youtube);
+  box-shadow: 0 0 28px rgba(255, 66, 66, 0.3);
+}
+
+.channelLetter {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-display);
+  font-size: 30px;
+  color: var(--c-youtube);
+  background: color-mix(in srgb, var(--c-youtube) 14%, transparent);
+  border: 2px solid var(--c-youtube);
+}
+
+.channelName {
+  font-size: clamp(24px, 3.5vw, 34px);
+}
+
+.channelActions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+/* watch history tiles */
+.histTile {
+  position: relative;
+}
+
+.histRemove {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 7px;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.7);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s ease, background 0.15s ease;
+}
+
+.histTile:hover .histRemove {
+  opacity: 1;
+}
+
+.histRemove:hover {
+  background: var(--c-youtube);
+}
+
+/* channel page: view/sort tabs */
+.channelTabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-4);
+}
+
+.loadMoreWrap {
+  display: flex;
+  justify-content: center;
+  margin: var(--space-6) 0 var(--space-2);
+}
+
+.plMeta {
+  display: block;
+  margin-top: 4px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--paper-faint);
+}
+
+/* playlist cards */
+.plCard {
+  display: block;
+  cursor: pointer;
+}
+
+.plThumbWrap {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--r-card);
+  overflow: hidden;
+  margin-bottom: var(--space-2);
+  border: 1px solid var(--rule);
+  /* stacked-paper edge to read as a "playlist" */
+  box-shadow:
+    4px -4px 0 -1px var(--surface),
+    4px -4px 0 0 var(--rule),
+    8px -8px 0 -1px var(--surface),
+    8px -8px 0 0 var(--rule);
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.plCard:hover .plThumbWrap {
+  transform: translateY(-3px);
+  box-shadow:
+    4px -4px 0 -1px var(--surface),
+    4px -4px 0 0 var(--c-youtube),
+    8px -8px 0 -1px var(--surface),
+    8px -8px 0 0 var(--rule),
+    0 12px 28px rgba(0, 0, 0, 0.35);
+}
+
+.plThumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.plThumbFallback {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  color: var(--c-youtube);
+  background: color-mix(in srgb, var(--c-youtube) 12%, transparent);
+}
+
+.plCount {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.78);
+}
+
+/* "Picked for you" gets two tiles' worth of height: tiles fill two rows, then
+   flow into new columns (still horizontally scrollable). */
+.shelfTall .shelfRow {
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-rows: repeat(2, auto);
+  grid-auto-columns: 270px;
+  align-items: start;
+}
+
+/* projection (discover) shelf gets a marquee treatment */
+.projection {
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--c-youtube);
+  padding: var(--space-4) var(--space-4) 0;
+  background: var(--surface);
+  border-radius: var(--r-card);
+}
