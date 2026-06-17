@@ -5,6 +5,7 @@ import { api, useApi } from '../api/client.js';
 import { ErrorBox, Receiving, SearchBar, SectionHead, useDebounced } from '../components/layout/Section.jsx';
 import HNCommentsPanel from '../components/modals/HNCommentsPanel.jsx';
 import { Button, IconButton, SegmentedControl } from '../components/ui/index.jsx';
+import { SaveButton } from '../components/ui/ItemActions.jsx';
 import { compact } from '../lib/format.js';
 import { timeAgo } from '../lib/time.js';
 import { useSettings } from '../state.jsx';
@@ -34,6 +35,9 @@ function WireRow({ item, index, onComments }) {
         <span className={s.points}>▲ {compact(item.score) ?? '–'}</span>
         <span className={s.comments}>{compact(item.comments_count) ?? 0} cmt</span>
       </div>
+      <span style={{ position: 'relative', alignSelf: 'center' }}>
+        <SaveButton item={item} />
+      </span>
     </div>
   );
 }

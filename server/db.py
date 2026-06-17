@@ -52,6 +52,14 @@ CREATE TABLE IF NOT EXISTS history (
   duration    REAL NOT NULL DEFAULT 0,
   watched_at  INTEGER NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS saved (
+  id        INTEGER PRIMARY KEY AUTOINCREMENT,
+  platform  TEXT NOT NULL,
+  item_id   TEXT NOT NULL UNIQUE,
+  payload   TEXT NOT NULL,
+  saved_at  INTEGER NOT NULL
+);
 """
 
 DEFAULT_SETTINGS = {
@@ -59,6 +67,9 @@ DEFAULT_SETTINGS = {
     "reddit_sort": "hot",
     "hn_list": "top",
     "foryou_weights": {"youtube": 2, "reddit": 2, "hackernews": 1},
+    # Player preferences.
+    "solo_audio": True,   # only the focused video plays sound; others auto-mute
+    "playback_rate": 1,   # remembered across videos
 }
 
 
@@ -91,6 +102,27 @@ def init_db():
         os.chmod(config.DB_PATH, 0o600)
     except OSError:
         pass
+    prune_old_data()
+
+
+def prune_old_data(history_cap=2000, cache_max_age=7 * 86400):
+    """Keep tubcal.db lean: cap watch history and drop long-dead cache rows
+    (kept past their TTL only for stale-while-error; a week old is useless)."""
+    con = connect()
+    try:
+        with con:
+            con.execute(
+                "DELETE FROM history WHERE id NOT IN "
+                "(SELECT id FROM history ORDER BY watched_at DESC LIMIT ?)",
+                (history_cap,),
+            )
+            con.execute(
+                "DELETE FROM cache WHERE fetched_at < ?",
+                (int(time.time()) - cache_max_age,),
+            )
+    except sqlite3.OperationalError:
+        pass  # cache table may not exist on a very first run
+    con.close()
 
 
 # ---- settings ----
@@ -227,6 +259,57 @@ def get_progress_map():
         r["item_id"]: {"position": r["position"], "duration": r["duration"]}
         for r in rows
     }
+
+
+def get_continue_watching(limit=30, ratio=0.95):
+    """Videos started but not finished, newest first — drives the
+    'Continue watching' shelf. >5s in so a stray click doesn't qualify."""
+    con = connect()
+    rows = con.execute(
+        "SELECT * FROM history WHERE platform='youtube' AND duration > 0 "
+        "AND position > 5 AND position < duration * ? "
+        "ORDER BY watched_at DESC LIMIT ?",
+        (ratio, limit),
+    ).fetchall()
+    con.close()
+    return [dict(r) for r in rows]
+
+
+# ---- saved (watch-later / bookmarks, cross-platform) ----
+
+def add_saved(item):
+    con = connect()
+    with con:
+        con.execute(
+            "INSERT INTO saved (platform, item_id, payload, saved_at) VALUES (?, ?, ?, ?) "
+            "ON CONFLICT(item_id) DO UPDATE SET payload=excluded.payload",
+            (item.get("platform"), item.get("id"), json.dumps(item), int(time.time())),
+        )
+    con.close()
+
+
+def remove_saved(item_id):
+    con = connect()
+    with con:
+        cur = con.execute("DELETE FROM saved WHERE item_id=?", (item_id,))
+        n = cur.rowcount
+    con.close()
+    return n
+
+
+def list_saved(platform=None, limit=500):
+    con = connect()
+    if platform:
+        rows = con.execute(
+            "SELECT payload FROM saved WHERE platform=? ORDER BY saved_at DESC LIMIT ?",
+            (platform, limit),
+        ).fetchall()
+    else:
+        rows = con.execute(
+            "SELECT payload FROM saved ORDER BY saved_at DESC LIMIT ?", (limit,)
+        ).fetchall()
+    con.close()
+    return [json.loads(r["payload"]) for r in rows]
 
 
 # ---- oauth ----

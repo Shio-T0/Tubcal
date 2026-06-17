@@ -142,6 +142,39 @@ a.title:hover {
   pointer-events: none;
 }
 
+.barMute {
+  flex: none;
+  display: grid;
+  place-items: center;
+  color: var(--text-muted);
+}
+
+/* Seek bar pinned across the bottom of the video. */
+.scrub {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 8px;
+  display: flex;
+  align-items: flex-end;
+  background: linear-gradient(to top, rgba(8, 6, 4, 0.5), transparent);
+  cursor: pointer;
+  z-index: 3;
+}
+
+.scrub:hover {
+  height: 12px;
+}
+
+.scrubFill {
+  height: 4px;
+  width: 0;
+  background: var(--c-youtube);
+  box-shadow: 0 0 8px rgba(255, 66, 66, 0.6);
+  pointer-events: none;
+}
+
 .meta {
   display: flex;
   align-items: center;

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { KeyRound, Minus, Palette, Plus, Settings, Trash2, Rss } from 'lucide-react';
+import { KeyRound, Minus, Palette, Plus, Settings, Trash2, Rss, Volume2 } from 'lucide-react';
 
 import { api, useApi } from '../api/client.js';
 import { SectionHead } from '../components/layout/Section.jsx';
@@ -268,6 +268,29 @@ export default function SettingsPage() {
             <WeightStepper label="YouTube" value={weights.youtube ?? 2} onChange={(v) => setWeight('youtube', v)} />
             <WeightStepper label="Reddit" value={weights.reddit ?? 2} onChange={(v) => setWeight('reddit', v)} />
             <WeightStepper label="Hacker News" value={weights.hackernews ?? 1} onChange={(v) => setWeight('hackernews', v)} />
+          </div>
+        </section>
+
+        <section className={`${s.section} glass`}>
+          <h2 className={s.sectionTitle}>
+            <Volume2 size={17} /> Playback
+          </h2>
+          <div className={s.row}>
+            <div>
+              <div className={s.rowLabel}>Audio focus</div>
+              <div className={s.rowHint}>
+                Solo keeps sound on the video you're watching and mutes the rest of the corner
+                stack. Mix lets every mini-player play at once.
+              </div>
+            </div>
+            <SegmentedControl
+              options={[
+                { value: 'solo', label: 'Solo' },
+                { value: 'mix', label: 'Mix' },
+              ]}
+              value={settings?.solo_audio === false ? 'mix' : 'solo'}
+              onChange={(v) => updateSettings({ solo_audio: v === 'solo' })}
+            />
           </div>
         </section>
 

@@ -12,6 +12,86 @@ from . import db
 
 _mem = {}
 _lock = threading.Lock()
+_refreshing = set()
+
+
+def _store(key, payload, now, ttl):
+    entry = {"payload": payload, "fetched_at": now}
+    with _lock:
+        _mem[key] = entry
+    con = db.connect()
+    with con:
+        con.execute(
+            "INSERT INTO cache (key, payload, fetched_at, ttl) VALUES (?, ?, ?, ?) "
+            "ON CONFLICT(key) DO UPDATE SET payload=excluded.payload, "
+            "fetched_at=excluded.fetched_at, ttl=excluded.ttl",
+            (key, json.dumps(payload), int(now), ttl),
+        )
+    con.close()
+    return entry
+
+
+def _load_entry(key):
+    with _lock:
+        entry = _mem.get(key)
+    if entry is not None:
+        return entry
+    con = db.connect()
+    row = con.execute("SELECT payload, fetched_at FROM cache WHERE key=?", (key,)).fetchone()
+    con.close()
+    if row:
+        entry = {"payload": json.loads(row["payload"]), "fetched_at": row["fetched_at"]}
+        with _lock:
+            _mem[key] = entry
+        return entry
+    return None
+
+
+def cached_swr(key, ttl, fetcher):
+    """Stale-while-revalidate. Always returns instantly when *any* cached value
+    exists (even expired), kicking off a background refresh when it's stale.
+    Only blocks on a genuinely cold cache. Returns (payload, stale).
+
+    Use for expensive, non-critical-to-be-fresh payloads (e.g. the discover
+    shelf) so the page paints immediately instead of waiting on upstream calls.
+    """
+    now = time.time()
+    entry = _load_entry(key)
+
+    if entry is None:
+        payload = fetcher()  # cold — nothing to serve, must wait
+        _store(key, payload, now, ttl)
+        return payload, False
+
+    stale = now - entry["fetched_at"] >= ttl
+    if stale:
+        _refresh_async(key, ttl, fetcher)
+    return entry["payload"], stale
+
+
+def _refresh_async(key, ttl, fetcher):
+    with _lock:
+        if key in _refreshing:
+            return
+        _refreshing.add(key)
+
+    def run():
+        try:
+            _store(key, fetcher(), time.time(), ttl)
+        except Exception:
+            pass  # keep serving the stale value
+        finally:
+            with _lock:
+                _refreshing.discard(key)
+
+    threading.Thread(target=run, daemon=True).start()
+
+
+def warm(key, ttl, fetcher):
+    """Prime a key in the background if it's missing or stale (used at startup)."""
+    entry = _load_entry(key)
+    if entry is None or time.time() - entry["fetched_at"] >= ttl:
+        _refresh_async(key, ttl, fetcher)
 
 
 def cached(key, ttl, fetcher):

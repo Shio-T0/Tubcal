@@ -1,4 +1,4 @@
-import { Moon, Settings, Sun } from 'lucide-react';
+import { Bookmark, Moon, Settings, Sun } from 'lucide-react';
 import { NavLink, useLocation } from 'react-router-dom';
 
 import { useSettings } from '../../state.jsx';
@@ -45,6 +45,13 @@ export default function Masthead() {
           >
             {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
           </button>
+          <NavLink
+            to="/saved"
+            className={`${s.actionBtn} ${pathname === '/saved' ? s.actionActive : ''}`}
+            title="Saved"
+          >
+            <Bookmark size={16} />
+          </NavLink>
           <NavLink
             to="/settings"
             className={`${s.actionBtn} ${pathname === '/settings' ? s.actionActive : ''}`}

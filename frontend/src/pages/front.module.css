@@ -1,6 +1,7 @@
 /* Front Page — newspaper lede + ruled columns */
 
 .lede {
+  position: relative;
   display: grid;
   grid-template-columns: 1.4fr 1fr;
   gap: var(--space-6);
@@ -11,6 +12,44 @@
   margin-bottom: var(--space-6);
   cursor: pointer;
   animation: fadeUp 0.5s ease 0.08s both;
+}
+
+/* Pinned Save button + YouTube watch-progress bars on the broadsheet. */
+.saveCorner {
+  position: absolute;
+  top: var(--space-4);
+  right: 0;
+}
+
+.colThumbWrap {
+  position: relative;
+  margin: var(--space-2) 0;
+}
+
+.colThumbWrap .colThumb {
+  margin: 0;
+}
+
+.ytProgress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 4px;
+  background: rgba(8, 6, 4, 0.55);
+  border-radius: 0 0 var(--r-card) var(--r-card);
+  overflow: hidden;
+}
+
+.ytProgressFill {
+  height: 100%;
+  background: var(--c-youtube);
+  box-shadow: 0 0 8px rgba(255, 66, 66, 0.6);
+}
+
+.ytProgressDone {
+  background: #3fb950;
+  box-shadow: 0 0 8px rgba(63, 185, 80, 0.6);
 }
 
 .ledeNoImage {
@@ -119,6 +158,7 @@
 }
 
 .colItem {
+  position: relative;
   break-inside: avoid;
   padding-bottom: var(--space-4);
   margin-bottom: var(--space-4);
@@ -145,6 +185,7 @@
   line-height: 1.28;
   transition: color 0.15s ease;
   margin-bottom: 5px;
+  padding-right: 30px;
 }
 
 .colItem:hover .colTitle {

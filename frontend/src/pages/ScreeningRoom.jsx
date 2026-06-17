@@ -24,6 +24,7 @@ import {
 } from '../components/layout/Section.jsx';
 import AddSubscriptionModal from '../components/modals/AddSubscriptionModal.jsx';
 import { Button, EmptyState, IconButton, SegmentedControl } from '../components/ui/index.jsx';
+import { TileActions } from '../components/ui/ItemActions.jsx';
 import { timeAgo } from '../lib/time.js';
 import { COMPLETE_RATIO, usePlayer, useProgress, useSubscriptions, useToast } from '../state.jsx';
 import s from './screening.module.css';
@@ -52,7 +53,19 @@ export function VideoTile({ item, onPlay, meta }) {
   const ratio = p && p.duration ? Math.min(1, p.position / p.duration) : 0;
   const done = ratio >= COMPLETE_RATIO;
   return (
-    <div className={s.tile} onClick={() => onPlay(item)}>
+    <div
+      className={s.tile}
+      onClick={() => onPlay(item)}
+      data-kbd-tile
+      tabIndex={0}
+      role="button"
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onPlay(item);
+        }
+      }}
+    >
       <div className={s.tileThumbWrap}>
         <img className={s.tileThumb} src={item.thumbnail} alt="" loading="lazy" />
         <div className={s.tilePlay}>
@@ -60,6 +73,7 @@ export function VideoTile({ item, onPlay, meta }) {
             <Play size={18} fill="currentColor" />
           </span>
         </div>
+        <TileActions item={item} watched />
         {ratio > 0 && (
           <div className={s.tileProgress} title={done ? 'Watched' : `${Math.round(ratio * 100)}% watched`}>
             <div
@@ -152,6 +166,8 @@ export default function ScreeningRoom() {
   // Always live — the "random video" pool from Invidious trending/popular, so the
   // home is populated even with zero subscriptions.
   const trending = useApi('/youtube/trending');
+  // Half-watched videos to pick back up (from local history + progress).
+  const continueWatching = useApi('/youtube/continue');
 
   // Real YouTube-wide search via Invidious (debounced), not just a local filter.
   const q = query.trim();
@@ -168,6 +184,7 @@ export default function ScreeningRoom() {
     feed.reload();
     discover.reload();
     trending.reload();
+    continueWatching.reload();
   };
 
   const items = feed.data?.items || [];
@@ -187,6 +204,7 @@ export default function ScreeningRoom() {
       .filter((x) => x.items.length > 0);
   }, [items, subs.youtube, searching]);
 
+  const resumable = searching ? [] : (continueWatching.data?.items || []).slice(0, 12);
   const projection = (discover.data?.items || []).filter((i) => i.id !== hero?.id).slice(0, 12);
   const random = (trending.data?.items || []).filter((i) => i.id !== hero?.id).slice(0, 12);
 
@@ -282,6 +300,17 @@ export default function ScreeningRoom() {
             </span>
           </div>
         </div>
+      )}
+
+      {resumable.length > 0 && (
+        <Shelf
+          title="Continue watching"
+          count={null}
+          items={resumable}
+          onPlay={setVideo}
+          allTo="/youtube/history"
+          className={s.projection}
+        />
       )}
 
       {!searching && projection.length > 0 && (

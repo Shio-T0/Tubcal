@@ -6,10 +6,28 @@ import { ErrorBox, Receiving, SectionHead } from '../components/layout/Section.j
 import HNCommentsPanel from '../components/modals/HNCommentsPanel.jsx';
 import RedditPostModal from '../components/modals/RedditPostModal.jsx';
 import { IconButton } from '../components/ui/index.jsx';
+import { SaveButton } from '../components/ui/ItemActions.jsx';
 import { compact } from '../lib/format.js';
 import { timeAgo } from '../lib/time.js';
-import { usePlayer } from '../state.jsx';
+import { COMPLETE_RATIO, useProgress, usePlayer } from '../state.jsx';
 import s from './front.module.css';
+
+// Thin watch-progress bar for YouTube items (matches the Screening Room tiles).
+function ProgressBar({ item }) {
+  const { progress } = useProgress();
+  const p = progress[item.id];
+  const ratio = p && p.duration ? Math.min(1, p.position / p.duration) : 0;
+  if (ratio <= 0) return null;
+  const done = ratio >= COMPLETE_RATIO;
+  return (
+    <div className={s.ytProgress}>
+      <div
+        className={`${s.ytProgressFill} ${done ? s.ytProgressDone : ''}`}
+        style={{ width: `${done ? 100 : Math.max(3, ratio * 100)}%` }}
+      />
+    </div>
+  );
+}
 
 const PLATFORM = {
   youtube: { color: 'var(--c-youtube)', tag: 'Screening Room' },
@@ -90,8 +108,10 @@ export default function FrontPage() {
                   </span>
                 </div>
               )}
+              {lede.platform === 'youtube' && <ProgressBar item={lede} />}
             </div>
           )}
+          <SaveButton item={lede} className={s.saveCorner} />
         </article>
       )}
 
@@ -104,9 +124,13 @@ export default function FrontPage() {
             onClick={() => open(item)}
           >
             <span className={s.colTag}>{PLATFORM[item.platform].tag}</span>
+            <SaveButton item={item} className={s.saveCorner} />
             <h3 className={s.colTitle}>{item.title}</h3>
             {item.platform === 'youtube' && item.thumbnail && (
-              <img className={s.colThumb} src={item.thumbnail} alt="" loading="lazy" />
+              <div className={s.colThumbWrap}>
+                <img className={s.colThumb} src={item.thumbnail} alt="" loading="lazy" />
+                <ProgressBar item={item} />
+              </div>
             )}
             <span className={s.colMeta}>{itemMeta(item)}</span>
           </article>

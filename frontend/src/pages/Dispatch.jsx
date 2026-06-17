@@ -7,6 +7,7 @@ import { chipStyles as c, ErrorBox, Receiving, SearchBar, SectionHead, useDeboun
 import AddSubscriptionModal from '../components/modals/AddSubscriptionModal.jsx';
 import RedditPostModal from '../components/modals/RedditPostModal.jsx';
 import { Button, EmptyState, IconButton, SegmentedControl } from '../components/ui/index.jsx';
+import { SaveButton } from '../components/ui/ItemActions.jsx';
 import { compact } from '../lib/format.js';
 import { timeAgo } from '../lib/time.js';
 import { useSettings, useSubscriptions } from '../state.jsx';
@@ -51,6 +52,9 @@ function Entry({ item, index, lead, onOpen }) {
             </span>
           )}
           <span className={s.stat}>read thread →</span>
+          <span style={{ marginLeft: 'auto', position: 'relative' }}>
+            <SaveButton item={item} />
+          </span>
         </div>
       </div>
       {lead && thumb && <img className={s.leadThumb} src={thumb} alt="" loading="lazy" />}

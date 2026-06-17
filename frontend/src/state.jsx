@@ -8,12 +8,14 @@ const SettingsCtx = createContext(null);
 const SubsCtx = createContext(null);
 const PlayerCtx = createContext(null);
 const ProgressCtx = createContext(null);
+const SavedCtx = createContext(null);
 
 export const useToast = () => useContext(ToastCtx);
 export const useSettings = () => useContext(SettingsCtx);
 export const useSubscriptions = () => useContext(SubsCtx);
 export const usePlayer = () => useContext(PlayerCtx);
 export const useProgress = () => useContext(ProgressCtx);
+export const useSaved = () => useContext(SavedCtx);
 
 // A video counts as "finished" once you're within the last 5% of it.
 export const COMPLETE_RATIO = 0.95;
@@ -71,6 +73,12 @@ export function AppProviders({ children }) {
   // Reordering and minimizing only change styling/coordinates, never DOM order,
   // so the iframes keep playing.
   const [pstate, setPstate] = useState({ players: [], expandedId: null, order: [] });
+  // Up-next queue; a finished expanded video auto-advances to the next item.
+  const [queue, setQueue] = useState([]);
+  const expandedRef = useRef(null);
+  useEffect(() => {
+    expandedRef.current = pstate.expandedId;
+  }, [pstate.expandedId]);
 
   const openVideo = useCallback((item) => {
     if (!item) return;
@@ -142,6 +150,38 @@ export function AppProviders({ children }) {
     });
   }, []);
 
+  // Add a video to the up-next queue without interrupting what's playing.
+  const enqueueVideo = useCallback((item) => {
+    if (!item) return;
+    setQueue((q) => (q.some((x) => x.id === item.id) ? q : [...q, item]));
+  }, []);
+
+  const dequeueVideo = useCallback((id) => {
+    setQueue((q) => q.filter((x) => x.id !== id));
+  }, []);
+
+  // Called when a video reaches its end. Remove it; if it was the one you were
+  // actually watching, auto-advance into the next queued video.
+  const endedVideo = useCallback(
+    (id) => {
+      const wasExpanded = expandedRef.current === id;
+      setPstate((st) => ({
+        players: st.players.filter((x) => x.id !== id),
+        order: st.order.filter((x) => x !== id),
+        expandedId: st.expandedId === id ? null : st.expandedId,
+      }));
+      if (wasExpanded) {
+        setQueue((q) => {
+          if (!q.length) return q;
+          const [next, ...rest] = q;
+          setTimeout(() => openVideo(next), 0);
+          return rest;
+        });
+      }
+    },
+    [openVideo],
+  );
+
   // Playback progress for every video, keyed by item id. Loaded once from the
   // server, then kept live as videos play so resume + tile progress bars work
   // anywhere the same video appears.
@@ -185,18 +225,66 @@ export function AppProviders({ children }) {
     }).catch(() => {});
   }, []);
 
-  const progressApi = { progress, writeProgress, flushProgress };
+  // Manually mark a video watched / unwatched (updates the bar everywhere).
+  const markWatched = useCallback((item, watched) => {
+    if (!item?.id) return;
+    setProgressMap((p) => {
+      const next = { ...p };
+      if (watched) next[item.id] = { position: 1, duration: 1 };
+      else delete next[item.id];
+      return next;
+    });
+    api('/history/mark', {
+      method: 'POST',
+      body: JSON.stringify({ item, watched }),
+    }).catch(() => {});
+  }, []);
+
+  const progressApi = { progress, writeProgress, flushProgress, markWatched };
+
+  // Saved / watch-later, keyed by item id (value = the full item for rendering).
+  const [saved, setSaved] = useState({});
+  useEffect(() => {
+    api('/saved')
+      .then((d) => {
+        const m = {};
+        (d?.items || []).forEach((it) => {
+          m[it.id] = it;
+        });
+        setSaved(m);
+      })
+      .catch(() => {});
+  }, []);
+  const toggleSaved = useCallback((item) => {
+    if (!item?.id) return;
+    setSaved((prev) => {
+      const next = { ...prev };
+      if (next[item.id]) {
+        delete next[item.id];
+        api(`/saved/${encodeURIComponent(item.id)}`, { method: 'DELETE' }).catch(() => {});
+      } else {
+        next[item.id] = item;
+        api('/saved', { method: 'POST', body: JSON.stringify({ item }) }).catch(() => {});
+      }
+      return next;
+    });
+  }, []);
+  const savedApi = { saved, toggleSaved };
 
   const player = {
     players: pstate.players,
     expandedId: pstate.expandedId,
     order: pstate.order,
+    queue,
     open: openVideo,
     close: closeVideo,
     minimize: minimizeVideo,
     undock: undockVideo,
     expandFromDock: expandVideo,
     reorder: reorderDocked,
+    enqueue: enqueueVideo,
+    dequeue: dequeueVideo,
+    ended: endedVideo,
   };
 
   return (
@@ -205,8 +293,10 @@ export function AppProviders({ children }) {
         <SubsCtx.Provider value={{ subs, refreshSubs }}>
           <PlayerCtx.Provider value={player}>
             <ProgressCtx.Provider value={progressApi}>
-              {children}
-              <ToastStack toasts={toasts} />
+              <SavedCtx.Provider value={savedApi}>
+                {children}
+                <ToastStack toasts={toasts} />
+              </SavedCtx.Provider>
             </ProgressCtx.Provider>
           </PlayerCtx.Provider>
         </SubsCtx.Provider>
