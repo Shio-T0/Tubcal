@@ -4,6 +4,7 @@ import { KeyRound, Minus, Palette, Plus, Settings, Trash2, Rss, Volume2 } from '
 
 import { api, useApi } from '../api/client.js';
 import { SectionHead } from '../components/layout/Section.jsx';
+import { Avatar } from '../components/ui/Avatar.jsx';
 import AddSubscriptionModal from '../components/modals/AddSubscriptionModal.jsx';
 import { Button, SegmentedControl } from '../components/ui/index.jsx';
 import { useSettings, useSubscriptions, useToast } from '../state.jsx';
@@ -48,13 +49,12 @@ function SubscriptionRows({ group }) {
       {rows.length === 0 && <div className={s.rowHint} style={{ padding: '8px 0' }}>None yet.</div>}
       {rows.map((row) => (
         <div key={row.id} className={s.subRow}>
-          {row.thumbnail ? (
-            <img className={s.subRowAvatar} src={row.thumbnail} alt="" />
-          ) : (
-            <span className={s.subRowAvatarLetter}>
-              {row.display_name.replace(/^r\//, '').charAt(0).toUpperCase()}
-            </span>
-          )}
+          <Avatar
+            src={row.thumbnail}
+            name={row.display_name}
+            imgClass={s.subRowAvatar}
+            letterClass={s.subRowAvatarLetter}
+          />
           <span className={s.subRowName}>{row.display_name}</span>
           <button className={s.removeBtn} onClick={() => remove(row)} title="Remove">
             <Trash2 size={15} />

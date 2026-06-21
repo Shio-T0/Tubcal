@@ -1,6 +1,9 @@
 import calendar
+import json
 import random
 import re
+import shutil
+import subprocess
 import time
 from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import quote
@@ -27,6 +30,11 @@ _EXTRACT_PATTERNS = (
 # the "reject all" cookie; without it channel pages never render.
 _CONSENT_COOKIE = "SOCS=CAI; CONSENT=YES+"
 
+# A full SOCS consent token (vs the bare SOCS=CAI) — empirically YouTube serves
+# twice as many playlist continuation pages with it (200 vs 100 items) before it
+# cuts off logged-out pagination. Used only for the yt-dlp playlist fetch.
+_CONSENT_COOKIE_FULL = "SOCS=CAISNggQEitib3FfaWRlbnRpdHlmcm9udGVuZF8yMDI0MDEwOQ"
+
 
 def _handle_from_input(raw):
     handle = raw.strip().lstrip("/")
@@ -36,6 +44,21 @@ def _handle_from_input(raw):
     handle = handle.strip("/").lstrip("@")
     handle = handle.split("/")[0].split("?")[0]
     return handle
+
+
+def fetch_channel_avatar(channel_id):
+    """Scrape a channel's avatar (og:image) from its page. Key-free; returns
+    None on any failure. Used when we resolve by raw channel id / URL, where the
+    RSS feed carries no avatar — that's why those subs fell back to a letter."""
+    try:
+        html = httpc.get(
+            f"https://www.youtube.com/channel/{channel_id}",
+            headers={"Accept-Language": "en-US,en;q=0.9", "Cookie": _CONSENT_COOKIE},
+        ).text
+    except Exception:
+        return None
+    m = re.search(r'property="og:image" content="([^"]+)"', html)
+    return m.group(1) if m else None
 
 
 def resolve_channel(raw):
@@ -81,6 +104,10 @@ def resolve_channel(raw):
         raise LookupError(f"Channel {channel_id} has no public video feed")
     parsed = feedparser.parse(rss)
     title = parsed.feed.get("title") or channel_id
+    # The id / URL path never scraped the page, so it had no avatar; also covers
+    # the rare case the handle page didn't expose og:image.
+    if not thumbnail:
+        thumbnail = fetch_channel_avatar(channel_id)
     return {"channel_id": channel_id, "title": title, "thumbnail": thumbnail}
 
 
@@ -181,6 +208,263 @@ def search_channel(channel_id, query):
     return {"items": items, "stale": True}
 
 
+def _collect_streams(data, is_live):
+    """Pick the muxed (audio+video) renditions playable in our player.
+
+      - "mp4"  progressive https mp4 — a plain <video src> (only itag 18 / 360p);
+      - "hls"  m3u8 renditions up to 1080p — needs hls.js + segment proxying.
+    We keep progressive 360p as the floor and HLS only above it, so the quality
+    list has no duplicate 360p and tops out at the best HLS rendition. For a live
+    broadcast YouTube only exposes HLS, so we keep every muxed m3u8 rung.
+    """
+    streams = []
+    for f in data.get("formats", []):
+        if f.get("vcodec") in (None, "none") or f.get("acodec") in (None, "none"):
+            continue
+        if not f.get("url"):
+            continue
+        proto = f.get("protocol") or ""
+        h = f.get("height") or 0
+        if proto.startswith("m3u8") and (h > 360 or is_live):
+            kind = "hls"
+        elif proto.startswith("http") and f.get("ext") == "mp4":
+            kind = "mp4"
+        else:
+            continue
+        streams.append({
+            "url": f["url"],
+            "quality": f"{h}p" if h else (f.get("format_note") or ""),
+            "itag": str(f.get("format_id")),
+            "kind": kind,
+            "type": "video/mp4",
+            "height": h,
+        })
+    streams.sort(key=lambda s: s["height"], reverse=True)
+    for s in streams:
+        s.pop("height", None)
+    return streams
+
+
+def _ytdlp_info(video_id):
+    """Resolve everything about one video with a single yt-dlp call: playable
+    muxed streams *and* the metadata the player panel needs (description, view
+    count, live/upcoming status + scheduled start).
+
+    Uses the *system* yt-dlp binary on purpose: it's updated via the package
+    manager, which matters because YouTube extraction breaks often and a pinned
+    dependency would rot. yt-dlp also descrambles YouTube's signature/`n`
+    parameter, so its stream URLs actually serve (Invidious' raw URLs 403).
+    """
+    exe = shutil.which("yt-dlp")
+    if not exe:
+        raise RuntimeError("yt-dlp not installed")
+    url = f"https://www.youtube.com/watch?v={video_id}"
+    # --ignore-no-formats-error: a scheduled premiere/stream has no formats yet and
+    # yt-dlp would otherwise abort ("Premieres in N hours") with no JSON — we still
+    # want its metadata (live_status=is_upcoming + release_timestamp).
+    proc = subprocess.run(
+        [exe, "-J", "--no-warnings", "--no-playlist", "--ignore-no-formats-error", url],
+        capture_output=True, text=True, timeout=60,
+    )
+    if proc.returncode != 0 or not proc.stdout.strip():
+        raise RuntimeError(f"yt-dlp failed: {(proc.stderr or '').strip()[:200]}")
+    data = json.loads(proc.stdout)
+
+    # live_status ∈ {is_live, is_upcoming, was_live, post_live, not_live, None}
+    live_status = data.get("live_status")
+    is_live = live_status == "is_live"
+    streams = _collect_streams(data, is_live)
+    # A finished/normal video with no stream is a real failure; an upcoming one
+    # legitimately has none yet, so don't treat that as an error.
+    if not streams and live_status != "is_upcoming":
+        raise RuntimeError("no playable muxed stream")
+    return {
+        "video_id": video_id,
+        "title": data.get("title", ""),
+        "description": data.get("description") or "",
+        "author": data.get("uploader") or data.get("channel") or "",
+        "channel_id": data.get("channel_id"),
+        "duration": data.get("duration"),
+        "view_count": data.get("view_count") or data.get("concurrent_view_count"),
+        "like_count": data.get("like_count"),
+        "live_status": live_status,
+        "scheduled_at": data.get("release_timestamp"),
+        "streams": streams,
+    }
+
+
+def video_info(video_id):
+    """Full metadata + playable streams for one video.
+
+    yt-dlp first (reliable), Invidious as a last resort. Cached briefly since the
+    googlevideo stream URLs carry a short-lived `expire`."""
+    from . import invidious
+
+    def fetch():
+        try:
+            return _ytdlp_info(video_id)
+        except Exception:
+            inv = invidious.video_streams(video_id)  # streams + title + duration
+            return {
+                "video_id": video_id,
+                "title": inv.get("title", ""),
+                "description": "",
+                "author": "",
+                "channel_id": None,
+                "duration": inv.get("duration"),
+                "view_count": None,
+                "like_count": None,
+                "live_status": None,
+                "scheduled_at": None,
+                "streams": inv.get("streams") or [],
+            }
+
+    payload, _ = cache.cached(f"yt:info:{video_id}", 1800, fetch)
+    return payload
+
+
+def video_streams(video_id):
+    """Playable stream URLs for one video (a slice of video_info)."""
+    info = video_info(video_id)
+    return {
+        "video_id": info["video_id"],
+        "title": info.get("title", ""),
+        "duration": info.get("duration"),
+        "streams": info.get("streams") or [],
+    }
+
+
+def video_comments(video_id):
+    """Top-level comments for a video (Invidious). Best-effort: empty on failure."""
+    from . import invidious
+
+    try:
+        return invidious.comments(video_id)
+    except Exception:
+        return {"comments": [], "disabled": False}
+
+
+def _ytdlp_flat_tab(channel_id, tab, limit=12):
+    """Video ids on one of a channel's tabs that have NO duration — i.e. live or
+    upcoming (a finished video always carries a duration in the flat listing).
+    Best-effort: [] on any failure."""
+    exe = shutil.which("yt-dlp")
+    if not exe:
+        return []
+    url = f"https://www.youtube.com/channel/{channel_id}{tab}"
+    try:
+        proc = subprocess.run(
+            [exe, "-J", "--flat-playlist", "--no-warnings", "--playlist-end", str(limit), url],
+            capture_output=True, text=True, timeout=60,
+        )
+        if proc.returncode != 0 or not proc.stdout.strip():
+            return []
+        data = json.loads(proc.stdout)
+    except Exception:
+        return []
+    return [
+        e["id"]
+        for e in (data.get("entries") or [])
+        if e.get("id") and not e.get("duration")
+    ]
+
+
+def _channel_candidates(channel_id):
+    """Candidate live/upcoming video ids for a channel: flat-playlist its Videos
+    and Streams tabs (premieres land in Videos, scheduled streams in Streams),
+    keeping the duration-less entries, plus anything Invidious flags. Cached."""
+    from . import invidious
+
+    def fetch():
+        ids = set()
+        for tab in ("/videos", "/streams"):
+            ids.update(_ytdlp_flat_tab(channel_id, tab))
+        try:
+            for item in invidious.channel_live_upcoming(channel_id):
+                ids.add(item["extra"]["video_id"])
+        except Exception:
+            pass
+        return list(ids)
+
+    try:
+        ids, _ = cache.cached(f"yt:cand:{channel_id}", 300, fetch)
+        return ids
+    except Exception:
+        return []
+
+
+def _info_to_live_item(info):
+    """A feed item built straight from yt-dlp video_info (no Invidious needed)."""
+    vid = info["video_id"]
+    author = info.get("author", "")
+    return {
+        "id": f"yt:{vid}",
+        "platform": "youtube",
+        "title": info.get("title", ""),
+        "url": f"https://www.youtube.com/watch?v={vid}",
+        "thumbnail": f"https://i.ytimg.com/vi/{vid}/hqdefault.jpg",
+        "author": author,
+        "source": author,
+        "published_at": 0,
+        "score": info.get("view_count"),
+        "comments_count": None,
+        "extra": {
+            "video_id": vid,
+            "channel_id": info.get("channel_id"),
+            "description": "",
+            "live_status": info.get("live_status"),
+            "scheduled_at": info.get("scheduled_at") or 0,
+        },
+    }
+
+
+def get_live_and_upcoming(channel_ids):
+    """Across the given channels, the streams that are live now or scheduled.
+
+    Two stages: cheaply discover candidate video ids per channel (duration-less
+    flat-playlist entries on the Videos/Streams tabs, plus Invidious), then yt-dlp
+    authoritatively confirms each one's status + real scheduled start. Anything
+    that turns out finished (was_live/post_live/not_live) is dropped. Live
+    broadcasts first, then upcoming sorted by soonest start.
+    """
+    if not channel_ids:
+        return {"items": [], "stale": False}
+    with ThreadPoolExecutor(max_workers=6) as ex:
+        cand_lists = list(ex.map(_channel_candidates, channel_ids))
+
+    vids, seen = [], set()
+    for lst in cand_lists:
+        for v in lst:
+            if v not in seen:
+                seen.add(v)
+                vids.append(v)
+    vids = vids[:24]  # bound the number of yt-dlp confirm calls
+
+    def confirm(vid):
+        try:
+            info = video_info(vid)
+        except Exception:
+            return None
+        if info.get("live_status") not in ("is_live", "is_upcoming"):
+            return None
+        return _info_to_live_item(info)
+
+    items = []
+    if vids:
+        with ThreadPoolExecutor(max_workers=4) as ex:
+            for r in ex.map(confirm, vids):
+                if r:
+                    items.append(r)
+
+    def sort_key(i):
+        if i["extra"].get("live_status") == "is_live":
+            return (0, 0)
+        return (1, i["extra"].get("scheduled_at") or 9_000_000_000)
+
+    items.sort(key=sort_key)
+    return {"items": items, "stale": False}
+
+
 def _playlist_items_rss(plid):
     rss = httpc.get(PLAYLIST_RSS_URL.format(plid)).text
     parsed = feedparser.parse(rss)
@@ -212,33 +496,82 @@ def _playlist_items_rss(plid):
     return title, items
 
 
-def get_playlist(plid):
-    """A playlist's videos. Prefer Invidious (full list); fall back to playlist
-    RSS (newest ~15) when the instance's companion can't serve playlist contents."""
-    from . import invidious
-
-    title, author, count = "", "", None
-    try:
-        pl = invidious.playlist(plid)
-        title, author, count = pl.get("title", ""), pl.get("author", ""), pl.get("video_count")
-        if pl.get("items"):
-            return {"title": title, "author": author, "video_count": count,
-                    "items": pl["items"], "stale": False}
-    except Exception:
-        pass
-
-    def fetch():
-        rss_title, items = _playlist_items_rss(plid)
-        return {"title": rss_title, "items": items}
-
-    payload, stale = cache.cached(f"yt:plrss:{plid}", config.TTL_YT_RSS, fetch)
+def _flat_entry_to_item(e):
+    """Normalize a yt-dlp --flat-playlist entry into our feed-item shape."""
+    vid = e.get("id")
+    author = e.get("channel") or e.get("uploader") or ""
     return {
-        "title": title or payload["title"],
+        "id": f"yt:{vid}",
+        "platform": "youtube",
+        "title": e.get("title") or "",
+        "url": f"https://www.youtube.com/watch?v={vid}",
+        "thumbnail": f"https://i.ytimg.com/vi/{vid}/hqdefault.jpg",
         "author": author,
-        "video_count": count,
-        "items": payload["items"],
-        "stale": stale,
+        "source": author,
+        "published_at": 0,  # flat playlist entries carry no publish date
+        "score": e.get("view_count"),
+        "comments_count": None,
+        "extra": {
+            "video_id": vid,
+            "channel_id": e.get("channel_id"),
+            "description": "",
+            "length_seconds": e.get("duration"),
+        },
     }
+
+
+def _ytdlp_playlist(plid):
+    """Full playlist contents via yt-dlp (flat = metadata only, fast).
+
+    This is the only source that returns the *whole* playlist — Invidious'
+    companion serves 0 videos and the playlist RSS only exposes the newest ~15.
+    Logged-out YouTube caps continuation pages (~200 items), which the full
+    consent token maximizes; we report the true total separately so the UI can
+    say "showing N of M"."""
+    exe = shutil.which("yt-dlp")
+    if not exe:
+        raise RuntimeError("yt-dlp not installed")
+    url = f"https://www.youtube.com/playlist?list={plid}"
+    proc = subprocess.run(
+        [exe, "-J", "--flat-playlist", "--no-warnings",
+         "--add-header", f"Cookie:{_CONSENT_COOKIE_FULL}", url],
+        capture_output=True, text=True, timeout=120,
+    )
+    if proc.returncode != 0:
+        raise RuntimeError(f"yt-dlp playlist failed: {(proc.stderr or '').strip()[:200]}")
+    data = json.loads(proc.stdout)
+    items = [_flat_entry_to_item(e) for e in (data.get("entries") or []) if e.get("id")]
+    if not items:
+        raise RuntimeError("yt-dlp returned no playlist entries")
+    return {
+        "title": data.get("title", ""),
+        "author": data.get("uploader") or data.get("channel") or "",
+        "video_count": data.get("playlist_count") or len(items),
+        "items": items,
+    }
+
+
+def get_playlist(plid):
+    """A playlist's videos. yt-dlp gives the full list (up to YouTube's logged-out
+    cap); Invidious then playlist RSS (~15) are fallbacks if yt-dlp is unavailable."""
+    def fetch():
+        try:
+            return _ytdlp_playlist(plid)
+        except Exception:
+            pass
+        from . import invidious
+        try:
+            pl = invidious.playlist(plid)
+            if pl.get("items"):
+                return {"title": pl.get("title", ""), "author": pl.get("author", ""),
+                        "video_count": pl.get("video_count"), "items": pl["items"]}
+        except Exception:
+            pass
+        rss_title, items = _playlist_items_rss(plid)
+        return {"title": rss_title, "author": "", "video_count": len(items), "items": items}
+
+    payload, stale = cache.cached(f"yt:pl:{plid}", config.TTL_YT_RSS, fetch)
+    return {**payload, "stale": stale}
 
 
 def get_discover(sub_channel_ids, history_rows, limit=40, region="US"):

@@ -270,12 +270,77 @@ def channel_search(channel_id, query):
     def fetch():
         data = _api_get(f"/channels/{channel_id}/search?q={quote(q)}")
         # This endpoint returns a bare list of mixed results.
-        return _normalize_list(data)
+        items = _normalize_list(data)
+        # A flaky instance can answer HTTP 200 with an empty list. Caching that
+        # would pin a false "no results" for the whole TTL (see channel_videos).
+        # If the raw response was empty too, treat it as a miss and raise so the
+        # next search re-fetches instead of serving the empty hole. A genuinely
+        # empty search (raw list had non-video results) is still cached.
+        if not items and not data:
+            raise RuntimeError("empty channel search result")
+        return items
 
     items, stale = cache.cached(
         f"yt:inv:chsearch:{channel_id}:{q.lower()}", config.TTL_YT_RSS, fetch
     )
     return {"items": items, "stale": stale}
+
+
+_QUALITY_ORDER = {"1080p": 4, "720p": 3, "480p": 2, "360p": 1, "240p": 0, "144p": -1}
+
+
+def video_streams(video_id):
+    """Resolve directly-playable muxed (audio+video) stream URLs for a video.
+
+    Returns mp4 `formatStreams` whose URLs point straight at YouTube's CDN
+    (googlevideo) — *not* the instance proxy. The proxied (`local=true`) variant
+    is dead on the instances that still serve metadata, but the direct URLs play
+    fine from the browser (googlevideo answers with `ipbypass=yes` despite the
+    instance's IP being baked in) and stream from Google's CDN, so playback is
+    fast and supports range requests for seeking. Only muxed formats work in a
+    bare <video> element — adaptive formats would need MSE/DASH wiring.
+
+    The URLs carry an `expire` (~6h), so we cache the resolved set only briefly.
+    Raises if no instance yields a muxed stream.
+    """
+    def fetch():
+        last_err = None
+        for base in _instances():
+            try:
+                resp = httpc.get(f"{base}/api/v1/videos/{video_id}", timeout=15)
+                data = resp.json()
+                if isinstance(data, dict) and data.get("error"):
+                    raise ValueError(data["error"])
+            except (requests.RequestException, ValueError) as e:
+                last_err = e
+                continue
+            streams = []
+            for f in data.get("formatStreams") or []:
+                url = f.get("url")
+                mime = f.get("type") or ""
+                # Only muxed mp4 plays in a plain <video>; skip webm/audio-only.
+                if not url or "video/mp4" not in mime:
+                    continue
+                label = f.get("qualityLabel") or f.get("quality") or ""
+                streams.append({
+                    "url": url,
+                    "quality": label,
+                    "itag": f.get("itag"),
+                    "kind": "mp4",
+                    "type": mime.split(";")[0].strip(),
+                })
+            if streams:
+                streams.sort(key=lambda s: _QUALITY_ORDER.get(s["quality"], -2), reverse=True)
+                return {
+                    "video_id": video_id,
+                    "title": data.get("title", ""),
+                    "duration": data.get("lengthSeconds"),
+                    "streams": streams,
+                }
+        raise RuntimeError(f"No playable stream for {video_id} ({last_err})")
+
+    payload, _ = cache.cached(f"yt:inv:streams:{video_id}", 1800, fetch)
+    return payload
 
 
 def _normalize_playlist_meta(p):
@@ -327,6 +392,73 @@ def playlist(plid):
 
     payload, _ = cache.cached(f"yt:inv:pl:{plid}", config.TTL_YT_RSS, fetch)
     return payload
+
+
+def comments(video_id):
+    """Top-level comments for a video, normalized to the CommentThread shape
+    (flat — no nested replies; the panel only shows the first layer)."""
+    def fetch():
+        data = _api_get(f"/comments/{video_id}?sort_by=top")
+        out = []
+        for c in data.get("comments") or []:
+            cid = c.get("commentId") or str(len(out))
+            out.append({
+                "id": cid,
+                "author": c.get("author", ""),
+                "author_thumb": (c.get("authorThumbnails") or [{}])[-1].get("url"),
+                "body_html": c.get("contentHtml") or "",
+                "score": c.get("likeCount"),
+                "created_at": _parse_published(c.get("published")),
+                "is_pinned": bool(c.get("isPinned")),
+                "depth": 0,
+                "children": [],
+            })
+        return {"comments": out, "disabled": False}
+
+    payload, _ = cache.cached(f"yt:inv:comments:{video_id}", config.TTL_HN_COMMENTS, fetch)
+    return payload
+
+
+def channel_live_upcoming(channel_id):
+    """Candidate live/scheduled streams for one channel (its Streams tab).
+
+    Best-effort: returns [] on any failure so one dead channel/instance never
+    breaks the whole 'Live & Upcoming' rail.
+
+    IMPORTANT: Invidious' own `isUpcoming` flag is unreliable — for some channels
+    it marks *every* past stream as upcoming (with premiereTimestamp 0). So we do
+    NOT trust it: a finished stream always has a real `lengthSeconds`, while a
+    live or genuinely-upcoming one has none yet. We gate on that, then let yt-dlp
+    confirm the true status + scheduled time downstream (see
+    youtube.get_live_and_upcoming). Each item carries a *provisional*
+    extra.live_status and extra.scheduled_at."""
+    def fetch():
+        out = []
+        try:
+            data = _api_get(f"/channels/{channel_id}/streams")
+        except Exception:
+            return out
+        for v in data.get("videos") or []:
+            if isinstance(v, dict) and v.get("type") not in (None, "video"):
+                continue
+            live = bool(v.get("liveNow"))
+            length = v.get("lengthSeconds") or 0
+            # Finished stream → has a duration → not a candidate.
+            if not live and length:
+                continue
+            n = _normalize(v)
+            if not n:
+                continue
+            n["extra"]["live_status"] = "is_live" if live else "is_upcoming"
+            n["extra"]["scheduled_at"] = v.get("premiereTimestamp") or 0
+            out.append(n)
+        return out
+
+    try:
+        items, _ = cache.cached(f"yt:inv:live:{channel_id}", 180, fetch)
+        return items
+    except Exception:
+        return []
 
 
 def random_pool(region="US", limit=40):

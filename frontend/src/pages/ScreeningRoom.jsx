@@ -3,12 +3,14 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft,
   ArrowRight,
+  CalendarClock,
   Clapperboard,
   History,
   ListVideo,
   Play,
   Plus,
   RefreshCw,
+  Radio,
   Shuffle,
   Trash2,
 } from 'lucide-react';
@@ -23,9 +25,10 @@ import {
   useDebounced,
 } from '../components/layout/Section.jsx';
 import AddSubscriptionModal from '../components/modals/AddSubscriptionModal.jsx';
+import { Avatar } from '../components/ui/Avatar.jsx';
 import { Button, EmptyState, IconButton, SegmentedControl } from '../components/ui/index.jsx';
 import { TileActions } from '../components/ui/ItemActions.jsx';
-import { timeAgo } from '../lib/time.js';
+import { formatWhen, timeAgo, timeUntil } from '../lib/time.js';
 import { COMPLETE_RATIO, usePlayer, useProgress, useSubscriptions, useToast } from '../state.jsx';
 import s from './screening.module.css';
 
@@ -45,6 +48,28 @@ export function ChannelLink({ item, className }) {
       {item.source}
     </Link>
   );
+}
+
+// LIVE / scheduled badge for a video tile, driven by extra.live_status set by
+// the live-and-upcoming endpoint. Returns null for ordinary videos.
+export function LiveBadge({ item }) {
+  const status = item.extra?.live_status;
+  if (status === 'is_live') {
+    return (
+      <span className={`${s.statusBadge} ${s.liveBadge}`}>
+        <Radio size={11} /> LIVE
+      </span>
+    );
+  }
+  if (status === 'is_upcoming') {
+    const at = item.extra?.scheduled_at;
+    return (
+      <span className={`${s.statusBadge} ${s.upcomingBadge}`} title={at ? formatWhen(at) : 'Scheduled'}>
+        <CalendarClock size={11} /> {at ? timeUntil(at) : 'Upcoming'}
+      </span>
+    );
+  }
+  return null;
 }
 
 export function VideoTile({ item, onPlay, meta }) {
@@ -73,6 +98,7 @@ export function VideoTile({ item, onPlay, meta }) {
             <Play size={18} fill="currentColor" />
           </span>
         </div>
+        <LiveBadge item={item} />
         <TileActions item={item} watched />
         {ratio > 0 && (
           <div className={s.tileProgress} title={done ? 'Watched' : `${Math.round(ratio * 100)}% watched`}>
@@ -133,11 +159,12 @@ function ChannelChips({ subs, onAdd, activeId }) {
           to={`/youtube/c/${sub.source_id}`}
           className={`${c.chip} ${activeId === sub.source_id ? c.chipActive : ''}`}
         >
-          {sub.thumbnail ? (
-            <img className={c.chipAvatar} src={sub.thumbnail} alt="" />
-          ) : (
-            <span className={c.chipLetter}>{sub.display_name.charAt(0).toUpperCase()}</span>
-          )}
+          <Avatar
+            src={sub.thumbnail}
+            name={sub.display_name}
+            imgClass={c.chipAvatar}
+            letterClass={c.chipLetter}
+          />
           {sub.display_name}
         </Link>
       ))}
@@ -162,6 +189,8 @@ export default function ScreeningRoom() {
   const enabled = source === 'account' || hasSubs;
 
   const feed = useApi(`/feed/youtube?source=${source}`, enabled);
+  // Live broadcasts + scheduled premieres across your channels.
+  const live = useApi('/youtube/live', hasSubs);
   const discover = useApi('/youtube/discover', hasSubs);
   // Always live — the "random video" pool from Invidious trending/popular, so the
   // home is populated even with zero subscriptions.
@@ -182,6 +211,7 @@ export default function ScreeningRoom() {
       /* best-effort */
     }
     feed.reload();
+    live.reload();
     discover.reload();
     trending.reload();
     continueWatching.reload();
@@ -204,6 +234,7 @@ export default function ScreeningRoom() {
       .filter((x) => x.items.length > 0);
   }, [items, subs.youtube, searching]);
 
+  const liveItems = searching ? [] : (live.data?.items || []);
   const resumable = searching ? [] : (continueWatching.data?.items || []).slice(0, 12);
   const projection = (discover.data?.items || []).filter((i) => i.id !== hero?.id).slice(0, 12);
   const random = (trending.data?.items || []).filter((i) => i.id !== hero?.id).slice(0, 12);
@@ -275,6 +306,16 @@ export default function ScreeningRoom() {
       {!searching && enabled && feed.error && <ErrorBox message={feed.error} />}
       {!searching && enabled && feed.loading && !feed.data && (
         <Receiving label="warming up the projector" />
+      )}
+
+      {liveItems.length > 0 && (
+        <Shelf
+          title="Live & Upcoming"
+          count={null}
+          items={liveItems}
+          onPlay={setVideo}
+          className={s.projection}
+        />
       )}
 
       {!searching && hero && (
@@ -488,11 +529,7 @@ export function ChannelPage() {
         <ArrowLeft size={13} /> back to the screening room
       </Link>
       <div className={s.channelHead}>
-        {sub?.thumbnail ? (
-          <img className={s.channelAvatar} src={sub.thumbnail} alt="" />
-        ) : (
-          <span className={s.channelLetter}>{name.charAt(0).toUpperCase()}</span>
-        )}
+        <Avatar src={sub?.thumbnail} name={name} imgClass={s.channelAvatar} letterClass={s.channelLetter} />
         <div>
           <span className="kicker" style={{ color: 'var(--c-youtube)' }}>
             Private screening
@@ -619,7 +656,7 @@ export function PlaylistPage() {
           <h1 className={s.channelName}>{title}</h1>
           {count != null && (
             <span className={s.plMeta}>
-              {count} videos{items.length < count ? ` · showing latest ${items.length}` : ''}
+              {count} videos{items.length < count ? ` · showing ${items.length}` : ''}
             </span>
           )}
         </div>

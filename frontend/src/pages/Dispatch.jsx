@@ -6,6 +6,7 @@ import { api, useApi } from '../api/client.js';
 import { chipStyles as c, ErrorBox, Receiving, SearchBar, SectionHead, useDebounced } from '../components/layout/Section.jsx';
 import AddSubscriptionModal from '../components/modals/AddSubscriptionModal.jsx';
 import RedditPostModal from '../components/modals/RedditPostModal.jsx';
+import { Avatar } from '../components/ui/Avatar.jsx';
 import { Button, EmptyState, IconButton, SegmentedControl } from '../components/ui/index.jsx';
 import { SaveButton } from '../components/ui/ItemActions.jsx';
 import { compact } from '../lib/format.js';
@@ -81,11 +82,12 @@ function SubChips({ subs, onAdd, activeSub }) {
           to={`/reddit/r/${sub.source_id}`}
           className={`${c.chip} ${activeSub === sub.source_id ? c.chipActive : ''}`}
         >
-          {sub.thumbnail ? (
-            <img className={c.chipAvatar} src={sub.thumbnail} alt="" />
-          ) : (
-            <span className={c.chipLetter}>{sub.source_id.charAt(0).toUpperCase()}</span>
-          )}
+          <Avatar
+            src={sub.thumbnail}
+            name={sub.source_id}
+            imgClass={c.chipAvatar}
+            letterClass={c.chipLetter}
+          />
           {sub.display_name}
         </Link>
       ))}

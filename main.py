@@ -1,4 +1,4 @@
-from server import cache, config, db
+from server import cache, config, db, notifier
 from server import create_app
 
 
@@ -15,10 +15,30 @@ def _warm_caches():
     cache.warm("yt:discover:US", config.TTL_YT_DISCOVER, discover)
 
 
+def _backfill_avatars():
+    """One-shot, in the background: fill in channel avatars for subscriptions
+    that were added by channel id (older builds stored no thumbnail for those)."""
+    import threading
+
+    from server.sources import youtube
+
+    def run():
+        for sub in db.list_subscriptions("youtube"):
+            if sub.get("thumbnail"):
+                continue
+            thumb = youtube.fetch_channel_avatar(sub["source_id"])
+            if thumb:
+                db.set_subscription_thumbnail(sub["id"], thumb)
+
+    threading.Thread(target=run, daemon=True).start()
+
+
 def main():
     db.init_db()
     app = create_app()
     _warm_caches()
+    _backfill_avatars()
+    notifier.start()
     print(f"\n  Tubcal — private social hub")
     print(f"  http://{config.HOST}:{config.PORT}\n")
     app.run(host=config.HOST, port=config.PORT, debug=False, threaded=True)

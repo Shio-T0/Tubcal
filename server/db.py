@@ -70,6 +70,8 @@ DEFAULT_SETTINGS = {
     # Player preferences.
     "solo_audio": True,   # only the focused video plays sound; others auto-mute
     "playback_rate": 1,   # remembered across videos
+    # Desktop notify-send 10 min before a subscribed channel goes live.
+    "notify_live": True,
 }
 
 
@@ -192,6 +194,13 @@ def add_subscription(platform, source_id, display_name, thumbnail):
     row = con.execute("SELECT * FROM subscriptions WHERE id=?", (rid,)).fetchone()
     con.close()
     return dict(row)
+
+
+def set_subscription_thumbnail(sub_id, thumbnail):
+    con = connect()
+    with con:
+        con.execute("UPDATE subscriptions SET thumbnail=? WHERE id=?", (thumbnail, sub_id))
+    con.close()
 
 
 def delete_subscription(sub_id):

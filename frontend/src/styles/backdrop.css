@@ -1,6 +1,7 @@
-/* Lamplit-den backdrop: a warm pool of light from above, a soft floor glow,
-   low paper grain, and a gentle vignette on warm walnut. Transform/opacity
-   only — calm and slow, like a lamp you forgot to turn off. */
+/* Shōwa-set backdrop: a warm amber phosphor glow like a wood-cabinet TV left
+   on in the corner, faint CRT scanlines, paper grain, and a screen-curve
+   vignette that rounds the edges into a glass tube. Sits behind the content
+   (z-index 0) so the scanlines stay ambient, never over text. */
 
 .backdrop {
   position: fixed;
@@ -10,7 +11,7 @@
   pointer-events: none;
 }
 
-/* the lamp — a soft amber pool spilling from the top of the page */
+/* the phosphor — a soft amber pool spilling from the top of the screen */
 .backdrop__lamp {
   position: absolute;
   width: 130vmax;
@@ -21,8 +22,8 @@
   border-radius: 50%;
   background: radial-gradient(
     ellipse at center,
-    rgba(226, 168, 92, 0.22) 0%,
-    rgba(226, 168, 92, 0.07) 34%,
+    rgba(230, 171, 94, 0.22) 0%,
+    rgba(230, 171, 94, 0.07) 34%,
     transparent 62%
   );
   opacity: var(--glow-strength);
@@ -30,7 +31,7 @@
   will-change: transform, opacity;
 }
 
-/* a dim cocoa warmth pooling along the bottom, grounding the room */
+/* a dim wood-warmth pooling along the bottom, grounding the room */
 .backdrop__floor {
   position: absolute;
   width: 150vmax;
@@ -41,8 +42,8 @@
   border-radius: 50%;
   background: radial-gradient(
     ellipse at center,
-    rgba(160, 96, 44, 0.1) 0%,
-    rgba(160, 96, 44, 0.03) 40%,
+    rgba(176, 96, 44, 0.1) 0%,
+    rgba(176, 96, 44, 0.03) 40%,
     transparent 66%
   );
   opacity: var(--glow-strength);
@@ -60,6 +61,25 @@
   }
 }
 
+/* CRT scanlines — thin horizontal lines, very faint */
+.backdrop__scan {
+  position: absolute;
+  inset: 0;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.16) 0px,
+    rgba(0, 0, 0, 0.16) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  opacity: 0.5;
+  mix-blend-mode: multiply;
+}
+
+[data-theme='light'] .backdrop__scan {
+  opacity: 0.22;
+}
+
 .backdrop__grain {
   position: absolute;
   inset: 0;
@@ -68,15 +88,16 @@
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
-/* soft vignette pulls focus to the reading column */
+/* screen-curve vignette: darkens all edges so the page reads like the face of
+   a slightly bulged picture tube */
 .backdrop__vignette {
   position: absolute;
   inset: 0;
-  background: radial-gradient(ellipse 120% 96% at 50% 4%, transparent 56%, rgba(12, 7, 3, 0.4) 100%);
+  background: radial-gradient(ellipse 128% 118% at 50% 46%, transparent 52%, rgba(10, 6, 2, 0.46) 100%);
 }
 
 [data-theme='light'] .backdrop__vignette {
-  background: radial-gradient(ellipse 120% 96% at 50% 4%, transparent 62%, rgba(120, 92, 54, 0.14) 100%);
+  background: radial-gradient(ellipse 128% 118% at 50% 46%, transparent 58%, rgba(120, 90, 52, 0.16) 100%);
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -1,49 +1,50 @@
-/* Tubcal — "Lamplit Den" design tokens.
-   Night Edition (default): walnut & espresso surfaces, parchment type, a single
-   honey-amber lamp. Day Edition: toasted-oat paper, cocoa ink, roasted amber.
-   Warm, low-contrast, soft-cornered — built to feel comfortable, not crisp. */
+/* Tubcal — "Shōwa Set" design tokens.
+   A 1970s Japanese living room at night: a warm wood-cabinet TV glowing amber
+   in the corner. Night Edition = kurocha (dark tea) wood + kinari (unbleached
+   cream) type + amber phosphor, with a persimmon (kaki) pop. Day Edition =
+   tatami daylight. Warm, low-contrast, soft-cornered. */
 
 :root {
-  /* canvas — warm browns, not neutral black */
-  --ink: #1a130c;
-  --ink-2: #221913;
-  --ink-3: #2b2017;
-  --paper: #efe3ce;
-  --paper-dim: #b9a888;
-  --paper-faint: #8a7860;
-  --rule: rgba(239, 227, 206, 0.12);
-  --rule-strong: rgba(239, 227, 206, 0.26);
+  /* canvas — warm wood browns (kurocha / kogecha / teak), never neutral */
+  --ink: #1c140d;
+  --ink-2: #251910;
+  --ink-3: #302114;
+  --paper: #e8d9b8;
+  --paper-dim: #b7a07c;
+  --paper-faint: #897053;
+  --rule: rgba(232, 217, 184, 0.12);
+  --rule-strong: rgba(232, 217, 184, 0.26);
   --bg-base: var(--ink);
-  --surface: rgba(239, 227, 206, 0.045);
-  --surface-hover: rgba(239, 227, 206, 0.085);
-  --surface-input: rgba(239, 227, 206, 0.06);
-  --backdrop: rgba(18, 12, 6, 0.78);
-  --shadow-modal: 0 28px 70px rgba(20, 12, 4, 0.62);
+  --surface: rgba(232, 217, 184, 0.045);
+  --surface-hover: rgba(232, 217, 184, 0.085);
+  --surface-input: rgba(232, 217, 184, 0.06);
+  --backdrop: rgba(16, 10, 5, 0.8);
+  --shadow-modal: 0 28px 70px rgba(16, 9, 3, 0.66);
   --glow-strength: 1;
-  --grain-opacity: 0.04;
+  --grain-opacity: 0.05;
 
-  /* signals — the lamp is honey amber; platforms are earthy, not neon */
-  --signal: #e2a85c;
-  --signal-soft: rgba(226, 168, 92, 0.16);
-  --c-youtube: #d65a44;
-  --c-reddit: #cf7b3c;
-  --c-hn: #d6a34a;
-  --c-foryou: #e2a85c;
-  --success: #9bbf7e;
-  --danger: #d9694f;
+  /* signals — amber phosphor lamp + persimmon pop; platforms earthy dyes */
+  --signal: #e6ab5e;
+  --signal-soft: rgba(230, 171, 94, 0.16);
+  --c-youtube: #c4503a;
+  --c-reddit: #cf7733;
+  --c-hn: #d3a24a;
+  --c-foryou: #e6ab5e;
+  --success: #9aae64;
+  --danger: #c75a44;
 
   /* aliases used across components */
   --text-primary: var(--paper);
   --text-secondary: var(--paper-dim);
   --text-muted: var(--paper-faint);
   --accent: var(--signal);
-  --accent-strong: #cf8a5a;
-  --accent-glow: rgba(226, 168, 92, 0.3);
+  --accent-strong: #c8643c;
+  --accent-glow: rgba(230, 171, 94, 0.32);
   --surface-glass: var(--surface);
   --surface-glass-hover: var(--surface-hover);
   --border-glass: var(--rule);
   --border-glass-strong: var(--rule-strong);
-  --shadow-card: 0 12px 34px rgba(20, 12, 4, 0.38);
+  --shadow-card: 0 12px 34px rgba(16, 9, 3, 0.4);
 
   /* type */
   --font-display: 'Fraunces Variable', georgia, serif;
@@ -60,47 +61,47 @@
   --space-7: 48px;
   --space-8: 64px;
 
-  /* radii — softened for a comfortable, tactile feel */
+  /* radii — soft, like a rounded CRT screen */
   --r-card: 14px;
-  --r-media: 14px;
+  --r-media: 16px;
   --r-modal: 18px;
   --r-pill: 999px;
   --r-input: 10px;
 
-  /* comment rails — all warm hues so threads stay cozy */
-  --rail-0: #e2a85c;
-  --rail-1: #d6a34a;
-  --rail-2: #9bbf7e;
-  --rail-3: #c98f6b;
-  --rail-4: #cf7b3c;
+  /* comment rails — warm dye family: persimmon, ochre, matcha, soot, terracotta */
+  --rail-0: #e6ab5e;
+  --rail-1: #d3a24a;
+  --rail-2: #9aae64;
+  --rail-3: #c8643c;
+  --rail-4: #cf7733;
 }
 
 [data-theme='light'] {
-  --ink: #ece1cd;
-  --ink-2: #e4d8c0;
-  --ink-3: #dccdb0;
-  --paper: #2a2017;
-  --paper-dim: #6b5c48;
-  --paper-faint: #9a8a72;
-  --rule: rgba(42, 32, 23, 0.16);
-  --rule-strong: rgba(42, 32, 23, 0.4);
-  --surface: rgba(42, 32, 23, 0.04);
-  --surface-hover: rgba(42, 32, 23, 0.075);
-  --surface-input: rgba(255, 250, 240, 0.6);
-  --backdrop: rgba(70, 52, 32, 0.42);
-  --shadow-modal: 0 28px 70px rgba(80, 58, 32, 0.3);
+  --ink: #e6d8bb;
+  --ink-2: #ddcdac;
+  --ink-3: #d3c19c;
+  --paper: #2a1d12;
+  --paper-dim: #6a5740;
+  --paper-faint: #978a6e;
+  --rule: rgba(42, 29, 18, 0.16);
+  --rule-strong: rgba(42, 29, 18, 0.4);
+  --surface: rgba(42, 29, 18, 0.04);
+  --surface-hover: rgba(42, 29, 18, 0.075);
+  --surface-input: rgba(255, 250, 238, 0.6);
+  --backdrop: rgba(74, 54, 32, 0.42);
+  --shadow-modal: 0 28px 70px rgba(82, 58, 30, 0.3);
   --glow-strength: 0.4;
-  --grain-opacity: 0.04;
+  --grain-opacity: 0.045;
 
-  --signal: #b9742f;
-  --signal-soft: rgba(185, 116, 47, 0.12);
-  --c-youtube: #c14a34;
+  --signal: #b06a26;
+  --signal-soft: rgba(176, 106, 38, 0.12);
+  --c-youtube: #b5402b;
   --c-reddit: #b4631f;
   --c-hn: #a8761f;
-  --success: #5a7d3f;
+  --success: #5e7338;
   --danger: #b3361f;
 
-  --accent-strong: #a85f2a;
-  --accent-glow: rgba(185, 116, 47, 0.22);
-  --shadow-card: 0 10px 28px rgba(90, 66, 38, 0.14);
+  --accent-strong: #b04a2e;
+  --accent-glow: rgba(176, 106, 38, 0.22);
+  --shadow-card: 0 10px 28px rgba(92, 64, 34, 0.14);
 }

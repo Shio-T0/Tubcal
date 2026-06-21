@@ -1,7 +1,11 @@
-from flask import Blueprint, request
+import base64
+import re
+from urllib.parse import urljoin, urlparse
+
+from flask import Blueprint, Response, request, stream_with_context
 
 from . import err, ok
-from .. import cache, config, db
+from .. import cache, config, db, httpc
 from ..sources import hackernews, invidious, mixer, reddit, youtube
 
 feeds_bp = Blueprint("feeds", __name__, url_prefix="/api")
@@ -155,12 +159,200 @@ def youtube_channel_search(channel_id):
         return err(f"Channel search failed: {e}", 502)
 
 
+@feeds_bp.get("/youtube/stream/<video_id>")
+def youtube_stream(video_id):
+    try:
+        return ok(youtube.video_streams(video_id))
+    except Exception as e:
+        return err(f"Stream resolve failed: {e}", 502)
+
+
+# Headers worth relaying from the upstream CDN response to the browser.
+_STREAM_PASS_HEADERS = ("Content-Type", "Content-Length", "Content-Range", "Accept-Ranges")
+
+
+def _fwd_headers():
+    h = {"User-Agent": config.BROWSER_UA}
+    if request.headers.get("Range"):
+        h["Range"] = request.headers["Range"]
+    return h
+
+
+def _relay(upstream, default_ct="application/octet-stream"):
+    """Stream an already-opened upstream response back to the browser, relaying
+    the headers a media element / hls.js cares about."""
+    def generate():
+        try:
+            for chunk in upstream.iter_content(chunk_size=65536):
+                if chunk:
+                    yield chunk
+        finally:
+            upstream.close()
+
+    headers = {k: upstream.headers[k] for k in _STREAM_PASS_HEADERS if k in upstream.headers}
+    headers.setdefault("Accept-Ranges", "bytes")
+    return Response(
+        stream_with_context(generate()),
+        status=upstream.status_code,
+        headers=headers,
+        content_type=upstream.headers.get("Content-Type", default_ct),
+    )
+
+
+def _find_stream(video_id, itag, kind=None):
+    data = youtube.video_streams(video_id)
+    streams = data.get("streams") or []
+    if kind:
+        streams = [s for s in streams if s.get("kind") == kind]
+    return next((s for s in streams if str(s.get("itag")) == str(itag)), None) or (
+        streams[0] if streams else None
+    )
+
+
+@feeds_bp.get("/youtube/stream/<video_id>/data")
+def youtube_stream_data(video_id):
+    """Proxy the progressive mp4 bytes through Flask.
+
+    The direct googlevideo URLs play under curl but a browser <video> element
+    refuses them (cross-origin redirect / IP-context quirks). Streaming them via
+    localhost makes playback same-origin — no CORS, no redirect surprises — and
+    keeps the browser from ever talking to googlevideo directly. Range requests
+    are forwarded so seeking works.
+    """
+    itag = request.args.get("itag")
+
+    # A cached stream URL can rot before its TTL (googlevideo 403s expired/
+    # consumed URLs); on a 403 drop the cache and re-resolve a fresh one once.
+    upstream = None
+    for attempt in range(2):
+        try:
+            target = _find_stream(video_id, itag)
+        except Exception as e:
+            return err(f"Stream resolve failed: {e}", 502)
+        if not target:
+            return err("No playable stream", 502)
+        upstream = httpc.session.get(
+            target["url"], headers=_fwd_headers(), stream=True, timeout=20, allow_redirects=True,
+        )
+        if upstream.status_code != 403 or attempt == 1:
+            break
+        upstream.close()
+        cache.invalidate(f"yt:info:{video_id}")
+        cache.invalidate(f"yt:inv:streams:{video_id}")
+
+    return _relay(upstream, default_ct="video/mp4")
+
+
+def _seg_proxy_url(abs_url):
+    token = base64.urlsafe_b64encode(abs_url.encode()).decode()
+    return f"/api/youtube/hls/seg?u={token}"
+
+
+_URI_ATTR_RE = re.compile(r'URI="([^"]+)"')
+
+
+def _rewrite_hls(text, base_url):
+    """Rewrite an HLS media playlist so every segment (and any KEY/MAP init URI)
+    is fetched back through our same-origin segment proxy — hls.js pulls these
+    via XHR, which would otherwise be CORS-blocked against googlevideo."""
+    out = []
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            out.append(line)
+        elif stripped.startswith("#"):
+            # EXT-X-KEY / EXT-X-MAP carry a URI="..." pointing at binary data.
+            out.append(_URI_ATTR_RE.sub(
+                lambda m: f'URI="{_seg_proxy_url(urljoin(base_url, m.group(1)))}"', stripped
+            ))
+        else:
+            out.append(_seg_proxy_url(urljoin(base_url, stripped)))
+    return "\n".join(out) + "\n"
+
+
+@feeds_bp.get("/youtube/hls/<video_id>/<itag>.m3u8")
+def youtube_hls_playlist(video_id, itag):
+    """Serve a rewritten HLS media playlist for one rendition (up to 1080p)."""
+    try:
+        target = _find_stream(video_id, itag, kind="hls")
+    except Exception as e:
+        return err(f"Stream resolve failed: {e}", 502)
+    if not target:
+        return err("No HLS stream", 404)
+    try:
+        text = httpc.session.get(
+            target["url"], headers={"User-Agent": config.BROWSER_UA}, timeout=20
+        ).text
+    except Exception as e:
+        return err(f"HLS playlist fetch failed: {e}", 502)
+    return Response(
+        _rewrite_hls(text, target["url"]),
+        content_type="application/vnd.apple.mpegurl",
+    )
+
+
+@feeds_bp.get("/youtube/hls/seg")
+def youtube_hls_segment():
+    """Proxy a single HLS segment (or key/init) by its base64url-encoded URL."""
+    token = request.args.get("u")
+    if not token:
+        return err("u required")
+    try:
+        url = base64.urlsafe_b64decode(token.encode()).decode()
+    except Exception:
+        return err("bad token")
+    if "googlevideo.com" not in (urlparse(url).hostname or ""):  # only proxy YouTube CDN
+        return err("forbidden host", 403)
+    upstream = httpc.session.get(
+        url, headers=_fwd_headers(), stream=True, timeout=20, allow_redirects=True,
+    )
+    return _relay(upstream, default_ct="video/mp2t")
+
+
 @feeds_bp.get("/youtube/playlist/<playlist_id>")
 def youtube_playlist(playlist_id):
     try:
         return ok(youtube.get_playlist(playlist_id))
     except Exception as e:
         return err(f"Playlist fetch failed: {e}", 502)
+
+
+@feeds_bp.get("/youtube/video/<video_id>")
+def youtube_video_info(video_id):
+    """Metadata for the player's info panel — title, description, view count,
+    and live/upcoming status. Stream URLs are deliberately stripped (they're
+    served only through the proxy endpoints)."""
+    try:
+        info = youtube.video_info(video_id)
+    except Exception as e:
+        return err(f"Video info failed: {e}", 502)
+    meta = {k: v for k, v in info.items() if k != "streams"}
+    meta["has_streams"] = bool(info.get("streams"))
+    return ok(meta)
+
+
+@feeds_bp.get("/youtube/comments/<video_id>")
+def youtube_comments(video_id):
+    try:
+        return ok(youtube.video_comments(video_id))
+    except Exception as e:
+        return err(f"Comments fetch failed: {e}", 502)
+
+
+@feeds_bp.get("/youtube/live")
+def youtube_live():
+    """Live + scheduled streams across your subscribed channels."""
+    ids = sorted(s["source_id"] for s in db.list_subscriptions("youtube"))
+    if not ids:
+        return ok({"items": [], "stale": False})
+    # SWR-cached: confirming candidates via yt-dlp is slow, so serve the last
+    # result instantly and refresh in the background.
+    key = "yt:live:" + ",".join(ids)
+    try:
+        data, stale = cache.cached_swr(key, 120, lambda: youtube.get_live_and_upcoming(ids))
+        return ok({**data, "stale": stale})
+    except Exception as e:
+        return err(f"Live fetch failed: {e}", 502)
 
 
 def _discover_payload(region):
