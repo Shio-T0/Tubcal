@@ -44,12 +44,27 @@ def get_anilist_title(anilist_id: int):
     return media["title"]["english"] or media["title"]["romaji"]
 
 
-def search_provider(title: str):
-    r = requests.get(f"{UPSTREAM}/anime/gogoanime/{title}", timeout=30)
+def get_provider_info(title: str):
+    # Step 1: search
+    search = requests.get(f"{UPSTREAM}/anime/gogoanime/{title}", timeout=30)
 
-    r.raise_for_status()
+    search.raise_for_status()
 
-    return r.json()
+    search_data = search.json()
+
+    results = search_data.get("results", [])
+
+    if not results:
+        raise Exception(f"No provider match found for '{title}'")
+
+    provider_id = results[0]["id"]
+
+    # Step 2: fetch anime info + episodes
+    info = requests.get(f"{UPSTREAM}/anime/gogoanime/info/{provider_id}", timeout=30)
+
+    info.raise_for_status()
+
+    return info.json()
 
 
 # ---------------------------------------
@@ -59,31 +74,26 @@ def search_provider(title: str):
 
 @app.get("/meta/anilist/info/{anilist_id}")
 def anime_info(anilist_id: int, provider: str | None = None):
-    try:
-        title = get_anilist_title(anilist_id)
+    title = get_anilist_title(anilist_id)
 
-        anime = search_provider(title)
+    anime = get_provider_info(title)
 
-        episodes = []
+    episodes = []
 
-        for ep in anime.get("episodes", []):
-            episode_id = ep["id"]
+    for ep in anime.get("episodes", []):
+        episodes.append(
+            {
+                "id": ep["id"],
+                "number": ep["number"],
+                "title": ep.get("title"),
+                "image": ep.get("image"),
+            }
+        )
 
-            mapping_cache[episode_id] = {"provider": provider, "anime": anilist_id}
-
-            episodes.append(
-                {
-                    "id": episode_id,
-                    "number": ep["number"],
-                    "title": ep.get("title"),
-                    "image": ep.get("image"),
-                }
-            )
-
-        return {"totalEpisodes": len(episodes), "episodes": episodes}
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    return {
+        "totalEpisodes": anime.get("totalEpisodes", len(episodes)),
+        "episodes": episodes,
+    }
 
 
 # ---------------------------------------
