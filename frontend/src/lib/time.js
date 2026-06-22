@@ -31,6 +31,16 @@ export function timeUntil(epochSeconds) {
   return `in ${days}d ${hrs % 24}h`;
 }
 
+/** A playback offset in seconds as a clock, e.g. 75 → "1:15", 3725 → "1:02:05". */
+export function clock(seconds) {
+  const s = Math.max(0, Math.floor(seconds || 0));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  const pad = (n) => String(n).padStart(2, '0');
+  return h ? `${h}:${pad(m)}:${pad(sec)}` : `${m}:${pad(sec)}`;
+}
+
 export function timeAgo(epochSeconds) {
   if (!epochSeconds) return '';
   const diff = Math.max(0, Date.now() / 1000 - epochSeconds);

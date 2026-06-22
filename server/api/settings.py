@@ -5,7 +5,9 @@ from .. import db
 
 settings_bp = Blueprint("settings", __name__, url_prefix="/api")
 
-ALLOWED_KEYS = {"theme", "reddit_sort", "hn_list", "foryou_weights"}
+# Allow exactly the keys we seed in DEFAULT_SETTINGS — derived so adding a new
+# setting there can never drift out of sync with this allow-list again.
+ALLOWED_KEYS = set(db.DEFAULT_SETTINGS)
 
 
 @settings_bp.get("/settings")

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { KeyRound, Minus, Palette, Plus, Settings, Trash2, Rss, Volume2 } from 'lucide-react';
+import { KeyRound, Library, Minus, Palette, Plus, Settings, Trash2, Rss, Tv, Volume2 } from 'lucide-react';
 
 import { api, useApi } from '../api/client.js';
 import { SectionHead } from '../components/layout/Section.jsx';
@@ -8,7 +8,36 @@ import { Avatar } from '../components/ui/Avatar.jsx';
 import AddSubscriptionModal from '../components/modals/AddSubscriptionModal.jsx';
 import { Button, SegmentedControl } from '../components/ui/index.jsx';
 import { useSettings, useSubscriptions, useToast } from '../state.jsx';
+import { THEMES } from '../lib/themes.js';
 import s from './settings.module.css';
+
+function SkinPicker({ value, onChange }) {
+  return (
+    <div className={s.skinGrid} role="radiogroup" aria-label="Skin">
+      {THEMES.map((t) => {
+        const on = value === t.value;
+        return (
+          <button
+            key={t.value}
+            type="button"
+            role="radio"
+            aria-checked={on}
+            className={`${s.skinCard} ${on ? s.skinCardOn : ''}`}
+            onClick={() => onChange(t.value)}
+          >
+            <span className={s.skinSwatch}>
+              {t.swatch.map((c, i) => (
+                <span key={i} className={s.skinDot} style={{ background: c }} />
+              ))}
+            </span>
+            <span className={s.skinName}>{t.label}</span>
+            <span className={s.skinBlurb}>{t.blurb}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 const GROUPS = [
   { platform: 'youtube', label: 'YouTube channels', color: 'var(--c-youtube)' },
@@ -25,6 +54,11 @@ const PROVIDERS = [
     id: 'reddit',
     name: 'Reddit',
     hint: 'Create a "web app" at reddit.com/prefs/apps. Unlocks your home feed, scores, and full comment threads.',
+  },
+  {
+    id: 'anilist',
+    name: 'AniList',
+    hint: 'Create a client at anilist.co/settings/developer (set the redirect URL below). Unlocks your anime list, progress sync, recommendations, and discussions in The Anime.',
   },
 ];
 
@@ -198,6 +232,182 @@ function HistoryRow() {
   );
 }
 
+function ModelLine({ label, value, installed, onChange, pullHint }) {
+  const ok = installed.some((m) => m === value || m === `${value}:latest` || m.split(':')[0] === value.split(':')[0]);
+  return (
+    <div className={s.row}>
+      <div>
+        <div className={s.rowLabel}>{label}</div>
+        <div className={s.rowHint}>
+          {ok ? 'installed' : <>not pulled — run <code>ollama pull {value}</code></>}
+        </div>
+      </div>
+      <select className={s.select} value={value} onChange={(e) => onChange(e.target.value)}>
+        {[value, ...installed.filter((m) => m !== value)].map((m) => (
+          <option key={m} value={m}>{m}</option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
+function ArchiveSettings() {
+  const { settings, updateSettings } = useSettings();
+  const status = useApi('/brain/status');
+  const b = status.data;
+  const installed = b?.models || [];
+  const enabled = settings?.brain_enabled !== false;
+
+  return (
+    <section className={`${s.section} glass`}>
+      <h2 className={s.sectionTitle}>
+        <Library size={17} /> The Archive
+      </h2>
+      <p className={s.sectionSub}>
+        Transcribe the videos you watch into a private, searchable memory with on-device AI
+        summaries. Everything stays on this machine.
+      </p>
+
+      {b && (
+        <p className={s.rowHint} style={{ marginTop: -4 }}>
+          {b.whisper ? 'Transcription engine ready' : 'Transcription engine not installed'} ·{' '}
+          {b.ollama ? `Ollama online (${installed.length} models)` : 'Ollama offline'}
+          {b.queue && (b.queue.queued || b.queue.transcribing)
+            ? ` · ${(b.queue.queued || 0) + (b.queue.transcribing || 0)} in queue`
+            : ''}
+        </p>
+      )}
+
+      <div className={s.row}>
+        <div>
+          <div className={s.rowLabel}>Archive</div>
+          <div className={s.rowHint}>Turn the background transcription worker on or off.</div>
+        </div>
+        <SegmentedControl
+          options={[{ value: 'on', label: 'On' }, { value: 'off', label: 'Off' }]}
+          value={enabled ? 'on' : 'off'}
+          onChange={(v) => updateSettings({ brain_enabled: v === 'on' })}
+        />
+      </div>
+
+      <div className={s.row}>
+        <div>
+          <div className={s.rowLabel}>Indexing</div>
+          <div className={s.rowHint}>
+            Manual adds only what you choose; Auto indexes every video you watch.
+          </div>
+        </div>
+        <SegmentedControl
+          options={[{ value: 'manual', label: 'Manual' }, { value: 'auto', label: 'Auto' }]}
+          value={settings?.brain_auto_index ? 'auto' : 'manual'}
+          onChange={(v) => updateSettings({ brain_auto_index: v === 'auto' })}
+        />
+      </div>
+
+      <div className={s.row}>
+        <div>
+          <div className={s.rowLabel}>Transcription quality</div>
+          <div className={s.rowHint}>Larger is more accurate but slower. GPU-accelerated.</div>
+        </div>
+        <SegmentedControl
+          options={['tiny', 'base', 'small', 'medium']}
+          value={settings?.brain_whisper_model || 'base'}
+          onChange={(v) => updateSettings({ brain_whisper_model: v })}
+        />
+      </div>
+
+      <ModelLine
+        label="LLM (summaries & answers)"
+        value={settings?.brain_llm_model || 'llama3.1:8b'}
+        installed={installed}
+        onChange={(v) => updateSettings({ brain_llm_model: v })}
+      />
+      <ModelLine
+        label="Embedding model (search)"
+        value={settings?.brain_embed_model || 'nomic-embed-text'}
+        installed={installed}
+        onChange={(v) => updateSettings({ brain_embed_model: v })}
+      />
+    </section>
+  );
+}
+
+function AnimeSettings() {
+  const { settings, updateSettings } = useSettings();
+  const [url, setUrl] = useState('');
+  const [provider, setProvider] = useState('');
+  useEffect(() => {
+    if (settings) {
+      setUrl(settings.anime_source_url || '');
+      setProvider(settings.anime_provider || '');
+    }
+  }, [settings?.anime_source_url, settings?.anime_provider]);
+
+  return (
+    <section className={`${s.section} glass`}>
+      <h2 className={s.sectionTitle}>
+        <Tv size={17} /> The Anime
+      </h2>
+      <p className={s.sectionSub}>
+        Connect AniList above to sync your list. To watch locally, run an AniList-id-mapped
+        episode aggregator on this machine and point Tubcal at it. Nothing leaves localhost.
+      </p>
+
+      <div>
+        <div className={s.rowLabel} style={{ marginBottom: 4 }}>Episode source URL</div>
+        <div className={s.rowHint} style={{ marginBottom: 8 }}>
+          The base URL of your local aggregator (e.g. <code>http://127.0.0.1:3000</code>). Blank uses the default.
+        </div>
+        <input
+          className={s.credInput}
+          placeholder="http://127.0.0.1:3000"
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          onBlur={() => url !== (settings?.anime_source_url || '') && updateSettings({ anime_source_url: url.trim() })}
+        />
+      </div>
+
+      <div>
+        <div className={s.rowLabel} style={{ marginBottom: 4 }}>Provider hint (optional)</div>
+        <div className={s.rowHint} style={{ marginBottom: 8 }}>
+          Adapter-specific source, if yours needs one (e.g. <code>zoro</code>, <code>gogoanime</code>).
+        </div>
+        <input
+          className={s.credInput}
+          placeholder="(default)"
+          value={provider}
+          onChange={(e) => setProvider(e.target.value)}
+          onBlur={() => provider !== (settings?.anime_provider || '') && updateSettings({ anime_provider: provider.trim() })}
+        />
+      </div>
+
+      <div className={s.row}>
+        <div>
+          <div className={s.rowLabel}>Prefer</div>
+          <div className={s.rowHint}>Subbed or dubbed episodes when both exist.</div>
+        </div>
+        <SegmentedControl
+          options={[{ value: 'sub', label: 'Sub' }, { value: 'dub', label: 'Dub' }]}
+          value={settings?.anime_sub_pref || 'sub'}
+          onChange={(v) => updateSettings({ anime_sub_pref: v })}
+        />
+      </div>
+
+      <div className={s.row}>
+        <div>
+          <div className={s.rowLabel}>Sync progress to AniList</div>
+          <div className={s.rowHint}>Finishing an episode bumps your AniList progress automatically.</div>
+        </div>
+        <SegmentedControl
+          options={[{ value: 'on', label: 'On' }, { value: 'off', label: 'Off' }]}
+          value={settings?.anime_autosync !== false ? 'on' : 'off'}
+          onChange={(v) => updateSettings({ anime_autosync: v === 'on' })}
+        />
+      </div>
+    </section>
+  );
+}
+
 export default function SettingsPage() {
   const { settings, updateSettings } = useSettings();
   const toast = useToast();
@@ -246,19 +456,12 @@ export default function SettingsPage() {
           <h2 className={s.sectionTitle}>
             <Palette size={17} /> Appearance
           </h2>
-          <div className={s.row}>
-            <div>
-              <div className={s.rowLabel}>Edition</div>
-              <div className={s.rowHint}>Night is ink and ember; Day is true newsprint.</div>
+          <div>
+            <div className={s.rowLabel} style={{ marginBottom: 4 }}>Skin</div>
+            <div className={s.rowHint} style={{ marginBottom: 12 }}>
+              Repaint the whole station. The Shōwa set is home; the rest are other machines.
             </div>
-            <SegmentedControl
-              options={[
-                { value: 'dark', label: 'Night' },
-                { value: 'light', label: 'Day' },
-              ]}
-              value={settings?.theme || 'dark'}
-              onChange={(theme) => updateSettings({ theme })}
-            />
+            <SkinPicker value={settings?.theme || 'dark'} onChange={(theme) => updateSettings({ theme })} />
           </div>
           <div>
             <div className={s.rowLabel} style={{ marginBottom: 4 }}>For You mix</div>
@@ -293,6 +496,10 @@ export default function SettingsPage() {
             />
           </div>
         </section>
+
+        <ArchiveSettings />
+
+        <AnimeSettings />
 
         <section className={`${s.section} glass`}>
           <h2 className={s.sectionTitle}>

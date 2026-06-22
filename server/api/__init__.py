@@ -14,8 +14,12 @@ def register_blueprints(app):
     from .subscriptions import subs_bp
     from .settings import settings_bp
     from .oauth import oauth_bp
+    from .brain import brain_bp
+    from .anime import anime_bp
 
     app.register_blueprint(feeds_bp)
     app.register_blueprint(subs_bp)
     app.register_blueprint(settings_bp)
     app.register_blueprint(oauth_bp)
+    app.register_blueprint(brain_bp)
+    app.register_blueprint(anime_bp)

@@ -1,7 +1,8 @@
-import { Bookmark, Moon, Settings, Sun } from 'lucide-react';
+import { Bookmark, Palette, Settings } from 'lucide-react';
 import { NavLink, useLocation } from 'react-router-dom';
 
 import { useSettings } from '../../state.jsx';
+import { nextTheme, themeMeta } from '../../lib/themes.js';
 import s from './Masthead.module.css';
 
 const NAV = [
@@ -9,6 +10,8 @@ const NAV = [
   { to: '/youtube', index: 'No 02', label: 'Screening Room', color: 'var(--c-youtube)' },
   { to: '/reddit', index: 'No 03', label: 'The Dispatch', color: 'var(--c-reddit)' },
   { to: '/hackernews', index: 'No 04', label: 'The Wire', color: 'var(--c-hn)' },
+  { to: '/archive', index: 'No 05', label: 'The Archive', color: 'var(--signal)' },
+  { to: '/anime', index: 'No 06', label: 'The Anime', color: 'var(--c-anime)' },
 ];
 
 function todayLine() {
@@ -21,12 +24,13 @@ export default function Masthead() {
   const { settings, updateSettings } = useSettings();
   const theme = settings?.theme || 'dark';
   const { pathname } = useLocation();
+  const upcoming = themeMeta(nextTheme(theme));
 
   return (
-    <header className={s.masthead}>
-      <div className={s.topline}>
+    <header className={`${s.masthead} tc-masthead`}>
+      <div className={`${s.topline} tc-topline`}>
         <span>{todayLine()}</span>
-        <span>{theme === 'dark' ? 'Evening' : 'Daytime'}</span>
+        <span>{themeMeta(theme).label}</span>
         <span className={s.onair}>
           <span className={s.onairDot} />
           tube warm · private
@@ -34,16 +38,16 @@ export default function Masthead() {
       </div>
 
       <div className={s.titleRow}>
-        <div className={s.wordmark}>
+        <div className={`${s.wordmark} tc-wordmark`}>
           Tubcal<em>.</em>
         </div>
         <div className={s.actions}>
           <button
             className={s.actionBtn}
-            title={theme === 'dark' ? 'Switch to Daytime' : 'Switch to Evening'}
-            onClick={() => updateSettings({ theme: theme === 'dark' ? 'light' : 'dark' })}
+            title={`Skin: ${themeMeta(theme).label} — switch to ${upcoming.label}`}
+            onClick={() => updateSettings({ theme: nextTheme(theme) })}
           >
-            {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+            <Palette size={16} />
           </button>
           <NavLink
             to="/saved"
@@ -62,14 +66,14 @@ export default function Masthead() {
         </div>
       </div>
 
-      <nav className={s.nav}>
+      <nav className={`${s.nav} tc-nav`}>
         {NAV.map(({ to, index, label, color }) => (
           <NavLink
             key={to}
             to={to}
             end={to === '/'}
             className={({ isActive }) =>
-              `${s.navItem} ${isActive || (to !== '/' && pathname.startsWith(to)) ? s.navItemActive : ''}`
+              `${s.navItem} tc-navitem ${isActive || (to !== '/' && pathname.startsWith(to)) ? s.navItemActive + ' tc-navitem-on' : ''}`
             }
             style={{ '--nav-c': color }}
           >

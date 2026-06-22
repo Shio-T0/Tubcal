@@ -17,6 +17,7 @@ import Hls from 'hls.js';
 
 import { api } from '../../api/client.js';
 import { formatWhen, timeUntil } from '../../lib/time.js';
+import { streamApi } from '../../lib/streams.js';
 import { COMPLETE_RATIO, usePlayer, useProgress, useSettings } from '../../state.jsx';
 import PlayerSidePanel from './PlayerSidePanel.jsx';
 import s from './player.module.css';
@@ -34,58 +35,90 @@ const BAR_H = 34;
 // This sidesteps YouTube's embed player entirely — which had started refusing
 // every video with "Video unavailable, watch on YouTube" — and gives us exact,
 // event-driven progress via the element's own timeupdate, no postMessage hacks.
-function PlayerCard({ item, expanded, style, dragging, muted, rate, roomForPanel, showPanel, onTogglePanel, onClose, onMinimize, onExpand, onEnded, onRateChange, drag }) {
+function PlayerCard({ item, expanded, style, dragging, muted, rate, roomForPanel, showPanel, seekSignal, takeSeekTarget, onTogglePanel, onClose, onMinimize, onExpand, onEnded, onRateChange, drag }) {
   const channelId = item.extra?.channel_id;
   const [over, setOver] = useState(false);
   const { progress, writeProgress, flushProgress } = useProgress();
+  const { settings } = useSettings();
   const videoRef = useRef(null);
   const lastRef = useRef({ position: 0, duration: 0 });
+  const syncedRef = useRef(false); // anime → AniList progress bumped once near the end
   const [streams, setStreams] = useState(null); // null=loading, []=failed
+  const [subtitles, setSubtitles] = useState([]); // [{src, lang, label}] — anime episodes
   const [quality, setQuality] = useState(0); // index into streams
   const [playErr, setPlayErr] = useState(null); // browser MediaError, if any
   const [info, setInfo] = useState(null); // metadata for the panel + live status
 
-  const vid = item.extra.video_id;
+  const sapi = streamApi(item);
   const liveStatus = info?.live_status;
   const isUpcoming = liveStatus === 'is_upcoming';
   const isLive = liveStatus === 'is_live';
 
   // Resolve metadata once per video: drives the info panel and tells us whether
   // this is a premiere that hasn't started (so we show a countdown, not an error).
+  // Platforms without a metadata endpoint (anime) just skip straight to playback.
   useEffect(() => {
     let alive = true;
     setInfo(null);
-    api(`/youtube/video/${vid}`)
+    if (!sapi.meta) {
+      setInfo({});
+      return undefined;
+    }
+    api(sapi.meta)
       .then((d) => alive && setInfo(d))
       .catch(() => alive && setInfo({}));
     return () => {
       alive = false;
     };
-  }, [vid]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [item.id]);
 
   // Compute the resume point once, when this video first mounts. A finished
   // video starts over; otherwise we rewind a couple seconds for context.
   const startRef = useRef(null);
   if (startRef.current === null) {
-    const p = progress[item.id];
-    startRef.current =
-      p && p.duration && p.position / p.duration < COMPLETE_RATIO
-        ? Math.max(0, Math.floor(p.position - 2))
-        : 0;
+    // A transcript deep-link (Archive / side panel) wins over resume position.
+    const forced = takeSeekTarget?.(item.id);
+    if (forced != null) {
+      startRef.current = Math.max(0, Math.floor(forced));
+    } else {
+      const p = progress[item.id];
+      startRef.current =
+        p && p.duration && p.position / p.duration < COMPLETE_RATIO
+          ? Math.max(0, Math.floor(p.position - 2))
+          : 0;
+    }
   }
 
-  // Resolve the playable stream URLs once per video.
+  // Live seek: a transcript click on an already-playing video jumps it there.
+  useEffect(() => {
+    if (!seekSignal || seekSignal.id !== item.id) return;
+    const v = videoRef.current;
+    if (v && v.readyState >= 1 && seekSignal.t != null) {
+      v.currentTime = seekSignal.t;
+      v.play?.().catch(() => {});
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seekSignal]);
+
+  // Resolve the playable stream URLs (and any subtitle tracks) once per video.
   useEffect(() => {
     let alive = true;
     setStreams(null);
     setPlayErr(null);
-    api(`/youtube/stream/${item.extra.video_id}`)
-      .then((d) => alive && setStreams(d.streams || []))
+    setSubtitles([]);
+    api(sapi.resolve)
+      .then((d) => {
+        if (!alive) return;
+        setStreams(d.streams || []);
+        setSubtitles(d.subtitles || []);
+      })
       .catch(() => alive && setStreams([]));
     return () => {
       alive = false;
     };
-  }, [item.extra.video_id]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [item.id]);
 
   // Flush the final position when this card unmounts (closed).
   useEffect(() => {
@@ -112,6 +145,21 @@ function PlayerCard({ item, expanded, style, dragging, muted, rate, roomForPanel
     if (!v.duration) return;
     lastRef.current = { position: v.currentTime, duration: v.duration };
     writeProgress(item.id, v.currentTime, v.duration);
+    // Anime: once you've effectively finished the episode, push progress to AniList.
+    if (
+      !syncedRef.current &&
+      item.platform === 'anime' &&
+      item.extra?.anilist_id &&
+      item.extra?.episode != null &&
+      settings?.anime_autosync !== false &&
+      v.currentTime / v.duration >= COMPLETE_RATIO
+    ) {
+      syncedRef.current = true;
+      api('/anime/list', {
+        method: 'POST',
+        body: JSON.stringify({ media_id: item.extra.anilist_id, progress: item.extra.episode }),
+      }).catch(() => {});
+    }
   };
   const onLoadedMeta = (e) => {
     const v = e.currentTarget;
@@ -142,7 +190,7 @@ function PlayerCard({ item, expanded, style, dragging, muted, rate, roomForPanel
     const v = videoRef.current;
     if (!v || !active) return undefined;
     if (isHls) {
-      const url = `/api/youtube/hls/${vid}/${active.itag}.m3u8`;
+      const url = sapi.hls(active.itag);
       if (Hls.isSupported()) {
         const hls = new Hls({ maxBufferLength: 30 });
         hls.loadSource(url);
@@ -160,7 +208,7 @@ function PlayerCard({ item, expanded, style, dragging, muted, rate, roomForPanel
         setPlayErr('HLS not supported by this browser');
       }
     } else {
-      v.src = `/api/youtube/stream/${vid}/data${active.itag ? `?itag=${active.itag}` : ''}`;
+      v.src = sapi.mp4(active.itag);
       v.play().catch(() => {});
     }
     return undefined;
@@ -273,6 +321,7 @@ function PlayerCard({ item, expanded, style, dragging, muted, rate, roomForPanel
               className={`${s.frame} ${dragging ? s.frameNoPointer : ''}`}
               title={item.title}
               controls
+              crossOrigin={subtitles.length ? 'anonymous' : undefined}
               playsInline
               onTimeUpdate={onTimeUpdate}
               onLoadedMetadata={onLoadedMeta}
@@ -280,13 +329,24 @@ function PlayerCard({ item, expanded, style, dragging, muted, rate, roomForPanel
               onEnded={() => onEnded?.()}
               onRateChange={onRateEvt}
               onError={onVideoError}
-            />
+            >
+              {subtitles.map((sub, i) => (
+                <track
+                  key={sub.src}
+                  kind="subtitles"
+                  src={sub.src}
+                  srcLang={sub.lang || 'en'}
+                  label={sub.label || sub.lang || 'Subtitles'}
+                  default={i === 0}
+                />
+              ))}
+            </video>
             {playErr && (
               <div className={s.frameMsg}>
                 <div className={s.frameError}>
                   <span>Playback failed ({playErr}).</span>
                   <a className={s.metaLink} href={item.url} target="_blank" rel="noopener noreferrer">
-                    <ExternalLink size={13} /> Watch on YouTube
+                    <ExternalLink size={13} /> {item.platform === 'youtube' ? 'Watch on YouTube' : 'Open source page'}
                   </a>
                 </div>
               </div>
@@ -345,7 +405,7 @@ function PlayerCard({ item, expanded, style, dragging, muted, rate, roomForPanel
 }
 
 export default function PlayerLayer() {
-  const { players, expandedId, order, close, minimize, undock, expandFromDock, reorder, ended } = usePlayer();
+  const { players, expandedId, order, close, minimize, undock, expandFromDock, reorder, ended, seekSignal, takeSeekTarget } = usePlayer();
   const { settings, updateSettings } = useSettings();
   const [vp, setVp] = useState({ w: window.innerWidth, h: window.innerHeight });
   const [dragId, setDragId] = useState(null);
@@ -383,9 +443,12 @@ export default function PlayerLayer() {
   // The info/comments panel floats at the left edge; it only fits on a wide
   // enough viewport, otherwise the toggle is hidden and the video stays centered.
   const PANEL_W = 360;
-  const roomForPanel = vp.w >= 1024;
-  const panelVisible = !!expandedId && roomForPanel && showPanel;
   const expandedItem = players.find((p) => p.id === expandedId)?.item;
+  // The info/transcript panel is YouTube-only (description, comments, the Archive);
+  // anime episodes and other platforms have nothing to put in it.
+  const roomForPanel = vp.w >= 1024;
+  const canPanel = (it) => it?.platform === 'youtube';
+  const panelVisible = !!expandedId && roomForPanel && showPanel && canPanel(expandedItem);
 
   // Panel floats at the right edge; the video centers in the space to its left
   // and keeps its normal size as long as that space allows — so it doesn't shrink
@@ -415,8 +478,10 @@ export default function PlayerLayer() {
             dragging={dragId != null}
             muted={soloAudio && id !== activeId}
             rate={rate}
-            roomForPanel={roomForPanel}
+            roomForPanel={roomForPanel && canPanel(item)}
             showPanel={showPanel}
+            seekSignal={seekSignal}
+            takeSeekTarget={takeSeekTarget}
             onTogglePanel={() => setShowPanel((p) => !p)}
             onClose={() => (isExpanded ? close() : undock(id))}
             onMinimize={minimize}

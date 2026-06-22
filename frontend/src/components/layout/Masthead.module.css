@@ -88,9 +88,13 @@
 
 .nav {
   display: flex;
-  border-top: 3px double var(--rule-strong);
-  border-bottom: 1px solid var(--rule);
+  gap: var(--space-1);
+  padding: 5px;
   margin-bottom: var(--space-6);
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: calc(var(--r-card) + 4px);
+  box-shadow: inset 0 1px 0 rgba(232, 217, 184, 0.04);
   overflow-x: auto;
 }
 
@@ -99,21 +103,17 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding: 10px 14px 12px;
-  border-right: 1px solid var(--rule);
+  padding: 9px 16px 11px;
+  border-radius: var(--r-card);
   color: var(--paper-dim);
   position: relative;
   white-space: nowrap;
   transition: color 0.18s ease, background 0.18s ease;
 }
 
-.navItem:first-child {
-  border-left: 1px solid var(--rule);
-}
-
 .navItem:hover {
   color: var(--paper);
-  background: var(--surface);
+  background: var(--surface-hover);
 }
 
 .navIndex {
@@ -131,7 +131,7 @@
 
 .navItemActive {
   color: var(--paper);
-  background: var(--surface);
+  background: color-mix(in srgb, var(--nav-c, var(--signal)) 15%, transparent);
 }
 
 .navItemActive .navIndex {
@@ -141,12 +141,13 @@
 .navItemActive::after {
   content: '';
   position: absolute;
-  left: 0;
-  right: 0;
-  bottom: -1px;
-  height: 3px;
+  left: 16px;
+  right: 16px;
+  bottom: 5px;
+  height: 2px;
+  border-radius: 2px;
   background: var(--nav-c, var(--signal));
-  box-shadow: 0 0 14px var(--nav-c, var(--signal));
+  box-shadow: 0 0 12px var(--nav-c, var(--signal));
 }
 
 @media (max-width: 800px) {

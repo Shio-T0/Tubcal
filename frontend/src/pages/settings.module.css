@@ -197,6 +197,76 @@
   line-height: 1.5;
 }
 
+.select {
+  padding: 8px 12px;
+  border-radius: var(--r-input);
+  border: 1px solid var(--border-glass);
+  background: var(--surface-input);
+  color: var(--text-primary);
+  outline: none;
+  font-size: 12.5px;
+  font-family: var(--font-mono);
+  cursor: pointer;
+  max-width: 200px;
+}
+
+.select:focus {
+  border-color: var(--signal);
+}
+
+.skinGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: var(--space-3);
+}
+
+.skinCard {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  text-align: left;
+  padding: var(--space-3);
+  border-radius: var(--r-card);
+  border: 1px solid var(--border-glass);
+  background: var(--surface-input);
+  transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease;
+}
+
+.skinCard:hover {
+  border-color: var(--border-glass-strong);
+  background: var(--surface-glass-hover);
+}
+
+.skinCardOn {
+  border-color: var(--signal);
+  box-shadow: 0 0 0 1px var(--signal);
+}
+
+.skinSwatch {
+  display: flex;
+  gap: 5px;
+}
+
+.skinDot {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1px solid var(--border-glass-strong);
+}
+
+.skinName {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 560;
+  color: var(--text-primary);
+}
+
+.skinBlurb {
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
 .connectionActions {
   display: flex;
   gap: var(--space-2);

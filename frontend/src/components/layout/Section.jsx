@@ -5,7 +5,7 @@ import s from './Section.module.css';
 
 export function SectionHead({ kicker, title, note, color, children }) {
   return (
-    <div className={s.head} style={{ '--signal-local': color }}>
+    <div className={`${s.head} tc-sectionhead`} style={{ '--signal-local': color }}>
       <div className={s.headText}>
         <span className="kicker" style={color ? { color } : undefined}>
           {kicker}

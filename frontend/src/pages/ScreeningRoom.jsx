@@ -29,6 +29,7 @@ import { Avatar } from '../components/ui/Avatar.jsx';
 import { Button, EmptyState, IconButton, SegmentedControl } from '../components/ui/index.jsx';
 import { TileActions } from '../components/ui/ItemActions.jsx';
 import { formatWhen, timeAgo, timeUntil } from '../lib/time.js';
+import { useHorizontalWheel } from '../lib/useHorizontalWheel.js';
 import { COMPLETE_RATIO, usePlayer, useProgress, useSubscriptions, useToast } from '../state.jsx';
 import s from './screening.module.css';
 
@@ -125,6 +126,7 @@ export function VideoTile({ item, onPlay, meta }) {
 }
 
 function Shelf({ title, count, items, onPlay, allTo, onShuffle, shuffling, className }) {
+  const rowRef = useHorizontalWheel();
   return (
     <section className={`${s.shelf} ${className || ''}`}>
       <div className={s.shelfHead}>
@@ -141,7 +143,7 @@ function Shelf({ title, count, items, onPlay, allTo, onShuffle, shuffling, class
           </Link>
         )}
       </div>
-      <div className={s.shelfRow}>
+      <div className={s.shelfRow} ref={rowRef}>
         {items.map((item) => (
           <VideoTile key={item.id} item={item} onPlay={onPlay} />
         ))}
@@ -151,8 +153,9 @@ function Shelf({ title, count, items, onPlay, allTo, onShuffle, shuffling, class
 }
 
 function ChannelChips({ subs, onAdd, activeId }) {
+  const rowRef = useHorizontalWheel();
   return (
-    <div className={c.chips} style={{ '--chip-c': 'var(--c-youtube)' }}>
+    <div className={c.chips} ref={rowRef} style={{ '--chip-c': 'var(--c-youtube)' }}>
       {subs.map((sub) => (
         <Link
           key={sub.id}
@@ -236,7 +239,7 @@ export default function ScreeningRoom() {
 
   const liveItems = searching ? [] : (live.data?.items || []);
   const resumable = searching ? [] : (continueWatching.data?.items || []).slice(0, 12);
-  const projection = (discover.data?.items || []).filter((i) => i.id !== hero?.id).slice(0, 12);
+  const projection = (discover.data?.items || []).filter((i) => i.id !== hero?.id).slice(0, 20);
   const random = (trending.data?.items || []).filter((i) => i.id !== hero?.id).slice(0, 12);
 
   return (

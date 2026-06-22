@@ -10,6 +10,15 @@ dependencies = [
     "python-dotenv>=1.0",
 ]
 
+[project.optional-dependencies]
+# The Archive (local second brain). Heavy + needs a Python with ML wheels
+# (3.12, not the system 3.14) — install with: uv sync --extra brain.
+# Ollama is reached over plain HTTP via `requests`, so no client lib here.
+brain = [
+    "faster-whisper>=1.0",
+    "numpy>=1.26",
+]
+
 [dependency-groups]
 dev = [
     "pytest>=8.0",

@@ -12,6 +12,8 @@ import FrontPage from './pages/FrontPage.jsx';
 import ScreeningRoom, { ChannelPage, HistoryPage, PlaylistPage } from './pages/ScreeningRoom.jsx';
 import Dispatch, { SubredditPage } from './pages/Dispatch.jsx';
 import Wire from './pages/Wire.jsx';
+import Archive from './pages/Archive.jsx';
+import Anime, { AnimeDetail } from './pages/Anime.jsx';
 import SavedPage from './pages/SavedPage.jsx';
 import SettingsPage from './pages/SettingsPage.jsx';
 
@@ -30,6 +32,9 @@ export default function App() {
           <Route path="/reddit" element={<Dispatch />} />
           <Route path="/reddit/r/:sub" element={<SubredditPage />} />
           <Route path="/hackernews" element={<Wire />} />
+          <Route path="/archive" element={<Archive />} />
+          <Route path="/anime" element={<Anime />} />
+          <Route path="/anime/:id" element={<AnimeDetail />} />
           <Route path="/saved" element={<SavedPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />

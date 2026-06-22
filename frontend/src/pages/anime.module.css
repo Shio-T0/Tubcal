@@ -1,0 +1,658 @@
+.tabs {
+  margin-bottom: var(--space-5);
+}
+
+.browseBar {
+  margin: var(--space-4) 0 var(--space-5);
+}
+
+.muted {
+  color: var(--paper-faint);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  padding: var(--space-4) 0;
+}
+
+/* poster grid */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: var(--space-4);
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: inherit;
+  animation: fadeUp 0.4s ease both;
+}
+
+.cardCoverWrap {
+  position: relative;
+  aspect-ratio: 2 / 3;
+  border-radius: var(--r-media);
+  overflow: hidden;
+  background: var(--surface-input);
+  border: 1px solid var(--rule);
+  box-shadow: var(--shadow-card);
+  transition: transform 0.18s ease, border-color 0.18s ease;
+}
+
+.card:hover .cardCoverWrap {
+  transform: translateY(-3px);
+  border-color: color-mix(in srgb, var(--cover-c) 60%, var(--rule));
+}
+
+.cardCover {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.cardCoverFallback {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  color: var(--paper-faint);
+}
+
+.cardCorner {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  padding: 2px 7px;
+  border-radius: var(--r-pill);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  color: #fff;
+  background: var(--accent-strong);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  white-space: nowrap;
+}
+
+.cardScore {
+  position: absolute;
+  bottom: 6px;
+  left: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  border-radius: var(--r-pill);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--c-anime) 88%, white);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.cardTitle {
+  font-family: var(--font-display);
+  font-size: 14.5px;
+  font-weight: 560;
+  line-height: 1.25;
+  color: var(--text-primary);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.cardMeta {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--paper-faint);
+}
+
+/* my list */
+.filterRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-5);
+}
+
+.filterPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 13px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--rule);
+  background: var(--surface);
+  color: var(--paper-dim);
+  font-size: 12.5px;
+  transition: all 0.15s ease;
+}
+.filterPill:hover {
+  color: var(--text-primary);
+  border-color: var(--rule-strong);
+}
+.filterPillOn {
+  color: var(--ink);
+  background: var(--c-anime);
+  border-color: var(--c-anime);
+}
+
+.filterCount {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  opacity: 0.7;
+}
+
+.lists {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.listHead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: 16px;
+  margin-bottom: var(--space-4);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--rule);
+}
+
+.listCount {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--paper-faint);
+}
+
+/* list-entry quick controls (My List) */
+.listEntry {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.quickRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.quickProg {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--paper-dim);
+}
+
+.quickBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 8px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--rule);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--c-anime);
+  transition: all 0.15s ease;
+}
+.quickBtn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--c-anime) 14%, transparent);
+  border-color: var(--c-anime);
+}
+.quickBtn:disabled {
+  opacity: 0.4;
+}
+
+/* list controls panel (detail) */
+.yourList {
+  margin-top: var(--space-6);
+}
+
+.listPanel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  max-width: 360px;
+  padding: var(--space-4);
+  border-radius: var(--r-card);
+  border: 1px solid var(--rule);
+  background: var(--surface);
+}
+
+.listRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.listLabel {
+  flex: none;
+  width: 72px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--paper-faint);
+}
+
+.select {
+  flex: 1;
+  padding: 7px 10px;
+  border-radius: var(--r-input);
+  border: 1px solid var(--rule);
+  background: var(--surface-input);
+  color: var(--text-primary);
+  font-size: 13px;
+  outline: none;
+  cursor: pointer;
+}
+.select:focus {
+  border-color: var(--c-anime);
+}
+
+.stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.stepper button {
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  border: 1px solid var(--rule);
+  color: var(--text-secondary);
+  transition: all 0.15s ease;
+}
+.stepper button:hover:not(:disabled) {
+  border-color: var(--c-anime);
+  color: var(--text-primary);
+}
+.stepper button:disabled {
+  opacity: 0.35;
+}
+.stepperVal {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  min-width: 56px;
+  text-align: center;
+}
+
+.scoreInput {
+  width: 72px;
+  padding: 6px 8px;
+  border-radius: var(--r-input);
+  border: 1px solid var(--rule);
+  background: var(--surface-input);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  outline: none;
+}
+.scoreInput:focus {
+  border-color: var(--c-anime);
+}
+.scoreMax {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--paper-faint);
+}
+
+.removeLink {
+  align-self: flex-start;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--danger);
+  opacity: 0.8;
+  transition: opacity 0.15s ease;
+}
+.removeLink:hover:not(:disabled) {
+  opacity: 1;
+}
+
+.endorseBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 2px;
+  padding: 2px 8px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--rule);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--paper-dim);
+  transition: all 0.15s ease;
+}
+.endorseBtn:hover {
+  color: var(--c-anime);
+  border-color: var(--c-anime);
+}
+
+/* detail */
+.back {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--paper-dim);
+  margin-bottom: var(--space-4);
+  transition: color 0.15s ease;
+}
+.back:hover {
+  color: var(--c-anime);
+}
+
+.detail {
+  position: relative;
+}
+
+.banner {
+  height: 220px;
+  border-radius: var(--r-modal);
+  background-size: cover;
+  background-position: center;
+  margin-bottom: -70px;
+  -webkit-mask-image: linear-gradient(to bottom, black 40%, transparent);
+  mask-image: linear-gradient(to bottom, black 40%, transparent);
+  opacity: 0.7;
+}
+
+.detailHead {
+  position: relative;
+  display: flex;
+  gap: var(--space-5);
+  align-items: flex-end;
+}
+
+.poster {
+  width: 180px;
+  flex: none;
+  border-radius: var(--r-media);
+  border: 1px solid var(--rule-strong);
+  box-shadow: var(--shadow-modal);
+  background: var(--surface-input);
+}
+
+.detailMeta {
+  flex: 1;
+  min-width: 0;
+  padding-bottom: var(--space-2);
+}
+
+.detailTitle {
+  font-size: clamp(26px, 4vw, 40px);
+  margin: 6px 0 2px;
+}
+
+.detailNative {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  color: var(--paper-faint);
+}
+
+.detailStats {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-4);
+  margin-top: var(--space-3);
+  font-size: 13px;
+  color: var(--paper-dim);
+}
+.detailStats span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.listChip {
+  padding: 3px 10px;
+  border-radius: var(--r-pill);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--c-anime);
+  background: color-mix(in srgb, var(--c-anime) 14%, transparent);
+}
+
+.detailActions {
+  margin-top: var(--space-4);
+}
+
+.genreRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+}
+
+.genre {
+  padding: 3px 10px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--rule);
+  font-size: 11.5px;
+  color: var(--paper-dim);
+  background: var(--surface);
+}
+
+.synopsis {
+  margin: var(--space-6) 0 var(--space-5);
+  font-size: 14.5px;
+  line-height: 1.7;
+  color: var(--text-secondary);
+  max-width: 760px;
+}
+
+/* The Anime Channel — trailer reel */
+.channelHead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-5);
+}
+
+.guide {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: var(--space-3);
+}
+
+.guideRow {
+  display: flex;
+  gap: var(--space-3);
+  padding: 8px;
+  border-radius: var(--r-card);
+  border: 1px solid var(--rule);
+  background: var(--surface);
+  transition: border-color 0.15s ease;
+}
+.guideRow:hover {
+  border-color: color-mix(in srgb, var(--c-anime) 50%, var(--rule));
+}
+
+.guideThumb {
+  position: relative;
+  flex: none;
+  width: 140px;
+  aspect-ratio: 16 / 9;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--surface-input);
+}
+.guideThumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.guidePlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.32);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.guideThumb:hover .guidePlay {
+  opacity: 1;
+}
+
+.guideMeta {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding-top: 2px;
+}
+.guideTitle {
+  font-family: var(--font-display);
+  font-size: 14.5px;
+  font-weight: 560;
+  line-height: 1.2;
+  color: var(--text-primary);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.guideTitle:hover {
+  color: var(--c-anime);
+}
+.guideSub {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--paper-faint);
+}
+.planBtn {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-top: 2px;
+  padding: 2px 8px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--rule);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--paper-dim);
+  transition: all 0.15s ease;
+}
+.planBtn:hover {
+  color: var(--c-anime);
+  border-color: var(--c-anime);
+}
+
+/* episodes */
+.episodes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--space-3);
+}
+
+.episode {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  text-align: left;
+  padding: 6px;
+  border-radius: var(--r-card);
+  border: 1px solid var(--rule);
+  background: var(--surface);
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.episode:hover {
+  border-color: var(--c-anime);
+  background: var(--surface-hover);
+}
+
+.epThumb {
+  position: relative;
+  flex: none;
+  width: 96px;
+  aspect-ratio: 16 / 9;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--surface-input);
+  display: grid;
+  place-items: center;
+  color: var(--paper-faint);
+}
+.epThumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.epPlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.3);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.episode:hover .epPlay {
+  opacity: 1;
+}
+
+.epMeta {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.epNum {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--c-anime);
+}
+.epTitle {
+  font-size: 13px;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.relBlock {
+  margin-top: var(--space-6);
+}
+
+.blockLabel {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--paper-faint);
+  margin-bottom: var(--space-3);
+}
+
+.relRow {
+  display: flex;
+  gap: var(--space-4);
+  overflow-x: auto;
+  padding-bottom: var(--space-3);
+  scroll-snap-type: x proximity;
+}
+
+.relItem {
+  flex: none;
+  width: 150px;
+  scroll-snap-align: start;
+}
+
+@media (max-width: 700px) {
+  .detailHead {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .poster {
+    width: 130px;
+  }
+}

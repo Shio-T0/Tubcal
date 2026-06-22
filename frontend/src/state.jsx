@@ -75,14 +75,23 @@ export function AppProviders({ children }) {
   const [pstate, setPstate] = useState({ players: [], expandedId: null, order: [] });
   // Up-next queue; a finished expanded video auto-advances to the next item.
   const [queue, setQueue] = useState([]);
+  // Seek-to-timestamp plumbing (Archive transcript deep-links). `seekTargets`
+  // holds a pending offset for a video about to mount; `seekSignal` nudges an
+  // already-playing card to jump. The expanded PlayerCard consumes both.
+  const seekTargets = useRef({});
+  const [seekSignal, setSeekSignal] = useState(null);
   const expandedRef = useRef(null);
   useEffect(() => {
     expandedRef.current = pstate.expandedId;
   }, [pstate.expandedId]);
 
-  const openVideo = useCallback((item) => {
+  const openVideo = useCallback((item, opts = {}) => {
     if (!item) return;
     recordWatch(item);
+    if (opts.start != null) {
+      seekTargets.current[item.id] = opts.start;       // applied on mount
+      setSeekSignal({ id: item.id, t: opts.start, n: Date.now() }); // and if already open
+    }
     setPstate((st) => {
       const players = st.players.some((x) => x.id === item.id)
         ? st.players
@@ -94,6 +103,18 @@ export function AppProviders({ children }) {
       }
       return { players, expandedId: item.id, order };
     });
+  }, []);
+
+  // Jump the (already-open) video to a timestamp — used by transcript clicks.
+  const seekVideo = useCallback((id, t) => {
+    if (!id || t == null) return;
+    seekTargets.current[id] = t;
+    setSeekSignal({ id, t, n: Date.now() });
+  }, []);
+  const takeSeekTarget = useCallback((id) => {
+    const t = seekTargets.current[id];
+    delete seekTargets.current[id];
+    return t;
   }, []);
 
   // Close the expanded video entirely (stop it).
@@ -285,6 +306,9 @@ export function AppProviders({ children }) {
     enqueue: enqueueVideo,
     dequeue: dequeueVideo,
     ended: endedVideo,
+    seek: seekVideo,
+    seekSignal,
+    takeSeekTarget,
   };
 
   return (

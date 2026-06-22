@@ -67,17 +67,17 @@
   inset: 0;
   background-image: repeating-linear-gradient(
     to bottom,
-    rgba(0, 0, 0, 0.16) 0px,
-    rgba(0, 0, 0, 0.16) 1px,
+    rgba(0, 0, 0, 0.26) 0px,
+    rgba(0, 0, 0, 0.26) 1px,
     transparent 1px,
-    transparent 3px
+    transparent 4px
   );
-  opacity: 0.5;
+  opacity: 0.8;
   mix-blend-mode: multiply;
 }
 
 [data-theme='light'] .backdrop__scan {
-  opacity: 0.22;
+  opacity: 0.34;
 }
 
 .backdrop__grain {
@@ -102,6 +102,172 @@
 
 @media (prefers-reduced-motion: reduce) {
   .backdrop__lamp {
+    animation: none;
+  }
+}
+
+/* ===================== PHOSPHOR TERMINAL ===================== */
+.bd-term__scan {
+  position: absolute;
+  inset: 0;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.32) 0px,
+    rgba(0, 0, 0, 0.32) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  opacity: 0.7;
+}
+
+/* a soft green inner glow + a slow brightness breathe — the tube warming */
+.bd-term__flicker {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 90% 70% at 50% 42%, rgba(54, 255, 106, 0.07), transparent 70%);
+  animation: tcFlicker 5s ease-in-out infinite;
+}
+
+@keyframes tcFlicker {
+  0%, 100% { opacity: 0.85; }
+  47% { opacity: 1; }
+  48% { opacity: 0.7; }
+  49% { opacity: 1; }
+  70% { opacity: 0.92; }
+}
+
+.bd-term__vignette {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 124% 116% at 50% 48%, transparent 46%, rgba(0, 0, 0, 0.72) 100%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bd-term__flicker {
+    animation: none;
+  }
+}
+
+/* ===================== BAUHAUS PRINT ===================== */
+/* big flat primary shapes washing the bone paper, kept faint so content reads */
+.bd-bau__circle {
+  position: absolute;
+  width: 46vmax;
+  height: 46vmax;
+  right: -10vmax;
+  top: -8vmax;
+  border-radius: 50%;
+  background: #e2231a;
+  opacity: 0.12;
+}
+
+.bd-bau__bar {
+  position: absolute;
+  width: 150vmax;
+  height: 12vmax;
+  left: -10vmax;
+  top: 38%;
+  background: #0b4ee2;
+  opacity: 0.1;
+  transform: rotate(-18deg);
+}
+
+.bd-bau__tri {
+  position: absolute;
+  left: -4vmax;
+  bottom: -6vmax;
+  width: 0;
+  height: 0;
+  border-left: 22vmax solid transparent;
+  border-right: 22vmax solid transparent;
+  border-bottom: 34vmax solid #ffd400;
+  opacity: 0.13;
+}
+
+/* ===================== BLUEPRINT ===================== */
+.bd-bp__grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    repeating-linear-gradient(to right, rgba(95, 208, 255, 0.16) 0 1px, transparent 1px 40px),
+    repeating-linear-gradient(to bottom, rgba(95, 208, 255, 0.16) 0 1px, transparent 1px 40px);
+}
+
+.bd-bp__grid--fine {
+  background-image:
+    repeating-linear-gradient(to right, rgba(95, 208, 255, 0.07) 0 1px, transparent 1px 8px),
+    repeating-linear-gradient(to bottom, rgba(95, 208, 255, 0.07) 0 1px, transparent 1px 8px);
+}
+
+.bd-bp__vignette {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 126% 116% at 50% 46%, transparent 50%, rgba(3, 11, 24, 0.66) 100%);
+}
+
+/* ===================== AQUA Y2K ===================== */
+.bd-aqua__sky {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, #cfe0f7 0%, #eef3fb 55%, #e7eefb 100%);
+}
+
+.bd-aqua__pin {
+  position: absolute;
+  inset: 0;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    rgba(120, 150, 200, 0.05) 0 1px,
+    transparent 1px 4px
+  );
+}
+
+/* ===================== DEEP SPACE ===================== */
+.bd-space__nebula {
+  position: absolute;
+  inset: -10%;
+  background:
+    radial-gradient(40vmax 36vmax at 18% 22%, rgba(124, 92, 255, 0.32), transparent 60%),
+    radial-gradient(44vmax 40vmax at 82% 72%, rgba(34, 211, 238, 0.22), transparent 62%),
+    radial-gradient(34vmax 30vmax at 60% 30%, rgba(255, 92, 168, 0.16), transparent 60%);
+  animation: spaceDrift 48s ease-in-out infinite alternate;
+  will-change: transform;
+}
+
+@keyframes spaceDrift {
+  from { transform: translate3d(-2%, -1%, 0) scale(1); }
+  to { transform: translate3d(2%, 2%, 0) scale(1.08); }
+}
+
+/* two star layers, different density + parallax speed */
+.bd-space__stars {
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(1.4px 1.4px at 20px 30px, rgba(255, 255, 255, 0.9), transparent),
+    radial-gradient(1.4px 1.4px at 120px 80px, rgba(255, 255, 255, 0.7), transparent),
+    radial-gradient(1.6px 1.6px at 200px 160px, rgba(200, 220, 255, 0.9), transparent),
+    radial-gradient(1.2px 1.2px at 280px 40px, rgba(255, 255, 255, 0.6), transparent),
+    radial-gradient(1.4px 1.4px at 340px 220px, rgba(255, 255, 255, 0.8), transparent);
+  background-size: 360px 280px;
+  background-repeat: repeat;
+  animation: starDrift 90s linear infinite;
+}
+
+.bd-space__stars--far {
+  background-size: 240px 200px;
+  opacity: 0.55;
+  animation-duration: 150s;
+}
+
+@keyframes starDrift {
+  from { background-position: 0 0; }
+  to { background-position: 0 -1400px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bd-space__nebula,
+  .bd-space__stars {
     animation: none;
   }
 }

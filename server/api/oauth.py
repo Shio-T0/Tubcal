@@ -25,6 +25,12 @@ PROVIDERS = {
         "token_url": "https://www.reddit.com/api/v1/access_token",
         "scope": "read mysubreddits identity",
     },
+    "anilist": {
+        "auth_url": "https://anilist.co/api/v2/oauth/authorize",
+        "token_url": "https://anilist.co/api/v2/oauth/token",
+        "scope": None,        # AniList has no scope system — tokens are full-access
+        "no_refresh": True,   # access tokens last ~1 year; there is no refresh flow
+    },
 }
 
 
@@ -40,12 +46,22 @@ def _check_provider(provider):
 def get_valid_token(provider):
     """Return a fresh access token, refreshing lazily. Raises LookupError if not connected."""
     row = db.get_oauth(provider)
+    meta = PROVIDERS.get(provider, {})
+
+    # No-refresh providers (AniList): the access token is long-lived and there is
+    # no refresh flow — return it while valid, otherwise ask the user to reconnect.
+    if meta.get("no_refresh"):
+        if not row or not row.get("access_token"):
+            raise LookupError(f"{provider} is not connected — add credentials in Settings")
+        if (row.get("expires_at") or 0) <= time.time() + 60:
+            raise LookupError(f"{provider} token expired — reconnect in Settings")
+        return row["access_token"]
+
     if not row or not row.get("refresh_token"):
         raise LookupError(f"{provider} is not connected — add credentials in Settings")
     if row.get("access_token") and (row.get("expires_at") or 0) > time.time() + 60:
         return row["access_token"]
 
-    meta = PROVIDERS[provider]
     if provider == "google":
         resp = httpc.post(meta["token_url"], data={
             "client_id": row["client_id"],
@@ -70,11 +86,16 @@ def get_valid_token(provider):
 @oauth_bp.get("/status")
 def status():
     out = {}
-    for provider in PROVIDERS:
+    for provider, meta in PROVIDERS.items():
         row = db.get_oauth(provider)
+        # No-refresh providers count as connected once they hold an access token.
+        connected = bool(
+            row
+            and (row.get("refresh_token") or (meta.get("no_refresh") and row.get("access_token")))
+        )
         out[provider] = {
             "configured": bool(row and row.get("client_id")),
-            "connected": bool(row and row.get("refresh_token")),
+            "connected": connected,
         }
     return ok(out)
 
@@ -118,6 +139,14 @@ def start(provider):
             "prompt": "consent",
             "state": state,
         }
+    elif provider == "anilist":
+        # AniList has no scope/duration params — just the code request.
+        params = {
+            "client_id": row["client_id"],
+            "redirect_uri": _redirect_uri(provider),
+            "response_type": "code",
+            "state": state,
+        }
     else:
         params = {
             "client_id": row["client_id"],
@@ -158,6 +187,15 @@ def callback(provider):
                 "redirect_uri": _redirect_uri(provider),
                 "grant_type": "authorization_code",
             })
+        elif provider == "anilist":
+            # AniList wants JSON; returns a ~1-year access_token and no refresh_token.
+            resp = httpc.post(meta["token_url"], json={
+                "grant_type": "authorization_code",
+                "client_id": row["client_id"],
+                "client_secret": row["client_secret"],
+                "redirect_uri": _redirect_uri(provider),
+                "code": code,
+            })
         else:
             resp = httpc.post(
                 meta["token_url"],
@@ -175,7 +213,7 @@ def callback(provider):
         expires_at = int(time.time()) + int(tok.get("expires_in", 3600))
         db.set_oauth_tokens(
             provider, tok["access_token"], tok.get("refresh_token"), expires_at,
-            scopes=meta["scope"],
+            scopes=meta.get("scope"),
         )
     except Exception:
         return redirect("/settings?oauth_error=token_exchange_failed")
