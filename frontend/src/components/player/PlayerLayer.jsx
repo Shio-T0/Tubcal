@@ -189,15 +189,37 @@ function PlayerCard({ item, expanded, style, dragging, muted, rate, roomForPanel
   useEffect(() => {
     const v = videoRef.current;
     if (!v || !active) return undefined;
+    retryRef.current = 0; // fresh source — reset the per-source error retries
+    setPlayErr(null);
     if (isHls) {
       const url = sapi.hls(active.itag);
       if (Hls.isSupported()) {
-        const hls = new Hls({ maxBufferLength: 30 });
+        // backBufferLength frees already-played segments so long videos don't
+        // grow memory unbounded; the buffer caps keep ahead-of-playhead modest.
+        const hls = new Hls({
+          maxBufferLength: 30,
+          maxMaxBufferLength: 60,
+          backBufferLength: 30,
+        });
+        // A single fatal HLS error is often transient (an expired segment, a
+        // dropped connection). hls.js can recover network errors by reloading
+        // and media errors by flushing the decoder, so try a bounded number of
+        // recoveries before surfacing an error — this is what otherwise showed
+        // up as an intermittent "unsupported format".
+        let recoveries = 0;
         hls.loadSource(url);
         hls.attachMedia(v);
         hls.on(Hls.Events.MANIFEST_PARSED, () => v.play().catch(() => {}));
         hls.on(Hls.Events.ERROR, (_, d) => {
-          if (d.fatal) setPlayErr(`HLS ${d.type}${d.details ? ` — ${d.details}` : ''}`);
+          if (!d.fatal) return;
+          if (recoveries < 3) {
+            recoveries += 1;
+            if (d.type === Hls.ErrorTypes.NETWORK_ERROR) hls.startLoad();
+            else if (d.type === Hls.ErrorTypes.MEDIA_ERROR) hls.recoverMediaError();
+            else hls.destroy();
+            return;
+          }
+          setPlayErr(`HLS ${d.type}${d.details ? ` — ${d.details}` : ''}`);
         });
         return () => hls.destroy();
       }
@@ -215,8 +237,22 @@ function PlayerCard({ item, expanded, style, dragging, muted, rate, roomForPanel
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playKey]);
 
+  const retryRef = useRef(0);
   const onVideoError = (e) => {
-    const me = e.currentTarget.error;
+    const v = e.currentTarget;
+    const me = v.error;
+    // The progressive proxy re-resolves expired URLs itself, so a browser-side
+    // error here is usually a transient network/decode blip. Reload the element
+    // a couple of times (cache-busted) before giving up — this avoids a flash of
+    // "unsupported format" on a stream that's actually fine on the next try.
+    if (!isHls && active && retryRef.current < 2) {
+      retryRef.current += 1;
+      const base = sapi.mp4(active.itag);
+      v.src = `${base}${base.includes('?') ? '&' : '?'}r=${retryRef.current}`;
+      v.load();
+      v.play().catch(() => {});
+      return;
+    }
     const codes = { 1: 'ABORTED', 2: 'NETWORK', 3: 'DECODE', 4: 'SRC_NOT_SUPPORTED' };
     setPlayErr(me ? `${codes[me.code] || me.code}${me.message ? ` — ${me.message}` : ''}` : 'unknown');
   };
@@ -442,7 +478,7 @@ export default function PlayerLayer() {
   const dockCardH = BAR_H + (dockW * 9) / 16;
   // The info/comments panel floats at the left edge; it only fits on a wide
   // enough viewport, otherwise the toggle is hidden and the video stays centered.
-  const PANEL_W = 360;
+  const PANEL_W = 420; // keep in sync with .floatPanel width in player.module.css
   const expandedItem = players.find((p) => p.id === expandedId)?.item;
   // The info/transcript panel is YouTube-only (description, comments, the Archive);
   // anime episodes and other platforms have nothing to put in it.

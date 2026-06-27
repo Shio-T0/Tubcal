@@ -512,6 +512,9 @@ export function ChannelPage() {
 
   const vids = useChannelVideos(channelId, sort);
   const playlists = useApi(`/youtube/channel/${channelId}/playlists`, view === 'playlists');
+  // When not subscribed there's no stored thumbnail, so fetch the channel's
+  // avatar + name directly (otherwise the header falls back to a bare letter).
+  const about = useApi(`/youtube/channel/${channelId}/about`, !sub);
 
   // Real search across the channel's whole catalogue (not just loaded pages).
   const q = query.trim();
@@ -523,7 +526,9 @@ export function ChannelPage() {
   );
   const searchItems = chSearch.data?.items || [];
 
-  const name = sub?.display_name || vids.videos[0]?.source || channelId;
+  const name =
+    sub?.display_name || about.data?.title || vids.videos[0]?.source || channelId;
+  const avatar = sub?.thumbnail || about.data?.thumbnail;
   const pls = playlists.data?.items || [];
 
   return (
@@ -532,7 +537,7 @@ export function ChannelPage() {
         <ArrowLeft size={13} /> back to the screening room
       </Link>
       <div className={s.channelHead}>
-        <Avatar src={sub?.thumbnail} name={name} imgClass={s.channelAvatar} letterClass={s.channelLetter} />
+        <Avatar src={avatar} name={name} imgClass={s.channelAvatar} letterClass={s.channelLetter} />
         <div>
           <span className="kicker" style={{ color: 'var(--c-youtube)' }}>
             Private screening

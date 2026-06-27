@@ -16,7 +16,7 @@ _refreshing = set()
 
 
 def _store(key, payload, now, ttl):
-    entry = {"payload": payload, "fetched_at": now}
+    entry = {"payload": payload, "fetched_at": now, "ttl": ttl}
     with _lock:
         _mem[key] = entry
     con = db.connect()
@@ -37,10 +37,16 @@ def _load_entry(key):
     if entry is not None:
         return entry
     con = db.connect()
-    row = con.execute("SELECT payload, fetched_at FROM cache WHERE key=?", (key,)).fetchone()
+    row = con.execute(
+        "SELECT payload, fetched_at, ttl FROM cache WHERE key=?", (key,)
+    ).fetchone()
     con.close()
     if row:
-        entry = {"payload": json.loads(row["payload"]), "fetched_at": row["fetched_at"]}
+        entry = {
+            "payload": json.loads(row["payload"]),
+            "fetched_at": row["fetched_at"],
+            "ttl": row["ttl"],
+        }
         with _lock:
             _mem[key] = entry
         return entry
@@ -135,6 +141,26 @@ def cached(key, ttl, fetcher):
         )
     con.close()
     return payload, False
+
+
+def cached_dynamic(key, fetcher):
+    """Like cached(), but the fetcher returns (payload, ttl) so the freshness
+    window can depend on the *result*. Use when a fully-resolved value should be
+    cached for a long time but a degraded/fallback value only briefly, so a
+    transient upstream hiccup can't lock in a bad payload for the full TTL.
+    Falls back to any stored value (even expired) when the fetch raises."""
+    now = time.time()
+    entry = _load_entry(key)
+    if entry and now - entry["fetched_at"] < entry.get("ttl", 0):
+        return entry["payload"]
+    try:
+        payload, ttl = fetcher()
+    except Exception:
+        if entry:
+            return entry["payload"]
+        raise
+    _store(key, payload, now, ttl)
+    return payload
 
 
 def invalidate(prefix=""):

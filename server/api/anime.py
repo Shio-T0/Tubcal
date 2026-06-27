@@ -34,7 +34,7 @@ def search():
         return ok({"items": []})
     page = int(request.args.get("page") or 1)
     try:
-        return ok({"items": anilist.search(q, page=page)})
+        return ok({"items": anilist.search(q, page=page, token=_token())})
     except Exception as e:
         return err(f"AniList search failed: {e}", 502)
 
@@ -44,7 +44,7 @@ def browse():
     kind = request.args.get("kind") or "trending"
     page = int(request.args.get("page") or 1)
     try:
-        return ok({"items": anilist.browse(kind, page=page), "kind": kind})
+        return ok({"items": anilist.browse(kind, page=page, token=_token()), "kind": kind})
     except Exception as e:
         return err(f"AniList browse failed: {e}", 502)
 
@@ -85,6 +85,41 @@ def me():
         return err(f"AniList viewer failed: {e}", 502)
 
 
+@anime_bp.get("/settings")
+def get_settings():
+    """Editable AniList account settings for the active profile studio."""
+    try:
+        token = get_valid_token("anilist")
+    except LookupError as e:
+        return err(str(e), 401)
+    try:
+        return ok(anilist.viewer_settings(token))
+    except Exception as e:
+        return err(f"AniList settings failed: {e}", 502)
+
+
+@anime_bp.post("/settings")
+def set_settings():
+    try:
+        token = get_valid_token("anilist")
+    except LookupError as e:
+        return err(str(e), 401)
+    body = request.get_json(force=True, silent=True) or {}
+    allowed = {
+        k: body[k]
+        for k in ("about", "score_format", "title_language", "profile_color",
+                  "adult_content", "airing_notifications")
+        if k in body
+    }
+    if not allowed:
+        return err("nothing to update")
+    try:
+        anilist.update_user(token, **allowed)
+        return ok(anilist.viewer_settings(token))
+    except Exception as e:
+        return err(f"AniList update failed: {e}", 502)
+
+
 @anime_bp.post("/list")
 def set_list():
     try:
@@ -95,12 +130,16 @@ def set_list():
     media_id = body.get("media_id")
     if not media_id:
         return err("media_id required")
-    status, progress, score = body.get("status"), body.get("progress"), body.get("score")
-    if status is None and progress is None and score is None:
+    fields = {
+        k: body[k]
+        for k in ("status", "progress", "score", "repeat", "notes",
+                  "started_at", "completed_at")
+        if k in body
+    }
+    if not fields:
         return err("nothing to update")
     try:
-        return ok(anilist.save_list_entry(
-            token, int(media_id), status=status, progress=progress, score=score))
+        return ok(anilist.save_list_entry(token, int(media_id), **fields))
     except Exception as e:
         return err(f"AniList update failed: {e}", 502)
 
@@ -134,16 +173,46 @@ def recommend():
         return err(f"AniList recommend failed: {e}", 502)
 
 
+@anime_bp.post("/favourite")
+def favourite():
+    try:
+        token = get_valid_token("anilist")
+    except LookupError as e:
+        return err(str(e), 401)
+    media_id = (request.get_json(force=True, silent=True) or {}).get("media_id")
+    if not media_id:
+        return err("media_id required")
+    try:
+        return ok(anilist.toggle_favourite(token, int(media_id)))
+    except Exception as e:
+        return err(f"AniList favourite failed: {e}", 502)
+
+
 # ── discussions: forum threads + activity feed ───────────────────────────────
 
 @anime_bp.get("/threads")
 def threads():
     media_id = request.args.get("media_id", type=int)
+    category = request.args.get("category", type=int)
+    q = (request.args.get("q") or "").strip() or None
+    spoiler = request.args.get("spoiler") or None
     page = int(request.args.get("page") or 1)
     try:
-        return ok({"items": anilist.forum_threads(media_id=media_id, page=page)})
+        return ok({"items": anilist.forum_threads(
+            category_id=category, media_id=media_id, search=q, spoiler=spoiler, page=page)})
     except Exception as e:
         return err(f"AniList threads failed: {e}", 502)
+
+
+@anime_bp.get("/user/<name>")
+def user(name):
+    try:
+        prof = anilist.user_profile(name)
+        if not prof:
+            return err("user not found", 404)
+        return ok(prof)
+    except Exception as e:
+        return err(f"AniList user failed: {e}", 502)
 
 
 @anime_bp.get("/thread/<int:thread_id>")
@@ -160,13 +229,25 @@ def thread_comment(thread_id):
         token = get_valid_token("anilist")
     except LookupError as e:
         return err(str(e), 401)
-    text = ((request.get_json(force=True, silent=True) or {}).get("text") or "").strip()
+    body = request.get_json(force=True, silent=True) or {}
+    text = (body.get("text") or "").strip()
     if not text:
         return err("comment text required")
     try:
-        return ok(anilist.save_thread_comment(token, thread_id, text))
+        return ok(anilist.save_thread_comment(token, thread_id, text, parent_id=body.get("parent_id")))
     except Exception as e:
         return err(f"AniList comment failed: {e}", 502)
+
+
+@anime_bp.get("/media_card/<int:media_id>")
+def media_card(media_id):
+    try:
+        card = anilist.media_card(media_id)
+        if not card:
+            return err("not found", 404)
+        return ok(card)
+    except Exception as e:
+        return err(f"AniList media card failed: {e}", 502)
 
 
 @anime_bp.get("/activity")

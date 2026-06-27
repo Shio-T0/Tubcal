@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { BookOpen, Eye, FileText, Sparkles, ThumbsUp, X } from 'lucide-react';
+import { BookOpen, Eye, FileText, MessageCircle, Sparkles, ThumbsUp, X } from 'lucide-react';
 
 import { api, useApi } from '../../api/client.js';
 import { compact } from '../../lib/format.js';
@@ -202,42 +202,58 @@ function InfoTab({ item }) {
   const comments = useApi(vid ? `/youtube/comments/${vid}` : '', !!vid);
   const info = meta.data;
   const list = comments.data?.comments || [];
+
+  // Lazily fetch a comment's nested replies by its continuation token.
+  const loadReplies = useCallback(
+    (token, depth) =>
+      api(`/youtube/comments/${vid}/replies?token=${encodeURIComponent(token)}&depth=${depth}`),
+    [vid],
+  );
+
   return (
     <>
       {info && (info.view_count != null || info.like_count != null) && (
         <div className={s.panelStats}>
           {info.view_count != null && (
-            <span>
-              <Eye size={12} /> {compact(info.view_count)}
-              {info.live_status === 'is_live' ? ' watching' : ' views'}
+            <span className={s.statChip}>
+              <Eye size={13} />
+              <b>{compact(info.view_count)}</b>
+              {info.live_status === 'is_live' ? 'watching' : 'views'}
             </span>
           )}
           {info.like_count != null && (
-            <span>
-              <ThumbsUp size={12} /> {compact(info.like_count)}
+            <span className={s.statChip}>
+              <ThumbsUp size={13} />
+              <b>{compact(info.like_count)}</b>
+              likes
             </span>
           )}
         </div>
       )}
 
       {info?.description ? (
-        <>
+        <section className={s.panelSection}>
           <div className={s.panelLabel}>Description</div>
           <Description text={info.description} />
-        </>
+        </section>
       ) : null}
 
-      <div className={s.panelLabel}>Comments</div>
-      {comments.loading && (
-        <div className={s.panelCenter}>
-          <Spinner />
+      <section className={s.panelSection}>
+        <div className={s.panelLabel}>
+          <MessageCircle size={12} /> Comments
+          {list.length > 0 && <span className={s.labelCount}>{list.length}</span>}
         </div>
-      )}
-      {comments.error && <p className={s.panelEmpty}>Comments unavailable right now.</p>}
-      {!comments.loading && !comments.error && list.length === 0 && (
-        <p className={s.panelEmpty}>No comments to show.</p>
-      )}
-      {list.length > 0 && <CommentThread comments={list} />}
+        {comments.loading && (
+          <div className={s.panelCenter}>
+            <Spinner />
+          </div>
+        )}
+        {comments.error && <p className={s.panelEmpty}>Comments unavailable right now.</p>}
+        {!comments.loading && !comments.error && list.length === 0 && (
+          <p className={s.panelEmpty}>No comments to show.</p>
+        )}
+        {list.length > 0 && <CommentThread comments={list} loadReplies={loadReplies} />}
+      </section>
     </>
   );
 }
@@ -258,6 +274,9 @@ export default function PlayerSidePanel({ item, onClose }) {
   return (
     <aside className={s.floatPanel}>
       <div className={s.panelHead}>
+        {item.thumbnail && (
+          <img className={s.panelHeadThumb} src={item.thumbnail} alt="" loading="lazy" />
+        )}
         <div className={s.panelHeadText}>
           <span className={s.panelHeadTitle}>{item.title}</span>
           {channelId ? (

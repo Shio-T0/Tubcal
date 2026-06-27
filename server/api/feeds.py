@@ -128,6 +128,14 @@ def feed_youtube_channel(channel_id):
         return err(f"Channel fetch failed: {e}", 502)
 
 
+@feeds_bp.get("/youtube/channel/<channel_id>/about")
+def youtube_channel_about(channel_id):
+    try:
+        return ok(youtube.channel_about(channel_id))
+    except Exception as e:
+        return err(f"Channel info fetch failed: {e}", 502)
+
+
 @feeds_bp.get("/youtube/channel/<channel_id>/videos")
 def youtube_channel_videos(channel_id):
     sort = (request.args.get("sort") or "newest").strip()
@@ -221,8 +229,10 @@ def youtube_stream_data(video_id):
     """
     itag = request.args.get("itag")
 
-    # A cached stream URL can rot before its TTL (googlevideo 403s expired/
-    # consumed URLs); on a 403 drop the cache and re-resolve a fresh one once.
+    # A cached stream URL can rot before its TTL (googlevideo 4xx's expired/
+    # consumed URLs); on any client/server error drop the cache and re-resolve a
+    # fresh one once — otherwise the browser sees a non-media error body and
+    # reports it as an unsupported source.
     upstream = None
     for attempt in range(2):
         try:
@@ -234,7 +244,7 @@ def youtube_stream_data(video_id):
         upstream = httpc.session.get(
             target["url"], headers=_fwd_headers(), stream=True, timeout=20, allow_redirects=True,
         )
-        if upstream.status_code != 403 or attempt == 1:
+        if upstream.status_code < 400 or attempt == 1:
             break
         upstream.close()
         cache.invalidate(f"yt:info:{video_id}")
@@ -272,23 +282,36 @@ def _rewrite_hls(text, base_url):
 
 @feeds_bp.get("/youtube/hls/<video_id>/<itag>.m3u8")
 def youtube_hls_playlist(video_id, itag):
-    """Serve a rewritten HLS media playlist for one rendition (up to 1080p)."""
-    try:
-        target = _find_stream(video_id, itag, kind="hls")
-    except Exception as e:
-        return err(f"Stream resolve failed: {e}", 502)
-    if not target:
-        return err("No HLS stream", 404)
-    try:
-        text = httpc.session.get(
-            target["url"], headers={"User-Agent": config.BROWSER_UA}, timeout=20
-        ).text
-    except Exception as e:
-        return err(f"HLS playlist fetch failed: {e}", 502)
-    return Response(
-        _rewrite_hls(text, target["url"]),
-        content_type="application/vnd.apple.mpegurl",
-    )
+    """Serve a rewritten HLS media playlist for one rendition (up to 1080p).
+
+    Like the progressive path, a cached manifest URL can expire; if the fetch
+    fails or comes back as anything but a real playlist (an expired URL returns
+    an error page, which hls.js then rejects as a malformed manifest → looks like
+    an unsupported video), drop the cache and re-resolve a fresh URL once."""
+    last_err = None
+    for attempt in range(2):
+        try:
+            target = _find_stream(video_id, itag, kind="hls")
+        except Exception as e:
+            return err(f"Stream resolve failed: {e}", 502)
+        if not target:
+            return err("No HLS stream", 404)
+        try:
+            resp = httpc.session.get(
+                target["url"], headers={"User-Agent": config.BROWSER_UA}, timeout=20
+            )
+            if resp.status_code == 200 and resp.text.lstrip().startswith("#EXTM3U"):
+                return Response(
+                    _rewrite_hls(resp.text, target["url"]),
+                    content_type="application/vnd.apple.mpegurl",
+                )
+            last_err = f"HTTP {resp.status_code}"
+        except Exception as e:
+            last_err = str(e)
+        if attempt == 0:
+            cache.invalidate(f"yt:info:{video_id}")
+            cache.invalidate(f"yt:inv:streams:{video_id}")
+    return err(f"HLS playlist fetch failed: {last_err or 'bad manifest'}", 502)
 
 
 @feeds_bp.get("/youtube/hls/seg")
@@ -337,6 +360,18 @@ def youtube_comments(video_id):
         return ok(youtube.video_comments(video_id))
     except Exception as e:
         return err(f"Comments fetch failed: {e}", 502)
+
+
+@feeds_bp.get("/youtube/comments/<video_id>/replies")
+def youtube_comment_replies(video_id):
+    token = request.args.get("token", "")
+    if not token:
+        return err("missing reply token")
+    depth = request.args.get("depth", type=int) or 1
+    try:
+        return ok(youtube.video_comment_replies(video_id, token, depth))
+    except Exception as e:
+        return err(f"Replies fetch failed: {e}", 502)
 
 
 @feeds_bp.get("/youtube/live")

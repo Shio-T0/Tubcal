@@ -111,6 +111,28 @@ def resolve_channel(raw):
     return {"channel_id": channel_id, "title": title, "thumbnail": thumbnail}
 
 
+def channel_about(channel_id):
+    """Channel name + avatar for a raw channel id, for the channel page header
+    when the user isn't subscribed (a subscription row carries the thumbnail; a
+    cold visit has none, which is why the avatar fell back to a letter). Cached;
+    RSS gives the canonical title, og:image scrape gives the avatar."""
+    def fetch():
+        title = channel_id
+        try:
+            rss = httpc.get(RSS_URL.format(channel_id)).text
+            title = feedparser.parse(rss).feed.get("title") or channel_id
+        except Exception:
+            pass
+        return {
+            "channel_id": channel_id,
+            "title": title,
+            "thumbnail": fetch_channel_avatar(channel_id),
+        }
+
+    payload, _ = cache.cached(f"yt:about:{channel_id}", config.TTL_YT_RSS, fetch)
+    return payload
+
+
 def _channel_items(channel_id):
     def fetch():
         rss = httpc.get(RSS_URL.format(channel_id)).text
@@ -216,16 +238,30 @@ def _collect_streams(data, is_live):
     We keep progressive 360p as the floor and HLS only above it, so the quality
     list has no duplicate 360p and tops out at the best HLS rendition. For a live
     broadcast YouTube only exposes HLS, so we keep every muxed m3u8 rung.
+
+    Multi-audio handling: when a video ships dubbed audio tracks, YouTube exposes
+    one muxed rendition per language at every height (e.g. 96-0 … 96-22), tagging
+    the creator's real track with format_note "(original)". Picking blindly would
+    surface — and default to — a dubbed track, so on such videos we keep only the
+    original-language renditions. (Progressive itag 18 always carries the original
+    audio, so it's exempt.)
     """
+    formats = data.get("formats", [])
+    multi_audio = any(
+        "original" in (f.get("format_note") or "").lower() for f in formats
+    )
     streams = []
-    for f in data.get("formats", []):
+    for f in formats:
         if f.get("vcodec") in (None, "none") or f.get("acodec") in (None, "none"):
             continue
         if not f.get("url"):
             continue
         proto = f.get("protocol") or ""
         h = f.get("height") or 0
+        note = (f.get("format_note") or "").lower()
         if proto.startswith("m3u8") and (h > 360 or is_live):
+            if multi_audio and "original" not in note:
+                continue  # a dubbed track — skip it, keep only the original
             kind = "hls"
         elif proto.startswith("http") and f.get("ext") == "mp4":
             kind = "mp4"
@@ -296,13 +332,18 @@ def _ytdlp_info(video_id):
 def video_info(video_id):
     """Full metadata + playable streams for one video.
 
-    yt-dlp first (reliable), Invidious as a last resort. Cached briefly since the
-    googlevideo stream URLs carry a short-lived `expire`."""
+    yt-dlp first (reliable), Invidious as a last resort. Cached since the
+    googlevideo stream URLs carry a short-lived `expire`.
+
+    The fetch returns (payload, ttl): a clean yt-dlp resolve is cached 30 min,
+    but the Invidious fallback — whose raw URLs often 403 in the browser, showing
+    up as an intermittent "unsupported format" — is cached only ~90 s so a
+    transient yt-dlp hiccup can't lock in a broken stream for the full window."""
     from . import invidious
 
     def fetch():
         try:
-            return _ytdlp_info(video_id)
+            return _ytdlp_info(video_id), 1800
         except Exception:
             inv = invidious.video_streams(video_id)  # streams + title + duration
             return {
@@ -317,10 +358,10 @@ def video_info(video_id):
                 "live_status": None,
                 "scheduled_at": None,
                 "streams": inv.get("streams") or [],
-            }
+                "degraded": True,
+            }, 90
 
-    payload, _ = cache.cached(f"yt:info:{video_id}", 1800, fetch)
-    return payload
+    return cache.cached_dynamic(f"yt:info:{video_id}", fetch)
 
 
 def video_streams(video_id):
@@ -342,6 +383,16 @@ def video_comments(video_id):
         return invidious.comments(video_id)
     except Exception:
         return {"comments": [], "disabled": False}
+
+
+def video_comment_replies(video_id, continuation, depth=1):
+    """Nested replies under a comment, via its continuation token. Best-effort."""
+    from . import invidious
+
+    try:
+        return invidious.comment_replies(video_id, continuation, depth)
+    except Exception:
+        return {"comments": [], "continuation": None}
 
 
 def _ytdlp_flat_tab(channel_id, tab, limit=12):
@@ -496,6 +547,48 @@ def _playlist_items_rss(plid):
     return title, items
 
 
+def _video_author(video_id):
+    """Resolve one video's uploader (name + channel id) via YouTube's key-free
+    oEmbed endpoint. Flat-playlist entries carry no channel info at all, so a
+    mixed playlist's cards would otherwise show no creator. Cached per video id
+    (channels rarely rename), best-effort → {author, channel_id} with blanks on
+    failure."""
+    def fetch():
+        url = (
+            "https://www.youtube.com/oembed?format=json&url="
+            + quote(f"https://www.youtube.com/watch?v={video_id}", safe="")
+        )
+        data = httpc.get(url).json()
+        channel_id = None
+        m = re.search(r"/channel/(UC[A-Za-z0-9_-]{22})", data.get("author_url") or "")
+        if m:
+            channel_id = m.group(1)
+        return {"author": data.get("author_name") or "", "channel_id": channel_id}
+
+    try:
+        payload, _ = cache.cached(f"yt:oembed:{video_id}", config.TTL_YT_RSS, fetch)
+        return payload
+    except Exception:
+        return {"author": "", "channel_id": None}
+
+
+def _enrich_authors(items):
+    """Fill in blank authors on a list of feed items (in place) via oEmbed,
+    fetched in parallel. Items that already have an author are left untouched."""
+    missing = [it for it in items if not it.get("author")]
+    if not missing:
+        return items
+    with ThreadPoolExecutor(max_workers=8) as ex:
+        metas = list(ex.map(lambda it: _video_author(it["extra"]["video_id"]), missing))
+    for it, meta in zip(missing, metas):
+        author = meta.get("author") or ""
+        it["author"] = author
+        it["source"] = author
+        if meta.get("channel_id") and not it["extra"].get("channel_id"):
+            it["extra"]["channel_id"] = meta["channel_id"]
+    return items
+
+
 def _flat_entry_to_item(e):
     """Normalize a yt-dlp --flat-playlist entry into our feed-item shape."""
     vid = e.get("id")
@@ -543,6 +636,8 @@ def _ytdlp_playlist(plid):
     items = [_flat_entry_to_item(e) for e in (data.get("entries") or []) if e.get("id")]
     if not items:
         raise RuntimeError("yt-dlp returned no playlist entries")
+    # Flat entries carry no uploader, so fill each card's creator via oEmbed.
+    _enrich_authors(items)
     return {
         "title": data.get("title", ""),
         "author": data.get("uploader") or data.get("channel") or "",

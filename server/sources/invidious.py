@@ -9,6 +9,7 @@ Public instances go up and down constantly, so we keep a fallback list, try them
 in order, and cache whichever one answered last so we don't re-probe every call.
 """
 
+import hashlib
 import random
 from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import quote
@@ -394,28 +395,58 @@ def playlist(plid):
     return payload
 
 
+def _norm_comment(c, depth):
+    """One Invidious comment → the CommentThread shape. A comment that has replies
+    carries reply_count + reply_token (a continuation) so the UI can lazily expand
+    its nested thread via comment_replies()."""
+    replies = c.get("replies") or {}
+    return {
+        "id": c.get("commentId") or c.get("id") or "",
+        "author": c.get("author", ""),
+        "author_thumb": (c.get("authorThumbnails") or [{}])[-1].get("url"),
+        "body_html": c.get("contentHtml") or "",
+        "score": c.get("likeCount"),
+        "created_at": _parse_published(c.get("published")),
+        "is_pinned": bool(c.get("isPinned")),
+        "depth": depth,
+        "children": [],
+        "reply_count": replies.get("replyCount") or 0,
+        "reply_token": replies.get("continuation"),
+    }
+
+
 def comments(video_id):
-    """Top-level comments for a video, normalized to the CommentThread shape
-    (flat — no nested replies; the panel only shows the first layer)."""
+    """Top-level comments for a video, normalized to the CommentThread shape.
+    Nested replies load on demand: each comment with replies carries a reply_count
+    and a reply_token the panel expands via comment_replies()."""
     def fetch():
         data = _api_get(f"/comments/{video_id}?sort_by=top")
-        out = []
-        for c in data.get("comments") or []:
-            cid = c.get("commentId") or str(len(out))
-            out.append({
-                "id": cid,
-                "author": c.get("author", ""),
-                "author_thumb": (c.get("authorThumbnails") or [{}])[-1].get("url"),
-                "body_html": c.get("contentHtml") or "",
-                "score": c.get("likeCount"),
-                "created_at": _parse_published(c.get("published")),
-                "is_pinned": bool(c.get("isPinned")),
-                "depth": 0,
-                "children": [],
-            })
+        out = [_norm_comment(c, 0) for c in (data.get("comments") or [])]
+        for i, c in enumerate(out):
+            if not c["id"]:
+                c["id"] = f"c{i}"
         return {"comments": out, "disabled": False}
 
     payload, _ = cache.cached(f"yt:inv:comments:{video_id}", config.TTL_HN_COMMENTS, fetch)
+    return payload
+
+
+def comment_replies(video_id, continuation, depth=1):
+    """One page of replies beneath a comment (or a deeper reply), via that node's
+    continuation token. Returns {comments, continuation}; `continuation` is the
+    token for the next page of replies at this level (None when exhausted). Reply
+    nodes that themselves have replies carry their own reply_token for deeper
+    nesting."""
+    def fetch():
+        data = _api_get(f"/comments/{video_id}?continuation={quote(continuation, safe='')}")
+        out = [_norm_comment(c, depth) for c in (data.get("comments") or [])]
+        for i, c in enumerate(out):
+            if not c["id"]:
+                c["id"] = f"r{depth}-{i}"
+        return {"comments": out, "continuation": data.get("continuation")}
+
+    key = "yt:inv:replies:" + hashlib.sha1(f"{video_id}:{continuation}".encode()).hexdigest()[:16]
+    payload, _ = cache.cached(key, config.TTL_HN_COMMENTS, fetch)
     return payload
 
 
