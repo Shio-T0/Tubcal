@@ -89,6 +89,15 @@ export default function FrontPage() {
           className={`${s.lede} ${lede.thumbnail ? '' : s.ledeNoImage}`}
           style={{ '--lede-c': PLATFORM[lede.platform].color }}
           onClick={() => open(lede)}
+          data-kbd-tile
+          tabIndex={0}
+          role="button"
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              open(lede);
+            }
+          }}
         >
           <div>
             <span className={s.ledeTag}>{PLATFORM[lede.platform].tag} — lead story</span>
@@ -122,6 +131,15 @@ export default function FrontPage() {
             className={s.colItem}
             style={{ '--i': i, '--item-c': PLATFORM[item.platform].color }}
             onClick={() => open(item)}
+            data-kbd-tile
+            tabIndex={0}
+            role="button"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                open(item);
+              }
+            }}
           >
             <span className={s.colTag}>{PLATFORM[item.platform].tag}</span>
             <SaveButton item={item} className={s.saveCorner} />

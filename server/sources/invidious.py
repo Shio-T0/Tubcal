@@ -11,6 +11,8 @@ in order, and cache whichever one answered last so we don't re-probe every call.
 
 import hashlib
 import random
+import threading
+import time
 from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import quote
 
@@ -65,30 +67,86 @@ def _instances():
     return base
 
 
-def _api_get(path):
-    """GET an Invidious /api/v1 path, trying instances in order until one works.
+# ── per-family instance health ───────────────────────────────────────────────
+# _api_get probes instances in order, and public ones go up and down constantly:
+# a cold probe through a dead leader adds whole seconds to *every* call — and
+# opening a channel fires several (videos + playlists + search). So we remember,
+# per endpoint *family* (the first path segment: channels / search / trending /
+# videos / …), which instance last answered and try it first, and we briefly
+# bench an instance that just failed *for that family*.
+#
+# Health is tracked per-family on purpose. The live instances are complementary —
+# darkness.services serves channels/videos/playlists/search/trending and
+# pagination but 404s single-video lookups, while melmac serves single-video
+# (recommendations) but 500s on channel pagination. A *global* winner or loser
+# would therefore break the other family; per-family memory keeps each endpoint
+# pinned to whatever instance actually serves it, while never pinning across
+# families.
+_HEALTH_TTL = 300          # trust a remembered-good instance for a family this long
+_COOLDOWN_SECS = 120       # bench an instance for a family this long after it fails
+_REQUEST_TIMEOUT = 12
+_health_lock = threading.Lock()
+_healthy = {}              # family -> (base, ts)
+_benched = {}              # (family, base) -> until_ts
 
-    We deliberately DON'T cache a 'winning' instance: the live instances are
-    complementary — darkness.services serves channels/videos/playlists/search/
-    trending and pagination but 404s single-video lookups, while melmac serves
-    single-video (recommendations) but 500s on channel pagination. Pinning either
-    one as the global favourite breaks the other family of endpoints, so we just
-    always try the default order (which puts the most capable instance first).
+
+def _family(path):
+    """The endpoint family = the first path segment (channels / search / …)."""
+    return (path.lstrip("/").split("/", 1)[0].split("?", 1)[0]) or "_"
+
+
+def _ordered_instances(family):
+    """Instances to try for a family: the last-good one first, then the rest in
+    preference order, with any currently-benched (recently-failed-here) ones moved
+    to the back so they remain a fallback but never delay a healthy instance."""
+    now = time.time()
+    with _health_lock:
+        good = _healthy.get(family)
+        good_base = good[0] if good and now - good[1] < _HEALTH_TTL else None
+        benched = {b for (f, b), until in _benched.items() if f == family and until > now}
+    live, cold = [], []
+    for b in _instances():
+        (cold if b in benched else live).append(b)
+    order = live + cold
+    if good_base and good_base in order:
+        order.remove(good_base)
+        order.insert(0, good_base)
+    return order
+
+
+def _mark(family, base, ok):
+    now = time.time()
+    with _health_lock:
+        if ok:
+            _healthy[family] = (base, now)
+            _benched.pop((family, base), None)
+        else:
+            _benched[(family, base)] = now + _COOLDOWN_SECS
+
+
+def _api_get(path):
+    """GET an Invidious /api/v1 path, trying instances until one works.
+
+    Order is health-aware (see the note above): the instance that last served
+    this endpoint family is tried first, recently-failed ones last.
     """
+    family = _family(path)
     last_err = None
-    for base in _instances():
+    for base in _ordered_instances(family):
         url = f"{base}/api/v1{path}"
         try:
-            resp = httpc.get(url, timeout=12)
+            resp = httpc.get(url, timeout=_REQUEST_TIMEOUT)
             data = resp.json()
             # Invidious answers HTTP 200 with {"error": ...} when its backend
             # ("companion") can't serve an endpoint — treat that as a miss so we
             # fall through to an instance that actually works for this path.
             if isinstance(data, dict) and data.get("error"):
                 raise ValueError(data["error"])
+            _mark(family, base, True)
             return data
         except (requests.RequestException, ValueError) as e:
             last_err = e
+            _mark(family, base, False)
             continue
     raise RuntimeError(f"All Invidious instances failed ({last_err})")
 

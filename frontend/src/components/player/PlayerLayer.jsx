@@ -18,7 +18,9 @@ import Hls from 'hls.js';
 import { api } from '../../api/client.js';
 import { formatWhen, timeUntil } from '../../lib/time.js';
 import { streamApi } from '../../lib/streams.js';
-import { COMPLETE_RATIO, usePlayer, useProgress, useSettings } from '../../state.jsx';
+import { COMPLETE_RATIO, useAnimeSync, usePlayer, useProgress, useSettings } from '../../state.jsx';
+import { useVideoControls } from '../../lib/useVideoControls.js';
+import PlayerControls from './PlayerControls.jsx';
 import PlayerSidePanel from './PlayerSidePanel.jsx';
 import s from './player.module.css';
 
@@ -39,8 +41,10 @@ function PlayerCard({ item, expanded, style, dragging, muted, rate, roomForPanel
   const channelId = item.extra?.channel_id;
   const [over, setOver] = useState(false);
   const { progress, writeProgress, flushProgress } = useProgress();
-  const { settings } = useSettings();
+  const { settings, setVolumePref } = useSettings();
+  const { queueListEdit } = useAnimeSync();
   const videoRef = useRef(null);
+  const cardRef = useRef(null);
   const lastRef = useRef({ position: 0, duration: 0 });
   const syncedRef = useRef(false); // anime → AniList progress bumped once near the end
   const [streams, setStreams] = useState(null); // null=loading, []=failed
@@ -155,16 +159,16 @@ function PlayerCard({ item, expanded, style, dragging, muted, rate, roomForPanel
       v.currentTime / v.duration >= COMPLETE_RATIO
     ) {
       syncedRef.current = true;
-      api('/anime/list', {
-        method: 'POST',
-        body: JSON.stringify({ media_id: item.extra.anilist_id, progress: item.extra.episode }),
-      }).catch(() => {});
+      // Route through the shared sync queue so it coalesces with any list edits
+      // and the overlay reflects the bumped progress everywhere at once.
+      queueListEdit({ id: item.extra.anilist_id }, { progress: item.extra.episode });
     }
   };
   const onLoadedMeta = (e) => {
     const v = e.currentTarget;
     v.playbackRate = rate;
     v.muted = muted;
+    v.volume = settings?.player_volume ?? 1; // restore the remembered level
     if (startRef.current && startRef.current < v.duration) v.currentTime = startRef.current;
   };
   const onPauseFlush = (e) => {
@@ -182,6 +186,7 @@ function PlayerCard({ item, expanded, style, dragging, muted, rate, roomForPanel
   // (up to 1080p) are fed to hls.js, which fetches the (proxied) playlist+segments.
   const isHls = active?.kind === 'hls';
   const playKey = active ? `${active.kind}:${active.itag}` : null;
+  const ctl = useVideoControls(videoRef, playKey, cardRef);
 
   // Attach the chosen source to the element. Re-runs when the selection changes
   // (keyed via playKey); the <video>'s key={playKey} remounts it so this always
@@ -259,6 +264,7 @@ function PlayerCard({ item, expanded, style, dragging, muted, rate, roomForPanel
 
   return (
     <div
+      ref={cardRef}
       className={`${s.card} ${expanded ? s.cardExpanded : s.cardDocked} ${over ? s.cardOver : ''}`}
       style={style}
       onDragOver={drag ? (e) => { e.preventDefault(); setOver(true); } : undefined}
@@ -356,7 +362,6 @@ function PlayerCard({ item, expanded, style, dragging, muted, rate, roomForPanel
               key={playKey}
               className={`${s.frame} ${dragging ? s.frameNoPointer : ''}`}
               title={item.title}
-              controls
               crossOrigin={subtitles.length ? 'anonymous' : undefined}
               playsInline
               onTimeUpdate={onTimeUpdate}
@@ -377,6 +382,29 @@ function PlayerCard({ item, expanded, style, dragging, muted, rate, roomForPanel
                 />
               ))}
             </video>
+            {!playErr && (
+              <PlayerControls
+                expanded={expanded}
+                isLive={isLive}
+                dragging={dragging}
+                videoRef={videoRef}
+                playKey={playKey}
+                ctl={ctl}
+                streams={streams}
+                quality={quality}
+                onQuality={(i) => {
+                  // Remounting on a source change loses position; resume where we are.
+                  startRef.current = Math.max(0, Math.floor(lastRef.current.position));
+                  setQuality(i);
+                }}
+                subtitles={subtitles}
+                rate={rate}
+                onRate={(r) => onRateChange?.(r)}
+                resumeAt={startRef.current}
+                canVolume={!muted}
+                onVolumePersist={setVolumePref}
+              />
+            )}
             {playErr && (
               <div className={s.frameMsg}>
                 <div className={s.frameError}>
@@ -391,7 +419,11 @@ function PlayerCard({ item, expanded, style, dragging, muted, rate, roomForPanel
         ) : (
           <div className={s.frameMsg}>
             {streams === null ? (
-              <span className={s.frameSpinner}>Loading stream…</span>
+              <div className={s.tuning}>
+                <span className={s.tuningSweep} aria-hidden="true" />
+                <span className={s.tuningRing} aria-hidden="true" />
+                <span className={s.tuningText}>Tuning in…</span>
+              </div>
             ) : (
               <div className={s.frameError}>
                 <span>Couldn’t load a stream for this video.</span>
@@ -412,24 +444,6 @@ function PlayerCard({ item, expanded, style, dragging, muted, rate, roomForPanel
             </Link>
           ) : (
             <span className={s.metaChannel}>{item.source}</span>
-          )}
-          {Array.isArray(streams) && streams.length > 1 && (
-            <select
-              className={s.quality}
-              value={quality}
-              onChange={(e) => {
-                // Remounting on src change loses position; resume where we are.
-                startRef.current = Math.max(0, Math.floor(lastRef.current.position));
-                setQuality(Number(e.target.value));
-              }}
-              title="Quality"
-            >
-              {streams.map((st, i) => (
-                <option key={st.url} value={i}>
-                  {st.quality || `Source ${i + 1}`}
-                </option>
-              ))}
-            </select>
           )}
           <a className={s.metaLink} href={item.url} target="_blank" rel="noopener noreferrer">
             <ExternalLink size={13} /> Open on YouTube
@@ -458,7 +472,8 @@ export default function PlayerLayer() {
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
-  // Lock body scroll + Esc minimizes while a video is expanded.
+  // Lock body scroll + Esc minimizes while a video is expanded. The body marker
+  // lets the global feed shortcuts (j/k) stand down so the player owns those keys.
   useEffect(() => {
     if (!expandedId) return undefined;
     const onKey = (e) => {
@@ -466,9 +481,11 @@ export default function PlayerLayer() {
     };
     document.addEventListener('keydown', onKey);
     document.body.style.overflow = 'hidden';
+    document.body.dataset.playerExpanded = '1';
     return () => {
       document.removeEventListener('keydown', onKey);
       document.body.style.overflow = '';
+      delete document.body.dataset.playerExpanded;
     };
   }, [expandedId, minimize]);
 

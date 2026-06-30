@@ -2067,3 +2067,67 @@
     width: 130px;
   }
 }
+
+/* ── sync state glyph ─────────────────────────────────────────────────────────
+   AniList edits apply locally at once and flush on a debounce; these badges tell
+   you whether a change is still local (pending), in flight (syncing), or failed. */
+.syncBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--rule);
+  white-space: nowrap;
+  user-select: none;
+}
+.sync_pending {
+  color: color-mix(in srgb, var(--c-anime) 70%, var(--paper-faint));
+  border-color: color-mix(in srgb, var(--c-anime) 35%, var(--rule));
+  background: color-mix(in srgb, var(--c-anime) 8%, var(--surface));
+}
+.sync_syncing {
+  color: var(--c-anime);
+  border-color: color-mix(in srgb, var(--c-anime) 50%, var(--rule));
+  background: color-mix(in srgb, var(--c-anime) 12%, var(--surface));
+}
+.sync_error {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 45%, var(--rule));
+  background: color-mix(in srgb, var(--danger) 10%, var(--surface));
+}
+.spin {
+  animation: spin 0.85s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .spin {
+    animation: none;
+  }
+}
+
+/* a compact, label-less badge for tight rows (list cards) */
+.quickSync {
+  padding: 3px;
+  gap: 0;
+}
+.listSync {
+  margin-left: auto;
+  align-self: center;
+}
+
+/* header summary: the worst-of status across the room, with a count when several */
+.syncSummary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.syncCount {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-style: normal;
+  color: var(--paper-faint);
+}

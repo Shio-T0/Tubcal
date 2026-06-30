@@ -168,6 +168,20 @@
   animation-delay: calc(min(var(--i, 0), 12) * 32ms);
 }
 
+/* keyboard focus (vim h/j/k/l): a tinted column with a left accent rule */
+.colItem:focus-visible {
+  outline: none;
+  border-radius: 0 var(--r-input) var(--r-input) 0;
+  background: color-mix(in srgb, var(--signal) 8%, transparent);
+  box-shadow: inset 3px 0 0 0 var(--signal);
+}
+
+.lede:focus-visible {
+  outline: 2px solid var(--signal);
+  outline-offset: -4px;
+  border-radius: var(--r-card);
+}
+
 .colTag {
   font-family: var(--font-mono);
   font-size: 10px;

@@ -102,6 +102,7 @@ DEFAULT_SETTINGS = {
     # Player preferences.
     "solo_audio": True,   # only the focused video plays sound; others auto-mute
     "playback_rate": 1,   # remembered across videos
+    "player_volume": 1,   # 0..1, remembered across videos (custom controls)
     # Desktop notify-send 10 min before a subscribed channel goes live.
     "notify_live": True,
     # The Archive (local second brain): transcription + semantic search + LLM.

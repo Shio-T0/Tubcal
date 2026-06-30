@@ -133,7 +133,7 @@
 }
 
 .shelfAll:hover {
-  color: var(--c-youtube);
+  color: var(--shelf-c, var(--c-youtube));
 }
 
 .spin {
@@ -160,6 +160,19 @@
   width: 270px;
   cursor: pointer;
   scroll-snap-align: start;
+  transition: transform 0.2s ease;
+}
+
+.tile:hover {
+  transform: translateY(-3px);
+}
+
+/* Keyboard selection (hjkl nav) lifts further and scales up so the active tile
+   clearly stands apart from a plain hover. */
+.tile:focus-visible {
+  outline: none;
+  transform: translateY(-5px) scale(1.035);
+  z-index: 3;
 }
 
 .tileThumbWrap {
@@ -169,19 +182,113 @@
   background: #000;
   border: 1px solid var(--rule);
   margin-bottom: var(--space-2);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.tile:hover .tileThumbWrap {
+  border-color: color-mix(in srgb, var(--c-youtube) 45%, var(--rule));
+  box-shadow: 0 14px 34px rgba(10, 6, 2, 0.5);
+}
+
+.tile:focus-visible .tileThumbWrap {
+  border-color: var(--signal);
+  box-shadow:
+    0 0 0 3px var(--signal),
+    0 0 0 6px color-mix(in srgb, var(--signal) 30%, transparent),
+    0 0 26px 3px color-mix(in srgb, var(--signal) 55%, transparent),
+    0 18px 40px rgba(10, 6, 2, 0.6);
+  animation: tileSelectPulse 1.8s ease-in-out infinite;
+}
+
+@keyframes tileSelectPulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 3px var(--signal),
+      0 0 0 6px color-mix(in srgb, var(--signal) 28%, transparent),
+      0 0 22px 2px color-mix(in srgb, var(--signal) 45%, transparent),
+      0 18px 40px rgba(10, 6, 2, 0.6);
+  }
+  50% {
+    box-shadow:
+      0 0 0 3px var(--signal),
+      0 0 0 7px color-mix(in srgb, var(--signal) 40%, transparent),
+      0 0 34px 5px color-mix(in srgb, var(--signal) 65%, transparent),
+      0 18px 40px rgba(10, 6, 2, 0.6);
+  }
 }
 
 .tileThumb {
   width: 100%;
   aspect-ratio: 16 / 9;
   object-fit: cover;
-  transition: transform 0.4s ease, opacity 0.25s ease;
+  transition: transform 0.45s ease, opacity 0.25s ease;
   opacity: 0.92;
 }
 
-.tile:hover .tileThumb {
-  transform: scale(1.05);
+.tile:hover .tileThumb,
+.tile:focus-visible .tileThumb {
+  transform: scale(1.06);
   opacity: 1;
+}
+
+/* bottom scrim so the runtime pill stays legible; deepens on hover/focus */
+.tileScrim {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 46%;
+  z-index: 1;
+  background: linear-gradient(to top, rgba(8, 6, 4, 0.62), transparent);
+  opacity: 0.7;
+  transition: opacity 0.25s ease;
+  pointer-events: none;
+}
+
+.tile:hover .tileScrim,
+.tile:focus-visible .tileScrim {
+  opacity: 1;
+}
+
+/* a soft light sweep that glides across the cover on hover/focus */
+.tileSheen {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background: linear-gradient(105deg, transparent 38%, rgba(255, 240, 214, 0.16) 50%, transparent 62%);
+  background-size: 220% 100%;
+  background-position: 150% 0;
+  opacity: 0;
+}
+
+.tile:hover .tileSheen,
+.tile:focus-visible .tileSheen {
+  opacity: 1;
+  animation: tileSheen 0.9s ease;
+}
+
+@keyframes tileSheen {
+  from { background-position: 150% 0; }
+  to { background-position: -50% 0; }
+}
+
+/* runtime pill, bottom-right of the cover */
+.tileDuration {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  z-index: 3;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: rgba(8, 6, 4, 0.82);
+  backdrop-filter: blur(3px);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #f3e7cf;
 }
 
 /* Watch-progress bar pinned to the bottom of the thumbnail. Full + green once
@@ -250,26 +357,35 @@
 .tilePlay {
   position: absolute;
   inset: 0;
+  z-index: 2;
   display: grid;
   place-items: center;
   color: #fff;
-  background: rgba(8, 6, 4, 0.35);
+  background: rgba(8, 6, 4, 0.32);
   opacity: 0;
   transition: opacity 0.2s ease;
 }
 
-.tile:hover .tilePlay {
+.tile:hover .tilePlay,
+.tile:focus-visible .tilePlay {
   opacity: 1;
 }
 
 .tilePlay span {
   display: grid;
   place-items: center;
-  width: 44px;
-  height: 44px;
+  width: 46px;
+  height: 46px;
   border-radius: 50%;
-  background: rgba(255, 66, 66, 0.9);
+  background: rgba(255, 66, 66, 0.92);
   box-shadow: 0 0 26px rgba(255, 66, 66, 0.5);
+  transform: scale(0.72);
+  transition: transform 0.26s cubic-bezier(0.2, 0.8, 0.3, 1.25);
+}
+
+.tile:hover .tilePlay span,
+.tile:focus-visible .tilePlay span {
+  transform: scale(1);
 }
 
 .tileTitle {
@@ -277,10 +393,41 @@
   font-size: 13.5px;
   font-weight: 600;
   line-height: 1.35;
+  color: var(--paper);
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  transition: color 0.15s ease;
+}
+
+.tile:hover .tileTitle {
+  color: color-mix(in srgb, var(--paper) 78%, white);
+}
+
+.tile:focus-visible .tileTitle {
+  color: var(--signal);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tile:hover,
+  .tile:focus-visible {
+    transform: none;
+  }
+  .tile:hover .tileThumb,
+  .tile:focus-visible .tileThumb {
+    transform: none;
+  }
+  .tileSheen {
+    display: none;
+  }
+  .tilePlay span {
+    transition: none;
+    transform: scale(1);
+  }
+  .tile:focus-visible .tileThumbWrap {
+    animation: none;
+  }
 }
 
 .tileMeta {
@@ -474,21 +621,76 @@
   background: rgba(0, 0, 0, 0.78);
 }
 
+/* projection (discover) shelf gets a marquee treatment.
+   --shelf-c (set per-shelf in JSX) gives each marquee its own warm accent,
+   tinting both the left rule and the title; falls back to youtube red. */
+.projection {
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--shelf-c, var(--c-youtube));
+  padding: var(--space-4) var(--space-4) 0;
+  background: linear-gradient(
+    to right,
+    color-mix(in srgb, var(--shelf-c, var(--c-youtube)) 11%, var(--surface)),
+    var(--surface) 260px
+  );
+  border-radius: var(--r-card);
+}
+
+/* tint the marquee heading toward its shelf accent so each shelf reads as its
+   own colour — kept desaturated against paper so it stays comfy, not loud */
+.projection .shelfTitle {
+  color: color-mix(in srgb, var(--shelf-c, var(--c-youtube)) 70%, var(--paper));
+}
+
 /* "Picked for you" gets two tiles' worth of height: tiles fill two rows, then
-   flow into new columns (still horizontally scrollable). */
+   flow into new columns (still horizontally scrollable). As the marquee
+   feature shelf its tiles run a touch larger than the standard 270px. */
 .shelfTall .shelfRow {
   display: grid;
   grid-auto-flow: column;
   grid-template-rows: repeat(2, auto);
-  grid-auto-columns: 270px;
+  grid-auto-columns: 336px;
   align-items: start;
+  gap: var(--space-5);
 }
 
-/* projection (discover) shelf gets a marquee treatment */
-.projection {
-  border: 1px solid var(--rule);
-  border-left: 3px solid var(--c-youtube);
-  padding: var(--space-4) var(--space-4) 0;
-  background: var(--surface);
-  border-radius: var(--r-card);
+.shelfTall .tile {
+  width: 336px;
+}
+
+/* slightly larger title on the feature shelf so its meta reads comfortably */
+.shelfTall .tileTitle {
+  font-size: 15px;
+}
+
+/* The Projection is the marquee feature shelf — give it more breathing room, a
+   wider accent rule, a soft radial wash and an inner highlight so it feels like
+   a warm, lit display rather than just another row. */
+.shelfTall.projection {
+  border-left-width: 4px;
+  padding: var(--space-5) var(--space-5) var(--space-3);
+  margin-bottom: var(--space-8);
+  background:
+    radial-gradient(
+      130% 100% at 0% 0%,
+      color-mix(in srgb, var(--shelf-c, var(--c-youtube)) 15%, transparent),
+      transparent 58%
+    ),
+    linear-gradient(
+      to right,
+      color-mix(in srgb, var(--shelf-c, var(--c-youtube)) 12%, var(--surface)),
+      var(--surface) 320px
+    );
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--shelf-c, var(--c-youtube)) 24%, transparent),
+    0 20px 48px rgba(10, 6, 2, 0.34);
+}
+
+.shelfTall.projection .shelfHead {
+  margin-bottom: var(--space-5);
+}
+
+.shelfTall.projection .shelfTitle {
+  font-size: 23px;
+  letter-spacing: -0.01em;
 }

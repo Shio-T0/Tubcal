@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
-  ArrowLeft, ArrowRight, Bookmark, Calendar, Check, CheckCheck, ChevronDown,
-  ChevronLeft, ChevronRight, CircleSlash, Clapperboard, Eye, ExternalLink, Flag,
-  Frown, Heart, Meh, Minus, Pause, Play, Plus, Repeat, Smile, Star, ThumbsUp,
-  Trash2, Tv, User,
+  AlertTriangle, ArrowLeft, ArrowRight, Bookmark, Calendar, Check, CheckCheck,
+  ChevronDown, ChevronLeft, ChevronRight, CircleSlash, Clapperboard, CloudOff,
+  Eye, ExternalLink, Flag, Frown, Heart, Meh, Minus, Pause, Play, Plus,
+  RefreshCw, Repeat, Smile, Star, ThumbsUp, Trash2, Tv, User,
 } from 'lucide-react';
 
 import { api, useApi } from '../api/client.js';
@@ -20,7 +20,7 @@ import { Avatar } from '../components/ui/Avatar.jsx';
 import { ActivityFeed, ForumList } from '../components/anime/Discussions.jsx';
 import { ProfileModal, ProfileStudio } from '../components/anime/Profile.jsx';
 import { useHorizontalWheel } from '../lib/useHorizontalWheel.js';
-import { usePlayer, useToast } from '../state.jsx';
+import { applyOverlay, useAnimeSync, usePlayer, useToast } from '../state.jsx';
 import s from './anime.module.css';
 
 // AniList score scales by the viewer's chosen format.
@@ -475,14 +475,52 @@ const STATUS_META = [
   ['REPEATING', 'Rewatching', Repeat],
 ];
 
-async function patchList(patch, toast, onSaved) {
-  try {
-    await api('/anime/list', { method: 'POST', body: JSON.stringify(patch) });
-    toast('List updated', 'success');
-    onSaved?.();
-  } catch (e) {
-    toast(e.message, 'error');
-  }
+// Sync-state glyph: edits land locally at once, so this is how you tell whether a
+// change is still only on this machine (pending), being pushed (syncing), or
+// failed. Absent when everything is in sync with AniList.
+const SYNC_META = {
+  pending: [CloudOff, 'Not yet synced'],
+  syncing: [RefreshCw, 'Syncing to AniList…'],
+  error: [AlertTriangle, 'Sync failed — kept locally'],
+};
+
+function SyncBadge({ status, label = true, className }) {
+  const meta = SYNC_META[status];
+  if (!meta) return null;
+  const [Icon, text] = meta;
+  return (
+    <span
+      className={`${s.syncBadge} ${s[`sync_${status}`] || ''} ${className || ''}`}
+      title={text}
+      data-status={status}
+    >
+      <Icon size={12} className={status === 'syncing' ? s.spin : undefined} aria-hidden="true" />
+      {label && <span>{text}</span>}
+    </span>
+  );
+}
+
+/** Worst-of sync status across every media with a pending/in-flight edit, for the
+ *  room header — at a glance you know the whole room is settled or still flushing. */
+function AnimeSyncStatus() {
+  const { syncState } = useAnimeSync();
+  const vals = Object.values(syncState || {});
+  if (!vals.length) return null;
+  const status = vals.includes('syncing')
+    ? 'syncing'
+    : vals.includes('pending')
+      ? 'pending'
+      : vals.includes('error')
+        ? 'error'
+        : null;
+  if (!status) return null;
+  const n = vals.filter((v) => v === status).length;
+  return (
+    <span className={s.syncSummary}>
+      <SyncBadge status={status} />
+      {n > 1 && <em className={s.syncCount}>{n}</em>}
+    </span>
+  );
 }
 
 /** An adaptive score control: stars for POINT_5, smileys for POINT_3, and a
@@ -557,32 +595,20 @@ function ScoreField({ scoreFormat, value, disabled, onSet }) {
 /** Status / progress / score editor for a media's AniList list entry — the
  *  "Your list" panel: status pills, a progress meter, an adaptive score control,
  *  and a foldout for rewatches, dates and notes. */
-function ListControls({ media, scoreFormat, onSaved }) {
-  const toast = useToast();
-  const [busy, setBusy] = useState(false);
+function ListControls({ media, scoreFormat }) {
+  const { overlay, syncState, queueListEdit, removeListEntry } = useAnimeSync();
   const [more, setMore] = useState(false);
-  const entry = media.list_entry;
+  const entry = applyOverlay(media.id, media.list_entry, overlay);
+  const status = syncState[media.id];
   const prog = entry?.progress || 0;
   const total = media.episodes;
   const pct = total ? Math.min(100, Math.round((prog / total) * 100)) : 0;
   const repeat = entry?.repeat || 0;
 
-  const save = async (patch) => {
-    setBusy(true);
-    await patchList({ media_id: media.id, ...patch }, toast, onSaved);
-    setBusy(false);
-  };
-  const remove = async () => {
-    setBusy(true);
-    try {
-      await api(`/anime/list/${entry.id}`, { method: 'DELETE' });
-      toast('Removed from list', 'info');
-      onSaved?.();
-    } catch (e) {
-      toast(e.message, 'error');
-    }
-    setBusy(false);
-  };
+  // Edits apply locally at once and flush to AniList on a debounce (see state.jsx),
+  // so the controls stay responsive and never block on the network.
+  const save = (patch) => queueListEdit(media, patch);
+  const remove = () => removeListEntry(media, entry?.id);
   // Mark the whole run watched and complete it in one tap.
   const finish = () => save({ status: 'COMPLETED', ...(total ? { progress: total } : {}) });
 
@@ -596,12 +622,12 @@ function ListControls({ media, scoreFormat, onSaved }) {
             type="button"
             className={s.statusPill}
             data-on={entry?.status === v ? '' : undefined}
-            disabled={busy}
             onClick={() => save({ status: v })}
           >
             <Icon size={14} /> {label}
           </button>
         ))}
+        <SyncBadge status={status} className={s.listSync} />
       </div>
 
       {!entry && (
@@ -620,18 +646,18 @@ function ListControls({ media, scoreFormat, onSaved }) {
                 </span>
               </div>
               <div className={s.progRow}>
-                <button className={s.stepBtn} disabled={busy || prog <= 0} onClick={() => save({ progress: prog - 1 })} aria-label="One fewer">
+                <button className={s.stepBtn} disabled={prog <= 0} onClick={() => save({ progress: prog - 1 })} aria-label="One fewer">
                   <Minus size={14} />
                 </button>
                 <div className={s.progTrack} title={total ? `${pct}% watched` : undefined}>
                   <span className={s.progFill} style={{ width: `${total ? pct : prog > 0 ? 100 : 0}%` }} />
                 </div>
-                <button className={s.stepBtn} disabled={busy || (total && prog >= total)} onClick={() => save({ progress: prog + 1 })} aria-label="One more">
+                <button className={s.stepBtn} disabled={total && prog >= total} onClick={() => save({ progress: prog + 1 })} aria-label="One more">
                   <Plus size={14} />
                 </button>
               </div>
               {total > 0 && prog < total && entry.status !== 'COMPLETED' && (
-                <button className={s.finishBtn} disabled={busy} onClick={finish}>
+                <button className={s.finishBtn} onClick={finish}>
                   <Flag size={12} /> Finish — mark all {total} watched
                 </button>
               )}
@@ -645,7 +671,6 @@ function ListControls({ media, scoreFormat, onSaved }) {
               <ScoreField
                 scoreFormat={scoreFormat}
                 value={entry.score || 0}
-                disabled={busy}
                 onSet={(v) => { if (v !== (entry.score || 0)) save({ score: v }); }}
               />
             </div>
@@ -662,11 +687,11 @@ function ListControls({ media, scoreFormat, onSaved }) {
                   <span className={s.listLabel}>Rewatches</span>
                 </div>
                 <div className={s.stepper}>
-                  <button className={s.stepBtn} disabled={busy || repeat <= 0} onClick={() => save({ repeat: repeat - 1 })} aria-label="One fewer rewatch">
+                  <button className={s.stepBtn} disabled={repeat <= 0} onClick={() => save({ repeat: repeat - 1 })} aria-label="One fewer rewatch">
                     <Minus size={14} />
                   </button>
                   <span className={s.stepperVal}><Repeat size={12} /> {repeat}×</span>
-                  <button className={s.stepBtn} disabled={busy} onClick={() => save({ repeat: repeat + 1 })} aria-label="One more rewatch">
+                  <button className={s.stepBtn} onClick={() => save({ repeat: repeat + 1 })} aria-label="One more rewatch">
                     <Plus size={14} />
                   </button>
                 </div>
@@ -678,7 +703,6 @@ function ListControls({ media, scoreFormat, onSaved }) {
                   type="date"
                   className={s.dateInput}
                   defaultValue={entry.started_at || ''}
-                  disabled={busy}
                   onChange={(e) => save({ started_at: e.target.value })}
                 />
               </label>
@@ -688,7 +712,6 @@ function ListControls({ media, scoreFormat, onSaved }) {
                   type="date"
                   className={s.dateInput}
                   defaultValue={entry.completed_at || ''}
-                  disabled={busy}
                   onChange={(e) => save({ completed_at: e.target.value })}
                 />
               </label>
@@ -700,14 +723,13 @@ function ListControls({ media, scoreFormat, onSaved }) {
                   rows={2}
                   placeholder="A private note for this title…"
                   defaultValue={entry.notes || ''}
-                  disabled={busy}
                   onBlur={(e) => { if (e.target.value !== (entry.notes || '')) save({ notes: e.target.value }); }}
                 />
               </label>
             </div>
           )}
 
-          <button className={s.removeLink} disabled={busy} onClick={remove}>
+          <button className={s.removeLink} onClick={remove}>
             <Trash2 size={12} /> Remove from list
           </button>
         </>
@@ -716,31 +738,33 @@ function ListControls({ media, scoreFormat, onSaved }) {
   );
 }
 
-function ListEntryCard({ entry, onSaved, scoreFormat }) {
-  const toast = useToast();
-  const [busy, setBusy] = useState(false);
+function ListEntryCard({ entry, scoreFormat }) {
+  const { overlay, syncState, queueListEdit } = useAnimeSync();
   const m = entry.media;
+  const eff = applyOverlay(m.id, entry, overlay);
+  if (!eff) return null; // removed locally from elsewhere
+  const status = syncState[m.id];
   const total = m.episodes;
-  const prog = entry.progress || 0;
+  const prog = eff.progress || 0;
   // Episodes available so far: for an airing show, the episode before the next to
   // air; otherwise the full run. "Behind" = aired-so-far minus what you've watched.
   const aired = m.next_episode ? m.next_episode - 1 : (total || 0);
   const behind = Math.max(0, aired - prog);
   const behindTag = behind > 0 ? `${behind} ep${behind > 1 ? 's' : ''} behind` : null;
-  const bump = async (e) => {
+  const bump = (e) => {
     e.preventDefault();
     e.stopPropagation();
-    setBusy(true);
-    await patchList({ media_id: m.id, progress: prog + 1 }, toast, onSaved);
-    setBusy(false);
+    queueListEdit(m, { progress: prog + 1 });
   };
   return (
     <div className={s.listEntry}>
-      <AnimeCard media={m} corner={behindTag} scoreFormat={scoreFormat} />
+      {/* feed the optimistic entry through so the card's "your rating" stays live */}
+      <AnimeCard media={{ ...m, list_entry: eff }} corner={behindTag} scoreFormat={scoreFormat} />
       <div className={s.quickRow}>
         <span className={s.quickProg}>{prog}{total ? ` / ${total}` : ''}</span>
+        {status && <SyncBadge status={status} label={false} className={s.quickSync} />}
         {(!total || prog < total) && (
-          <button className={s.quickBtn} disabled={busy} onClick={bump} title="Mark next episode watched">
+          <button className={s.quickBtn} onClick={bump} title="Mark next episode watched">
             <Plus size={12} /> ep
           </button>
         )}
@@ -883,7 +907,7 @@ function MyListTab() {
               ) : (
                 <div className={s.grid}>
                   {entries.map((e) => (
-                    <ListEntryCard key={e.entry_id} entry={e} onSaved={lists.reload} scoreFormat={scoreFormat} />
+                    <ListEntryCard key={e.entry_id} entry={e} scoreFormat={scoreFormat} />
                   ))}
                 </div>
               )}
@@ -898,6 +922,7 @@ function MyListTab() {
 function TrailerChannel() {
   const ch = useApi('/anime/channel');
   const { open, enqueue } = usePlayer();
+  const { queueListEdit } = useAnimeSync();
   const toast = useToast();
 
   if (ch.loading && !ch.data) return <Receiving label="tuning the anime channel" />;
@@ -922,10 +947,11 @@ function TrailerChannel() {
     open(reel[i].item);
     reel.slice(i + 1).forEach((t) => enqueue(t.item));
   };
-  const plan = async (e, m) => {
+  const plan = (e, m) => {
     e.preventDefault();
     e.stopPropagation();
-    await patchList({ media_id: m.id, status: 'PLANNING' }, toast);
+    queueListEdit(m, { status: 'PLANNING' });
+    toast(`Added “${m.title}” to Planning`, 'success');
   };
 
   return (
@@ -1020,6 +1046,7 @@ export default function Anime() {
         note="Browse and search AniList, keep your list in sync, and watch — all on this machine."
         color="var(--c-anime)"
       >
+        <AnimeSyncStatus />
         <ActiveProfileButton />
       </SectionHead>
       <div className={s.tabs} style={ACCENT}>
@@ -1124,11 +1151,12 @@ function epSubtitle(title, number) {
   return cleaned && cleaned !== String(number) ? cleaned : null;
 }
 
-function EpisodeList({ media, onProgress }) {
+function EpisodeList({ media }) {
   // The aggregator is optional now — it only enables local playback when up.
   const eps = useApi(`/anime/episodes/${media.id}`);
   const { open } = usePlayer();
-  const toast = useToast();
+  const { overlay, queueListEdit } = useAnimeSync();
+  const entry = applyOverlay(media.id, media.list_entry, overlay);
 
   // Build the episode list from AniList, then fold in aggregator keys (by number)
   // so a local stream can play when the source is reachable.
@@ -1175,8 +1203,8 @@ function EpisodeList({ media, onProgress }) {
   // Launch official source; optionally advance AniList progress on launch.
   const launch = (url, epNumber) => {
     launchOfficial(url);
-    if (epNumber != null && media.list_entry && epNumber > (media.list_entry.progress || 0)) {
-      patchList({ media_id: media.id, progress: epNumber }, toast, onProgress);
+    if (epNumber != null && entry && epNumber > (entry.progress || 0)) {
+      queueListEdit(media, { progress: epNumber });
     }
   };
 
@@ -1450,13 +1478,13 @@ export function AnimeDetail() {
           {me.data && (
             <div className={s.yourList}>
               <h3 className={s.blockLabel}>Your list</h3>
-              <ListControls media={m} scoreFormat={me.data.score_format} onSaved={detail.reload} />
+              <ListControls media={m} scoreFormat={me.data.score_format} />
             </div>
           )}
 
           {m.description && <Synopsis html={m.description} tags={m.tags} />}
 
-          <EpisodeList media={m} onProgress={detail.reload} />
+          <EpisodeList media={m} />
 
           <RecStrip
             title="Recommended if you like this"

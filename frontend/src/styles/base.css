@@ -70,6 +70,16 @@ h4 {
   outline-offset: 2px;
 }
 
+/* Keyboard-navigable tiles (vim h/j/k/l): each surface draws its own focus ring,
+   so suppress the default outline and just keep a focused tile clear of the
+   sticky masthead when it scrolls into view. */
+[data-kbd-tile] {
+  scroll-margin: 96px 16px;
+}
+[data-kbd-tile]:focus {
+  outline: none;
+}
+
 ::selection {
   background: var(--signal);
   color: var(--ink);

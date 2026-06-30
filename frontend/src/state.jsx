@@ -9,6 +9,7 @@ const SubsCtx = createContext(null);
 const PlayerCtx = createContext(null);
 const ProgressCtx = createContext(null);
 const SavedCtx = createContext(null);
+const AnimeSyncCtx = createContext(null);
 
 export const useToast = () => useContext(ToastCtx);
 export const useSettings = () => useContext(SettingsCtx);
@@ -16,6 +17,17 @@ export const useSubscriptions = () => useContext(SubsCtx);
 export const usePlayer = () => useContext(PlayerCtx);
 export const useProgress = () => useContext(ProgressCtx);
 export const useSaved = () => useContext(SavedCtx);
+export const useAnimeSync = () => useContext(AnimeSyncCtx);
+
+/** Paint the local (not-yet-synced) AniList overlay on top of a base list entry.
+ *  Returns the base unchanged when there's no pending edit, null when the entry
+ *  was locally removed, else the base merged with the queued field changes. */
+export function applyOverlay(mediaId, baseEntry, overlay) {
+  const ov = overlay?.[mediaId];
+  if (!ov) return baseEntry;
+  if (ov._deleted) return null;
+  return { ...(baseEntry || {}), ...ov };
+}
 
 // A video counts as "finished" once you're within the last 5% of it.
 export const COMPLETE_RATIO = 0.95;
@@ -53,6 +65,19 @@ export function AppProviders({ children }) {
     },
     [toast],
   );
+
+  // Volume changes by dragging fire fast; apply locally at once (so every video
+  // and the next-opened one see it) but debounce the network write so we don't
+  // PUT on every pixel. No toast on failure — volume isn't worth interrupting for.
+  const volTimer = useRef(null);
+  const setVolumePref = useCallback((v) => {
+    const vol = Math.max(0, Math.min(1, Number(v) || 0));
+    setSettings((s) => ({ ...s, player_volume: vol }));
+    if (volTimer.current) clearTimeout(volTimer.current);
+    volTimer.current = setTimeout(() => {
+      api('/settings', { method: 'PUT', body: JSON.stringify({ player_volume: vol }) }).catch(() => {});
+    }, 600);
+  }, []);
 
   const [subs, setSubs] = useState({ youtube: [], reddit: [] });
   const refreshSubs = useCallback(async () => {
@@ -292,6 +317,131 @@ export function AppProviders({ children }) {
   }, []);
   const savedApi = { saved, toggleSaved };
 
+  // ── Anime list sync ─────────────────────────────────────────────────────────
+  // AniList edits (status / progress / score / …) apply locally at once and push
+  // to AniList on a short debounce, coalescing a flurry of taps into a single
+  // mutation — instant UI, and far gentler on AniList's 90 req/min cap. `overlay`
+  // holds per-media field overrides we paint over server data (see applyOverlay);
+  // `syncState` tracks each media's push status so the UI can show a sync glyph.
+  const [animeOverlay, setAnimeOverlay] = useState({}); // mediaId -> {…fields} | {_deleted:true}
+  const [animeSync, setAnimeSync] = useState({});       // mediaId -> 'pending'|'syncing'|'error'
+  const animePending = useRef({});                       // mediaId -> { patch, timer }
+  const lastSyncErr = useRef(0);
+
+  const setOneSync = useCallback((id, st) => {
+    setAnimeSync((m) => {
+      if (!st) {
+        if (!(id in m)) return m;
+        const n = { ...m };
+        delete n[id];
+        return n;
+      }
+      return { ...m, [id]: st };
+    });
+  }, []);
+
+  // Push one media's batched edits to AniList, then reconcile the overlay with
+  // exactly what AniList stored (it applies its own rules, e.g. auto-completing a
+  // show when progress hits the finale), keeping fields it doesn't echo back.
+  const flushAnime = useCallback(
+    async (id) => {
+      const slot = animePending.current[id];
+      if (!slot) return;
+      if (slot.timer) {
+        clearTimeout(slot.timer);
+        slot.timer = null;
+      }
+      const patch = slot.patch;
+      if (!patch || Object.keys(patch).length === 0) return;
+      slot.patch = {}; // take this batch; edits arriving mid-flight re-accumulate
+      setOneSync(id, 'syncing');
+      try {
+        const entry = await api('/anime/list', {
+          method: 'POST',
+          body: JSON.stringify({ media_id: Number(id), ...patch }),
+        });
+        setAnimeOverlay((o) => ({ ...o, [id]: { ...(o[id] || {}), ...(entry || {}) } }));
+        if (Object.keys(animePending.current[id]?.patch || {}).length) {
+          flushAnime(id); // more edits queued while we were syncing
+        } else {
+          setOneSync(id, null);
+        }
+      } catch (e) {
+        // Keep the un-pushed edits (newest wins) so the next change retries.
+        slot.patch = { ...patch, ...slot.patch };
+        setOneSync(id, 'error');
+        const now = Date.now();
+        if (now - lastSyncErr.current > 4000) {
+          lastSyncErr.current = now;
+          toast(`AniList sync failed — kept locally: ${e.message}`, 'error');
+        }
+      }
+    },
+    [setOneSync, toast],
+  );
+
+  const queueListEdit = useCallback(
+    (media, patch) => {
+      const id = media?.id ?? media;
+      if (id == null) return;
+      setAnimeOverlay((o) => ({ ...o, [id]: { ...(o[id] || {}), ...patch } }));
+      const slot = animePending.current[id] || (animePending.current[id] = { patch: {}, timer: null });
+      slot.patch = { ...slot.patch, ...patch };
+      setOneSync(id, 'pending');
+      if (slot.timer) clearTimeout(slot.timer);
+      slot.timer = setTimeout(() => flushAnime(id), 1400);
+    },
+    [flushAnime, setOneSync],
+  );
+
+  const removeListEntry = useCallback(
+    async (media, entryId) => {
+      const id = media?.id ?? media;
+      const eid = entryId ?? animeOverlay[id]?.id ?? media?.list_entry?.id;
+      const slot = animePending.current[id];
+      if (slot?.timer) clearTimeout(slot.timer);
+      animePending.current[id] = { patch: {}, timer: null }; // drop any queued edits
+      setAnimeOverlay((o) => ({ ...o, [id]: { _deleted: true } }));
+      setOneSync(id, 'syncing');
+      try {
+        if (eid) await api(`/anime/list/${eid}`, { method: 'DELETE' });
+        setOneSync(id, null);
+        return true;
+      } catch (e) {
+        setAnimeOverlay((o) => {
+          const n = { ...o };
+          delete n[id];
+          return n;
+        });
+        setOneSync(id, 'error');
+        toast(e.message, 'error');
+        return false;
+      }
+    },
+    [animeOverlay, setOneSync, toast],
+  );
+
+  // Best-effort: don't sit on un-pushed edits when the tab is hidden or closed.
+  useEffect(() => {
+    const flushAll = () => Object.keys(animePending.current).forEach((id) => flushAnime(id));
+    const onHide = () => {
+      if (document.visibilityState === 'hidden') flushAll();
+    };
+    window.addEventListener('beforeunload', flushAll);
+    document.addEventListener('visibilitychange', onHide);
+    return () => {
+      window.removeEventListener('beforeunload', flushAll);
+      document.removeEventListener('visibilitychange', onHide);
+    };
+  }, [flushAnime]);
+
+  const animeSyncApi = {
+    overlay: animeOverlay,
+    syncState: animeSync,
+    queueListEdit,
+    removeListEntry,
+  };
+
   const player = {
     players: pstate.players,
     expandedId: pstate.expandedId,
@@ -313,13 +463,15 @@ export function AppProviders({ children }) {
 
   return (
     <ToastCtx.Provider value={toast}>
-      <SettingsCtx.Provider value={{ settings, updateSettings }}>
+      <SettingsCtx.Provider value={{ settings, updateSettings, setVolumePref }}>
         <SubsCtx.Provider value={{ subs, refreshSubs }}>
           <PlayerCtx.Provider value={player}>
             <ProgressCtx.Provider value={progressApi}>
               <SavedCtx.Provider value={savedApi}>
-                {children}
-                <ToastStack toasts={toasts} />
+                <AnimeSyncCtx.Provider value={animeSyncApi}>
+                  {children}
+                  <ToastStack toasts={toasts} />
+                </AnimeSyncCtx.Provider>
               </SavedCtx.Provider>
             </ProgressCtx.Provider>
           </PlayerCtx.Provider>

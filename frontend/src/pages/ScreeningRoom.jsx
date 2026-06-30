@@ -28,7 +28,7 @@ import AddSubscriptionModal from '../components/modals/AddSubscriptionModal.jsx'
 import { Avatar } from '../components/ui/Avatar.jsx';
 import { Button, EmptyState, IconButton, SegmentedControl } from '../components/ui/index.jsx';
 import { TileActions } from '../components/ui/ItemActions.jsx';
-import { formatWhen, timeAgo, timeUntil } from '../lib/time.js';
+import { clock, formatWhen, timeAgo, timeUntil } from '../lib/time.js';
 import { useHorizontalWheel } from '../lib/useHorizontalWheel.js';
 import { COMPLETE_RATIO, usePlayer, useProgress, useSubscriptions, useToast } from '../state.jsx';
 import s from './screening.module.css';
@@ -73,11 +73,16 @@ export function LiveBadge({ item }) {
   return null;
 }
 
+// Compact view counts: 1234 → "1.2K", 3_400_000 → "3.4M".
+const compactNum = new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 });
+
 export function VideoTile({ item, onPlay, meta }) {
   const { progress } = useProgress();
   const p = progress[item.id];
   const ratio = p && p.duration ? Math.min(1, p.position / p.duration) : 0;
   const done = ratio >= COMPLETE_RATIO;
+  const length = item.extra?.length_seconds;
+  const views = item.extra?.view_count ?? (typeof item.score === 'number' ? item.score : null);
   return (
     <div
       className={s.tile}
@@ -94,6 +99,8 @@ export function VideoTile({ item, onPlay, meta }) {
     >
       <div className={s.tileThumbWrap}>
         <img className={s.tileThumb} src={item.thumbnail} alt="" loading="lazy" />
+        <span className={s.tileScrim} aria-hidden="true" />
+        <span className={s.tileSheen} aria-hidden="true" />
         <div className={s.tilePlay}>
           <span>
             <Play size={18} fill="currentColor" />
@@ -101,6 +108,7 @@ export function VideoTile({ item, onPlay, meta }) {
         </div>
         <LiveBadge item={item} />
         <TileActions item={item} watched />
+        {length ? <span className={s.tileDuration}>{clock(length)}</span> : null}
         {ratio > 0 && (
           <div className={s.tileProgress} title={done ? 'Watched' : `${Math.round(ratio * 100)}% watched`}>
             <div
@@ -118,6 +126,7 @@ export function VideoTile({ item, onPlay, meta }) {
           <>
             <ChannelLink item={item} />
             {timeAgo(item.published_at) && ` · ${timeAgo(item.published_at)}`}
+            {views ? ` · ${compactNum.format(views)} views` : ''}
           </>
         )}
       </div>
@@ -125,10 +134,10 @@ export function VideoTile({ item, onPlay, meta }) {
   );
 }
 
-function Shelf({ title, count, items, onPlay, allTo, onShuffle, shuffling, className }) {
+function Shelf({ title, count, items, onPlay, allTo, onShuffle, shuffling, className, style }) {
   const rowRef = useHorizontalWheel();
   return (
-    <section className={`${s.shelf} ${className || ''}`}>
+    <section className={`${s.shelf} ${className || ''}`} style={style}>
       <div className={s.shelfHead}>
         <h2 className={s.shelfTitle}>{title}</h2>
         {count != null && <span className={s.shelfCount}>{count} new</span>}
@@ -318,6 +327,7 @@ export default function ScreeningRoom() {
           items={liveItems}
           onPlay={setVideo}
           className={s.projection}
+          style={{ '--shelf-c': '#cc5b45' }}
         />
       )}
 
@@ -354,6 +364,7 @@ export default function ScreeningRoom() {
           onPlay={setVideo}
           allTo="/youtube/history"
           className={s.projection}
+          style={{ '--shelf-c': '#e0a955' }}
         />
       )}
 
@@ -364,6 +375,7 @@ export default function ScreeningRoom() {
           items={projection}
           onPlay={setVideo}
           className={`${s.projection} ${s.shelfTall}`}
+          style={{ '--shelf-c': '#5fa597' }}
         />
       )}
 
@@ -376,6 +388,7 @@ export default function ScreeningRoom() {
           onShuffle={() => trending.reload()}
           shuffling={trending.loading}
           className={s.projection}
+          style={{ '--shelf-c': '#8e88cc' }}
         />
       )}
       {!searching && trending.loading && random.length === 0 && (
