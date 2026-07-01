@@ -170,9 +170,37 @@ def youtube_channel_search(channel_id):
 @feeds_bp.get("/youtube/stream/<video_id>")
 def youtube_stream(video_id):
     try:
-        return ok(youtube.video_streams(video_id))
+        data = youtube.video_streams(video_id)
     except Exception as e:
         return err(f"Stream resolve failed: {e}", 502)
+    # Point each caption at the yt-dlp-backed endpoint (a raw timedtext GET gets
+    # bot-blocked for auto/translated tracks — the Japanese→English case).
+    subs = []
+    for sub in data.get("subtitles") or []:
+        lang = sub.get("lang", "en")
+        subs.append({
+            "src": f"/api/youtube/captions/{video_id}?lang={lang}",
+            "lang": lang,
+            "label": sub.get("label", "English"),
+        })
+    return ok({**data, "subtitles": subs})
+
+
+@feeds_bp.get("/youtube/captions/<video_id>")
+def youtube_captions(video_id):
+    """A video's caption track as WebVTT, fetched via yt-dlp (see fetch_captions)."""
+    lang = request.args.get("lang", "en")
+    try:
+        vtt = youtube.fetch_captions(video_id, lang)
+    except Exception as e:
+        return err(f"caption fetch failed: {e}", 502)
+    if not vtt:
+        return err("no captions for this video", 404)
+    return Response(
+        vtt,
+        mimetype="text/vtt",
+        headers={"Cache-Control": "public, max-age=1800"},
+    )
 
 
 # Headers worth relaying from the upstream CDN response to the browser.
@@ -349,8 +377,9 @@ def youtube_video_info(video_id):
         info = youtube.video_info(video_id)
     except Exception as e:
         return err(f"Video info failed: {e}", 502)
-    meta = {k: v for k, v in info.items() if k != "streams"}
+    meta = {k: v for k, v in info.items() if k not in ("streams", "subtitles")}
     meta["has_streams"] = bool(info.get("streams"))
+    meta["has_captions"] = bool(info.get("subtitles"))
     return ok(meta)
 
 

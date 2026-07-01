@@ -1,9 +1,11 @@
 import calendar
 import json
+import os
 import random
 import re
 import shutil
 import subprocess
+import tempfile
 import time
 from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import quote
@@ -16,6 +18,13 @@ from .. import cache, config, httpc
 RSS_URL = "https://www.youtube.com/feeds/videos.xml?channel_id={}"
 PLAYLIST_RSS_URL = "https://www.youtube.com/feeds/videos.xml?playlist_id={}"
 CHANNEL_ID_RE = re.compile(r"UC[A-Za-z0-9_-]{22}")
+
+
+def _cookie_args():
+    """yt-dlp args to borrow a logged-in browser's YouTube cookies, when
+    configured (config.YT_COOKIES_BROWSER). Cookies make resolves + auto/
+    translated captions far less likely to be 429'd / bot-blocked."""
+    return ["--cookies-from-browser", config.YT_COOKIES_BROWSER] if config.YT_COOKIES_BROWSER else []
 
 # Order matters: the page embeds "channelId" for *related* channels too, so the
 # canonical/og:url links (which always point at this channel) come first.
@@ -299,7 +308,8 @@ def _ytdlp_info(video_id):
     # yt-dlp would otherwise abort ("Premieres in N hours") with no JSON — we still
     # want its metadata (live_status=is_upcoming + release_timestamp).
     proc = subprocess.run(
-        [exe, "-J", "--no-warnings", "--no-playlist", "--ignore-no-formats-error", url],
+        [exe, *_cookie_args(), "-J", "--no-warnings", "--no-playlist",
+         "--ignore-no-formats-error", url],
         capture_output=True, text=True, timeout=60,
     )
     if proc.returncode != 0 or not proc.stdout.strip():
@@ -326,7 +336,123 @@ def _ytdlp_info(video_id):
         "live_status": live_status,
         "scheduled_at": data.get("release_timestamp"),
         "streams": streams,
+        "subtitles": _english_captions(data),
     }
+
+
+def fetch_captions(video_id, lang="en"):
+    """Caption track as WebVTT text, fetched **via yt-dlp** and cached 30 min.
+
+    A bare GET of YouTube's auto/translated timedtext endpoint gets bot-blocked
+    (a "Sorry" 429 page) — which is exactly the English-on-a-Japanese-video case,
+    since that track is an auto-translation of the original-language ASR. yt-dlp
+    carries the right client context, so it downloads the (translated) VTT
+    cleanly. Returns the VTT string, or None when no such track exists."""
+
+    def fetch():
+        vtt = _ytdlp_captions(video_id, lang)
+        # Cache a hit for 30 min; a miss only briefly so a transient yt-dlp/IP
+        # hiccup doesn't lock in "no captions" for the full window.
+        return vtt, (1800 if vtt else 120)
+
+    return cache.cached_dynamic(f"yt:caps:{video_id}:{lang}", fetch)
+
+
+def _ytdlp_captions(video_id, lang):
+    """Download one language's subtitle track (manual or auto/translated) with
+    yt-dlp and return it as WebVTT text. Best-effort: None on any failure."""
+    exe = shutil.which("yt-dlp")
+    if not exe:
+        return None
+    url = f"https://www.youtube.com/watch?v={video_id}"
+    with tempfile.TemporaryDirectory() as td:
+        proc = subprocess.run(
+            [
+                exe, *_cookie_args(), "--skip-download",
+                "--write-subs", "--write-auto-subs",
+                # exact code first, then regional/auto variants (en, en-US, en-orig…)
+                "--sub-langs", f"{lang},{lang}.*",
+                "--sub-format", "vtt/best", "--convert-subs", "vtt",
+                "--no-warnings", "--no-playlist",
+                "-o", os.path.join(td, "%(id)s"), url,
+            ],
+            capture_output=True, text=True, timeout=90,
+        )
+        if proc.returncode != 0:
+            return None
+        # Prefer an exact-language file (…​.en.vtt) over an auto/regional variant.
+        vtts = [f for f in os.listdir(td) if f.endswith(".vtt")]
+        if not vtts:
+            return None
+        vtts.sort(key=lambda f: (f != f"{video_id}.{lang}.vtt", len(f)))
+        try:
+            with open(os.path.join(td, vtts[0]), encoding="utf-8") as fh:
+                return fh.read()
+        except OSError:
+            return None
+
+
+def _english_captions(data):
+    """The best English caption track for the player.
+
+    Preference: a human-authored English subtitle track, then YouTube's
+    auto-generated / auto-translated English captions. That second tier is what
+    gives a **Japanese (or any non-English) video English captions** — YouTube
+    exposes an auto-translated `en` track alongside the original-language ASR,
+    and yt-dlp surfaces it in `automatic_captions`.
+
+    Returns a 0- or 1-element list of `{lang, label, url, kind}`, where `url` is
+    the raw timedtext WebVTT URL (the API layer proxies it before it reaches the
+    browser so we never leak googlevideo URLs / trip CORS)."""
+    manual = data.get("subtitles") or {}
+    auto = data.get("automatic_captions") or {}
+
+    def vtt_url(tracks):
+        # yt-dlp lists several formats per language; the <track> element only
+        # renders a plain WebVTT file, so insist on the vtt variant served by
+        # YouTube's `api/timedtext` endpoint. A few videos also expose a "vtt"
+        # entry that is really an HLS manifest of caption segments — a <track>
+        # can't load that, so skip anything that isn't a timedtext URL.
+        fallback = None
+        for t in tracks or []:
+            if (t.get("ext") or "").lower() != "vtt":
+                continue
+            u = t.get("url")
+            if not u:
+                continue
+            if "timedtext" in u:
+                return u
+            if ".m3u8" not in u and "manifest" not in u and fallback is None:
+                fallback = u
+        return fallback
+
+    def english(track_map):
+        for code in ("en", "en-US", "en-GB", "en-orig"):
+            if code in track_map:
+                u = vtt_url(track_map[code])
+                if u:
+                    return u
+        for code, tracks in track_map.items():
+            if code.lower().startswith("en"):
+                u = vtt_url(tracks)
+                if u:
+                    return u
+        return None
+
+    u = english(manual)
+    if u:
+        return [{"lang": "en", "label": "English", "url": u, "kind": "manual"}]
+    # An auto `en` track is a plain transcript when the video is English-spoken,
+    # or an auto-translation when it isn't (e.g. Japanese). We can't always tell
+    # the two apart, so label it as auto and note translation when the original
+    # audio language is known and non-English.
+    u = english(auto)
+    if u:
+        orig = (data.get("language") or "").lower()
+        translated = bool(orig) and not orig.startswith("en")
+        label = "English (auto-translated)" if translated else "English (auto)"
+        return [{"lang": "en", "label": label, "url": u, "kind": "auto"}]
+    return []
 
 
 def video_info(video_id):
@@ -358,6 +484,7 @@ def video_info(video_id):
                 "live_status": None,
                 "scheduled_at": None,
                 "streams": inv.get("streams") or [],
+                "subtitles": [],
                 "degraded": True,
             }, 90
 
@@ -372,6 +499,7 @@ def video_streams(video_id):
         "title": info.get("title", ""),
         "duration": info.get("duration"),
         "streams": info.get("streams") or [],
+        "subtitles": info.get("subtitles") or [],
     }
 
 
@@ -405,7 +533,8 @@ def _ytdlp_flat_tab(channel_id, tab, limit=12):
     url = f"https://www.youtube.com/channel/{channel_id}{tab}"
     try:
         proc = subprocess.run(
-            [exe, "-J", "--flat-playlist", "--no-warnings", "--playlist-end", str(limit), url],
+            [exe, *_cookie_args(), "-J", "--flat-playlist", "--no-warnings",
+             "--playlist-end", str(limit), url],
             capture_output=True, text=True, timeout=60,
         )
         if proc.returncode != 0 or not proc.stdout.strip():
@@ -626,7 +755,7 @@ def _ytdlp_playlist(plid):
         raise RuntimeError("yt-dlp not installed")
     url = f"https://www.youtube.com/playlist?list={plid}"
     proc = subprocess.run(
-        [exe, "-J", "--flat-playlist", "--no-warnings",
+        [exe, *_cookie_args(), "-J", "--flat-playlist", "--no-warnings",
          "--add-header", f"Cookie:{_CONSENT_COOKIE_FULL}", url],
         capture_output=True, text=True, timeout=120,
     )

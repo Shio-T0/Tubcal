@@ -27,6 +27,12 @@ ANILIST_GQL = "https://graphql.anilist.co"
 ANIME_SOURCE_URL = os.environ.get("TUBCAL_ANIME_SOURCE", "http://127.0.0.1:3000").rstrip("/")
 ANIME_PROVIDER = os.environ.get("TUBCAL_ANIME_PROVIDER", "")
 
+# Optional: have yt-dlp borrow a logged-in browser's YouTube cookies so resolves
+# and (especially) auto/translated captions stop getting bot-blocked / 429'd.
+# Value is yt-dlp's --cookies-from-browser arg, e.g. "firefox", "chromium",
+# "brave", or "firefox:profilename". Empty = off (default).
+YT_COOKIES_BROWSER = os.environ.get("TUBCAL_YT_COOKIES_BROWSER", "").strip()
+
 BROWSER_UA = (
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
