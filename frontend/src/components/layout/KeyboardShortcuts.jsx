@@ -62,6 +62,12 @@ export default function KeyboardShortcuts() {
         focusTile(els[0]);
         return;
       }
+      const horizontal = dir === 'left' || dir === 'right';
+      // Horizontal moves stay inside the current section (shelf): h/l never jump
+      // to another section or wrap, so at a section's start 'h' and at its end 'l'
+      // simply do nothing. j/k still cross sections vertically. (No <section>
+      // ancestor → fall back to the global geometry, unchanged.)
+      const curSection = horizontal ? cur.closest('section') : null;
       const a = cur.getBoundingClientRect();
       const ax = a.left + a.width / 2;
       const ay = a.top + a.height / 2;
@@ -69,6 +75,7 @@ export default function KeyboardShortcuts() {
       let bestScore = Infinity;
       for (const el of els) {
         if (el === cur) continue;
+        if (curSection && el.closest('section') !== curSection) continue;
         const b = el.getBoundingClientRect();
         const dx = b.left + b.width / 2 - ax;
         const dy = b.top + b.height / 2 - ay;
@@ -76,7 +83,6 @@ export default function KeyboardShortcuts() {
         if (dir === 'right' && dx < 4) continue;
         if (dir === 'up' && dy > -4) continue;
         if (dir === 'down' && dy < 4) continue;
-        const horizontal = dir === 'left' || dir === 'right';
         const primary = Math.abs(horizontal ? dx : dy);
         const cross = Math.abs(horizontal ? dy : dx);
         const score = primary + cross * 3; // keep to the same row / column when possible
