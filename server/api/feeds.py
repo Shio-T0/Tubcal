@@ -1,12 +1,14 @@
 import base64
+import logging
 import re
+import threading
 from urllib.parse import urljoin, urlparse
 
 from flask import Blueprint, Response, current_app, request, stream_with_context
 
 from . import err, ok
 from .. import cache, config, db, httpc
-from ..sources import github, hackernews, invidious, mixer, reddit, youtube
+from ..sources import anilist, github, hackernews, invidious, mixer, reddit, youtube
 
 feeds_bp = Blueprint("feeds", __name__, url_prefix="/api")
 
@@ -500,7 +502,47 @@ def post_progress():
     except Exception as e:
         current_app.logger.exception("Failed to set progress")
         return err(f"Failed to save progress: {e}", 500)
+    _maybe_mark_anime(item_id, position, duration)
     return ok({"saved": True})
+
+
+# Auto-mark anime episodes watched on AniList once played past the threshold. The
+# anime player reports progress under item ids shaped `anime:<anilist_id>:<episode>`
+# (see EpisodeList in the frontend), so we piggyback on the same progress POSTs —
+# no separate call from the client.
+_log = logging.getLogger(__name__)
+_ANIME_ID_RE = re.compile(r"^anime:(\d+):(\d+(?:\.\d+)?)$")
+_anime_marked = set()          # (anilist_id, episode) already handled this run
+_anime_mark_lock = threading.Lock()
+
+
+def _mark_anime_async(anilist_id, episode):
+    from .oauth import get_valid_token  # lazy: avoid an api-package import cycle
+    try:
+        token = get_valid_token("anilist")
+    except Exception:
+        token = None
+    if not token:
+        return
+    try:
+        anilist.mark_episode_watched(token, anilist_id, episode)
+    except Exception:
+        _log.exception("AniList auto-mark failed for anime:%s ep %s", anilist_id, episode)
+
+
+def _maybe_mark_anime(item_id, position, duration):
+    threshold = config.ANIME_WATCHED_PERCENT
+    if threshold <= 0 or duration <= 0:
+        return
+    m = _ANIME_ID_RE.match(item_id)
+    if not m or (position / duration) * 100 < threshold:
+        return
+    key = (int(m.group(1)), int(float(m.group(2))))
+    with _anime_mark_lock:
+        if key in _anime_marked:
+            return
+        _anime_marked.add(key)  # optimistic: mark once per episode per run
+    threading.Thread(target=_mark_anime_async, args=key, daemon=True).start()
 
 
 def _history_row_to_item(r):

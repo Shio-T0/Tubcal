@@ -85,6 +85,11 @@ no ORM.
   the AniList id to a title via `anilist.media`, searches the provider, and returns
   the same `{sources,subtitles,headers}` shape the player/proxy forward. The old
   `TUBCAL_ANIME_SOURCE` / `anime_source_url` setting is now inert.
+  Auto-watched: the anime player reports progress under item ids
+  `anime:<anilist_id>:<episode>`, so `feeds.post_progress` piggybacks on those
+  POSTs and, once past `ANIME_WATCHED_PERCENT` (default 90), advances AniList
+  progress via `anilist.mark_episode_watched` (advance-only, in a background
+  thread, once per episode per run) — no extra client call.
 - `mixer.py` — deterministic weighted round-robin that interleaves platforms into
   the Front Page "For You" feed.
 

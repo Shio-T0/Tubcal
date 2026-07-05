@@ -81,6 +81,7 @@ are optional:
 | `TUBCAL_YT_COOKIES_BROWSER` | *(off)* | Have `yt-dlp` borrow a browser's YouTube cookies (e.g. `firefox`, `firefox:profile`) so resolves/captions stop getting rate-limited. Off = maximum privacy. |
 | `TUBCAL_ANIME_SOURCE` | `http://127.0.0.1:3000` | *(inert)* Episodes now resolve in-process via `anipy_api`; no external aggregator is used. |
 | `TUBCAL_ANIME_PROVIDER` | *(none)* | anipy provider to prefer: `allanime` or `animekai` (defaults to allanime→animekai). |
+| `TUBCAL_ANIME_WATCHED_PERCENT` | `90` | Auto-mark an episode watched on AniList once this % has played (needs AniList connected; `0` disables). |
 
 ### Connecting accounts (optional)
 

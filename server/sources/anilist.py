@@ -439,6 +439,30 @@ def save_list_entry(token, media_id, *, status=None, progress=None, score=None,
     return d.get("SaveMediaListEntry")
 
 
+def mark_episode_watched(token, media_id, episode, total=None):
+    """Advance the viewer's AniList progress for `media_id` to `episode`, never
+    lowering it. Flips the entry to COMPLETED on the final episode, otherwise
+    CURRENT. Returns the updated entry, or None if nothing changed / not connected.
+    """
+    if not token or not media_id or not episode:
+        return None
+    ep = int(float(episode))
+    if ep <= 0:
+        return None
+    d = _post(
+        "query($id:Int){ Media(id:$id){ episodes mediaListEntry { progress status } } }",
+        {"id": int(media_id)}, token=token,
+    )
+    media = d.get("Media") or {}
+    entry = media.get("mediaListEntry") or {}
+    if ep <= (entry.get("progress") or 0):
+        return None  # never lower an existing (or equal) progress
+    if total is None:
+        total = media.get("episodes")
+    status = "COMPLETED" if (total and ep >= total) else "CURRENT"
+    return save_list_entry(token, int(media_id), status=status, progress=ep)
+
+
 def delete_list_entry(token, entry_id):
     d = _post("mutation ($id:Int){ DeleteMediaListEntry(id:$id){ deleted } }", {"id": entry_id}, token=token)
     _invalidate_user(token)
