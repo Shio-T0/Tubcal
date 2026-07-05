@@ -157,13 +157,20 @@ function Shelf({ title, count, items, onPlay, allTo, onShuffle, shuffling, class
         {items.map((item) => (
           <VideoTile key={item.id} item={item} onPlay={onPlay} />
         ))}
-        {onLoadMore && hasMore && (
-          <button className={s.loadMoreTile} onClick={onLoadMore} disabled={loadingMore}>
-            <Plus size={18} />
+      </div>
+      {onLoadMore && hasMore && (
+        <div className={s.shelfLoadMore}>
+          <button
+            className={s.loadMoreBtn}
+            onClick={onLoadMore}
+            disabled={loadingMore}
+            data-kbd-tile
+          >
+            <Plus size={15} />
             {loadingMore ? 'loading…' : 'load more'}
           </button>
-        )}
-      </div>
+        </div>
+      )}
     </section>
   );
 }
