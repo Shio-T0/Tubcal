@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   AlertTriangle, ArrowLeft, ArrowRight, Bookmark, Calendar, Check, CheckCheck,
   ChevronDown, ChevronLeft, ChevronRight, CircleSlash, Clapperboard, CloudOff,
-  Eye, ExternalLink, Flag, Frown, Heart, Meh, Minus, Pause, Play, Plus,
+  Eye, ExternalLink, Flag, Frown, Heart, Meh, Minus, Pause, Play, PlayCircle, Plus,
   RefreshCw, Repeat, Smile, Star, ThumbsUp, Trash2, Tv, User,
 } from 'lucide-react';
 
@@ -20,7 +20,8 @@ import { Avatar } from '../components/ui/Avatar.jsx';
 import { ActivityFeed, ForumList } from '../components/anime/Discussions.jsx';
 import { ProfileModal, ProfileStudio } from '../components/anime/Profile.jsx';
 import { useHorizontalWheel } from '../lib/useHorizontalWheel.js';
-import { applyOverlay, useAnimeSync, usePlayer, useToast } from '../state.jsx';
+import { clock } from '../lib/time.js';
+import { applyOverlay, COMPLETE_RATIO, useAnimeSync, usePlayer, useProgress, useToast } from '../state.jsx';
 import s from './anime.module.css';
 
 // AniList score scales by the viewer's chosen format.
@@ -1155,8 +1156,18 @@ function EpisodeList({ media }) {
   // The aggregator is optional now — it only enables local playback when up.
   const eps = useApi(`/anime/episodes/${media.id}`);
   const { open } = usePlayer();
+  const { progress } = useProgress();
   const { overlay, queueListEdit } = useAnimeSync();
   const entry = applyOverlay(media.id, media.list_entry, overlay);
+
+  // Playback state per episode, keyed exactly like the player reports it, so the
+  // per-episode progress bars match the Screening Room tiles' resume indicator.
+  const progKey = (n) => `anime:${media.id}:${n}`;
+  const progOf = (n) => progress[progKey(n)];
+  const ratioOf = (n) => {
+    const p = progOf(n);
+    return p && p.duration ? Math.min(1, p.position / p.duration) : 0;
+  };
 
   // Build the episode list from AniList, then fold in aggregator keys (by number)
   // so a local stream can play when the source is reachable.
@@ -1200,6 +1211,21 @@ function EpisodeList({ media }) {
       extra: { stream_key: e.key, anilist_id: media.id, episode: e.number },
     });
 
+  // Continue watching: resume the last episode you left unfinished, or — if it's
+  // done — start the next one. Sequential-watch assumption (highest touched ep).
+  // Playable only for local episodes; the player auto-resumes from saved progress.
+  let cont = null; // { ep, mode: 'resume' | 'next', pos }
+  const touched = list.filter((e) => e.key && ratioOf(e.number) > 0);
+  if (touched.length) {
+    const lastN = Math.max(...touched.map((e) => e.number));
+    if (ratioOf(lastN) < COMPLETE_RATIO) {
+      cont = { ep: list.find((e) => e.number === lastN), mode: 'resume', pos: progOf(lastN).position };
+    } else {
+      const next = list.find((e) => e.number > lastN && e.key);
+      if (next) cont = { ep: next, mode: 'next' };
+    }
+  }
+
   // Launch official source; optionally advance AniList progress on launch.
   const launch = (url, epNumber) => {
     launchOfficial(url);
@@ -1211,6 +1237,19 @@ function EpisodeList({ media }) {
   return (
     <div className={s.relBlock}>
       <h3 className={s.blockLabel}>Episodes</h3>
+
+      {cont && (
+        <button className={s.continueBtn} onClick={() => playLocal(cont.ep)}>
+          <PlayCircle size={16} />
+          <span className={s.continueLabel}>
+            {cont.mode === 'resume' ? 'Continue watching' : 'Up next'}
+          </span>
+          <span className={s.continueEp}>
+            Episode {cont.ep.number}
+            {cont.mode === 'resume' && cont.pos ? ` · ${clock(cont.pos)}` : ''}
+          </span>
+        </button>
+      )}
 
       {links.length > 0 && (
         <div className={s.deepLinks}>
@@ -1255,6 +1294,30 @@ function EpisodeList({ media }) {
                     <span className={s.epPlay}>
                       {local ? <Play size={15} fill="currentColor" /> : <ExternalLink size={15} />}
                     </span>
+                    {(() => {
+                      const r = ratioOf(e.number);
+                      if (r <= 0) return null;
+                      const p = progOf(e.number);
+                      const done = r >= COMPLETE_RATIO;
+                      return (
+                        <>
+                          {p?.duration ? (
+                            <span className={s.epTime}>
+                              {done ? clock(p.duration) : `${clock(p.position)} / ${clock(p.duration)}`}
+                            </span>
+                          ) : null}
+                          <div
+                            className={s.epProgress}
+                            title={done ? 'Watched' : `${Math.round(r * 100)}% watched`}
+                          >
+                            <div
+                              className={`${s.epProgressFill} ${done ? s.epProgressDone : ''}`}
+                              style={{ width: `${done ? 100 : Math.max(4, r * 100)}%` }}
+                            />
+                          </div>
+                        </>
+                      );
+                    })()}
                   </div>
                   <div className={s.epMeta}>
                     <span className={s.epNum}>Episode {e.number}</span>
