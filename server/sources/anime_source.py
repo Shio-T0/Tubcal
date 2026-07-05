@@ -21,16 +21,32 @@ functions for a local-files or torrent adapter later without touching the player
 import base64
 import json
 
-from rapidfuzz import fuzz
-
-from anipy_api.provider import LanguageTypeEnum, get_provider
-
 from .. import cache, config, db
 from . import anilist
 
 # anipy's real providers. A leftover Consumet provider name in settings (e.g.
 # "gogoanime") isn't one of these, so we ignore it and fall back to the defaults.
 _VALID_PROVIDERS = ("allanime", "animekai")
+
+
+def _anipy():
+    """Import anipy_api on demand. It's a desktop-only dependency (it pulls in
+    python-mpv → libmpv, pycryptodomex, etc.), so keeping the import lazy lets this
+    module load on minimal runtimes — notably the Android/Chaquopy build, where
+    anime streaming isn't available and these calls just surface a clean error."""
+    from anipy_api.provider import LanguageTypeEnum, get_provider
+    return get_provider, LanguageTypeEnum
+
+
+def _ratio(a, b):
+    """Title similarity 0–100. Prefer rapidfuzz; fall back to stdlib difflib so a
+    runtime without rapidfuzz (e.g. Android) still works."""
+    try:
+        from rapidfuzz import fuzz
+        return fuzz.WRatio(a, b)
+    except Exception:
+        import difflib
+        return difflib.SequenceMatcher(None, a, b).ratio() * 100
 
 
 def _providers():
@@ -74,7 +90,7 @@ def _best_match(results, titles):
     """Pick the search result whose name best matches any known title."""
     best, best_score = None, -1.0
     for r in results:
-        score = max((fuzz.WRatio(t.lower(), (r.name or "").lower()) for t in titles), default=0)
+        score = max((_ratio(t.lower(), (r.name or "").lower()) for t in titles), default=0)
         if score > best_score:
             best, best_score = r, score
     if best_score >= 60:
@@ -85,6 +101,7 @@ def _best_match(results, titles):
 def _resolve_episodes(titles):
     """Search each provider in turn until one yields a matching entry with
     episodes; return the {episodes, total} payload."""
+    get_provider, LanguageTypeEnum = _anipy()
     for provider in _providers():
         try:
             prov = get_provider(provider)
@@ -142,6 +159,7 @@ def watch(key):
     headers:{Referer}} — the aggregator shape the proxy already forwards.
     """
     provider, identifier, episode, lang = _decode_key(key)
+    get_provider, LanguageTypeEnum = _anipy()
     prov = get_provider(provider)
     lang_enum = LanguageTypeEnum.DUB if lang == "dub" else LanguageTypeEnum.SUB
     streams = prov.get_video(identifier, episode, lang_enum)

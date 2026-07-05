@@ -7,7 +7,10 @@ feed items for that source, so a near-miss query still surfaces relevant results
 without hitting the API again.
 """
 
-from rapidfuzz import fuzz
+try:
+    from rapidfuzz import fuzz
+except Exception:  # pragma: no cover - rapidfuzz is a native dep absent on some
+    fuzz = None     # runtimes (e.g. the Android/Chaquopy build); fall back to no-op.
 
 
 def fuzzy_filter(items, query, key="title", threshold=60, limit=30):
@@ -28,7 +31,7 @@ def fuzzy_filter(items, query, key="title", threshold=60, limit=30):
     Returns:
         List of (item, score) tuples sorted descending by score.
     """
-    if not items or not query:
+    if not items or not query or fuzz is None:
         return []
 
     q = query.strip().lower()
