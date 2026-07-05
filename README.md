@@ -79,8 +79,8 @@ are optional:
 | `TUBCAL_OLLAMA_URL` | `http://127.0.0.1:11434` | Local Ollama endpoint for The Archive. |
 | `TUBCAL_INVIDIOUS` | *(auto)* | Comma-separated Invidious instances for YouTube trending/search. |
 | `TUBCAL_YT_COOKIES_BROWSER` | *(off)* | Have `yt-dlp` borrow a browser's YouTube cookies (e.g. `firefox`, `firefox:profile`) so resolves/captions stop getting rate-limited. Off = maximum privacy. |
-| `TUBCAL_ANIME_SOURCE` | `http://127.0.0.1:3000` | Base URL of the local episode source for The Anime. |
-| `TUBCAL_ANIME_PROVIDER` | *(none)* | Optional adapter hint for the anime source. |
+| `TUBCAL_ANIME_SOURCE` | `http://127.0.0.1:3000` | *(inert)* Episodes now resolve in-process via `anipy_api`; no external aggregator is used. |
+| `TUBCAL_ANIME_PROVIDER` | *(none)* | anipy provider to prefer: `allanime` or `animekai` (defaults to allanime→animekai). |
 
 ### Connecting accounts (optional)
 

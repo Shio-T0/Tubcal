@@ -42,8 +42,21 @@ mediaListEntry { id status score progress }
 """
 
 
+def _fallback_token():
+    """AniList now rejects *unauthenticated* GraphQL with a 403 ("API temporarily
+    disabled"), so when a read passes no token, fall back to the connected
+    account's token if there is one. Lazy import avoids an api↔sources cycle."""
+    try:
+        from ..api.oauth import get_valid_token
+        return get_valid_token("anilist")
+    except Exception:
+        return None
+
+
 def _post(query, variables=None, token=None):
     """Run a GraphQL document. Raises RuntimeError on AniList-reported errors."""
+    if token is None:
+        token = _fallback_token()
     headers = {"Content-Type": "application/json", "Accept": "application/json"}
     if token:
         headers["Authorization"] = f"Bearer {token}"

@@ -78,8 +78,13 @@ no ORM.
   logged-out data is degraded; OAuth upgrades it. Threaded comments.
 - `hackernews.py` — Firebase API + Algolia search.
 - `anilist.py` — GraphQL; reads cached, user writes (progress sync) uncached.
-- `anime_source.py` — talks to a **separate, user-run** local episode aggregator
-  (default `http://127.0.0.1:3000`, set via `TUBCAL_ANIME_SOURCE` or Settings).
+  AniList now 403s *unauthenticated* reads, so `_post` falls back to the connected
+  account's OAuth token when a caller passes none.
+- `anime_source.py` — resolves the episode list + playable streams with `anipy_api`
+  (the allanime/animekai scraper Shou uses); no external aggregator needed. It maps
+  the AniList id to a title via `anilist.media`, searches the provider, and returns
+  the same `{sources,subtitles,headers}` shape the player/proxy forward. The old
+  `TUBCAL_ANIME_SOURCE` / `anime_source_url` setting is now inert.
 - `mixer.py` — deterministic weighted round-robin that interleaves platforms into
   the Front Page "For You" feed.
 
