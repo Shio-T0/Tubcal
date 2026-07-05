@@ -77,8 +77,20 @@ EDITION_SNIPPET = 400     # chars of snippet fed to embedding / synthesis
 # Minimum spacing between requests to a host (seconds).
 # Reddit 429s aggressively on unauthenticated RSS — keep this generous;
 # the TTL cache means we rarely hit them anyway.
+#
+# Invidious: opening a channel fires several calls at once (videos + playlists +
+# search + live) and the recommendation shelf fans out more, all to one public
+# instance — that burst is what trips a 429 and then blocks the host for ~30s,
+# taking search and pagination down with it. A modest spacing turns the burst
+# into a gentle stream so our pagination instance stays usable. Cache TTLs mean
+# repeat opens don't re-hit these at all. Mirrors invidious._DEFAULT_INSTANCES.
 HOST_INTERVALS = {
     "www.reddit.com": 3.0,
+    "invidious.darkness.services": 1.0,
+    "iv.melmac.space": 1.0,
+    "invidious.privacydev.net": 1.0,
+    "invidious.nerdvpn.de": 1.0,
+    "yewtu.be": 1.0,
 }
 
 # Room ids — mirrors frontend/src/lib/rooms.js ROOM_IDS.

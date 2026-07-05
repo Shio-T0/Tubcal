@@ -145,7 +145,11 @@ def _api_get(path):
                 raise ValueError(data["error"])
             _mark(family, base, True)
             return data
-        except (requests.RequestException, ValueError) as e:
+        except (requests.RequestException, ValueError, httpc.RateLimited) as e:
+            # A rate-limit is just another reason this instance can't serve us
+            # right now — bench it and fall through to the next one, rather than
+            # aborting the whole fallback loop (which killed search/pagination the
+            # moment our leader instance 429'd).
             last_err = e
             _mark(family, base, False)
             continue
@@ -296,7 +300,9 @@ def recommendations(seeds, exclude_ids=(), limit=40):
         return []
     exclude = set(exclude_ids)
 
-    with ThreadPoolExecutor(max_workers=6) as ex:
+    # Keep the fan-out modest: these all hit the same public instances, and a
+    # wide burst is what gets us rate-limited (see config.HOST_INTERVALS).
+    with ThreadPoolExecutor(max_workers=3) as ex:
         rec_lists = list(ex.map(lambda s: (s[1], recommended(s[0])), seeds))
 
     scored = {}  # id -> [score, item]
