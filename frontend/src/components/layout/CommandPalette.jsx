@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
-import { Bookmark, Clapperboard, CornerDownLeft, Hash, Newspaper, Play, Radio, Search, Settings } from 'lucide-react';
+import { Bookmark, Clapperboard, CornerDownLeft, Hash, Newspaper, Play, Radio, ScrollText, Search, Settings } from 'lucide-react';
 
 import { api } from '../../api/client.js';
 import { usePlayer } from '../../state.jsx';
 import s from './CommandPalette.module.css';
 
 const NAV = [
+  { id: 'nav:/edition', label: 'The Edition', icon: <ScrollText size={15} />, to: '/edition' },
   { id: 'nav:/', label: 'Front Page', icon: <Newspaper size={15} />, to: '/' },
   { id: 'nav:/youtube', label: 'Screening Room', icon: <Clapperboard size={15} />, to: '/youtube' },
   { id: 'nav:/reddit', label: 'The Dispatch', icon: <Radio size={15} />, to: '/reddit' },

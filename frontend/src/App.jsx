@@ -8,6 +8,7 @@ import OfflineBanner from './components/layout/OfflineBanner.jsx';
 import PlayerLayer from './components/player/PlayerLayer.jsx';
 import { AppProviders } from './state.jsx';
 
+import Edition from './pages/Edition.jsx';
 import FrontPage from './pages/FrontPage.jsx';
 import ScreeningRoom, { ChannelPage, HistoryPage, PlaylistPage } from './pages/ScreeningRoom.jsx';
 import Dispatch, { SubredditPage } from './pages/Dispatch.jsx';
@@ -25,6 +26,7 @@ export default function App() {
         <Masthead />
         <Routes>
           <Route path="/" element={<FrontPage />} />
+          <Route path="/edition" element={<Edition />} />
           <Route path="/youtube" element={<ScreeningRoom />} />
           <Route path="/youtube/c/:channelId" element={<ChannelPage />} />
           <Route path="/youtube/playlist/:playlistId" element={<PlaylistPage />} />

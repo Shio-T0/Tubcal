@@ -40,6 +40,7 @@ def main():
     _backfill_avatars()
     notifier.start()
     brain.start()
+    brain.edition.start()
     print(f"\n  Tubcal — private social hub")
     print(f"  http://{config.HOST}:{config.PORT}\n")
     app.run(host=config.HOST, port=config.PORT, debug=False, threaded=True)

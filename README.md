@@ -14,6 +14,7 @@ you watch into a searchable second brain.
 
 | | Room | What it is |
 |---|---|---|
+| **00** | **The Edition** | A daily paper composed on this machine: the same story found across YouTube, Reddit, and HN is clustered into one article, ranked by an editor's salience (cross-platform stories win), and — with Ollama running — written up as grounded, citation-checked prose. Works with zero AI installed as a "wire edition". |
 | **01** | **Front Page** | One mixed stream from everything you follow — a newspaper lede plus ruled columns, weighted toward your taste. |
 | **02** | **Screening Room** | Cinematic YouTube: a hero premiere, a shelf per channel, per-channel & playlist pages, watch history, and **The Projection** — a fully local recommendation shelf powered by your own watch history. English captions for foreign-language videos. |
 | **03** | **The Dispatch** | Reddit as an editorial broadsheet: serif headlines, per-subreddit pages, full-text search, threaded comments. |
@@ -126,6 +127,12 @@ URIs to register if you want richer data:
   Reddit/YouTube ~5–10 min) and survive restarts; the ⟳ button forces a refresh.
 - **The Projection** — a fully local recommendation shelf built from your watch
   history, warmed in the background at startup so it's ready on first open.
+- **The Edition** — a background thread composes one paper a day (after a
+  configurable hour, default 06:00): feed items are embedded (one batched Ollama
+  call), clustered by canonical URL + cosine similarity, ranked, and the top
+  stories synthesized by the local LLM behind a citation-validation gate that
+  falls back to stitched snippets — the paper can never hallucinate a story.
+  Reading it is a single SQLite row: nothing is computed when you open the page.
 - **Captions** — foreign-language YouTube videos get English captions fetched via
   `yt-dlp` (which carries the right client context for auto-translated tracks).
 - **The Archive memory** — a background worker transcribes watched videos with
@@ -144,9 +151,10 @@ server/
   config.py             # env-driven config & cache TTLs
   db.py                 # SQLite: subscriptions, settings, history, tokens, brain
   cache.py              # SQLite-backed TTL/SWR cache (persists across restarts)
-  api/                  # HTTP blueprints (feeds, subscriptions, settings, oauth, brain, anime)
+  api/                  # HTTP blueprints (feeds, subscriptions, settings, oauth, brain, anime, edition)
   sources/              # feed adapters (youtube, reddit, hackernews, invidious, anilist, …)
   brain/                # The Archive: transcribe · search · summarize · llm · worker
+                        # + The Edition: cluster · feed_index · edition
 frontend/
   src/pages/            # one component per room
   src/components/       # layout, player, modals, ui

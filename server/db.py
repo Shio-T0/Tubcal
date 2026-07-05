@@ -92,6 +92,36 @@ CREATE TABLE IF NOT EXISTS brain_chunks (
   embedding BLOB                                -- packed float32 vector
 );
 CREATE INDEX IF NOT EXISTS idx_brain_chunks_doc ON brain_chunks(doc_id);
+
+-- The Edition (No 00): embedded feed items + pre-built daily papers.
+CREATE TABLE IF NOT EXISTS feed_vectors (
+  item_id      TEXT PRIMARY KEY,                -- 'yt:ID' | 'rd:ID' | 'hn:ID'
+  platform     TEXT NOT NULL,
+  title        TEXT,
+  snippet      TEXT,
+  url          TEXT,
+  source_id    TEXT,
+  source_name  TEXT,
+  thumbnail    TEXT,
+  score        INTEGER,
+  comments     INTEGER,
+  published_at INTEGER,
+  vector       BLOB,                            -- UNIT-normalized packed float32
+  model        TEXT,                            -- embed model; mismatch => re-embed
+  embedded_at  INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_feed_vectors_time ON feed_vectors(published_at);
+
+CREATE TABLE IF NOT EXISTS editions (
+  id       INTEGER PRIMARY KEY AUTOINCREMENT,
+  date     TEXT NOT NULL UNIQUE,                -- 'YYYY-MM-DD' local
+  status   TEXT NOT NULL,                       -- 'wire' | 'edited'
+  model    TEXT,                                -- chat model used (null for wire)
+  sources  INTEGER NOT NULL,                    -- item count that fed this paper
+  build_ms INTEGER NOT NULL,
+  payload  TEXT NOT NULL,                       -- the complete pre-rendered edition JSON
+  built_at INTEGER NOT NULL
+);
 """
 
 DEFAULT_SETTINGS = {
@@ -111,6 +141,10 @@ DEFAULT_SETTINGS = {
     "brain_whisper_model": "base",        # faster-whisper size (tiny→medium)
     "brain_llm_model": "llama3.1:8b",     # Ollama chat model for summaries/ask
     "brain_embed_model": "nomic-embed-text",  # Ollama embedding model
+    # The Edition (No 00): the daily synthesized paper.
+    "edition_enabled": True,      # master gate for the builder thread
+    "edition_hour": 6,            # local hour after which today's paper is composed
+    "edition_llm_model": "",      # chat model override (blank -> brain_llm_model)
     # The Anime room: AniList sync + local episode source.
     "anime_autosync": True,       # finishing an episode bumps AniList progress
     "anime_sub_pref": "sub",      # 'sub' | 'dub'
@@ -169,6 +203,11 @@ def prune_old_data(history_cap=2000, cache_max_age=7 * 86400):
     except sqlite3.OperationalError:
         pass  # cache table may not exist on a very first run
     con.close()
+    try:
+        feed_vectors_prune()
+        edition_prune()
+    except sqlite3.OperationalError:
+        pass  # tables may not exist on a very first run
 
 
 # ---- settings ----
@@ -563,6 +602,133 @@ def brain_delete(item_id):
         n = cur.rowcount
     con.close()
     return n
+
+
+# ---- the edition (daily paper) ----
+
+def feed_vectors_missing(item_ids, model):
+    """Subset of item_ids with no stored vector for this embed model. One query;
+    the working set is capped upstream so the IN list stays small."""
+    if not item_ids:
+        return set()
+    con = connect()
+    marks = ",".join("?" * len(item_ids))
+    rows = con.execute(
+        f"SELECT item_id FROM feed_vectors WHERE item_id IN ({marks}) "
+        "AND vector IS NOT NULL AND model=?",
+        (*item_ids, model),
+    ).fetchall()
+    con.close()
+    have = {r["item_id"] for r in rows}
+    return set(item_ids) - have
+
+
+def feed_vectors_save(rows):
+    """rows = [{item_id, platform, title, snippet, url, source_id, source_name,
+    thumbnail, score, comments, published_at, vector(bytes), model}]."""
+    if not rows:
+        return
+    now = int(time.time())
+    con = connect()
+    with con:
+        con.executemany(
+            "INSERT OR REPLACE INTO feed_vectors "
+            "(item_id, platform, title, snippet, url, source_id, source_name, "
+            " thumbnail, score, comments, published_at, vector, model, embedded_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            [
+                (r["item_id"], r["platform"], r.get("title"), r.get("snippet"),
+                 r.get("url"), r.get("source_id"), r.get("source_name"),
+                 r.get("thumbnail"), r.get("score"), r.get("comments"),
+                 r.get("published_at"), r.get("vector"), r.get("model"), now)
+                for r in rows
+            ],
+        )
+    con.close()
+
+
+def feed_vectors_get(item_ids, model):
+    """item_id -> raw vector bytes, for the ids that have one under this model."""
+    if not item_ids:
+        return {}
+    con = connect()
+    marks = ",".join("?" * len(item_ids))
+    rows = con.execute(
+        f"SELECT item_id, vector FROM feed_vectors WHERE item_id IN ({marks}) "
+        "AND vector IS NOT NULL AND model=?",
+        (*item_ids, model),
+    ).fetchall()
+    con.close()
+    return {r["item_id"]: r["vector"] for r in rows}
+
+
+def feed_vectors_prune(max_age=14 * 86400):
+    con = connect()
+    with con:
+        con.execute(
+            "DELETE FROM feed_vectors WHERE embedded_at < ?",
+            (int(time.time()) - max_age,),
+        )
+    con.close()
+
+
+def edition_save(date, status, model, sources, build_ms, payload):
+    """Persist one built paper (payload = the complete render-ready dict)."""
+    con = connect()
+    with con:
+        con.execute(
+            "INSERT INTO editions (date, status, model, sources, build_ms, payload, built_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?) "
+            "ON CONFLICT(date) DO UPDATE SET status=excluded.status, "
+            "model=excluded.model, sources=excluded.sources, "
+            "build_ms=excluded.build_ms, payload=excluded.payload, "
+            "built_at=excluded.built_at",
+            (date, status, model, sources, build_ms, json.dumps(payload),
+             int(time.time())),
+        )
+    con.close()
+
+
+def edition_latest():
+    """The newest paper's payload, or None. One row — the reader hot path."""
+    con = connect()
+    row = con.execute(
+        "SELECT payload FROM editions ORDER BY date DESC LIMIT 1"
+    ).fetchone()
+    con.close()
+    return json.loads(row["payload"]) if row else None
+
+
+def edition_get(date):
+    con = connect()
+    row = con.execute(
+        "SELECT payload FROM editions WHERE date=?", (date,)
+    ).fetchone()
+    con.close()
+    return json.loads(row["payload"]) if row else None
+
+
+def edition_list(limit=60):
+    """Meta only — the archive drawer must never drag payloads across a query."""
+    con = connect()
+    rows = con.execute(
+        "SELECT date, status, model, sources, build_ms, built_at "
+        "FROM editions ORDER BY date DESC LIMIT ?",
+        (limit,),
+    ).fetchall()
+    con.close()
+    return [dict(r) for r in rows]
+
+
+def edition_prune(keep=90):
+    con = connect()
+    with con:
+        con.execute(
+            "DELETE FROM editions WHERE date NOT IN "
+            "(SELECT date FROM editions ORDER BY date DESC LIMIT ?)",
+            (keep,),
+        )
+    con.close()
 
 
 # ---- oauth ----

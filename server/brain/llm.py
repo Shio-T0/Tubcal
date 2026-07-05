@@ -74,19 +74,23 @@ def embed(texts, model):
     return out
 
 
-def chat(system, prompt, model, temperature=0.2):
-    """Single-shot chat completion → the assistant's text."""
+def chat(system, prompt, model, temperature=0.2, fmt=None):
+    """Single-shot chat completion → the assistant's text. `fmt="json"` asks
+    Ollama to constrain the output to valid JSON (used by The Edition)."""
+    body = {
+        "model": model,
+        "messages": [
+            {"role": "system", "content": system},
+            {"role": "user", "content": prompt},
+        ],
+        "stream": False,
+        "options": {"temperature": temperature},
+    }
+    if fmt:
+        body["format"] = fmt
     r = requests.post(
         f"{config.OLLAMA_URL}/api/chat",
-        json={
-            "model": model,
-            "messages": [
-                {"role": "system", "content": system},
-                {"role": "user", "content": prompt},
-            ],
-            "stream": False,
-            "options": {"temperature": temperature},
-        },
+        json=body,
         timeout=_TIMEOUT_CHAT,
     )
     r.raise_for_status()

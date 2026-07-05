@@ -6,6 +6,7 @@ import { nextTheme, themeMeta } from '../../lib/themes.js';
 import s from './Masthead.module.css';
 
 const NAV = [
+  { to: '/edition', index: 'No 00', label: 'The Edition', color: 'var(--c-foryou)' },
   { to: '/', index: 'No 01', label: 'Front Page', color: 'var(--c-foryou)' },
   { to: '/youtube', index: 'No 02', label: 'Screening Room', color: 'var(--c-youtube)' },
   { to: '/reddit', index: 'No 03', label: 'The Dispatch', color: 'var(--c-reddit)' },

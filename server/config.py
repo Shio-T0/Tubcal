@@ -64,6 +64,17 @@ INVIDIOUS_INSTANCES = [
     if i.strip()
 ] or None
 
+# The Edition (No 00): the daily cross-platform paper. All embedding/clustering/
+# synthesis happens in a background thread; the reader-facing API only ever reads
+# a pre-built row, so none of these affect request latency.
+EDITION_WINDOW_H = 36     # clustering lookback over feed items (hours)
+EDITION_SIM = 0.80        # cosine threshold for joining a story cluster. Short
+                          # title+snippet vectors run hot under nomic — unrelated
+                          # tech headlines often score 0.6+ — so this stays strict;
+                          # same-story pairs land ~0.85+. (0.62 blobbed 40 items.)
+EDITION_MAX_SYNTH = 6     # hard cap on LLM story writes per build (lede + columns)
+EDITION_SNIPPET = 400     # chars of snippet fed to embedding / synthesis
+
 # Minimum spacing between requests to a host (seconds).
 # Reddit 429s aggressively on unauthenticated RSS — keep this generous;
 # the TTL cache means we rarely hit them anyway.

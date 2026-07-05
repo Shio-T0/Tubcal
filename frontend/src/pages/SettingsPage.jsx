@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { KeyRound, Library, Minus, Palette, Plus, Settings, Trash2, Rss, Tv, Volume2 } from 'lucide-react';
+import { KeyRound, Library, Minus, Newspaper, Palette, Plus, Settings, Trash2, Rss, Tv, Volume2 } from 'lucide-react';
 
 import { api, useApi } from '../api/client.js';
 import { SectionHead } from '../components/layout/Section.jsx';
@@ -251,6 +251,92 @@ function ModelLine({ label, value, installed, onChange, pullHint }) {
   );
 }
 
+function EditionSettings() {
+  const { settings, updateSettings } = useSettings();
+  const toast = useToast();
+  const status = useApi('/brain/status');
+  const installed = status.data?.models || [];
+  const enabled = settings?.edition_enabled !== false;
+  const hour = settings?.edition_hour ?? 6;
+
+  const recompose = async () => {
+    try {
+      await api('/edition/rebuild', { method: 'POST' });
+      toast('The presses are running — the paper will recompose shortly.');
+    } catch (e) {
+      toast(e.message);
+    }
+  };
+
+  return (
+    <section className={`${s.section} glass`}>
+      <h2 className={s.sectionTitle}>
+        <Newspaper size={17} /> The Edition
+      </h2>
+      <p className={s.sectionSub}>
+        A daily paper composed from everything you follow — the same story found across
+        YouTube, Reddit, and Hacker News, clustered and written up on this machine. Works
+        without any AI installed (wire edition); Ollama upgrades it to synthesized prose.
+      </p>
+
+      <div className={s.row}>
+        <div>
+          <div className={s.rowLabel}>Daily paper</div>
+          <div className={s.rowHint}>Turn the background composer on or off.</div>
+        </div>
+        <SegmentedControl
+          options={[{ value: 'on', label: 'On' }, { value: 'off', label: 'Off' }]}
+          value={enabled ? 'on' : 'off'}
+          onChange={(v) => updateSettings({ edition_enabled: v === 'on' })}
+        />
+      </div>
+
+      <div className={s.row}>
+        <div>
+          <div className={s.rowLabel}>Composed after</div>
+          <div className={s.rowHint}>
+            The local hour from which today&rsquo;s paper may go to press.
+          </div>
+        </div>
+        <select
+          className={s.select}
+          value={hour}
+          onChange={(e) => updateSettings({ edition_hour: Number(e.target.value) })}
+        >
+          {Array.from({ length: 24 }, (_, h) => (
+            <option key={h} value={h}>{String(h).padStart(2, '0')}:00</option>
+          ))}
+        </select>
+      </div>
+
+      <div className={s.row}>
+        <div>
+          <div className={s.rowLabel}>Writer model</div>
+          <div className={s.rowHint}>The Ollama model that writes the stories.</div>
+        </div>
+        <select
+          className={s.select}
+          value={settings?.edition_llm_model || ''}
+          onChange={(e) => updateSettings({ edition_llm_model: e.target.value })}
+        >
+          <option value="">Same as The Archive</option>
+          {installed.map((m) => (
+            <option key={m} value={m}>{m}</option>
+          ))}
+        </select>
+      </div>
+
+      <div className={s.row}>
+        <div>
+          <div className={s.rowLabel}>Presses</div>
+          <div className={s.rowHint}>Force a fresh paper from the current signals.</div>
+        </div>
+        <Button onClick={recompose}>Recompose now</Button>
+      </div>
+    </section>
+  );
+}
+
 function ArchiveSettings() {
   const { settings, updateSettings } = useSettings();
   const status = useApi('/brain/status');
@@ -496,6 +582,8 @@ export default function SettingsPage() {
             />
           </div>
         </section>
+
+        <EditionSettings />
 
         <ArchiveSettings />
 

@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 // Vim-style global navigation.
-//   g + letter   jump between rooms (gf/gy/gr/gn/gs)
+//   g + letter   jump between rooms (ge/gf/gy/gr/gn/gs)
 //   gg / G       jump to the first / last tile on the page
 //   h j k l      move a roving focus across tiles by geometry — works in both the
 //                horizontal shelves and the wall grids (arrows mirror them once a
@@ -13,6 +13,7 @@ import { useNavigate } from 'react-router-dom';
 const GOTO = {
   h: '/',
   f: '/',
+  e: '/edition',
   y: '/youtube',
   r: '/reddit',
   n: '/hackernews',
