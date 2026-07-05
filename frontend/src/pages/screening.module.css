@@ -589,6 +589,17 @@
   transform: translateY(-2px);
 }
 
+/* Keyboard focus (base.css suppresses the default outline for kbd tiles, so the
+   end-cap needs to draw its own — a solid accent border + ring). */
+.loadMoreTile:focus,
+.loadMoreTile:focus-visible {
+  outline: none;
+  color: var(--ink-strong, var(--paper));
+  border-style: solid;
+  border-color: var(--shelf-c, var(--signal));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--shelf-c, var(--signal)) 55%, transparent);
+}
+
 .loadMoreTile:disabled {
   cursor: default;
   opacity: 0.6;
@@ -696,6 +707,10 @@
   grid-auto-columns: 336px;
   align-items: start;
   gap: var(--space-5);
+  /* No scroll-snap on the tall Projection grid: proximity-snapping fights the
+     JS wheel-scroll (each notch scrolls, then the browser tugs back to a snap
+     point), which is what made the wheel feel broken here. */
+  scroll-snap-type: none;
 }
 
 .shelfTall .tile {

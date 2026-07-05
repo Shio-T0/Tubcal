@@ -20,13 +20,19 @@ export function useHorizontalWheel() {
       if (e.deltaY === 0 || Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
       if (el.scrollWidth <= el.clientWidth) return;
 
+      // Normalize the delta to pixels. Many mice (esp. on Linux/Firefox) report
+      // deltaMode = LINE (1) with a delta of only ~3, which — added raw to
+      // scrollLeft — moves the row a couple of pixels per notch and feels broken.
+      const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? el.clientHeight : 1;
+      const amount = e.deltaY * unit;
+
       const atStart = el.scrollLeft <= 0;
       const atEnd = el.scrollLeft + el.clientWidth >= el.scrollWidth - 1;
       // at an edge and pushing further that way → let the page take the wheel
-      if ((atStart && e.deltaY < 0) || (atEnd && e.deltaY > 0)) return;
+      if ((atStart && amount < 0) || (atEnd && amount > 0)) return;
 
       e.preventDefault();
-      el.scrollLeft += e.deltaY;
+      el.scrollLeft += amount;
     };
 
     el.addEventListener('wheel', onWheel, { passive: false });

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -135,10 +135,10 @@ export function VideoTile({ item, onPlay, meta }) {
 }
 
 function Shelf({ title, count, items, onPlay, allTo, onShuffle, shuffling, className, style,
-                onLoadMore, hasMore, loadingMore }) {
+                onLoadMore, hasMore, loadingMore, dataShelf }) {
   const rowRef = useHorizontalWheel();
   return (
-    <section className={`${s.shelf} ${className || ''}`} style={style}>
+    <section className={`${s.shelf} ${className || ''}`} style={style} data-shelf={dataShelf}>
       <div className={s.shelfHead}>
         <h2 className={s.shelfTitle}>{title}</h2>
         {count != null && <span className={s.shelfCount}>{count} new</span>}
@@ -284,6 +284,24 @@ export default function ScreeningRoom() {
   const searching = dq.length > 0;
   // How many "picked for you" recommendations are revealed (grows on load-more).
   const [projShown, setProjShown] = useState(20);
+  // After a load-more, jump keyboard focus to the first freshly-revealed tile so
+  // hjkl continues straight into the new videos instead of stranding on the button.
+  const projFocusAt = useRef(null);
+  const loadMoreProjection = () => {
+    projFocusAt.current = projShown; // 0-based index of the first new tile
+    setProjShown((n) => n + 12);
+  };
+  useEffect(() => {
+    if (projFocusAt.current == null) return;
+    const idx = projFocusAt.current;
+    projFocusAt.current = null;
+    const tiles = document.querySelectorAll('[data-shelf="projection"] [data-kbd-tile]');
+    const el = tiles[idx];
+    if (el) {
+      el.focus({ preventScroll: true });
+      el.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
+    }
+  }, [projShown]);
 
   const refresh = async () => {
     try {
@@ -452,8 +470,9 @@ export default function ScreeningRoom() {
           count={null}
           items={projection}
           onPlay={setVideo}
-          onLoadMore={() => setProjShown((n) => n + 12)}
+          onLoadMore={loadMoreProjection}
           hasMore={projHasMore}
+          dataShelf="projection"
           className={`${s.projection} ${s.shelfTall}`}
           style={{ '--shelf-c': '#5fa597' }}
         />

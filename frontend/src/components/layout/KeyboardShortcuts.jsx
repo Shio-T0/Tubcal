@@ -41,7 +41,10 @@ export default function KeyboardShortcuts() {
     const focusTile = (el) => {
       if (!el) return;
       el.focus({ preventScroll: true });
-      el.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
+      // Keep the focused tile centred in its horizontal scroller: near the start
+      // it can't centre (no room to scroll left) so it just stays put, and the row
+      // only begins to scroll once the selection has reached the middle.
+      el.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
     };
 
     const focusEdge = (last) => {
