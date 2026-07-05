@@ -1,0 +1,14 @@
+import { chromium } from 'playwright';
+const browser = await chromium.launch();
+const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+await page.goto('http://127.0.0.1:5000/anime', { waitUntil: 'networkidle' }).catch(() => {});
+await page.waitForTimeout(1200);
+await page.getByText('My List', { exact: true }).click().catch(() => {});
+await page.waitForTimeout(3000);
+await page.screenshot({ path: '/tmp/mylist-all.png' });
+console.log('all');
+await page.getByText('Watching', { exact: true }).click().catch(() => {});
+await page.waitForTimeout(1500);
+await page.screenshot({ path: '/tmp/mylist-watching.png' });
+console.log('watching');
+await browser.close();

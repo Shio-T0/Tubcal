@@ -1,0 +1,852 @@
+.muted {
+  color: var(--paper-faint);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  padding: var(--space-4) 0;
+}
+
+.dot {
+  color: var(--paper-faint);
+}
+
+/* avatars */
+.av {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.avL {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--c-anime);
+  background: color-mix(in srgb, var(--c-anime) 16%, transparent);
+}
+
+/* clickable username → profile */
+.userChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 7px 2px 2px;
+  border-radius: var(--r-pill);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--paper-dim);
+  transition: color 0.15s ease, background 0.15s ease;
+}
+.userChip:hover {
+  color: var(--c-anime);
+  background: color-mix(in srgb, var(--c-anime) 12%, transparent);
+}
+/* avatar-only (comment / activity gutter) */
+.commentAvatarOnly {
+  flex: none;
+  padding: 0;
+}
+.commentAvatarOnly > span:last-child {
+  display: none;
+}
+.commentAvatarOnly:hover {
+  background: none;
+}
+/* name-only (in a head row) */
+.commentNameOnly {
+  padding: 1px 6px 1px 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.commentNameOnly .av,
+.commentNameOnly .avL {
+  display: none;
+}
+
+/* ── forum ─────────────────────────────────────────────────────────────────── */
+.forum {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* category rail */
+.catRail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.catChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 13px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--rule);
+  background: var(--surface);
+  color: var(--paper-dim);
+  font-size: 12.5px;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+.catChip:hover {
+  color: var(--text-primary);
+  border-color: var(--rule-strong);
+}
+.catChipOn {
+  color: var(--ink);
+  background: var(--c-anime);
+  border-color: var(--c-anime);
+}
+
+/* context bar: active category description + filters */
+.forumBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--rule);
+}
+.forumDesc {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--paper-faint);
+}
+.forumDesc svg {
+  color: var(--c-anime);
+}
+.forumFilters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* title sub-category picker */
+.picker {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--rule);
+  background: var(--surface-input);
+  color: var(--paper-faint);
+}
+.pickerInput {
+  width: 130px;
+  background: none;
+  border: none;
+  outline: none;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+.pickerMenu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 20;
+  width: 280px;
+  max-height: 320px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  padding: 5px;
+  border-radius: var(--r-card);
+  border: 1px solid var(--rule-strong);
+  background: var(--ink-2);
+  box-shadow: var(--shadow-modal);
+}
+.pickerItem {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  text-align: left;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  transition: background 0.12s ease;
+}
+.pickerItem:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+.pickerItem img {
+  width: 26px;
+  height: 36px;
+  border-radius: 4px;
+  object-fit: cover;
+  flex: none;
+}
+
+/* spoiler filter tabs */
+.spoilTabs {
+  display: inline-flex;
+  padding: 3px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--rule);
+  background: var(--surface-input);
+}
+.spoilTabs button {
+  padding: 4px 11px;
+  border-radius: var(--r-pill);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--paper-dim);
+  transition: color 0.15s ease, background 0.15s ease;
+}
+.spoilTabs button:hover {
+  color: var(--text-primary);
+}
+.spoilOn {
+  color: var(--ink) !important;
+  background: var(--c-anime);
+}
+
+/* thread text search */
+.searchMini {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 11px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--rule);
+  background: var(--surface-input);
+  color: var(--paper-faint);
+}
+.searchMini input {
+  width: 130px;
+  background: none;
+  border: none;
+  outline: none;
+  color: var(--text-primary);
+  font-size: 12.5px;
+}
+
+/* active sub-category banner */
+.subcat {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  align-self: flex-start;
+  padding: 5px 6px 5px 5px;
+  border-radius: var(--r-pill);
+  border: 1px solid color-mix(in srgb, var(--c-anime) 40%, var(--rule));
+  background: color-mix(in srgb, var(--c-anime) 10%, transparent);
+  font-size: 12.5px;
+  color: var(--paper-dim);
+}
+.subcat img {
+  width: 22px;
+  height: 30px;
+  border-radius: 4px;
+  object-fit: cover;
+}
+.subcat strong {
+  color: var(--text-primary);
+}
+.subcat button {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  color: var(--paper-faint);
+}
+.subcat button:hover {
+  color: var(--text-primary);
+  background: var(--surface-hover);
+}
+
+/* thread list + rows */
+.threadList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.thread {
+  display: flex;
+  gap: var(--space-4);
+  align-items: stretch;
+  text-align: left;
+  width: 100%;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--r-card);
+  border: 1px solid var(--rule);
+  background: var(--surface);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease;
+}
+.thread:hover {
+  border-color: color-mix(in srgb, var(--c-anime) 55%, var(--rule));
+  background: var(--surface-hover);
+  transform: translateY(-1px);
+}
+.threadMain {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.threadTop {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.threadTitle {
+  font-family: var(--font-display);
+  font-size: 15.5px;
+  font-weight: 560;
+  line-height: 1.3;
+  color: var(--text-primary);
+  margin: 0;
+}
+.threadSnippet {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--paper-dim);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.threadFoot {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  margin-top: 2px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--paper-dim);
+}
+.threadStat {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.threadTime {
+  color: var(--paper-faint);
+}
+.threadCover {
+  flex: none;
+  width: 46px;
+  height: 64px;
+  border-radius: 8px;
+  object-fit: cover;
+  border: 1px solid var(--rule);
+  align-self: center;
+}
+
+/* badges + tags */
+.badgePin,
+.badgeLock,
+.badgeSpoiler {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: var(--r-pill);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+}
+.badgePin {
+  color: var(--c-hn);
+  background: color-mix(in srgb, var(--c-hn) 16%, transparent);
+}
+.badgeLock {
+  color: var(--paper-faint);
+  background: var(--surface-input);
+}
+.badgeSpoiler {
+  color: var(--danger);
+  border: 1px solid color-mix(in srgb, var(--danger) 45%, transparent);
+}
+.tag {
+  padding: 2px 9px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--rule);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--paper-faint);
+  background: var(--surface);
+}
+
+/* ── thread modal ──────────────────────────────────────────────────────────── */
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: var(--backdrop);
+  display: grid;
+  place-items: start center;
+  padding: var(--space-6) var(--space-4);
+  overflow-y: auto;
+  backdrop-filter: blur(3px);
+}
+.modal {
+  position: relative;
+  width: min(740px, 100%);
+  background: var(--ink-2);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--r-modal);
+  box-shadow: var(--shadow-modal);
+  padding: var(--space-6);
+  animation: modalIn 0.22s ease both;
+}
+@keyframes modalIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.close {
+  position: absolute;
+  top: var(--space-3);
+  right: var(--space-3);
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-pill);
+  color: var(--paper-dim);
+  transition: all 0.15s ease;
+}
+.close:hover {
+  color: var(--text-primary);
+  background: var(--surface-hover);
+}
+
+.modalHead {
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--rule);
+}
+.threadTags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: var(--space-3);
+}
+.mediaTag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px 3px 3px;
+  border-radius: var(--r-pill);
+  border: 1px solid color-mix(in srgb, var(--c-anime) 40%, var(--rule));
+  background: color-mix(in srgb, var(--c-anime) 10%, transparent);
+  font-size: 12px;
+  color: var(--c-anime);
+}
+.mediaTag img {
+  width: 20px;
+  height: 26px;
+  border-radius: 4px;
+  object-fit: cover;
+}
+.modalTitle {
+  font-family: var(--font-display);
+  font-size: 23px;
+  line-height: 1.2;
+  margin: 0 var(--space-6) var(--space-3) 0;
+}
+.byline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--paper-dim);
+}
+.bylineStats {
+  display: inline-flex;
+  gap: var(--space-3);
+  margin-left: auto;
+}
+.bylineStats span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.body {
+  margin: var(--space-4) 0;
+  font-size: 14px;
+  line-height: 1.65;
+  color: var(--text-secondary);
+  word-break: break-word;
+}
+
+/* ── rendered AniList HTML (thread body / comment / activity) ─────────────────── */
+.rich {
+  word-break: break-word;
+}
+.rich > :first-child { margin-top: 0; }
+.rich > :last-child { margin-bottom: 0; }
+.rich p {
+  margin: 0 0 0.7em;
+}
+.rich strong,
+.rich b {
+  font-weight: 680;
+  color: var(--text-primary);
+}
+.rich em,
+.rich i {
+  font-style: italic;
+}
+.rich del,
+.rich s {
+  opacity: 0.65;
+}
+.rich a {
+  color: var(--c-anime);
+  text-decoration: none;
+  border-bottom: 1px solid color-mix(in srgb, var(--c-anime) 40%, transparent);
+}
+.rich a:hover {
+  border-bottom-color: var(--c-anime);
+}
+.rich h1,
+.rich h2,
+.rich h3,
+.rich h4 {
+  font-family: var(--font-display);
+  line-height: 1.25;
+  margin: 1em 0 0.4em;
+  color: var(--text-primary);
+}
+.rich h1 { font-size: 1.45em; }
+.rich h2 { font-size: 1.28em; }
+.rich h3 { font-size: 1.13em; }
+.rich h4 { font-size: 1em; }
+.rich ul,
+.rich ol {
+  margin: 0 0 0.7em;
+  padding-left: 1.4em;
+}
+.rich li {
+  margin: 0.2em 0;
+}
+.rich blockquote {
+  margin: 0.6em 0;
+  padding: 4px 0 4px 14px;
+  border-left: 3px solid color-mix(in srgb, var(--c-anime) 55%, var(--rule));
+  color: var(--paper-dim);
+}
+.rich code {
+  font-family: var(--font-mono);
+  font-size: 0.86em;
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: var(--surface-input);
+  border: 1px solid var(--rule);
+}
+.rich pre {
+  margin: 0.6em 0;
+  padding: var(--space-3);
+  overflow-x: auto;
+  border-radius: var(--r-card);
+  background: var(--ink-3);
+  border: 1px solid var(--rule);
+}
+.rich pre code {
+  padding: 0;
+  border: none;
+  background: none;
+}
+.rich hr {
+  border: none;
+  border-top: 1px solid var(--rule);
+  margin: 0.9em 0;
+}
+.rich center {
+  display: block;
+  text-align: center;
+}
+.rich img {
+  max-width: 100%;
+  max-height: 380px;
+  height: auto;
+  border-radius: var(--r-card);
+  margin: var(--space-2) 0;
+  border: 1px solid var(--rule);
+}
+
+/* click-to-reveal spoiler (AniList wraps spoilers in span.markdown_spoiler) */
+.rich :global(.markdown_spoiler) {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+  border-radius: 6px;
+  padding: 1px 8px;
+  background: var(--ink-3);
+  border: 1px solid var(--rule-strong);
+  color: transparent;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.18s ease;
+}
+.rich :global(.markdown_spoiler) * {
+  visibility: hidden;
+}
+.rich :global(.markdown_spoiler)::after {
+  content: 'spoiler';
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--paper-faint);
+}
+.rich :global(.markdown_spoiler:hover)::after {
+  color: var(--danger);
+}
+.rich :global(.markdown_spoiler.revealed) {
+  display: inline;
+  background: color-mix(in srgb, var(--danger) 14%, transparent);
+  border-color: transparent;
+  color: inherit;
+  cursor: auto;
+  user-select: auto;
+}
+.rich :global(.markdown_spoiler.revealed) * {
+  visibility: visible;
+}
+.rich :global(.markdown_spoiler.revealed)::after {
+  content: none;
+}
+
+.commentsHead {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--paper-faint);
+  margin: var(--space-2) 0 var(--space-4);
+}
+.comments {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin-bottom: var(--space-5);
+}
+.comment {
+  display: flex;
+  gap: var(--space-3);
+}
+.commentBody {
+  flex: 1;
+  min-width: 0;
+  padding: var(--space-3);
+  border-radius: var(--r-card);
+  border: 1px solid var(--rule);
+  background: var(--surface);
+}
+.commentHead {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+.time {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--paper-faint);
+}
+.commentText {
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--text-secondary);
+  word-break: break-word;
+}
+.commentActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin-top: var(--space-2);
+}
+
+/* nested replies: indented with a connecting rail */
+.replies {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+  padding-left: var(--space-4);
+  border-left: 2px solid var(--rule);
+}
+.commentNested > .commentBody {
+  background: transparent;
+  border-color: var(--rule);
+}
+
+/* a comment box / reply box wrapper above the thread's comments */
+.replyBox {
+  margin: var(--space-4) 0 var(--space-5);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--rule);
+}
+
+/* ── inline AniList link preview cards ───────────────────────────────────────── */
+.linkCards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+.linkCard {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: min(280px, 100%);
+  padding: 7px 12px 7px 7px;
+  border-radius: var(--r-card);
+  border: 1px solid var(--rule);
+  background: var(--surface);
+  color: inherit;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.linkCard:hover {
+  border-color: var(--c-anime);
+  background: var(--surface-hover);
+}
+.linkCard img,
+.lcFallback {
+  flex: none;
+  width: 38px;
+  height: 52px;
+  border-radius: 6px;
+  object-fit: cover;
+  background: var(--surface-input);
+}
+.lcFallback {
+  display: grid;
+  place-items: center;
+  color: var(--paper-faint);
+}
+.lcMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.lcKicker {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--c-anime);
+}
+.lcTitle {
+  font-family: var(--font-display);
+  font-size: 13.5px;
+  font-weight: 560;
+  line-height: 1.25;
+  color: var(--text-primary);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ── activity feed ─────────────────────────────────────────────────────────── */
+.feed {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.activity {
+  display: flex;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--r-card);
+  border: 1px solid var(--rule);
+  background: var(--surface);
+}
+.activityBody {
+  flex: 1;
+  min-width: 0;
+}
+.aLink {
+  color: var(--c-anime);
+}
+.aLink:hover {
+  text-decoration: underline;
+}
+.activityActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin-top: var(--space-2);
+}
+.like,
+.reBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--paper-dim);
+  transition: color 0.15s ease;
+}
+.like:hover,
+.reBtn:hover {
+  color: var(--c-anime);
+}
+.likeOn,
+.likeOn:hover {
+  color: var(--danger);
+}
+
+/* composer */
+.composer {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+.textarea {
+  width: 100%;
+  resize: vertical;
+  min-height: 44px;
+  padding: 10px 12px;
+  border-radius: var(--r-input);
+  border: 1px solid var(--rule);
+  background: var(--surface-input);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: 13.5px;
+  outline: none;
+}
+.textarea:focus {
+  border-color: var(--c-anime);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .thread,
+  .modal {
+    animation: none !important;
+    transition: none !important;
+  }
+}

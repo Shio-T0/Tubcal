@@ -1,0 +1,31 @@
+.banner {
+  position: fixed;
+  left: 50%;
+  bottom: var(--space-4);
+  transform: translateX(-50%);
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  max-width: min(560px, 92vw);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid color-mix(in srgb, var(--c-youtube) 50%, var(--border-glass-strong));
+  border-radius: var(--r-card);
+  background: color-mix(in srgb, var(--bg-base) 90%, transparent);
+  backdrop-filter: blur(18px) saturate(1.3);
+  box-shadow: var(--shadow-modal);
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  line-height: 1.4;
+  animation: rise 0.2s ease both;
+}
+
+.banner code {
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+}
+
+@keyframes rise {
+  from { opacity: 0; transform: translate(-50%, 8px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}

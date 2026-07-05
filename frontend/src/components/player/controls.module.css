@@ -1,0 +1,638 @@
+/* ── The Cabinet Deck ─────────────────────────────────────────────────────────
+   A warm amber-phosphor control deck that rises over the video on activity and
+   recedes while you watch. Reuses the app's alias tokens (--text-*, --surface-
+   glass, --border-glass) plus the canonical --signal / --accent-glow amber. */
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+}
+.overlay[data-hidden] {
+  cursor: none;
+}
+
+/* full-frame catcher: single-click toggles play, double-click skips/fullscreens */
+.clickCatch {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  z-index: 1;
+}
+
+/* ── deck ────────────────────────────────────────────────────────────────────*/
+.deck {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 3;
+  padding: 30px 14px 12px;
+  background: linear-gradient(
+    to top,
+    color-mix(in srgb, var(--ink) 92%, transparent) 0%,
+    color-mix(in srgb, var(--ink) 52%, transparent) 52%,
+    transparent 100%
+  );
+  transition: opacity 0.26s ease, transform 0.26s ease;
+}
+.overlay[data-hidden] .deck {
+  opacity: 0;
+  transform: translateY(10px);
+  pointer-events: none;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  row-gap: 6px;
+  margin-top: 4px;
+}
+.cluster {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+/* control button */
+.btn {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: var(--paper);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, transform 0.12s ease;
+}
+.btn:hover {
+  background: color-mix(in srgb, var(--signal) 16%, transparent);
+  color: color-mix(in srgb, var(--signal) 88%, white);
+}
+.btn:active {
+  transform: scale(0.92);
+}
+.btnOn {
+  color: var(--signal);
+  background: color-mix(in srgb, var(--signal) 18%, transparent);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--signal) 30%, transparent);
+}
+
+/* ⟲10 / 10⟳ skip glyphs: the "10" sits inside the curl, the icon spins once */
+.skip {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+}
+.skip i {
+  position: absolute;
+  font-family: var(--font-mono);
+  font-size: 7.5px;
+  font-style: normal;
+  font-weight: 600;
+  letter-spacing: -0.04em;
+  top: 52%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+.spinBack {
+  animation: spinBack 0.5s ease;
+}
+.spinFwd {
+  animation: spinFwd 0.5s ease;
+}
+@keyframes spinBack { from { transform: rotate(0); } to { transform: rotate(-360deg); } }
+@keyframes spinFwd { from { transform: rotate(0); } to { transform: rotate(360deg); } }
+
+/* tape counter */
+.time {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  margin-left: 6px;
+  padding: 4px 6px;
+  border: none;
+  background: transparent;
+  border-radius: var(--r-input);
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.time:hover {
+  color: var(--text-secondary);
+}
+.timeCur {
+  color: var(--paper);
+}
+.timeSep {
+  opacity: 0.5;
+}
+
+.liveTag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 8px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--danger);
+}
+.liveDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--danger);
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--danger) 70%, transparent);
+  animation: livePulse 1.8s ease-out infinite;
+}
+@keyframes livePulse {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--danger) 60%, transparent); }
+  70% { box-shadow: 0 0 0 6px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+
+/* speed / quality pills */
+.pill {
+  flex: none;
+  height: 30px;
+  padding: 0 11px;
+  border: 1px solid var(--border-glass);
+  border-radius: var(--r-pill);
+  background: color-mix(in srgb, var(--paper) 5%, transparent);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+.pill:hover {
+  color: var(--paper);
+  border-color: var(--rule-strong);
+  background: var(--surface-hover);
+}
+.pillOn {
+  color: var(--signal);
+  border-color: color-mix(in srgb, var(--signal) 45%, var(--border-glass));
+  box-shadow: 0 0 12px color-mix(in srgb, var(--signal) 24%, transparent);
+}
+
+/* ── popover menu ─────────────────────────────────────────────────────────────*/
+.menuWrap {
+  position: relative;
+  display: inline-flex;
+}
+.menuScrim {
+  position: fixed;
+  inset: 0;
+  z-index: 6;
+}
+.menu {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  z-index: 7;
+  min-width: 124px;
+  padding: 5px;
+  border: 1px solid var(--border-glass-strong);
+  border-radius: var(--r-input);
+  background: color-mix(in srgb, var(--bg-base) 92%, transparent);
+  backdrop-filter: blur(18px) saturate(1.3);
+  box-shadow: var(--shadow-modal);
+  animation: menuPop 0.16s ease both;
+}
+.menuRight { right: 0; }
+.menuLeft { left: 0; }
+@keyframes menuPop {
+  from { opacity: 0; transform: translateY(6px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.menuItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 7px 9px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.menuItem:hover {
+  background: var(--surface-hover);
+  color: var(--paper);
+}
+.menuCheck {
+  opacity: 0;
+  color: var(--signal);
+  flex: none;
+}
+.menuItem[data-on] {
+  color: var(--signal);
+}
+.menuItem[data-on] .menuCheck {
+  opacity: 1;
+}
+
+/* ── volume ───────────────────────────────────────────────────────────────────*/
+.vol {
+  display: inline-flex;
+  align-items: center;
+}
+.volWrap {
+  width: 0;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  transition: width 0.2s ease;
+}
+.vol:hover .volWrap,
+.vol:focus-within .volWrap {
+  width: 80px;
+}
+.volRange {
+  width: 72px;
+  margin: 0 6px 0 2px;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 5px;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--signal) 88%, white) var(--pct, 100%),
+    color-mix(in srgb, var(--paper) 16%, transparent) var(--pct, 100%)
+  );
+  cursor: pointer;
+}
+.volRange::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--signal) 85%, white);
+  border: 2px solid var(--ink);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--signal) 45%, transparent);
+  cursor: pointer;
+}
+.volRange::-moz-range-thumb {
+  width: 13px;
+  height: 13px;
+  border: 2px solid var(--ink);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--signal) 85%, white);
+  cursor: pointer;
+}
+
+/* ── the phosphor scrubber ────────────────────────────────────────────────────*/
+.scrub {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  padding: 7px 0;
+  cursor: pointer;
+  touch-action: none;
+}
+.scrub[data-disabled] {
+  cursor: default;
+  opacity: 0.55;
+}
+.scrub:focus-visible {
+  outline: none;
+}
+.scrub:focus-visible .track {
+  box-shadow: inset 0 0 0 1px var(--rule), 0 0 0 2px color-mix(in srgb, var(--signal) 55%, transparent);
+}
+.track {
+  position: relative;
+  height: 4px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--paper) 9%, transparent);
+  box-shadow: inset 0 0 0 1px var(--rule);
+  transition: height 0.12s ease;
+}
+.scrub[data-active] .track {
+  height: 7px;
+}
+.buf {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--paper) 22%, transparent);
+}
+.played {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--signal) 72%, var(--accent-strong, var(--signal))),
+    var(--signal)
+  );
+  box-shadow: 0 0 10px color-mix(in srgb, var(--signal) 55%, transparent);
+  animation: warmup 0.6s ease both;
+}
+@keyframes warmup {
+  from { opacity: 0.35; box-shadow: 0 0 0 transparent; }
+  to { opacity: 1; }
+}
+.ghost {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--signal) 70%, transparent);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--signal) 50%, transparent);
+  pointer-events: none;
+}
+.bead {
+  position: absolute;
+  top: 50%;
+  width: 13px;
+  height: 13px;
+  margin-left: -6.5px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--signal) 88%, white);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--signal) 22%, transparent), 0 1px 5px rgba(0, 0, 0, 0.45);
+  transform: translateY(-50%) scale(0);
+  transition: transform 0.12s ease;
+  pointer-events: none;
+}
+.scrub[data-active] .bead {
+  transform: translateY(-50%) scale(1);
+}
+.guide {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  width: 1px;
+  margin-left: -0.5px;
+  background: color-mix(in srgb, var(--paper) 35%, transparent);
+  pointer-events: none;
+}
+.chip {
+  position: absolute;
+  bottom: calc(100% + 2px);
+  transform: translateX(-50%);
+  padding: 3px 7px;
+  border-radius: var(--r-input);
+  background: color-mix(in srgb, var(--bg-base) 92%, transparent);
+  border: 1px solid var(--border-glass);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--paper);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* ── center bloom + buffering ring + edge ripple ──────────────────────────────*/
+.hud {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 4;
+  display: grid;
+  place-items: center;
+  width: 92px;
+  height: 92px;
+  border-radius: 50%;
+  color: var(--paper);
+  background: color-mix(in srgb, var(--ink) 42%, transparent);
+  backdrop-filter: blur(3px);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  animation: hudPop 0.62s ease both;
+}
+.hudText {
+  font-family: var(--font-mono);
+  font-size: 19px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.hudVol {
+  display: grid;
+  place-items: center;
+  gap: 2px;
+}
+.hudVol i {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-style: normal;
+}
+@keyframes hudPop {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.7); }
+  30% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1.12); }
+}
+
+.ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 4;
+  width: 46px;
+  height: 46px;
+  margin: -23px 0 0 -23px;
+  border-radius: 50%;
+  border: 3px solid color-mix(in srgb, var(--paper) 22%, transparent);
+  border-top-color: var(--signal);
+  animation: spin 0.8s linear infinite;
+  pointer-events: none;
+}
+
+.edge {
+  position: absolute;
+  top: 50%;
+  z-index: 4;
+  display: grid;
+  place-items: center;
+  width: 120px;
+  height: 120px;
+  transform: translateY(-50%);
+  font-family: var(--font-mono);
+  font-size: 16px;
+  font-weight: 600;
+  color: color-mix(in srgb, var(--signal) 90%, white);
+  background: radial-gradient(circle at center, color-mix(in srgb, var(--signal) 22%, transparent), transparent 70%);
+  pointer-events: none;
+  animation: edgePop 0.5s ease both;
+}
+.edgeLeft { left: 6%; }
+.edgeRight { right: 6%; }
+@keyframes edgePop {
+  0% { opacity: 0; }
+  30% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* ── keyboard cheat-sheet (press ?) ───────────────────────────────────────────*/
+.keysCard {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 8;
+  transform: translate(-50%, -50%);
+  min-width: 280px;
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--border-glass-strong);
+  border-radius: var(--r-card);
+  background: color-mix(in srgb, var(--bg-base) 94%, transparent);
+  backdrop-filter: blur(20px) saturate(1.3);
+  box-shadow: var(--shadow-modal);
+  cursor: pointer;
+  animation: menuPop 0.18s ease both;
+}
+.keysCard h4 {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--signal);
+  margin-bottom: var(--space-3);
+}
+.keysCard dl {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.keysCard dl > div {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-4);
+  font-size: 13px;
+}
+.keysCard dt {
+  font-family: var(--font-mono);
+  color: var(--paper);
+}
+.keysCard dd {
+  color: var(--text-muted);
+}
+
+/* ── docked mini-variant ──────────────────────────────────────────────────────*/
+.mini {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+}
+.miniCatch {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+.miniRow {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 10px 8px;
+  background: linear-gradient(to top, color-mix(in srgb, var(--ink) 88%, transparent), transparent);
+  opacity: 0;
+  transition: opacity 0.18s ease;
+}
+.mini:hover .miniRow {
+  opacity: 1;
+}
+/* while a docked card is being dragged, let dragover/drop pass to the card */
+.mini[data-drag] {
+  pointer-events: none;
+}
+.miniBtn {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--signal) 20%, transparent);
+  color: color-mix(in srgb, var(--signal) 92%, white);
+  cursor: pointer;
+}
+.miniTime {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--paper);
+}
+.miniFilament {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: color-mix(in srgb, var(--paper) 14%, transparent);
+  transition: opacity 0.18s ease;
+}
+.mini:hover .miniFilament {
+  opacity: 0;
+}
+.miniFilament span {
+  display: block;
+  height: 100%;
+  background: var(--signal);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--signal) 60%, transparent);
+}
+
+/* ── narrow decks: tighten spacing; the row wraps rather than clipping ─────────*/
+@media (max-width: 600px) {
+  .deck { padding: 24px 8px 8px; }
+  .btn { width: 30px; height: 30px; }
+  .pill { height: 27px; padding: 0 9px; }
+  .time { margin-left: 2px; font-size: 12px; }
+  .vol:hover .volWrap,
+  .vol:focus-within .volWrap { width: 64px; }
+}
+
+/* ── reduced motion: keep the meaning, drop the flourish ──────────────────────*/
+@media (prefers-reduced-motion: reduce) {
+  .played,
+  .spinBack,
+  .spinFwd,
+  .liveDot,
+  .ring {
+    animation: none;
+  }
+  .hud { animation: hudFade 0.5s ease both; }
+  .edge { animation: edgePop 0.4s ease both; }
+  .deck { transition: opacity 0.2s ease; }
+  @keyframes hudFade { 0% { opacity: 0; } 25% { opacity: 1; } 100% { opacity: 0; } }
+}

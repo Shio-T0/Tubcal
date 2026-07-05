@@ -1,0 +1,112 @@
+/* Tubcal — "Shōwa Set" design tokens.
+   A 1970s Japanese living room at night: a warm wood-cabinet TV glowing amber
+   in the corner. Night Edition = kurocha (dark tea) wood + kinari (unbleached
+   cream) type + amber phosphor, with a persimmon (kaki) pop. Day Edition =
+   tatami daylight. Warm, low-contrast, soft-cornered. */
+
+:root {
+  /* canvas — warm wood browns (kurocha / kogecha / teak), never neutral */
+  --ink: #1c140d;
+  --ink-2: #251910;
+  --ink-3: #302114;
+  --paper: #e8d9b8;
+  --paper-dim: #b7a07c;
+  --paper-faint: #897053;
+  --rule: rgba(232, 217, 184, 0.12);
+  --rule-strong: rgba(232, 217, 184, 0.26);
+  --bg-base: var(--ink);
+  --surface: rgba(232, 217, 184, 0.045);
+  --surface-hover: rgba(232, 217, 184, 0.085);
+  --surface-input: rgba(232, 217, 184, 0.06);
+  --backdrop: rgba(16, 10, 5, 0.8);
+  --shadow-modal: 0 28px 70px rgba(16, 9, 3, 0.66);
+  --glow-strength: 1;
+  --grain-opacity: 0.05;
+
+  /* signals — amber phosphor lamp + persimmon pop; platforms earthy dyes */
+  --signal: #e6ab5e;
+  --signal-soft: rgba(230, 171, 94, 0.16);
+  --c-youtube: #c4503a;
+  --c-reddit: #cf7733;
+  --c-hn: #d3a24a;
+  --c-foryou: #e6ab5e;
+  --c-github: #9a8ec7;
+  --c-anime: var(--signal);   /* The Anime room — adopts each skin's accent */
+  --success: #9aae64;
+  --danger: #c75a44;
+
+  /* aliases used across components */
+  --text-primary: var(--paper);
+  --text-secondary: var(--paper-dim);
+  --text-muted: var(--paper-faint);
+  --accent: var(--signal);
+  --accent-strong: #c8643c;
+  --accent-glow: rgba(230, 171, 94, 0.32);
+  --surface-glass: var(--surface);
+  --surface-glass-hover: var(--surface-hover);
+  --border-glass: var(--rule);
+  --border-glass-strong: var(--rule-strong);
+  --shadow-card: 0 12px 34px rgba(16, 9, 3, 0.4);
+
+  /* type */
+  --font-display: 'Fraunces Variable', georgia, serif;
+  --font-body: 'Schibsted Grotesk Variable', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+
+  /* spacing */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+
+  /* radii — soft, like a rounded CRT screen */
+  --r-card: 14px;
+  --r-media: 16px;
+  --r-modal: 18px;
+  --r-pill: 999px;
+  --r-input: 10px;
+
+  /* comment rails — warm dye family: persimmon, ochre, matcha, soot, terracotta */
+  --rail-0: #e6ab5e;
+  --rail-1: #d3a24a;
+  --rail-2: #9aae64;
+  --rail-3: #c8643c;
+  --rail-4: #cf7733;
+}
+
+[data-theme='light'] {
+  --ink: #e6d8bb;
+  --ink-2: #ddcdac;
+  --ink-3: #d3c19c;
+  --paper: #2a1d12;
+  --paper-dim: #6a5740;
+  --paper-faint: #978a6e;
+  --rule: rgba(42, 29, 18, 0.16);
+  --rule-strong: rgba(42, 29, 18, 0.4);
+  --surface: rgba(42, 29, 18, 0.04);
+  --surface-hover: rgba(42, 29, 18, 0.075);
+  --surface-input: rgba(255, 250, 238, 0.6);
+  --backdrop: rgba(74, 54, 32, 0.42);
+  --shadow-modal: 0 28px 70px rgba(82, 58, 30, 0.3);
+  --glow-strength: 0.4;
+  --grain-opacity: 0.045;
+
+  --signal: #b06a26;
+  --signal-soft: rgba(176, 106, 38, 0.12);
+  --c-youtube: #b5402b;
+  --c-reddit: #b4631f;
+  --c-hn: #a8761f;
+  --c-foryou: #b06a26;
+  --c-github: #7b6fa5;
+  --c-anime: var(--signal);
+  --success: #5e7338;
+  --danger: #b3361f;
+
+  --accent-strong: #b04a2e;
+  --accent-glow: rgba(176, 106, 38, 0.22);
+  --shadow-card: 0 10px 28px rgba(92, 64, 34, 0.14);
+}

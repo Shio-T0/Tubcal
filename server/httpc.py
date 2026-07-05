@@ -1,0 +1,114 @@
+"""Shared HTTP client: one requests.Session, per-host minimum spacing."""
+
+"""Shared HTTP client: one requests.Session, per-host minimum spacing, and
+dynamic rate-limit tracking driven by response headers (e.g. Reddit's
+x-ratelimit-remaining/x-ratelimit-reset).
+
+Reddit's anonymous RSS endpoint has a very tight budget — it commonly comes
+back with x-ratelimit-remaining: 0 after a SINGLE request, resetting only
+after tens of seconds. A fixed 3s spacing (HOST_INTERVALS) doesn't come
+close to respecting that, so callers were getting silent 429s that got
+misreported as "not found". Instead of guessing a static interval, we read
+the limiter's own headers and remember when a host is next available.
+"""
+
+import threading
+import time
+from urllib.parse import urlparse
+
+import requests
+from requests.adapters import HTTPAdapter
+
+from . import config
+
+session = requests.Session()
+# The default urllib3 pool caps each host at 10 connections. Proxying an HLS
+# rendition fans out into many concurrent segment fetches to the same googlevideo
+# host (plus the held-open streaming relays), which blew past 10 and forced
+# connections to be discarded/rebuilt mid-playback — a real source of stutter.
+# A roomier pool lets segments load in parallel without churn.
+_adapter = HTTPAdapter(pool_connections=32, pool_maxsize=64)
+session.mount("https://", _adapter)
+session.mount("http://", _adapter)
+
+_host_locks = {}
+_host_last = {}
+_host_blocked_until = {}
+_registry_lock = threading.Lock()
+
+
+class RateLimited(Exception):
+    """Raised when a host has told us (via headers, past or present) that we're
+    out of budget. `retry_after` is seconds until it's safe to try again."""
+
+    def __init__(self, host, retry_after):
+        self.host = host
+        self.retry_after = max(0, retry_after)
+        super().__init__(f"{host} rate-limited us — retry in {self.retry_after:.0f}s")
+
+
+def _note_rate_limit(host, resp):
+    """Read rate-limit headers (Reddit-style x-ratelimit-*, or a plain
+    Retry-After on 429) and remember when this host is next usable."""
+    now = time.time()
+    retry_after = resp.headers.get("Retry-After")
+    if retry_after is not None:
+        try:
+            with _registry_lock:
+                _host_blocked_until[host] = now + float(retry_after)
+            return
+        except ValueError:
+            pass
+
+    remaining = resp.headers.get("x-ratelimit-remaining")
+    reset = resp.headers.get("x-ratelimit-reset")
+    if remaining is not None and reset is not None:
+        try:
+            if float(remaining) <= 0:
+                with _registry_lock:
+                    _host_blocked_until[host] = now + float(reset)
+        except ValueError:
+            pass
+
+
+def get(url, *, ua=config.BROWSER_UA, headers=None, timeout=15, **kwargs):
+    hdrs = dict(headers or {})
+    hdrs.setdefault("User-Agent", ua)
+
+    host = urlparse(url).hostname or ""
+
+    # Short-circuit instantly if we already know this host is out of budget —
+    # don't burn the request (or a thread) finding that out again.
+    blocked_until = _host_blocked_until.get(host)
+    if blocked_until and time.time() < blocked_until:
+        raise RateLimited(host, blocked_until - time.time())
+
+    interval = config.HOST_INTERVALS.get(host)
+    if interval:
+        with _registry_lock:
+            lock = _host_locks.setdefault(host, threading.Lock())
+        with lock:
+            wait = _host_last.get(host, 0) + interval - time.time()
+            if wait > 0:
+                time.sleep(wait)
+            _host_last[host] = time.time()
+            resp = session.get(url, headers=hdrs, timeout=timeout, **kwargs)
+    else:
+        resp = session.get(url, headers=hdrs, timeout=timeout, **kwargs)
+
+    _note_rate_limit(host, resp)
+
+    if resp.status_code == 429:
+        blocked_until = _host_blocked_until.get(host, time.time() + 30)
+        raise RateLimited(host, blocked_until - time.time())
+
+    resp.raise_for_status()
+    return resp
+
+
+def post(url, *, ua=config.BROWSER_UA, headers=None, timeout=15, **kwargs):
+    hdrs = dict(headers or {})
+    hdrs.setdefault("User-Agent", ua)
+    resp = session.post(url, headers=hdrs, timeout=timeout, **kwargs)
+    resp.raise_for_status()
+    return resp

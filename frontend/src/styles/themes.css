@@ -1,0 +1,678 @@
+/* Tubcal — alternate skins.
+   Each [data-theme] block re-skins the whole app by (1) overriding the design
+   tokens from tokens.css and (2) restyling the global hooks: base.css classes
+   (.app-shell, .glass, .kicker, .search-input), element/selection rules, and the
+   structural hooks added in JSX (.tc-masthead, .tc-topline, .tc-wordmark,
+   .tc-nav, .tc-navitem(/-on), .tc-sectionhead). Component CSS Modules inherit the
+   palette/fonts/radii for free through var(--token); the hooks carry the layout
+   personality the tokens can't express. Backdrop atmospheres live in backdrop.css. */
+
+/* ===================================================================== *
+ * PHOSPHOR TERMINAL — an older machine: green text on a black tube.
+ * ===================================================================== */
+[data-theme='terminal'] {
+  --ink: #05080a;
+  --ink-2: #07110d;
+  --ink-3: #0b1a14;
+  --paper: #36ff6a;
+  --paper-dim: #1fc24f;
+  --paper-faint: #178a3a;
+  --rule: rgba(54, 255, 106, 0.22);
+  --rule-strong: rgba(54, 255, 106, 0.46);
+  --surface: rgba(54, 255, 106, 0.05);
+  --surface-hover: rgba(54, 255, 106, 0.1);
+  --surface-input: rgba(54, 255, 106, 0.07);
+  --backdrop: rgba(0, 8, 4, 0.86);
+  --shadow-modal: 0 0 0 1px rgba(54, 255, 106, 0.45), 0 24px 60px rgba(0, 0, 0, 0.8);
+  --glow-strength: 0;
+  --grain-opacity: 0;
+
+  --signal: #36ff6a;
+  --signal-soft: rgba(54, 255, 106, 0.16);
+  /* one-colour tube: every platform glows the same phosphor, amber is the alarm */
+  --c-youtube: #36ff6a;
+  --c-reddit: #36ff6a;
+  --c-hn: #36ff6a;
+  --c-foryou: #aaffb8;
+  --success: #36ff6a;
+  --danger: #ff5555;
+
+  --accent-strong: #ffb000;
+  --accent-glow: rgba(54, 255, 106, 0.5);
+  --shadow-card: 0 0 0 1px rgba(54, 255, 106, 0.18);
+
+  --font-display: 'VT323', 'IBM Plex Mono', monospace;
+  --font-body: 'IBM Plex Mono', ui-monospace, monospace;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+
+  --r-card: 0;
+  --r-media: 0;
+  --r-modal: 0;
+  --r-pill: 2px;
+  --r-input: 0;
+
+  --rail-0: #36ff6a;
+  --rail-1: #aaffb8;
+  --rail-2: #1fc24f;
+  --rail-3: #ffb000;
+  --rail-4: #178a3a;
+}
+
+[data-theme='terminal'] body {
+  text-shadow: 0 0 3px rgba(54, 255, 106, 0.28);
+  letter-spacing: 0.01em;
+}
+
+[data-theme='terminal'] ::selection {
+  background: #36ff6a;
+  color: #05080a;
+  text-shadow: none;
+}
+
+[data-theme='terminal'] .glass {
+  background: var(--ink-2);
+  border: 1px solid var(--rule);
+  box-shadow: inset 0 0 0 1px rgba(54, 255, 106, 0.04);
+}
+
+/* topline: a status strip across the top of the screen */
+[data-theme='terminal'] .tc-topline {
+  border: 1px solid var(--rule);
+  background: var(--ink-2);
+  padding: 6px 10px;
+  text-shadow: 0 0 4px rgba(54, 255, 106, 0.4);
+}
+
+/* wordmark becomes a boot prompt with a blinking block cursor */
+[data-theme='terminal'] .tc-wordmark {
+  font-variation-settings: normal;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  text-shadow: 0 0 10px rgba(54, 255, 106, 0.55);
+}
+[data-theme='terminal'] .tc-wordmark::before {
+  content: 'C:\\> ';
+  color: var(--paper-dim);
+}
+[data-theme='terminal'] .tc-wordmark::after {
+  content: '\2588';
+  margin-left: 0.08em;
+  animation: tcBlink 1.06s steps(1) infinite;
+}
+@keyframes tcBlink {
+  50% {
+    opacity: 0;
+  }
+}
+
+/* nav becomes a function-key bar: [F1] FRONT  [F2] SCREENING ... */
+[data-theme='terminal'] .tc-nav {
+  counter-reset: fkey;
+  border: 1px solid var(--rule-strong);
+  border-radius: 0;
+  background: var(--ink-2);
+  padding: 0;
+  gap: 0;
+  box-shadow: none;
+}
+[data-theme='terminal'] .tc-navitem {
+  counter-increment: fkey;
+  flex-direction: row;
+  align-items: baseline;
+  gap: 6px;
+  border-right: 1px solid var(--rule);
+  padding: 8px 14px 9px;
+}
+/* hide the "No 0x" index span and stamp an Fn key in its place */
+[data-theme='terminal'] .tc-navitem > span:first-child {
+  font-size: 0;
+}
+[data-theme='terminal'] .tc-navitem > span:first-child::before {
+  content: '[F' counter(fkey) ']';
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0;
+  color: var(--accent-strong);
+}
+[data-theme='terminal'] .tc-navitem-on {
+  background: #36ff6a;
+  color: #05080a;
+  text-shadow: none;
+}
+[data-theme='terminal'] .tc-navitem-on > span:first-child::before {
+  color: #05080a;
+}
+[data-theme='terminal'] .tc-navitem-on::after {
+  display: none; /* drop the soft underline glow; selection is an inverted block */
+}
+
+/* section heads get a prompt caret */
+[data-theme='terminal'] .tc-sectionhead .kicker::before {
+  content: '> ';
+}
+
+/* ===================================================================== *
+ * BAUHAUS PRINT — off the screen: a constructivist poster.
+ * ===================================================================== */
+[data-theme='bauhaus'] {
+  --ink: #f4f1e9;
+  --ink-2: #ece7d9;
+  --ink-3: #e3ddcb;
+  --paper: #111111;
+  --paper-dim: #45403a;
+  --paper-faint: #79726a;
+  --rule: rgba(17, 17, 17, 0.22);
+  --rule-strong: rgba(17, 17, 17, 0.9);
+  --surface: rgba(17, 17, 17, 0.035);
+  --surface-hover: rgba(17, 17, 17, 0.07);
+  --surface-input: #ffffff;
+  --backdrop: rgba(20, 18, 12, 0.45);
+  --shadow-modal: 8px 8px 0 #111111;
+  --glow-strength: 0;
+  --grain-opacity: 0;
+
+  --signal: #e2231a;
+  --signal-soft: rgba(226, 35, 26, 0.14);
+  --c-youtube: #e2231a;
+  --c-reddit: #0b4ee2;
+  --c-hn: #d9a400;
+  --c-foryou: #111111;
+  --success: #1f7a3d;
+  --danger: #e2231a;
+
+  --accent-strong: #0b4ee2;
+  --accent-glow: transparent;
+  --shadow-card: 4px 4px 0 rgba(17, 17, 17, 0.9);
+
+  --font-display: 'Archivo', system-ui, sans-serif;
+  --font-body: 'Archivo', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', monospace;
+
+  --r-card: 0;
+  --r-media: 0;
+  --r-modal: 0;
+  --r-pill: 0;
+  --r-input: 0;
+
+  --rail-0: #e2231a;
+  --rail-1: #0b4ee2;
+  --rail-2: #d9a400;
+  --rail-3: #111111;
+  --rail-4: #1f7a3d;
+}
+
+[data-theme='bauhaus'] h1,
+[data-theme='bauhaus'] h2,
+[data-theme='bauhaus'] h3,
+[data-theme='bauhaus'] h4 {
+  font-weight: 900;
+  letter-spacing: -0.02em;
+}
+
+[data-theme='bauhaus'] ::selection {
+  background: #ffd400;
+  color: #111111;
+}
+
+[data-theme='bauhaus'] .glass {
+  background: #ffffff;
+  border: 2px solid #111111;
+  box-shadow: 5px 5px 0 rgba(17, 17, 17, 0.9);
+}
+
+/* kicker becomes a yellow highlighter tag */
+[data-theme='bauhaus'] .kicker {
+  display: inline-block;
+  background: #ffd400;
+  color: #111111 !important;
+  padding: 2px 7px;
+  letter-spacing: 0.16em;
+}
+
+[data-theme='bauhaus'] .search-input {
+  border-bottom: 2px solid #111111;
+}
+
+[data-theme='bauhaus'] .tc-topline {
+  border: 2px solid #111111;
+  background: #ffffff;
+  padding: 6px 10px;
+  color: #111111;
+}
+
+[data-theme='bauhaus'] .tc-wordmark {
+  font-variation-settings: normal;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: -0.035em;
+}
+
+/* nav as a row of primary color blocks */
+[data-theme='bauhaus'] .tc-nav {
+  border: 2px solid #111111;
+  border-radius: 0;
+  gap: 0;
+  padding: 0;
+  background: #ffffff;
+  box-shadow: none;
+}
+[data-theme='bauhaus'] .tc-navitem {
+  border-right: 2px solid #111111;
+  padding: 12px 16px 14px;
+  color: #111111;
+}
+[data-theme='bauhaus'] .tc-navitem:nth-child(1) { background: #e2231a; color: #fff; }
+[data-theme='bauhaus'] .tc-navitem:nth-child(2) { background: #0b4ee2; color: #fff; }
+[data-theme='bauhaus'] .tc-navitem:nth-child(3) { background: #ffd400; color: #111; }
+[data-theme='bauhaus'] .tc-navitem:nth-child(4) { background: #111111; color: #fff; }
+[data-theme='bauhaus'] .tc-navitem:nth-child(5) { background: #f4f1e9; color: #111; }
+[data-theme='bauhaus'] .tc-navitem > span:first-child {
+  color: inherit;
+  opacity: 0.85;
+}
+[data-theme='bauhaus'] .tc-navitem:hover {
+  filter: brightness(1.08);
+}
+[data-theme='bauhaus'] .tc-navitem-on {
+  outline: 4px solid #111111;
+  outline-offset: -4px;
+}
+[data-theme='bauhaus'] .tc-navitem-on::after {
+  display: none;
+}
+
+/* ===================================================================== *
+ * BLUEPRINT — cyan hairlines on drafting navy.
+ * ===================================================================== */
+[data-theme='blueprint'] {
+  --ink: #081a33;
+  --ink-2: #0b2545;
+  --ink-3: #0e2d54;
+  --paper: #d4ebff;
+  --paper-dim: #8fb4d8;
+  --paper-faint: #5a86b0;
+  --rule: rgba(95, 208, 255, 0.24);
+  --rule-strong: rgba(95, 208, 255, 0.55);
+  --surface: rgba(95, 208, 255, 0.05);
+  --surface-hover: rgba(95, 208, 255, 0.1);
+  --surface-input: rgba(8, 26, 51, 0.55);
+  --backdrop: rgba(4, 14, 28, 0.82);
+  --shadow-modal: 0 0 0 1px rgba(95, 208, 255, 0.45), 0 24px 60px rgba(0, 0, 0, 0.6);
+  --glow-strength: 0;
+  --grain-opacity: 0;
+
+  --signal: #5fd0ff;
+  --signal-soft: rgba(95, 208, 255, 0.16);
+  --c-youtube: #5fd0ff;
+  --c-reddit: #6fb4ff;
+  --c-hn: #8fd6e6;
+  --c-foryou: #ffb454;
+  --success: #5fd0a0;
+  --danger: #ff7a6b;
+
+  --accent-strong: #ffb454;
+  --accent-glow: rgba(95, 208, 255, 0.4);
+  --shadow-card: 0 0 0 1px rgba(95, 208, 255, 0.18);
+
+  --font-display: 'Archivo', system-ui, sans-serif;
+  --font-body: 'Archivo', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', monospace;
+
+  --r-card: 2px;
+  --r-media: 2px;
+  --r-modal: 2px;
+  --r-pill: 2px;
+  --r-input: 2px;
+
+  --rail-0: #5fd0ff;
+  --rail-1: #6fb4ff;
+  --rail-2: #8fd6e6;
+  --rail-3: #ffb454;
+  --rail-4: #5fd0a0;
+}
+
+[data-theme='blueprint'] ::selection {
+  background: #5fd0ff;
+  color: #081a33;
+}
+
+[data-theme='blueprint'] .glass {
+  background: rgba(11, 37, 69, 0.66);
+  border: 1px solid var(--rule-strong);
+  box-shadow: none;
+  position: relative;
+}
+/* a drafting corner tick on every panel */
+[data-theme='blueprint'] .glass::before {
+  content: '';
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  width: 10px;
+  height: 10px;
+  border-left: 1px solid var(--signal);
+  border-top: 1px solid var(--signal);
+  opacity: 0.7;
+}
+
+[data-theme='blueprint'] .kicker {
+  font-family: var(--font-mono);
+}
+[data-theme='blueprint'] .kicker::before {
+  content: '[ ';
+}
+[data-theme='blueprint'] .kicker::after {
+  content: ' ]';
+}
+
+[data-theme='blueprint'] .search-input {
+  border-bottom: 1px solid var(--rule-strong);
+}
+
+[data-theme='blueprint'] .tc-topline {
+  border: 1px solid var(--rule);
+  background: rgba(11, 37, 69, 0.5);
+  padding: 6px 10px;
+}
+
+[data-theme='blueprint'] .tc-wordmark {
+  font-variation-settings: normal;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+[data-theme='blueprint'] .tc-wordmark::after {
+  content: ' REV.A';
+  font-family: var(--font-mono);
+  font-size: 0.26em;
+  vertical-align: super;
+  color: var(--accent-strong);
+  letter-spacing: 0.1em;
+}
+
+/* nav reads like a drawing's titleblock */
+[data-theme='blueprint'] .tc-nav {
+  border: 1px solid var(--rule-strong);
+  border-radius: 2px;
+  background: rgba(11, 37, 69, 0.5);
+  padding: 0;
+  gap: 0;
+  box-shadow: none;
+}
+[data-theme='blueprint'] .tc-navitem {
+  border-right: 1px solid var(--rule);
+  padding: 9px 14px 10px;
+}
+[data-theme='blueprint'] .tc-navitem-on::after {
+  background: var(--accent-strong);
+  box-shadow: none;
+}
+
+/* ===================================================================== *
+ * AQUA Y2K — a glossy turn-of-the-century desktop.
+ * ===================================================================== */
+[data-theme='aqua'] {
+  --ink: #eef3fb;
+  --ink-2: #e4ecf7;
+  --ink-3: #d9e4f4;
+  --paper: #1d2b3a;
+  --paper-dim: #4a5b6e;
+  --paper-faint: #7d8da0;
+  --rule: rgba(29, 43, 58, 0.16);
+  --rule-strong: rgba(29, 43, 58, 0.34);
+  --surface: rgba(255, 255, 255, 0.72);
+  --surface-hover: rgba(255, 255, 255, 0.92);
+  --surface-input: #ffffff;
+  --backdrop: rgba(40, 60, 90, 0.35);
+  --shadow-modal: 0 24px 60px rgba(20, 50, 90, 0.32);
+  --glow-strength: 0;
+  --grain-opacity: 0;
+
+  --signal: #1a73e8;
+  --signal-soft: rgba(26, 115, 232, 0.14);
+  --c-youtube: #e84a3a;
+  --c-reddit: #ff7a2f;
+  --c-hn: #f5a623;
+  --c-foryou: #1a73e8;
+  --success: #28c840;
+  --danger: #ff5f57;
+
+  --accent-strong: #0a59c8;
+  --accent-glow: rgba(26, 115, 232, 0.4);
+  --shadow-card: 0 8px 20px rgba(30, 60, 100, 0.14);
+
+  --font-display: 'Lucida Grande', 'Segoe UI', system-ui, sans-serif;
+  --font-body: 'Lucida Grande', 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', monospace;
+
+  --r-card: 12px;
+  --r-media: 12px;
+  --r-modal: 14px;
+  --r-pill: 999px;
+  --r-input: 9px;
+
+  --rail-0: #1a73e8;
+  --rail-1: #e84a3a;
+  --rail-2: #ff7a2f;
+  --rail-3: #28c840;
+  --rail-4: #12b5c9;
+}
+
+[data-theme='aqua'] ::selection {
+  background: #1a73e8;
+  color: #ffffff;
+}
+
+[data-theme='aqua'] .glass {
+  background: #ffffff;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-card);
+  box-shadow: 0 8px 20px rgba(30, 60, 100, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+[data-theme='aqua'] .search-input {
+  background: #ffffff;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--r-pill);
+  padding: 8px 14px 8px 30px;
+}
+[data-theme='aqua'] .search-input:focus {
+  border-color: var(--signal);
+  box-shadow: 0 0 0 3px var(--signal-soft);
+}
+
+/* topline becomes a window title bar with traffic-light dots */
+[data-theme='aqua'] .tc-topline {
+  background: linear-gradient(#fdfeff, #dbe6f5);
+  border: 1px solid var(--rule-strong);
+  border-radius: 10px;
+  padding: 8px 14px 8px 66px;
+  position: relative;
+  box-shadow: inset 0 1px 0 #ffffff;
+  color: var(--paper-dim);
+}
+[data-theme='aqua'] .tc-topline::before {
+  content: '';
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #ff5f57;
+  box-shadow: 18px 0 0 #febc2e, 36px 0 0 #28c840;
+}
+
+[data-theme='aqua'] .tc-wordmark {
+  font-variation-settings: normal;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+/* nav as a glossy capsule tab strip with a candy active lozenge */
+[data-theme='aqua'] .tc-nav {
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--r-pill);
+  background: linear-gradient(#f4f8fe, #dde8f6);
+  padding: 4px;
+  gap: 4px;
+  box-shadow: inset 0 1px 0 #ffffff;
+  overflow: visible;
+}
+[data-theme='aqua'] .tc-navitem {
+  border: none;
+  border-radius: var(--r-pill);
+  padding: 8px 18px;
+}
+[data-theme='aqua'] .tc-navitem:first-child {
+  border-left: none;
+}
+[data-theme='aqua'] .tc-navitem:hover {
+  background: rgba(255, 255, 255, 0.6);
+}
+[data-theme='aqua'] .tc-navitem-on,
+[data-theme='aqua'] .tc-navitem-on:hover {
+  background: linear-gradient(#5ea8ff, #1a73e8);
+  color: #ffffff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55), 0 2px 7px rgba(26, 115, 232, 0.45);
+}
+[data-theme='aqua'] .tc-navitem-on > span:first-child {
+  color: rgba(255, 255, 255, 0.85);
+}
+[data-theme='aqua'] .tc-navitem-on::after {
+  display: none;
+}
+
+/* ===================================================================== *
+ * DEEP SPACE — glass panels adrift over a nebula.
+ * ===================================================================== */
+[data-theme='space'] {
+  --ink: #05060c;
+  --ink-2: #0b0e1c;
+  --ink-3: #11152a;
+  --paper: #e8ecff;
+  --paper-dim: #a6adcf;
+  --paper-faint: #6f769b;
+  --rule: rgba(160, 180, 255, 0.16);
+  --rule-strong: rgba(160, 180, 255, 0.36);
+  --surface: rgba(140, 160, 255, 0.06);
+  --surface-hover: rgba(140, 160, 255, 0.12);
+  --surface-input: rgba(20, 24, 48, 0.5);
+  --backdrop: rgba(4, 5, 14, 0.72);
+  --shadow-modal: 0 30px 80px rgba(0, 0, 0, 0.62);
+  --glow-strength: 0;
+  --grain-opacity: 0;
+
+  --signal: #7c5cff;
+  --signal-soft: rgba(124, 92, 255, 0.18);
+  --c-youtube: #ff5ca8;
+  --c-reddit: #ff8a5c;
+  --c-hn: #ffd25c;
+  --c-foryou: #22d3ee;
+  --success: #34e2b0;
+  --danger: #ff6b8b;
+
+  --accent-strong: #22d3ee;
+  --accent-glow: rgba(124, 92, 255, 0.55);
+  --shadow-card: 0 16px 40px rgba(0, 0, 0, 0.45);
+
+  --font-display: 'Space Grotesk Variable', system-ui, sans-serif;
+  --font-body: 'Inter Variable', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', monospace;
+
+  --r-card: 18px;
+  --r-media: 18px;
+  --r-modal: 22px;
+  --r-pill: 999px;
+  --r-input: 14px;
+
+  --rail-0: #7c5cff;
+  --rail-1: #22d3ee;
+  --rail-2: #ff5ca8;
+  --rail-3: #34e2b0;
+  --rail-4: #ffd25c;
+}
+
+[data-theme='space'] ::selection {
+  background: #7c5cff;
+  color: #ffffff;
+}
+
+[data-theme='space'] .glass {
+  background: rgba(18, 22, 44, 0.45);
+  border: 1px solid rgba(160, 180, 255, 0.2);
+  border-radius: var(--r-card);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+[data-theme='space'] .search-input {
+  background: rgba(20, 24, 48, 0.5);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--r-input);
+  padding: 9px 14px 9px 30px;
+  backdrop-filter: blur(8px);
+}
+
+[data-theme='space'] .tc-topline {
+  background: rgba(18, 22, 44, 0.4);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-pill);
+  padding: 7px 16px;
+  backdrop-filter: blur(10px);
+}
+
+/* gradient-glow wordmark */
+[data-theme='space'] .tc-wordmark {
+  font-variation-settings: normal;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  background: linear-gradient(96deg, #b9a8ff 0%, #7c5cff 42%, #22d3ee 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 0 22px rgba(124, 92, 255, 0.45));
+}
+[data-theme='space'] .tc-wordmark em {
+  color: #22d3ee;
+  -webkit-text-fill-color: #22d3ee;
+}
+
+/* nav as a floating glass pill */
+[data-theme='space'] .tc-nav {
+  border: 1px solid var(--rule);
+  border-radius: var(--r-pill);
+  background: rgba(18, 22, 44, 0.4);
+  backdrop-filter: blur(12px);
+  padding: 5px;
+  gap: 4px;
+  overflow: visible;
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.42);
+}
+[data-theme='space'] .tc-navitem {
+  border: none;
+  border-radius: var(--r-pill);
+  padding: 8px 18px;
+}
+[data-theme='space'] .tc-navitem:first-child {
+  border-left: none;
+}
+[data-theme='space'] .tc-navitem:hover {
+  background: rgba(140, 160, 255, 0.1);
+}
+[data-theme='space'] .tc-navitem-on,
+[data-theme='space'] .tc-navitem-on:hover {
+  background: linear-gradient(96deg, rgba(124, 92, 255, 0.92), rgba(34, 211, 238, 0.92));
+  color: #ffffff;
+  box-shadow: 0 0 20px rgba(124, 92, 255, 0.5);
+}
+[data-theme='space'] .tc-navitem-on > span:first-child {
+  color: rgba(255, 255, 255, 0.85);
+}
+[data-theme='space'] .tc-navitem-on::after {
+  display: none;
+}

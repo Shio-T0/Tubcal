@@ -1,0 +1,40 @@
+.cluster {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: flex;
+  gap: 4px;
+  z-index: 3;
+}
+
+.action {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--border-glass);
+  border-radius: 8px;
+  background: rgba(8, 6, 4, 0.62);
+  backdrop-filter: blur(6px);
+  color: #f2f3f8;
+  cursor: pointer;
+  opacity: 0.78;
+  transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease, transform 0.12s ease;
+}
+
+.action:hover {
+  opacity: 1;
+  transform: translateY(-1px);
+  background: rgba(8, 6, 4, 0.85);
+}
+
+.actionOn {
+  opacity: 1;
+  color: var(--c-youtube);
+  border-color: color-mix(in srgb, var(--c-youtube) 60%, transparent);
+}
+
+/* Inline variant (e.g. broadsheet text cards) sits in normal flow, not pinned. */
+.inline {
+  position: static;
+}
