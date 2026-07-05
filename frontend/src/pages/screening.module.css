@@ -150,7 +150,9 @@
   display: flex;
   gap: var(--space-4);
   overflow-x: auto;
-  scroll-snap-type: x proximity;
+  /* No scroll-snap on any shelf: it pulled the keyboard-focused tile back to the
+     row's left edge, defeating the centred-focus scroll (scrollIntoView center),
+     and fought the JS wheel-scroll. Centred focus now holds on every shelf. */
   padding-bottom: var(--space-3);
 }
 
@@ -707,10 +709,6 @@
   grid-auto-columns: 336px;
   align-items: start;
   gap: var(--space-5);
-  /* No scroll-snap on the tall Projection grid: proximity-snapping fights the
-     JS wheel-scroll (each notch scrolls, then the browser tugs back to a snap
-     point), which is what made the wheel feel broken here. */
-  scroll-snap-type: none;
 }
 
 .shelfTall .tile {
