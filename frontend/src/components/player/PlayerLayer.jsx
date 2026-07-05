@@ -13,7 +13,8 @@ import {
   VolumeX,
   X,
 } from 'lucide-react';
-import Hls from 'hls.js';
+// hls.js (~150 KB) is loaded on demand the first time an HLS stream plays, so it
+// stays out of the initial bundle for anyone who never opens a 1080p video.
 
 import { api } from '../../api/client.js';
 import { formatWhen, timeUntil } from '../../lib/time.js';
@@ -198,46 +199,52 @@ function PlayerCard({ item, expanded, style, dragging, muted, rate, roomForPanel
     setPlayErr(null);
     if (isHls) {
       const url = sapi.hls(active.itag);
-      if (Hls.isSupported()) {
-        // backBufferLength frees already-played segments so long videos don't
-        // grow memory unbounded; the buffer caps keep ahead-of-playhead modest.
-        const hls = new Hls({
-          maxBufferLength: 30,
-          maxMaxBufferLength: 60,
-          backBufferLength: 30,
-        });
-        // A single fatal HLS error is often transient (an expired segment, a
-        // dropped connection). hls.js can recover network errors by reloading
-        // and media errors by flushing the decoder, so try a bounded number of
-        // recoveries before surfacing an error — this is what otherwise showed
-        // up as an intermittent "unsupported format".
-        let recoveries = 0;
-        hls.loadSource(url);
-        hls.attachMedia(v);
-        hls.on(Hls.Events.MANIFEST_PARSED, () => v.play().catch(() => {}));
-        hls.on(Hls.Events.ERROR, (_, d) => {
-          if (!d.fatal) return;
-          if (recoveries < 3) {
-            recoveries += 1;
-            if (d.type === Hls.ErrorTypes.NETWORK_ERROR) hls.startLoad();
-            else if (d.type === Hls.ErrorTypes.MEDIA_ERROR) hls.recoverMediaError();
-            else hls.destroy();
-            return;
-          }
-          setPlayErr(`HLS ${d.type}${d.details ? ` — ${d.details}` : ''}`);
-        });
-        return () => hls.destroy();
-      }
-      if (v.canPlayType('application/vnd.apple.mpegurl')) {
-        v.src = url; // Safari plays HLS natively
-        v.play().catch(() => {});
-      } else {
-        setPlayErr('HLS not supported by this browser');
-      }
-    } else {
-      v.src = sapi.mp4(active.itag);
-      v.play().catch(() => {});
+      let hls = null;
+      let cancelled = false;
+      // Dynamic import → hls.js is a separate chunk fetched only now.
+      import('hls.js').then(({ default: Hls }) => {
+        if (cancelled || !videoRef.current) return;
+        if (Hls.isSupported()) {
+          // backBufferLength frees already-played segments so long videos don't
+          // grow memory unbounded; the buffer caps keep ahead-of-playhead modest.
+          hls = new Hls({
+            maxBufferLength: 30,
+            maxMaxBufferLength: 60,
+            backBufferLength: 30,
+          });
+          // A single fatal HLS error is often transient (an expired segment, a
+          // dropped connection). hls.js can recover network errors by reloading
+          // and media errors by flushing the decoder, so try a bounded number of
+          // recoveries before surfacing an error — this is what otherwise showed
+          // up as an intermittent "unsupported format".
+          let recoveries = 0;
+          hls.loadSource(url);
+          hls.attachMedia(v);
+          hls.on(Hls.Events.MANIFEST_PARSED, () => v.play().catch(() => {}));
+          hls.on(Hls.Events.ERROR, (_, d) => {
+            if (!d.fatal) return;
+            if (recoveries < 3) {
+              recoveries += 1;
+              if (d.type === Hls.ErrorTypes.NETWORK_ERROR) hls.startLoad();
+              else if (d.type === Hls.ErrorTypes.MEDIA_ERROR) hls.recoverMediaError();
+              else hls.destroy();
+              return;
+            }
+            setPlayErr(`HLS ${d.type}${d.details ? ` — ${d.details}` : ''}`);
+          });
+        } else if (v.canPlayType('application/vnd.apple.mpegurl')) {
+          v.src = url; // Safari plays HLS natively
+          v.play().catch(() => {});
+        } else {
+          setPlayErr('HLS not supported by this browser');
+        }
+      }).catch(() => {
+        if (!cancelled) setPlayErr('failed to load HLS player');
+      });
+      return () => { cancelled = true; if (hls) hls.destroy(); };
     }
+    v.src = sapi.mp4(active.itag);
+    v.play().catch(() => {});
     return undefined;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playKey]);

@@ -8,4 +8,15 @@ export default defineConfig({
       '/api': 'http://127.0.0.1:5000',
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        // Split the rarely-changing React runtime into its own long-cached chunk
+        // so app-code rebuilds don't invalidate it.
+        manualChunks: {
+          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+        },
+      },
+    },
+  },
 });

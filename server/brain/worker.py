@@ -5,11 +5,28 @@ in, auto-enqueues newly watched videos. Same daemon pattern as notifier.py."""
 import threading
 import time
 
-from .. import db
+from .. import config, db
 from . import llm, search, summarize, transcribe
 
 POLL_IDLE = 20    # seconds between checks when there's nothing to do
 POLL_BUSY = 2     # short breather between docs when the queue is backed up
+
+
+def _sweep_orphans():
+    """Delete leftover audio downloads from a crashed/killed run.
+
+    `_process` unlinks its download in a `finally`, but a SIGKILL mid-download
+    skips that — leaving a full-video .mp4 (can be ~1 GB) stranded in BRAIN_DIR.
+    Jobs run one at a time and none are in flight at startup, so every .mp4 here
+    is dead weight and safe to remove."""
+    try:
+        for f in config.BRAIN_DIR.glob("*.mp4"):
+            try:
+                f.unlink()
+            except OSError:
+                pass
+    except OSError:
+        pass
 
 
 def _auto_enqueue():
@@ -79,6 +96,7 @@ def _process(doc):
 
 
 def _loop():
+    _sweep_orphans()  # reclaim any download stranded by a previous crash
     time.sleep(30)  # let startup settle (matches notifier)
     while True:
         delay = POLL_IDLE

@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 
 import { api } from './api/client.js';
+import { loadSkinFonts } from './lib/skinFonts.js';
 import ToastStack from './components/ui/Toast.jsx';
 
 const ToastCtx = createContext(() => {});
@@ -54,7 +55,9 @@ export function AppProviders({ children }) {
       .catch(() => setSettings({ theme: 'dark' }));
   }, []);
   useEffect(() => {
-    document.documentElement.dataset.theme = settings?.theme || 'dark';
+    const theme = settings?.theme || 'dark';
+    document.documentElement.dataset.theme = theme;
+    loadSkinFonts(theme);  // fetch this skin's fonts on demand (no-op for core skins)
   }, [settings?.theme]);
 
   const updateSettings = useCallback(

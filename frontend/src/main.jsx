@@ -2,19 +2,14 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 
+// Core fonts for the default Shōwa skins — eager so first paint has them.
 import '@fontsource-variable/fraunces';
 import '@fontsource-variable/schibsted-grotesk';
 import '@fontsource/ibm-plex-mono';
 import '@fontsource/ibm-plex-mono/500.css';
 
-// Skin fonts: Terminal (VT323), Bauhaus (Archivo + Archivo Black),
-// Space (Space Grotesk + Inter). Aqua/Blueprint reuse system + Plex Mono.
-import '@fontsource/vt323';
-import '@fontsource/archivo/400.css';
-import '@fontsource/archivo/600.css';
-import '@fontsource/archivo/900.css';
-import '@fontsource-variable/space-grotesk';
-import '@fontsource-variable/inter';
+// Skin fonts (Terminal/Bauhaus/Space) load lazily via lib/skinFonts.js when
+// their theme is selected — see state.jsx. Aqua/Blueprint reuse system + Plex Mono.
 
 import './styles/tokens.css';
 import './styles/themes.css';

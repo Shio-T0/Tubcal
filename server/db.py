@@ -160,7 +160,15 @@ def connect():
     config.DATA_DIR.mkdir(exist_ok=True)
     con = sqlite3.connect(config.DB_PATH, timeout=10)
     con.row_factory = sqlite3.Row
+    # journal_mode is persisted in the file; the rest are per-connection tuning.
+    # synchronous=NORMAL is safe (durable) under WAL and much faster on writes;
+    # mmap reads avoid syscalls; a 16 MB page cache and in-memory temp tables cut
+    # per-request latency for this local, single-user workload.
     con.execute("PRAGMA journal_mode=WAL")
+    con.execute("PRAGMA synchronous=NORMAL")
+    con.execute("PRAGMA mmap_size=268435456")   # 256 MB
+    con.execute("PRAGMA cache_size=-16000")      # 16 MB (negative = KiB)
+    con.execute("PRAGMA temp_store=MEMORY")
     return con
 
 
@@ -230,11 +238,31 @@ def init_db():
                 (key, json.dumps(value)),
             )
     con.close()
+    _ensure_incremental_vacuum()
     try:
         os.chmod(config.DB_PATH, 0o600)
     except OSError:
         pass
     prune_old_data()
+
+
+def _ensure_incremental_vacuum():
+    """One-time: put the DB in INCREMENTAL auto_vacuum mode and reclaim free pages.
+
+    auto_vacuum can only be changed by a full VACUUM, so this rewrites the file
+    once (reclaiming pages left by prior deletes) and is a cheap no-op on every
+    later startup once the mode is already INCREMENTAL. Thereafter prune_old_data
+    reclaims space cheaply via `PRAGMA incremental_vacuum`."""
+    con = sqlite3.connect(config.DB_PATH, timeout=30, isolation_level=None)
+    try:
+        mode = con.execute("PRAGMA auto_vacuum").fetchone()[0]
+        if mode != 2:  # 2 == INCREMENTAL
+            con.execute("PRAGMA auto_vacuum=INCREMENTAL")
+            con.execute("VACUUM")
+    except sqlite3.OperationalError:
+        pass
+    finally:
+        con.close()
 
 
 def prune_old_data(history_cap=2000, cache_max_age=7 * 86400):
@@ -260,6 +288,14 @@ def prune_old_data(history_cap=2000, cache_max_age=7 * 86400):
         edition_prune()
     except sqlite3.OperationalError:
         pass  # tables may not exist on a very first run
+    # Hand freed pages back to the filesystem (cheap under INCREMENTAL auto_vacuum;
+    # no-op otherwise). Runs outside any transaction on an autocommit connection.
+    try:
+        vac = sqlite3.connect(config.DB_PATH, timeout=30, isolation_level=None)
+        vac.execute("PRAGMA incremental_vacuum")
+        vac.close()
+    except sqlite3.OperationalError:
+        pass
 
 
 # ---- settings ----

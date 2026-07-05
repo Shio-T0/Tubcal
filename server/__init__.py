@@ -10,9 +10,15 @@ def create_app():
     register_blueprints(app)
 
     @app.after_request
-    def no_store(resp):
+    def cache_policy(resp):
+        # API responses must never be cached; hashed build assets can be cached
+        # forever (Vite content-hashes every filename under /assets/, so a changed
+        # file gets a new URL). This turns every asset re-request into a cache hit
+        # instead of a revalidation round-trip.
         if request.path.startswith("/api/"):
             resp.headers["Cache-Control"] = "no-store"
+        elif request.path.startswith("/assets/"):
+            resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
         return resp
 
     def serve_index(dist):
