@@ -16,6 +16,7 @@ from urllib.parse import quote
 import feedparser
 
 from .. import cache, config, httpc
+from .fuzzy import fuzzy_filter
 
 BASE = "https://www.reddit.com"
 OAUTH_BASE = "https://oauth.reddit.com"
@@ -63,8 +64,10 @@ def validate_subreddit(raw):
 
     try:
         rss = httpc.get(f"{BASE}/r/{name}/.rss?limit=3").text
+    except httpc.RateLimited as e:
+        raise LookupError(f"Reddit rate-limited us — try again in ~{e.retry_after:.0f}s")
     except Exception:
-        raise LookupError(f"Subreddit r/{name} not found (or Reddit rate-limited us — try again in a minute)")
+        raise LookupError(f"Subreddit r/{name} not found")
     parsed = feedparser.parse(rss)
     if parsed.get("bozo") and not parsed.entries and not parsed.feed.get("title"):
         raise LookupError(f"Subreddit r/{name} not found")
@@ -272,6 +275,31 @@ def search(query, sub=None):
     rss, stale = cache.cached(key, 300, fetch)
     parsed = feedparser.parse(rss)
     items = [n for n in (_normalize_rss_entry(e) for e in parsed.entries) if n]
+
+    # Fuzzy fallback: if the API returned few results, try matching against
+    # the cached feed for the subscribed subreddits.
+    if len(items) < 5:
+        subs_to_check = [sub] if sub else []
+        if not subs_to_check:
+            from .. import db
+            subs_to_check = [s["source_id"] for s in db.list_subscriptions("reddit")]
+        fuzzy_candidates = []
+        for sname in subs_to_check[:5]:
+            cached_listing = cache.peek(f"reddit:listing:rss:{sname}:hot")
+            if cached_listing:
+                parsed_feed = feedparser.parse(cached_listing)
+                for e in parsed_feed.entries:
+                    n = _normalize_rss_entry(e)
+                    if n:
+                        fuzzy_candidates.append(n)
+        if fuzzy_candidates:
+            fuzzy_hits = fuzzy_filter(fuzzy_candidates, query, threshold=60, limit=10)
+            seen_ids = {i["id"] for i in items}
+            for hit_item, score in fuzzy_hits:
+                if hit_item["id"] not in seen_ids:
+                    seen_ids.add(hit_item["id"])
+                    items.append(hit_item)
+
     return {"items": items, "stale": stale, "limited": True}
 
 

@@ -3,17 +3,8 @@ import { NavLink, useLocation } from 'react-router-dom';
 
 import { useSettings } from '../../state.jsx';
 import { nextTheme, themeMeta } from '../../lib/themes.js';
+import { getActiveRooms } from '../../lib/rooms.js';
 import s from './Masthead.module.css';
-
-const NAV = [
-  { to: '/edition', index: 'No 00', label: 'The Edition', color: 'var(--c-foryou)' },
-  { to: '/', index: 'No 01', label: 'Front Page', color: 'var(--c-foryou)' },
-  { to: '/youtube', index: 'No 02', label: 'Screening Room', color: 'var(--c-youtube)' },
-  { to: '/reddit', index: 'No 03', label: 'The Dispatch', color: 'var(--c-reddit)' },
-  { to: '/hackernews', index: 'No 04', label: 'The Wire', color: 'var(--c-hn)' },
-  { to: '/archive', index: 'No 05', label: 'The Archive', color: 'var(--signal)' },
-  { to: '/anime', index: 'No 06', label: 'The Anime', color: 'var(--c-anime)' },
-];
 
 function todayLine() {
   return new Date()
@@ -26,6 +17,10 @@ export default function Masthead() {
   const theme = settings?.theme || 'dark';
   const { pathname } = useLocation();
   const upcoming = themeMeta(nextTheme(theme));
+
+  // Derive nav from the ROOMS registry filtered/ordered by settings.active_rooms.
+  const activeRoomIds = settings?.active_rooms || ['edition', 'frontpage', 'youtube', 'reddit', 'hackernews', 'archive', 'anime'];
+  const navItems = getActiveRooms(activeRoomIds);
 
   return (
     <header className={`${s.masthead} tc-masthead`}>
@@ -68,20 +63,23 @@ export default function Masthead() {
       </div>
 
       <nav className={`${s.nav} tc-nav`}>
-        {NAV.map(({ to, index, label, color }) => (
-          <NavLink
-            key={to}
-            to={to}
-            end={to === '/'}
-            className={({ isActive }) =>
-              `${s.navItem} tc-navitem ${isActive || (to !== '/' && pathname.startsWith(to)) ? s.navItemActive + ' tc-navitem-on' : ''}`
-            }
-            style={{ '--nav-c': color }}
-          >
-            <span className={s.navIndex}>{index}</span>
-            <span className={s.navLabel}>{label}</span>
-          </NavLink>
-        ))}
+        {navItems.map((room, i) => {
+          const indexLabel = `No ${String(i + 1).padStart(2, '0')}`;
+          return (
+            <NavLink
+              key={room.id}
+              to={room.route}
+              end={room.route === '/'}
+              className={({ isActive }) =>
+                `${s.navItem} tc-navitem ${isActive || (room.route !== '/' && pathname.startsWith(room.route)) ? s.navItemActive + ' tc-navitem-on' : ''}`
+              }
+              style={{ '--nav-c': room.color }}
+            >
+              <span className={s.navIndex}>{indexLabel}</span>
+              <span className={s.navLabel}>{room.label}</span>
+            </NavLink>
+          );
+        })}
       </nav>
     </header>
   );

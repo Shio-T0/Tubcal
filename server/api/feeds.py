@@ -2,11 +2,11 @@ import base64
 import re
 from urllib.parse import urljoin, urlparse
 
-from flask import Blueprint, Response, request, stream_with_context
+from flask import Blueprint, Response, current_app, request, stream_with_context
 
 from . import err, ok
 from .. import cache, config, db, httpc
-from ..sources import hackernews, invidious, mixer, reddit, youtube
+from ..sources import github, hackernews, invidious, mixer, reddit, youtube
 
 feeds_bp = Blueprint("feeds", __name__, url_prefix="/api")
 
@@ -170,37 +170,9 @@ def youtube_channel_search(channel_id):
 @feeds_bp.get("/youtube/stream/<video_id>")
 def youtube_stream(video_id):
     try:
-        data = youtube.video_streams(video_id)
+        return ok(youtube.video_streams(video_id))
     except Exception as e:
         return err(f"Stream resolve failed: {e}", 502)
-    # Point each caption at the yt-dlp-backed endpoint (a raw timedtext GET gets
-    # bot-blocked for auto/translated tracks — the Japanese→English case).
-    subs = []
-    for sub in data.get("subtitles") or []:
-        lang = sub.get("lang", "en")
-        subs.append({
-            "src": f"/api/youtube/captions/{video_id}?lang={lang}",
-            "lang": lang,
-            "label": sub.get("label", "English"),
-        })
-    return ok({**data, "subtitles": subs})
-
-
-@feeds_bp.get("/youtube/captions/<video_id>")
-def youtube_captions(video_id):
-    """A video's caption track as WebVTT, fetched via yt-dlp (see fetch_captions)."""
-    lang = request.args.get("lang", "en")
-    try:
-        vtt = youtube.fetch_captions(video_id, lang)
-    except Exception as e:
-        return err(f"caption fetch failed: {e}", 502)
-    if not vtt:
-        return err("no captions for this video", 404)
-    return Response(
-        vtt,
-        mimetype="text/vtt",
-        headers={"Cache-Control": "public, max-age=1800"},
-    )
 
 
 # Headers worth relaying from the upstream CDN response to the browser.
@@ -377,9 +349,8 @@ def youtube_video_info(video_id):
         info = youtube.video_info(video_id)
     except Exception as e:
         return err(f"Video info failed: {e}", 502)
-    meta = {k: v for k, v in info.items() if k not in ("streams", "subtitles")}
+    meta = {k: v for k, v in info.items() if k != "streams"}
     meta["has_streams"] = bool(info.get("streams"))
-    meta["has_captions"] = bool(info.get("subtitles"))
     return ok(meta)
 
 
@@ -488,15 +459,19 @@ def post_history():
     item = body.get("item") or {}
     if not item.get("id") or not item.get("platform"):
         return err("item with id and platform required")
-    db.add_history(
-        item["platform"],
-        item["id"],
-        item.get("title"),
-        (item.get("extra") or {}).get("channel_id") or (item.get("extra") or {}).get("subreddit"),
-        item.get("source"),
-        item.get("thumbnail"),
-        item.get("url"),
-    )
+    try:
+        db.add_history(
+            item["platform"],
+            item["id"],
+            item.get("title"),
+            (item.get("extra") or {}).get("channel_id") or (item.get("extra") or {}).get("subreddit"),
+            item.get("source"),
+            item.get("thumbnail"),
+            item.get("url"),
+        )
+    except Exception as e:
+        current_app.logger.exception("Failed to add history")
+        return err(f"Failed to record history: {e}", 500)
     return ok({"recorded": True})
 
 
@@ -516,7 +491,11 @@ def post_progress():
         duration = max(0.0, float(body.get("duration") or 0))
     except (TypeError, ValueError):
         return err("position and duration must be numbers")
-    db.set_progress(item_id, position, duration)
+    try:
+        db.set_progress(item_id, position, duration)
+    except Exception as e:
+        current_app.logger.exception("Failed to set progress")
+        return err(f"Failed to save progress: {e}", 500)
     return ok({"saved": True})
 
 
@@ -553,19 +532,23 @@ def history_mark():
     item_id = item.get("id")
     if not item_id:
         return err("item with id required")
-    if watched:
-        db.add_history(
-            item.get("platform") or "youtube",
-            item_id,
-            item.get("title"),
-            (item.get("extra") or {}).get("channel_id"),
-            item.get("source"),
-            item.get("thumbnail"),
-            item.get("url"),
-        )
-        db.set_progress(item_id, 1.0, 1.0)  # ratio 1.0 → shows as finished
-    else:
-        db.set_progress(item_id, 0.0, 0.0)  # drops out of progress map + shelf
+    try:
+        if watched:
+            db.add_history(
+                item.get("platform") or "youtube",
+                item_id,
+                item.get("title"),
+                (item.get("extra") or {}).get("channel_id"),
+                item.get("source"),
+                item.get("thumbnail"),
+                item.get("url"),
+            )
+            db.set_progress(item_id, 1.0, 1.0)  # ratio 1.0 → shows as finished
+        else:
+            db.set_progress(item_id, 0.0, 0.0)  # drops out of progress map + shelf
+    except Exception as e:
+        current_app.logger.exception("Failed to mark history")
+        return err(f"Failed to mark watched: {e}", 500)
     return ok({"marked": watched})
 
 
@@ -582,22 +565,31 @@ def saved_add():
     item = body.get("item") or {}
     if not item.get("id") or not item.get("platform"):
         return err("item with id and platform required")
-    db.add_saved(item)
+    try:
+        db.add_saved(item)
+    except Exception as e:
+        current_app.logger.exception("Failed to add saved item")
+        return err(f"Failed to save item: {e}", 500)
     return ok({"saved": True})
 
 
 @feeds_bp.delete("/saved/<path:item_id>")
 def saved_remove(item_id):
-    return ok({"removed": db.remove_saved(item_id)})
+    try:
+        removed = db.remove_saved(item_id)
+    except Exception as e:
+        current_app.logger.exception("Failed to remove saved item")
+        return err(f"Failed to unsave item: {e}", 500)
+    return ok({"removed": removed})
 
 
 @feeds_bp.get("/search/all")
 def search_all():
-    """Unified search across all three rooms for the command palette."""
+    """Unified search across all rooms for the command palette."""
     q = (request.args.get("q") or "").strip()
     if not q:
         return err("q required")
-    results = {"youtube": [], "reddit": [], "hackernews": []}
+    results = {"youtube": [], "reddit": [], "hackernews": [], "github": []}
     try:
         results["youtube"] = invidious.search(q).get("items", [])[:8]
     except Exception:
@@ -610,34 +602,95 @@ def search_all():
         results["hackernews"] = hackernews.search(q).get("items", [])[:8]
     except Exception:
         pass
+    try:
+        results["github"] = github.search(q).get("items", [])[:8]
+    except Exception:
+        pass
     return ok(results)
+
+
+@feeds_bp.get("/feed/github")
+def feed_github():
+    list_name = request.args.get("list", "activity")
+    try:
+        page = max(0, int(request.args.get("page", 0)))
+    except ValueError:
+        return err("invalid page")
+    try:
+        return ok(github.get_feed(list_name, page))
+    except Exception as e:
+        return err(f"GitHub fetch failed: {e}", 502)
+
+
+@feeds_bp.get("/github/search")
+def github_search():
+    q = (request.args.get("q") or "").strip()
+    if not q:
+        return err("q required")
+    try:
+        return ok(github.search(q))
+    except Exception as e:
+        return err(f"Search failed: {e}", 502)
+
+
+@feeds_bp.get("/github/trending")
+def github_trending():
+    period = (request.args.get("period") or "daily").strip().lower()
+    if period not in ("daily", "weekly", "monthly"):
+        return err("period must be one of daily|weekly|monthly")
+    language = (request.args.get("language") or "").strip() or None
+    try:
+        page = max(0, int(request.args.get("page", 0)))
+    except ValueError:
+        return err("invalid page")
+    try:
+        return ok(github.trending(period, language, page))
+    except Exception as e:
+        return err(f"Trending fetch failed: {e}", 502)
+
+
+@feeds_bp.get("/github/item/<path:full_name>")
+def github_item(full_name):
+    try:
+        return ok(github.get_item(full_name))
+    except Exception as e:
+        return err(f"Could not load repo: {e}", 502)
 
 
 @feeds_bp.get("/feed/foryou")
 def feed_foryou():
     weights = db.get_setting("foryou_weights") or {"youtube": 2, "reddit": 2, "hackernews": 1}
+    active_rooms = set(db.get_setting("active_rooms") or ["frontpage", "youtube", "reddit", "hackernews", "archive", "anime"])
     feeds = {}
     errors = []
 
-    try:
-        feeds["hackernews"] = hackernews.get_feed("top", 0)["items"]
-    except Exception as e:
-        errors.append(f"hackernews: {e}")
+    if "hackernews" in active_rooms:
+        try:
+            feeds["hackernews"] = hackernews.get_feed("top", 0)["items"]
+        except Exception as e:
+            errors.append(f"hackernews: {e}")
 
     yt_subs = db.list_subscriptions("youtube")
-    if yt_subs:
+    if yt_subs and "youtube" in active_rooms:
         try:
             feeds["youtube"] = youtube.get_feed([s["source_id"] for s in yt_subs])["items"]
         except Exception as e:
             errors.append(f"youtube: {e}")
 
     rd_subs = db.list_subscriptions("reddit")
-    if rd_subs:
+    if rd_subs and "reddit" in active_rooms:
         sort = db.get_setting("reddit_sort") or "hot"
         try:
             feeds["reddit"] = reddit.get_feed([s["source_id"] for s in rd_subs], sort)["items"]
         except Exception as e:
             errors.append(f"reddit: {e}")
+
+    gh_subs = db.list_subscriptions("github")
+    if gh_subs and "github" in active_rooms:
+        try:
+            feeds["github"] = github.get_feed()["items"]
+        except Exception as e:
+            errors.append(f"github: {e}")
 
     items = mixer.mix(feeds, weights)[:90]
     return ok({"items": items, "errors": errors, "stale": False})
@@ -646,7 +699,7 @@ def feed_foryou():
 @feeds_bp.post("/refresh")
 def refresh():
     scope = request.args.get("scope", "")
-    prefixes = {"": "", "all": "", "reddit": "reddit:", "youtube": "yt:", "hackernews": "hn:"}
+    prefixes = {"": "", "all": "", "reddit": "reddit:", "youtube": "yt:", "hackernews": "hn:", "github": "github:"}
     if scope not in prefixes:
         return err("invalid scope")
     return ok({"cleared": cache.invalidate(prefixes[scope])})

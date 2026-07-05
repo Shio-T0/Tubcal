@@ -30,6 +30,7 @@
   --c-reddit: #cf7733;
   --c-hn: #d3a24a;
   --c-foryou: #e6ab5e;
+  --c-github: #9a8ec7;
   --c-anime: var(--signal);   /* The Anime room — adopts each skin's accent */
   --success: #9aae64;
   --danger: #c75a44;
@@ -99,6 +100,9 @@
   --c-youtube: #b5402b;
   --c-reddit: #b4631f;
   --c-hn: #a8761f;
+  --c-foryou: #b06a26;
+  --c-github: #7b6fa5;
+  --c-anime: var(--signal);
   --success: #5e7338;
   --danger: #b3361f;
 

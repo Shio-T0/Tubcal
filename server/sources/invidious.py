@@ -19,6 +19,7 @@ from urllib.parse import quote
 import requests
 
 from .. import cache, config, httpc
+from .fuzzy import fuzzy_filter
 
 # Order = preference; _api_get tries each in turn until one answers (see the note
 # there on why we don't pin a 'winning' instance). Most public instances now block
@@ -241,6 +242,26 @@ def search(query):
         return _normalize_list(_api_get(f"/search?q={quote(q)}&type=video"))
 
     items, stale = cache.cached(f"yt:inv:search:{q.lower()}", config.TTL_YT_RSS, fetch)
+
+    # Fuzzy fallback: if the API returned few results, try matching against
+    # the cached subscription feed (which may contain near-miss titles).
+    if len(items) < 5:
+        from .. import db
+        subs = db.list_subscriptions("youtube")
+        if subs:
+            fuzzy_candidates = []
+            for s in subs[:5]:
+                cached_feed = cache.peek(f"yt:rss:{s['source_id']}")
+                if cached_feed:
+                    fuzzy_candidates.extend(cached_feed)
+            if fuzzy_candidates:
+                fuzzy_hits = fuzzy_filter(fuzzy_candidates, query, threshold=60, limit=10)
+                seen_ids = {i["id"] for i in items}
+                for hit_item, score in fuzzy_hits:
+                    if hit_item["id"] not in seen_ids:
+                        seen_ids.add(hit_item["id"])
+                        items.append(hit_item)
+
     return {"items": items, "stale": stale}
 
 

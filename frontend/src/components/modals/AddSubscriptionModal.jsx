@@ -7,9 +7,16 @@ import { Button, SegmentedControl, Spinner } from '../ui/index.jsx';
 import Modal from './Modal.jsx';
 import s from './Modal.module.css';
 
+const PLATFORMS = [
+  { value: 'youtube', label: 'YouTube' },
+  { value: 'reddit', label: 'Reddit' },
+  { value: 'github', label: 'GitHub' },
+];
+
 const PLACEHOLDERS = {
   youtube: '@handle, channel URL, or UC… id',
   reddit: 'subreddit name, e.g. programming',
+  github: 'owner/repo or username',
 };
 
 export default function AddSubscriptionModal({
@@ -81,18 +88,27 @@ export default function AddSubscriptionModal({
     }
   };
 
-  const previewName = preview ? (platform === 'youtube' ? preview.title : preview.title) : null;
-  const previewThumb = preview ? (platform === 'youtube' ? preview.thumbnail : preview.icon) : null;
+  const previewName = preview
+    ? platform === 'youtube'
+      ? preview.title
+      : platform === 'reddit'
+        ? preview.title
+        : preview.name
+    : null;
+  const previewThumb = preview
+    ? platform === 'youtube'
+      ? preview.thumbnail
+      : platform === 'reddit' || platform === 'github'
+        ? preview.icon
+        : null
+    : null;
 
   return (
     <Modal open={open} onClose={onClose} label="Add subscription" maxWidth={460}>
       <div className={s.modalBody}>
         <h2 className={s.modalTitle}>Add subscription</h2>
         <SegmentedControl
-          options={[
-            { value: 'youtube', label: 'YouTube' },
-            { value: 'reddit', label: 'Reddit' },
-          ]}
+          options={PLATFORMS}
           value={platform}
           onChange={(p) => {
             setPlatform(p);
@@ -141,7 +157,7 @@ export default function AddSubscriptionModal({
                     fontWeight: 700,
                   }}
                 >
-                  {previewName?.replace(/^r\//, '').charAt(0).toUpperCase()}
+                  {previewName?.charAt(0).toUpperCase()}
                 </span>
               )}
               <div>

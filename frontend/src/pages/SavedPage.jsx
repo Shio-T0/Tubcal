@@ -4,6 +4,7 @@ import { Bookmark } from 'lucide-react';
 import { SectionHead } from '../components/layout/Section.jsx';
 import HNCommentsPanel from '../components/modals/HNCommentsPanel.jsx';
 import RedditPostModal from '../components/modals/RedditPostModal.jsx';
+import RepoDetailModal from '../components/modals/RepoDetailModal.jsx';
 import { EmptyState } from '../components/ui/index.jsx';
 import { SaveButton } from '../components/ui/ItemActions.jsx';
 import { timeAgo } from '../lib/time.js';
@@ -15,6 +16,7 @@ const PLATFORM_LABEL = {
   youtube: 'Screening Room',
   reddit: 'The Dispatch',
   hackernews: 'The Wire',
+  github: 'GitHub',
 };
 
 // Compact card for saved Reddit posts / HN stories (videos use VideoTile).
@@ -40,15 +42,18 @@ export default function SavedPage() {
   const { open: playVideo } = usePlayer();
   const [post, setPost] = useState(null);
   const [thread, setThread] = useState(null);
+  const [selectedRepo, setSelectedRepo] = useState(null);
 
   const items = Object.values(saved);
   const youtube = items.filter((i) => i.platform === 'youtube');
   const reddit = items.filter((i) => i.platform === 'reddit');
   const hn = items.filter((i) => i.platform === 'hackernews');
+  const github = items.filter((i) => i.platform === 'github');
 
   const openOther = (item) => {
     if (item.platform === 'reddit') setPost(item);
     else if (item.platform === 'hackernews') setThread(item);
+    else if (item.platform === 'github') setSelectedRepo(item);
     else window.open(item.url, '_blank', 'noopener');
   };
 
@@ -81,11 +86,11 @@ export default function SavedPage() {
         </section>
       )}
 
-      {(reddit.length > 0 || hn.length > 0) && (
+      {(reddit.length > 0 || hn.length > 0 || github.length > 0) && (
         <section className={s.group}>
           <h2 className={s.groupHead}>Posts & stories</h2>
           <div className={s.cards}>
-            {[...reddit, ...hn].map((item) => (
+            {[...reddit, ...hn, ...github].map((item) => (
               <SavedCard key={item.id} item={item} onOpen={openOther} />
             ))}
           </div>
@@ -94,6 +99,7 @@ export default function SavedPage() {
 
       <RedditPostModal item={post} onClose={() => setPost(null)} />
       <HNCommentsPanel item={thread} onClose={() => setThread(null)} />
+      <RepoDetailModal item={selectedRepo} onClose={() => setSelectedRepo(null)} />
     </>
   );
 }

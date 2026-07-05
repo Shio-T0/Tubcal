@@ -2,14 +2,14 @@ from flask import Blueprint, request
 
 from . import err, ok
 from .. import db
-from ..sources import reddit, youtube
+from ..sources import reddit, youtube, github
 
 subs_bp = Blueprint("subscriptions", __name__, url_prefix="/api")
 
 
 @subs_bp.get("/subscriptions")
 def list_subs():
-    grouped = {"youtube": [], "reddit": []}
+    grouped = {"youtube": [], "reddit": [], "github": []}
     for row in db.list_subscriptions():
         grouped[row["platform"]].append(row)
     return ok(grouped)
@@ -20,15 +20,19 @@ def add_sub():
     body = request.get_json(force=True, silent=True) or {}
     platform = body.get("platform")
     raw = (body.get("input") or "").strip()
-    if platform not in ("youtube", "reddit") or not raw:
-        return err("platform ('youtube'|'reddit') and input are required")
+    if platform not in ("youtube", "reddit", "github") or not raw:
+        return err("platform ('youtube'|'reddit'|'github') and input are required")
     try:
         if platform == "youtube":
             info = youtube.resolve_channel(raw)
             source_id, name, thumb = info["channel_id"], info["title"], info["thumbnail"]
-        else:
+        elif platform == "reddit":
             info = reddit.validate_subreddit(raw)
             source_id, name, thumb = info["name"], info["title"], info["icon"]
+        else:
+            # GitHub: raw is "owner/repo" or a username — validate against the API
+            info = github.resolve(raw)
+            source_id, name, thumb = info["source_id"], info["name"], info["icon"]
     except LookupError as e:
         return err(str(e), 404)
     except Exception as e:
@@ -71,3 +75,16 @@ def resolve_reddit():
         return err(str(e), 404)
     except Exception as e:
         return err(f"Resolve failed: {e}", 502)
+
+
+@subs_bp.post("/github/resolve")
+def resolve_github():
+    raw = ((request.get_json(force=True, silent=True) or {}).get("input") or "").strip()
+    if not raw:
+        return err("input required")
+    try:
+        return ok(github.resolve(raw))
+    except LookupError as e:
+        return err(str(e), 404)
+    except Exception as e:
+        return err(f"Could not resolve '{raw}': {e}", 502)

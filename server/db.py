@@ -8,7 +8,7 @@ from . import config
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS subscriptions (
   id           INTEGER PRIMARY KEY AUTOINCREMENT,
-  platform     TEXT NOT NULL CHECK (platform IN ('youtube','reddit')),
+  platform     TEXT NOT NULL CHECK (platform IN ('youtube','reddit','github')),
   source_id    TEXT NOT NULL,
   display_name TEXT NOT NULL,
   thumbnail    TEXT,
@@ -150,6 +150,9 @@ DEFAULT_SETTINGS = {
     "anime_sub_pref": "sub",      # 'sub' | 'dub'
     "anime_source_url": "",       # aggregator base URL (blank → config/env default)
     "anime_provider": "",         # adapter-specific provider hint (optional)
+    # Room configuration.
+    "active_rooms": ["edition", "frontpage", "youtube", "reddit", "hackernews", "archive", "anime"],
+    "max_active_rooms": 7,
 }
 
 
@@ -161,7 +164,33 @@ def connect():
     return con
 
 
+def _check_db_writable():
+    """Verify the database file and its directory are writable. Logs a clear
+    error if not, so permission/disk-space issues surface at startup instead
+    of on the first save."""
+    try:
+        db_path = config.DB_PATH
+        # Ensure parent directory exists and is writable.
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+        if not db_path.parent.is_dir():
+            raise OSError(f"Data directory does not exist or is not a directory: {db_path.parent}")
+        # Touch the DB file if missing, then do a test write.
+        con = sqlite3.connect(str(db_path), timeout=5)
+        con.execute("CREATE TABLE IF NOT EXISTS _writability_check (id INTEGER PRIMARY KEY)")
+        con.execute("INSERT INTO _writability_check (id) VALUES (1)")
+        con.execute("DELETE FROM _writability_check")
+        con.commit()
+        con.close()
+    except Exception as e:
+        import logging
+        logging.getLogger("tubcal").error(
+            "tubcal.db is not writable at %s — check permissions/disk space: %s",
+            config.DB_PATH, e,
+        )
+
+
 def init_db():
+    _check_db_writable()
     con = connect()
     with con:
         con.executescript(SCHEMA)
@@ -172,6 +201,29 @@ def init_db():
                 con.execute(f"ALTER TABLE history ADD COLUMN {col} {decl}")
             except sqlite3.OperationalError:
                 pass  # column already exists
+        # Migration: update subscriptions CHECK constraint to include 'github'.
+        # SQLite can't ALTER a CHECK, so we recreate the table if the old
+        # constraint is still in place (i.e. 'github' would be rejected).
+        try:
+            con.execute("INSERT INTO subscriptions (platform, source_id, display_name, added_at) "
+                        "VALUES ('github', '_migration_test', '_', 0)")
+            con.execute("DELETE FROM subscriptions WHERE platform='github' AND source_id='_migration_test'")
+        except sqlite3.IntegrityError:
+            # Old CHECK constraint — recreate the table with the updated constraint.
+            con.executescript("""
+                CREATE TABLE subscriptions_new (
+                  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                  platform     TEXT NOT NULL CHECK (platform IN ('youtube','reddit','github')),
+                  source_id    TEXT NOT NULL,
+                  display_name TEXT NOT NULL,
+                  thumbnail    TEXT,
+                  added_at     INTEGER NOT NULL,
+                  UNIQUE (platform, source_id)
+                );
+                INSERT INTO subscriptions_new SELECT * FROM subscriptions;
+                DROP TABLE subscriptions;
+                ALTER TABLE subscriptions_new RENAME TO subscriptions;
+            """)
         for key, value in DEFAULT_SETTINGS.items():
             con.execute(
                 "INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)",

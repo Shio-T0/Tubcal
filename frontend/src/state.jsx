@@ -33,7 +33,10 @@ export function applyOverlay(mediaId, baseEntry, overlay) {
 export const COMPLETE_RATIO = 0.95;
 
 function recordWatch(item) {
-  api('/history', { method: 'POST', body: JSON.stringify({ item }) }).catch(() => {});
+  api('/history', { method: 'POST', body: JSON.stringify({ item }) }).catch((err) => {
+    console.error('[history] POST failed', err);
+    toast('Failed to record watch history', 'error');
+  });
 }
 
 export function AppProviders({ children }) {
@@ -79,7 +82,7 @@ export function AppProviders({ children }) {
     }, 600);
   }, []);
 
-  const [subs, setSubs] = useState({ youtube: [], reddit: [] });
+  const [subs, setSubs] = useState({ youtube: [], reddit: [], github: [] });
   const refreshSubs = useCallback(async () => {
     try {
       setSubs(await api('/subscriptions'));
@@ -235,7 +238,9 @@ export function AppProviders({ children }) {
   useEffect(() => {
     api('/progress')
       .then((d) => setProgressMap(d?.progress || {}))
-      .catch(() => {});
+      .catch((err) => {
+        console.error('[progress] GET on mount failed', err);
+      });
   }, []);
 
   // Per-id bookkeeping so we don't re-render every tile (map) or hit the server
@@ -244,6 +249,7 @@ export function AppProviders({ children }) {
   const writeProgress = useCallback((id, position, duration) => {
     if (!id || !duration) return;
     const meta = progMeta.current[id] || (progMeta.current[id] = { mapPos: -10, sent: 0 });
+    const prevMapPos = meta.mapPos;
     if (Math.abs(position - meta.mapPos) >= 1) {
       meta.mapPos = position;
       setProgressMap((p) => ({ ...p, [id]: { position, duration } }));
@@ -254,26 +260,56 @@ export function AppProviders({ children }) {
       api('/progress', {
         method: 'POST',
         body: JSON.stringify({ item_id: id, position, duration }),
-      }).catch(() => {});
+      }).catch((err) => {
+        console.error('[progress] POST failed', err);
+        // Roll back optimistic update
+        meta.mapPos = prevMapPos;
+        setProgressMap((p) => {
+          const next = { ...p };
+          if (prevMapPos < -5) {
+            delete next[id];
+          } else {
+            next[id] = { position: prevMapPos, duration };
+          }
+          return next;
+        });
+        toast('Failed to save progress', 'error');
+      });
     }
-  }, []);
+  }, [toast]);
 
   // Force an immediate save (on pause / minimize / close / unmount).
   const flushProgress = useCallback((id, position, duration) => {
     if (!id || !duration) return;
     const meta = progMeta.current[id] || (progMeta.current[id] = { mapPos: -10, sent: 0 });
+    const prevMapPos = meta.mapPos;
     meta.mapPos = position;
     meta.sent = Date.now();
     setProgressMap((p) => ({ ...p, [id]: { position, duration } }));
     api('/progress', {
       method: 'POST',
       body: JSON.stringify({ item_id: id, position, duration }),
-    }).catch(() => {});
-  }, []);
+    }).catch((err) => {
+      console.error('[progress] flush POST failed', err);
+      // Roll back optimistic update
+      meta.mapPos = prevMapPos;
+      setProgressMap((p) => {
+        const next = { ...p };
+        if (prevMapPos < -5) {
+          delete next[id];
+        } else {
+          next[id] = { position: prevMapPos, duration };
+        }
+        return next;
+      });
+      toast('Failed to save progress', 'error');
+    });
+  }, [toast]);
 
   // Manually mark a video watched / unwatched (updates the bar everywhere).
   const markWatched = useCallback((item, watched) => {
     if (!item?.id) return;
+    const prevEntry = watched ? null : (progress[item.id] || null);
     setProgressMap((p) => {
       const next = { ...p };
       if (watched) next[item.id] = { position: 1, duration: 1 };
@@ -283,8 +319,21 @@ export function AppProviders({ children }) {
     api('/history/mark', {
       method: 'POST',
       body: JSON.stringify({ item, watched }),
-    }).catch(() => {});
-  }, []);
+    }).catch((err) => {
+      console.error('[history/mark] POST failed', err);
+      // Roll back optimistic update
+      setProgressMap((p) => {
+        const next = { ...p };
+        if (watched && prevEntry) {
+          next[item.id] = prevEntry;
+        } else {
+          delete next[item.id];
+        }
+        return next;
+      });
+      toast('Failed to mark watched', 'error');
+    });
+  }, [progress, toast]);
 
   const progressApi = { progress, writeProgress, flushProgress, markWatched };
 
@@ -305,16 +354,34 @@ export function AppProviders({ children }) {
     if (!item?.id) return;
     setSaved((prev) => {
       const next = { ...prev };
+      const wasSaved = !!next[item.id];
       if (next[item.id]) {
         delete next[item.id];
-        api(`/saved/${encodeURIComponent(item.id)}`, { method: 'DELETE' }).catch(() => {});
       } else {
         next[item.id] = item;
-        api('/saved', { method: 'POST', body: JSON.stringify({ item }) }).catch(() => {});
+      }
+      if (wasSaved) {
+        api(`/saved/${encodeURIComponent(item.id)}`, { method: 'DELETE' }).catch((err) => {
+          console.error('[saved] DELETE failed', err);
+          // Roll back: re-add the item
+          setSaved((p) => ({ ...p, [item.id]: item }));
+          toast('Failed to unsave item', 'error');
+        });
+      } else {
+        api('/saved', { method: 'POST', body: JSON.stringify({ item }) }).catch((err) => {
+          console.error('[saved] POST failed', err);
+          // Roll back: remove the item we just added
+          setSaved((p) => {
+            const next = { ...p };
+            delete next[item.id];
+            return next;
+          });
+          toast('Failed to save item', 'error');
+        });
       }
       return next;
     });
-  }, []);
+  }, [toast]);
   const savedApi = { saved, toggleSaved };
 
   // ── Anime list sync ─────────────────────────────────────────────────────────

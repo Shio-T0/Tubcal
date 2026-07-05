@@ -15,6 +15,7 @@ import Dispatch, { SubredditPage } from './pages/Dispatch.jsx';
 import Wire from './pages/Wire.jsx';
 import Archive from './pages/Archive.jsx';
 import Anime, { AnimeDetail } from './pages/Anime.jsx';
+import Github from './pages/Github.jsx';
 import SavedPage from './pages/SavedPage.jsx';
 import SettingsPage from './pages/SettingsPage.jsx';
 
@@ -34,6 +35,7 @@ export default function App() {
           <Route path="/reddit" element={<Dispatch />} />
           <Route path="/reddit/r/:sub" element={<SubredditPage />} />
           <Route path="/hackernews" element={<Wire />} />
+          <Route path="/github" element={<Github />} />
           <Route path="/archive" element={<Archive />} />
           <Route path="/anime" element={<Anime />} />
           <Route path="/anime/:id" element={<AnimeDetail />} />

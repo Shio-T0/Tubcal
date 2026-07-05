@@ -2,6 +2,7 @@ from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import quote, urlparse
 
 from .. import cache, config, httpc
+from .fuzzy import fuzzy_filter
 
 FIREBASE = "https://hacker-news.firebaseio.com/v0"
 ALGOLIA = "https://hn.algolia.com/api/v1"
@@ -79,6 +80,27 @@ def search(query):
             "comments_count": hit.get("num_comments") or 0,
             "extra": {"hn_id": int(hn_id), "domain": _domain(hit.get("url")), "type": "story"},
         })
+
+    # Fuzzy fallback: if the API returned few results, try matching against
+    # the cached top stories list (which may contain near-miss titles).
+    if len(items) < 5:
+        cached_feed = cache.peek(f"hn:list:top")
+        if cached_feed:
+            # Reconstruct items from the cached id list (fetch each from cache)
+            fuzzy_candidates = []
+            for hn_id in cached_feed[:200]:
+                cached_item = cache.peek(f"hn:item:{hn_id}")
+                if cached_item:
+                    n = normalize(cached_item)
+                    if n:
+                        fuzzy_candidates.append(n)
+            fuzzy_hits = fuzzy_filter(fuzzy_candidates, query, threshold=60, limit=10)
+            seen_ids = {i["id"] for i in items}
+            for hit_item, score in fuzzy_hits:
+                if hit_item["id"] not in seen_ids:
+                    seen_ids.add(hit_item["id"])
+                    items.append(hit_item)
+
     return {"items": items, "stale": stale}
 
 

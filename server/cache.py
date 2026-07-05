@@ -163,6 +163,14 @@ def cached_dynamic(key, fetcher):
     return payload
 
 
+def peek(key):
+    """Return the cached payload for a key if it exists (even if expired), or None.
+    Does NOT trigger a fetch. Useful for fuzzy fallback: check what's cached
+    without hitting the API."""
+    entry = _load_entry(key)
+    return entry["payload"] if entry else None
+
+
 def invalidate(prefix=""):
     """Drop cache entries whose key starts with prefix. Returns count removed."""
     with _lock:

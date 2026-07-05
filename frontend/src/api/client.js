@@ -12,7 +12,14 @@ export async function api(path, opts = {}) {
     /* non-JSON error */
   }
   if (!res.ok || body.ok === false) {
-    throw new Error(body.error || `Request failed (${res.status})`);
+    const err = new Error(body.error || `Request failed (${res.status})`);
+    err.status = res.status;
+    err.body = body;
+    console.error(`[api] ${opts.method || 'GET'} ${path} failed:`, {
+      status: res.status,
+      body,
+    });
+    throw err;
   }
   return body.data;
 }

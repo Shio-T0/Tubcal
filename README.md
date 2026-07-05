@@ -1,16 +1,24 @@
 # Tubcal
 
-> Your private broadcast station — YouTube, Reddit, Hacker News, and anime in one
-> beautiful localhost app. No accounts required, nothing leaves your machine.
+Your private broadcast station: YouTube, Reddit, and Hacker News in one beautiful
+localhost app — no accounts required, nothing leaves your machine.
 
-Tubcal is a self-hosted "midnight newsroom": a single Flask + React app, bound to
-`127.0.0.1`, that pulls the feeds you follow into one calm, on-theme reading room.
-Every platform gets its own room, and an optional on-device AI turns everything
-you watch into a searchable second brain.
+A "midnight newsroom" design where every platform gets its own room:
 
----
+- **No 01 · Front Page** — one mixed stream from everything you follow, set like a
+  newspaper lede + ruled columns, weighted to your taste.
+- **No 02 · Screening Room** — cinematic YouTube: a hero premiere, one shelf per
+  channel, per-channel pages, and **The Projection** — a fully local
+  recommendation shelf powered by your private watch history.
+- **No 03 · The Dispatch** — Reddit as an editorial broadsheet with serif
+  headlines, per-subreddit pages, and full-text search.
+- **No 04 · The Wire** — Hacker News as a dense amber teletype with Algolia
+  archive search.
 
 ## The rooms
+
+Rooms are a configurable registry (Settings → Rooms) — reorder them or toggle
+optional ones on and off.
 
 | | Room | What it is |
 |---|---|---|
@@ -21,6 +29,7 @@ you watch into a searchable second brain.
 | **04** | **The Wire** | Hacker News as a dense amber teletype, with Algolia archive search. |
 | **05** | **The Archive** | A local second brain over the videos you watch — automatic transcription, semantic search, and on-device summaries, digests, and "ask my feed" Q&A. Fully offline (Ollama + Whisper). *Optional.* |
 | **06** | **The Anime** | An AniList-backed tracker and browser: browse, search, follow, and sync progress against your AniList list. Episode playback reads from a configurable local source URL. |
+| — | **GitHub** | Follow repositories and read release/activity as a room. *Optional, off by default.* |
 
 Two skins: **Night Edition** (ink + ember) and **Day Edition** (true newsprint).
 Full keyboard navigation (`hjkl` tile selection, a command palette, and shortcuts).
@@ -29,25 +38,9 @@ Full keyboard navigation (`hjkl` tile selection, a command palette, and shortcut
 
 ## Privacy
 
-- Binds to **`127.0.0.1` only** — never exposed to your network.
-- Self-hosted fonts, a `youtube-nocookie` player, no trackers, no analytics.
-- Watch history, subscriptions, settings, and OAuth tokens live in a single local
-  SQLite file (`data/tubcal.db`). History is clearable in Settings.
-- The Archive runs **entirely on your machine** (local Whisper + a local Ollama
-  server); no transcript or query ever leaves the box.
-- The only outbound traffic is direct fetches to the platforms themselves.
-
----
-
-## Requirements
-
-- **Python ≥ 3.12** and [`uv`](https://docs.astral.sh/uv/)
-- **Node.js** (for building the frontend)
-- Optional, for YouTube stream resolution & captions: [`yt-dlp`](https://github.com/yt-dlp/yt-dlp) on `PATH`
-- Optional, for **The Archive**: an [Ollama](https://ollama.com/) server + the
-  `brain` extra (heavy ML wheels — install separately, see below)
-
----
+Binds to `127.0.0.1` only. Self-hosted fonts, `youtube-nocookie` player, no
+trackers. Watch history and all settings live in a local SQLite file. The only
+outbound traffic is direct fetches to the platforms themselves.
 
 ## Run
 
@@ -56,37 +49,18 @@ Full keyboard navigation (`hjkl` tile selection, a command palette, and shortcut
 uv sync
 cd frontend && npm install && npm run build && cd ..
 
-# start — everything on one port
-uv run python main.py          # → http://127.0.0.1:5000
+# start (everything on one port)
+uv run python main.py     # → http://127.0.0.1:5000
 ```
-
-Open <http://127.0.0.1:5000>. The Flask server serves the built frontend from
-`frontend/dist`, so after a UI change you only need to rebuild and hard-refresh
-the browser. Backend changes need a server restart.
-
-### Enabling The Archive (optional AI)
-
-```bash
-uv sync --extra brain          # faster-whisper + numpy (needs Python 3.12 ML wheels)
-# run an Ollama server and pull an embedding + a chat model, e.g.:
-#   ollama pull nomic-embed-text
-#   ollama pull llama3.1:8b
-```
-
-Then pick the models in **Settings → The Archive**. Watched videos are
-transcribed and indexed in the background automatically; the AI's "memory" is
-that growing transcript corpus, searched fresh on every question.
-
----
 
 ## Develop
 
 ```bash
-uv run python main.py          # API on :5000
-cd frontend && npm run dev     # UI on :5173, with /api proxied to :5000
+uv run python main.py        # API on :5000
+cd frontend && npm run dev   # UI on :5173 with /api proxied
 ```
 
-Run the backend tests with:
+## Notes
 
 ```bash
 uv run pytest

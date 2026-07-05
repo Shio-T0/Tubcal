@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { KeyRound, Library, Minus, Newspaper, Palette, Plus, Settings, Trash2, Rss, Tv, Volume2 } from 'lucide-react';
+import { KeyRound, Library, Minus, Newspaper, Palette, Plus, Settings, Trash2, Rss, Tv, Volume2, Layout } from 'lucide-react';
 
 import { api, useApi } from '../api/client.js';
 import { SectionHead } from '../components/layout/Section.jsx';
@@ -9,6 +9,7 @@ import AddSubscriptionModal from '../components/modals/AddSubscriptionModal.jsx'
 import { Button, SegmentedControl } from '../components/ui/index.jsx';
 import { useSettings, useSubscriptions, useToast } from '../state.jsx';
 import { THEMES } from '../lib/themes.js';
+import { ROOMS } from '../lib/rooms.js';
 import s from './settings.module.css';
 
 function SkinPicker({ value, onChange }) {
@@ -42,6 +43,7 @@ function SkinPicker({ value, onChange }) {
 const GROUPS = [
   { platform: 'youtube', label: 'YouTube channels', color: 'var(--c-youtube)' },
   { platform: 'reddit', label: 'Subreddits', color: 'var(--c-reddit)' },
+  { platform: 'github', label: 'GitHub repos/users', color: 'var(--c-github)' },
 ];
 
 const PROVIDERS = [
@@ -494,6 +496,100 @@ function AnimeSettings() {
   );
 }
 
+function RoomsSettings() {
+  const { settings, updateSettings } = useSettings();
+  const toast = useToast();
+
+  const activeRoomIds = settings?.active_rooms || ['edition', 'frontpage', 'youtube', 'reddit', 'hackernews', 'archive', 'anime'];
+  const maxActive = settings?.max_active_rooms ?? 6;
+
+  const toggleRoom = (roomId) => {
+    const current = new Set(activeRoomIds);
+    if (current.has(roomId)) {
+      current.delete(roomId);
+    } else {
+      if (current.size >= maxActive) {
+        toast(`Maximum ${maxActive} rooms active`, 'error');
+        return;
+      }
+      current.add(roomId);
+    }
+    // Preserve the original order from ROOMS registry
+    const ordered = ROOMS.filter((r) => current.has(r.id)).map((r) => r.id);
+    updateSettings({ active_rooms: ordered });
+  };
+
+  const setMaxRooms = (val) => {
+    const clamped = Math.max(1, Math.min(12, val));
+    updateSettings({ max_active_rooms: clamped });
+  };
+
+  const activeCount = activeRoomIds.length;
+
+  return (
+    <section className={`${s.section} glass`}>
+      <h2 className={s.sectionTitle}>
+        <Layout size={17} /> Rooms
+      </h2>
+      <p className={s.sectionSub}>
+        Choose which rooms appear in the masthead. Disabled rooms are still accessible via direct URL.
+      </p>
+
+      <div className={s.row}>
+        <div>
+          <div className={s.rowLabel}>Max active rooms</div>
+          <div className={s.rowHint}>How many rooms can be shown at once (1–12).</div>
+        </div>
+        <div className={s.stepper}>
+          <button className={s.stepperBtn} disabled={maxActive <= 1} onClick={() => setMaxRooms(maxActive - 1)}>
+            <Minus size={13} />
+          </button>
+          <span className={s.stepperValue}>{maxActive}</span>
+          <button className={s.stepperBtn} disabled={maxActive >= 12} onClick={() => setMaxRooms(maxActive + 1)}>
+            <Plus size={13} />
+          </button>
+        </div>
+      </div>
+
+      <div className={s.rowHint} style={{ marginBottom: 8 }}>
+        {activeCount}/{maxActive} rooms active
+      </div>
+
+      {ROOMS.map((room) => {
+        const enabled = activeRoomIds.includes(room.id);
+        const atCap = activeCount >= maxActive && !enabled;
+        return (
+          <div key={room.id} className={s.subRow}>
+            <span
+              className={s.subRowAvatarLetter}
+              style={{ '--group-c': room.color, opacity: enabled ? 1 : 0.4 }}
+            >
+              {room.label.charAt(0)}
+            </span>
+            <span className={s.subRowName} style={{ opacity: enabled ? 1 : 0.5 }}>
+              {room.label}
+            </span>
+            <button
+              className={`${s.stepperBtn} ${enabled ? s.skinCardOn : ''}`}
+              style={{
+                width: 36,
+                height: 28,
+                opacity: atCap ? 0.35 : 1,
+                cursor: atCap ? 'not-allowed' : 'pointer',
+              }}
+              disabled={atCap}
+              onClick={() => toggleRoom(room.id)}
+              title={enabled ? 'Disable room' : atCap ? `Max ${maxActive} rooms` : 'Enable room'}
+            >
+              {enabled ? 'ON' : 'OFF'}
+            </button>
+          </div>
+        );
+      })}
+    </section>
+  );
+}
+
 export default function SettingsPage() {
   const { settings, updateSettings } = useSettings();
   const toast = useToast();
@@ -559,6 +655,8 @@ export default function SettingsPage() {
             <WeightStepper label="Hacker News" value={weights.hackernews ?? 1} onChange={(v) => setWeight('hackernews', v)} />
           </div>
         </section>
+
+        <RoomsSettings />
 
         <section className={`${s.section} glass`}>
           <h2 className={s.sectionTitle}>

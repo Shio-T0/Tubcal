@@ -27,12 +27,6 @@ ANILIST_GQL = "https://graphql.anilist.co"
 ANIME_SOURCE_URL = os.environ.get("TUBCAL_ANIME_SOURCE", "http://127.0.0.1:3000").rstrip("/")
 ANIME_PROVIDER = os.environ.get("TUBCAL_ANIME_PROVIDER", "")
 
-# Optional: have yt-dlp borrow a logged-in browser's YouTube cookies so resolves
-# and (especially) auto/translated captions stop getting bot-blocked / 429'd.
-# Value is yt-dlp's --cookies-from-browser arg, e.g. "firefox", "chromium",
-# "brave", or "firefox:profilename". Empty = off (default).
-YT_COOKIES_BROWSER = os.environ.get("TUBCAL_YT_COOKIES_BROWSER", "").strip()
-
 BROWSER_UA = (
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
@@ -55,6 +49,11 @@ TTL_ANILIST_MEDIA = 3600
 TTL_ANILIST_LIST = 60       # short so list/progress edits reflect quickly
 TTL_ANILIST_THREADS = 300
 TTL_ANIME_EPISODES = 600    # aggregator episode list
+# GitHub (60 req/hr unauthenticated → cache aggressively)
+TTL_GITHUB_FEED = 600       # 10 min for subscribed repo/user activity
+TTL_GITHUB_SEARCH = 300     # 5 min for search results
+TTL_GITHUB_ITEM = 1800      # 30 min for a single repo detail
+TTL_GITHUB_TRENDING = 1800  # 30 min — trending is a search call, keep it cheap
 
 # Invidious instances (override via TUBCAL_INVIDIOUS env, comma-separated).
 # Used for trending/popular/search — things YouTube RSS can't provide.
@@ -81,3 +80,6 @@ EDITION_SNIPPET = 400     # chars of snippet fed to embedding / synthesis
 HOST_INTERVALS = {
     "www.reddit.com": 3.0,
 }
+
+# Room ids — mirrors frontend/src/lib/rooms.js ROOM_IDS.
+ROOM_IDS = ["edition", "frontpage", "youtube", "reddit", "hackernews", "archive", "anime", "github"]

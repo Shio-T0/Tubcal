@@ -33,6 +33,8 @@ const PLATFORM = {
   youtube: { color: 'var(--c-youtube)', tag: 'Screening Room' },
   reddit: { color: 'var(--c-reddit)', tag: 'The Dispatch' },
   hackernews: { color: 'var(--c-hn)', tag: 'The Wire' },
+  github: { color: 'var(--c-github)', tag: 'GitHub' },
+  anime: { color: 'var(--c-anime)', tag: 'The Anime' },
 };
 
 function itemMeta(item) {
@@ -87,7 +89,7 @@ export default function FrontPage() {
       {lede && (
         <article
           className={`${s.lede} ${lede.thumbnail ? '' : s.ledeNoImage}`}
-          style={{ '--lede-c': PLATFORM[lede.platform].color }}
+          style={{ '--lede-c': PLATFORM[lede.platform]?.color || 'var(--signal)' }}
           onClick={() => open(lede)}
           data-kbd-tile
           tabIndex={0}
@@ -100,7 +102,7 @@ export default function FrontPage() {
           }}
         >
           <div>
-            <span className={s.ledeTag}>{PLATFORM[lede.platform].tag} — lead story</span>
+            <span className={s.ledeTag}>{PLATFORM[lede.platform]?.tag || 'Feed'} — lead story</span>
             <h2 className={s.ledeTitle}>{lede.title}</h2>
             {lede.extra?.selftext_preview && (
               <p className={s.ledeExcerpt}>{lede.extra.selftext_preview}</p>
@@ -129,7 +131,7 @@ export default function FrontPage() {
           <article
             key={item.id}
             className={s.colItem}
-            style={{ '--i': i, '--item-c': PLATFORM[item.platform].color }}
+            style={{ '--i': i, '--item-c': PLATFORM[item.platform]?.color || 'var(--signal)' }}
             onClick={() => open(item)}
             data-kbd-tile
             tabIndex={0}
@@ -141,7 +143,7 @@ export default function FrontPage() {
               }
             }}
           >
-            <span className={s.colTag}>{PLATFORM[item.platform].tag}</span>
+            <span className={s.colTag}>{PLATFORM[item.platform]?.tag || 'Feed'}</span>
             <SaveButton item={item} className={s.saveCorner} />
             <h3 className={s.colTitle}>{item.title}</h3>
             {item.platform === 'youtube' && item.thumbnail && (
