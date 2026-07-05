@@ -550,39 +550,46 @@
   margin: var(--space-6) 0 var(--space-2);
 }
 
-/* "Load more" for a shelf sits centred *below* the scroller — deliberately not a
-   child of .shelfRow, so it never lands mid-row and never interferes with the
-   row's horizontal wheel-scroll. */
-.shelfLoadMore {
+/* "Load more" end-cap tile — lives at the end of the shelf's scroller, after the
+   videos. In the two-row Projection grid it spans BOTH rows as one full-height
+   column (grid-row 1/-1) so: it never lands mid-row, it's reachable by 'l' from
+   either row via keyboard nav, and being a full-height column keeps the grid's
+   scroll geometry intact so horizontal wheel-scroll still works. */
+.loadMoreTile {
+  flex: none;
+  align-self: stretch;
+  scroll-snap-align: start;
+  min-width: 148px;
+  padding: 0 var(--space-4);
   display: flex;
-  justify-content: center;
-  margin-top: var(--space-3);
-}
-
-.loadMoreBtn {
-  display: inline-flex;
+  flex-direction: column;
   align-items: center;
-  gap: 6px;
-  padding: 8px 20px;
+  justify-content: center;
+  gap: 8px;
   cursor: pointer;
   color: var(--paper-faint);
   font-family: var(--font-mono);
   font-size: 12px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  background: color-mix(in oklab, var(--surface) 60%, transparent);
-  border: 1px solid var(--rule);
-  border-radius: 999px;
+  background: color-mix(in oklab, var(--surface) 55%, transparent);
+  border: 1px dashed var(--rule);
+  border-radius: var(--r-card, 12px);
   transition: color 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
 }
 
-.loadMoreBtn:hover:not(:disabled) {
-  color: var(--ink-strong, var(--paper));
-  border-color: var(--shelf-c, var(--signal));
-  transform: translateY(-1px);
+.shelfTall .loadMoreTile {
+  grid-row: 1 / -1;
+  justify-self: center;
 }
 
-.loadMoreBtn:disabled {
+.loadMoreTile:hover:not(:disabled) {
+  color: var(--ink-strong, var(--paper));
+  border-color: var(--shelf-c, var(--signal));
+  transform: translateY(-2px);
+}
+
+.loadMoreTile:disabled {
   cursor: default;
   opacity: 0.6;
 }
