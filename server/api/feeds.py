@@ -426,7 +426,11 @@ def youtube_search():
     if not q:
         return err("q required")
     try:
-        return ok(invidious.search(q))
+        page = int(request.args.get("page") or 1)
+    except ValueError:
+        page = 1
+    try:
+        return ok(invidious.search(q, page=page))
     except Exception as e:
         return err(f"Search failed: {e}", 502)
 

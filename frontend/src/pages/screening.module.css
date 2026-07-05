@@ -550,6 +550,41 @@
   margin: var(--space-6) 0 var(--space-2);
 }
 
+/* Trailing "load more" affordance inside a horizontal shelf row. Matches tile
+   height so it sits flush at the end of the scroller. */
+.loadMoreTile {
+  flex: none;
+  width: 132px;
+  align-self: stretch;
+  min-height: 152px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+  color: var(--paper-faint);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  background: color-mix(in oklab, var(--surface) 60%, transparent);
+  border: 1px dashed var(--rule);
+  border-radius: var(--radius-2, 10px);
+  transition: color 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+}
+
+.loadMoreTile:hover:not(:disabled) {
+  color: var(--ink-strong, var(--paper));
+  border-color: var(--shelf-c, var(--signal));
+  transform: translateY(-3px);
+}
+
+.loadMoreTile:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
 .plMeta {
   display: block;
   margin-top: 4px;

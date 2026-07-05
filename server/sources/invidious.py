@@ -237,19 +237,27 @@ def popular():
     return {"items": items, "stale": stale}
 
 
-def search(query):
+def search(query, page=1):
+    """One page of YouTube-wide video search via Invidious. `page` is 1-based;
+    Invidious returns a fresh slice of results per page (no continuation token),
+    so `has_more` is simply whether this page came back non-empty."""
     q = (query or "").strip()
     if not q:
-        return {"items": []}
+        return {"items": [], "page": page, "has_more": False}
+    page = max(1, int(page or 1))
 
     def fetch():
-        return _normalize_list(_api_get(f"/search?q={quote(q)}&type=video"))
+        return _normalize_list(_api_get(f"/search?q={quote(q)}&type=video&page={page}"))
 
-    items, stale = cache.cached(f"yt:inv:search:{q.lower()}", config.TTL_YT_RSS, fetch)
+    items, stale = cache.cached(f"yt:inv:search:{q.lower()}:{page}", config.TTL_YT_RSS, fetch)
+    # Invidious pages run ~20 results; a full-length page means there's very
+    # likely another. An empty page is the end.
+    has_more = len(items) >= 15
 
-    # Fuzzy fallback: if the API returned few results, try matching against
-    # the cached subscription feed (which may contain near-miss titles).
-    if len(items) < 5:
+    # Fuzzy fallback (first page only): if the API returned few results, augment
+    # with near-miss titles from the cached subscription feed. Later pages skip
+    # this — it isn't paginated and would repeat the same local hits.
+    if page == 1 and len(items) < 5:
         from .. import db
         subs = db.list_subscriptions("youtube")
         if subs:
@@ -266,7 +274,7 @@ def search(query):
                         seen_ids.add(hit_item["id"])
                         items.append(hit_item)
 
-    return {"items": items, "stale": stale}
+    return {"items": items, "page": page, "has_more": has_more, "stale": stale}
 
 
 def recommended(video_id):

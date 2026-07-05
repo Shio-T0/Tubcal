@@ -134,7 +134,8 @@ export function VideoTile({ item, onPlay, meta }) {
   );
 }
 
-function Shelf({ title, count, items, onPlay, allTo, onShuffle, shuffling, className, style }) {
+function Shelf({ title, count, items, onPlay, allTo, onShuffle, shuffling, className, style,
+                onLoadMore, hasMore, loadingMore }) {
   const rowRef = useHorizontalWheel();
   return (
     <section className={`${s.shelf} ${className || ''}`} style={style}>
@@ -156,6 +157,12 @@ function Shelf({ title, count, items, onPlay, allTo, onShuffle, shuffling, class
         {items.map((item) => (
           <VideoTile key={item.id} item={item} onPlay={onPlay} />
         ))}
+        {onLoadMore && hasMore && (
+          <button className={s.loadMoreTile} onClick={onLoadMore} disabled={loadingMore}>
+            <Plus size={18} />
+            {loadingMore ? 'loading…' : 'load more'}
+          </button>
+        )}
       </div>
     </section>
   );
@@ -187,6 +194,61 @@ function ChannelChips({ subs, onAdd, activeId }) {
   );
 }
 
+/** YouTube-wide search that accumulates pages (Invidious ?page=N), so a
+ *  "load more" button can extend results beyond the first page. */
+function useYoutubeSearch(query) {
+  const [pages, setPages] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    if (!query) {
+      setPages([]);
+      setError(null);
+      setLoading(false);
+      return undefined;
+    }
+    let alive = true;
+    setLoading(true);
+    setError(null);
+    setPages([]);
+    api(`/youtube/search?q=${encodeURIComponent(query)}&page=1`)
+      .then((d) => alive && (setPages([d]), setLoading(false)))
+      .catch((e) => alive && (setError(e.message), setLoading(false)));
+    return () => {
+      alive = false;
+    };
+  }, [query]);
+
+  const last = pages.length ? pages[pages.length - 1] : null;
+  const hasMore = !!last?.has_more;
+  const items = useMemo(() => {
+    const seen = new Set();
+    const out = [];
+    for (const p of pages) {
+      for (const it of p.items || []) {
+        if (seen.has(it.id)) continue;
+        seen.add(it.id);
+        out.push(it);
+      }
+    }
+    return out;
+  }, [pages]);
+
+  const loadMore = () => {
+    if (!hasMore || loadingMore || !query) return;
+    const next = (last?.page || pages.length) + 1;
+    setLoadingMore(true);
+    api(`/youtube/search?q=${encodeURIComponent(query)}&page=${next}`)
+      .then((d) => setPages((p) => [...p, d]))
+      .catch(() => {})
+      .finally(() => setLoadingMore(false));
+  };
+
+  return { items, loading, loadingMore, error, hasMore, loadMore };
+}
+
 export default function ScreeningRoom() {
   const navigate = useNavigate();
   const { subs } = useSubscriptions();
@@ -213,8 +275,10 @@ export default function ScreeningRoom() {
   // Real YouTube-wide search via Invidious (debounced), not just a local filter.
   const q = query.trim();
   const dq = useDebounced(q);
-  const search = useApi(`/youtube/search?q=${encodeURIComponent(dq)}`, dq.length > 0);
+  const search = useYoutubeSearch(dq);
   const searching = dq.length > 0;
+  // How many "picked for you" recommendations are revealed (grows on load-more).
+  const [projShown, setProjShown] = useState(20);
 
   const refresh = async () => {
     try {
@@ -230,7 +294,7 @@ export default function ScreeningRoom() {
   };
 
   const items = feed.data?.items || [];
-  const searchItems = search.data?.items || [];
+  const searchItems = search.items;
 
   const hero = !searching && items.length > 0 ? items[0] : null;
   const shelves = useMemo(() => {
@@ -248,7 +312,9 @@ export default function ScreeningRoom() {
 
   const liveItems = searching ? [] : (live.data?.items || []);
   const resumable = searching ? [] : (continueWatching.data?.items || []).slice(0, 12);
-  const projection = (discover.data?.items || []).filter((i) => i.id !== hero?.id).slice(0, 20);
+  const projectionAll = (discover.data?.items || []).filter((i) => i.id !== hero?.id);
+  const projection = projectionAll.slice(0, projShown);
+  const projHasMore = projShown < projectionAll.length;
   const random = (trending.data?.items || []).filter((i) => i.id !== hero?.id).slice(0, 12);
 
   return (
@@ -283,12 +349,19 @@ export default function ScreeningRoom() {
       {searching && (
         <>
           {search.error && <ErrorBox message={search.error} />}
-          {search.loading && !search.data && <Receiving label={`searching YouTube for “${dq}”`} />}
+          {search.loading && <Receiving label={`searching YouTube for “${dq}”`} />}
           {!search.loading && (
             <div className={s.grid}>
               {searchItems.map((item) => (
                 <VideoTile key={item.id} item={item} onPlay={setVideo} />
               ))}
+            </div>
+          )}
+          {!search.loading && search.hasMore && (
+            <div className={s.loadMoreWrap}>
+              <Button variant="ghost" onClick={search.loadMore} disabled={search.loadingMore}>
+                {search.loadingMore ? 'loading…' : 'Load more results'}
+              </Button>
             </div>
           )}
           {!search.loading && searchItems.length === 0 && (
@@ -374,6 +447,8 @@ export default function ScreeningRoom() {
           count={null}
           items={projection}
           onPlay={setVideo}
+          onLoadMore={() => setProjShown((n) => n + 12)}
+          hasMore={projHasMore}
           className={`${s.projection} ${s.shelfTall}`}
           style={{ '--shelf-c': '#5fa597' }}
         />
