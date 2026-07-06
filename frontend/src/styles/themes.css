@@ -34,6 +34,7 @@
   --c-reddit: #36ff6a;
   --c-hn: #36ff6a;
   --c-foryou: #aaffb8;
+  --c-editor: #36ff6a;
   --success: #36ff6a;
   --danger: #ff5555;
 
@@ -178,6 +179,7 @@
   --c-reddit: #0b4ee2;
   --c-hn: #d9a400;
   --c-foryou: #111111;
+  --c-editor: #1f7a3d;
   --success: #1f7a3d;
   --danger: #e2231a;
 
@@ -308,6 +310,7 @@
   --c-reddit: #6fb4ff;
   --c-hn: #8fd6e6;
   --c-foryou: #ffb454;
+  --c-editor: #5fd0a0;
   --success: #5fd0a0;
   --danger: #ff7a6b;
 
@@ -435,6 +438,7 @@
   --c-reddit: #ff7a2f;
   --c-hn: #f5a623;
   --c-foryou: #1a73e8;
+  --c-editor: #28c840;
   --success: #28c840;
   --danger: #ff5f57;
 
@@ -572,6 +576,7 @@
   --c-reddit: #ff8a5c;
   --c-hn: #ffd25c;
   --c-foryou: #22d3ee;
+  --c-editor: #34e2b0;
   --success: #34e2b0;
   --danger: #ff6b8b;
 

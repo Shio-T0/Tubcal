@@ -1,0 +1,47 @@
+/* No 08 — The Composing Room: page chrome around the workbench. */
+
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.colophon {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-2);
+}
+
+.rootChip {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--paper-dim);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-pill);
+  padding: 3px 10px;
+  background: var(--surface);
+}
+
+.caps {
+  display: flex;
+  gap: var(--space-2);
+}
+
+/* capability plates — small brass tags on the cabinet back */
+.cap {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--paper-faint);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  padding: 1px 6px;
+  opacity: 0.6;
+}
+.capOn {
+  color: var(--c-editor);
+  border-color: color-mix(in srgb, var(--c-editor) 40%, transparent);
+  opacity: 1;
+}

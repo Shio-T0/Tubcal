@@ -20,6 +20,9 @@ brain = [
     "faster-whisper>=1.0",
     "numpy>=1.26",
 ]
+editor = [
+    "flask-sock>=0.7.0",
+]
 
 [dependency-groups]
 dev = [

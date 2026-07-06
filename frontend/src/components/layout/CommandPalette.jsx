@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
-import { Bookmark, Clapperboard, CornerDownLeft, Hash, Newspaper, Play, Radio, ScrollText, Search, Settings } from 'lucide-react';
+import { Bookmark, Clapperboard, Code2, CornerDownLeft, Hash, Newspaper, Play, Radio, ScrollText, Search, Settings } from 'lucide-react';
 
 import { api } from '../../api/client.js';
 import { usePlayer } from '../../state.jsx';
@@ -13,6 +13,7 @@ const NAV = [
   { id: 'nav:/youtube', label: 'Screening Room', icon: <Clapperboard size={15} />, to: '/youtube' },
   { id: 'nav:/reddit', label: 'The Dispatch', icon: <Radio size={15} />, to: '/reddit' },
   { id: 'nav:/hackernews', label: 'The Wire', icon: <Hash size={15} />, to: '/hackernews' },
+  { id: 'nav:/editor', label: 'The Composing Room', icon: <Code2 size={15} />, to: '/editor' },
   { id: 'nav:/saved', label: 'Saved', icon: <Bookmark size={15} />, to: '/saved' },
   { id: 'nav:/settings', label: 'Settings', icon: <Settings size={15} />, to: '/settings' },
 ];

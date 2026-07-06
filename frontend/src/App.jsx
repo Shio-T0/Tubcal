@@ -26,6 +26,7 @@ const Archive = lazy(() => import('./pages/Archive.jsx'));
 const Anime = lazy(() => import('./pages/Anime.jsx'));
 const AnimeDetail = lazy(() => import('./pages/Anime.jsx').then(m => ({ default: m.AnimeDetail })));
 const Github = lazy(() => import('./pages/Github.jsx'));
+const Composer = lazy(() => import('./pages/Composer.jsx'));
 const SavedPage = lazy(() => import('./pages/SavedPage.jsx'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage.jsx'));
 
@@ -58,6 +59,7 @@ export default function App() {
             <Route path="/archive" element={<Archive />} />
             <Route path="/anime" element={<Anime />} />
             <Route path="/anime/:id" element={<AnimeDetail />} />
+            <Route path="/editor" element={<Composer />} />
             <Route path="/saved" element={<SavedPage />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />

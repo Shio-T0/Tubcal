@@ -5,7 +5,8 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
-      '/api': 'http://127.0.0.1:5000',
+      // ws:true so the Composing Room's PTY/LSP sockets proxy through in dev.
+      '/api': { target: 'http://127.0.0.1:5000', ws: true },
     },
   },
   build: {

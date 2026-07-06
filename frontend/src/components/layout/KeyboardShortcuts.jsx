@@ -18,6 +18,7 @@ const GOTO = {
   r: '/reddit',
   n: '/hackernews',
   w: '/hackernews',
+  c: '/editor',
   s: '/saved',
 };
 
@@ -98,6 +99,7 @@ export default function KeyboardShortcuts() {
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       if (typingInField(e.target)) return;
       if (document.body.dataset.playerExpanded) return; // the player owns the keys
+      if (document.body.dataset.editorFocused) return;  // the Composing Room owns the keys
 
       // second key of a chord started by `g`
       if (gPending.current && Date.now() - gPending.current < 1000) {

@@ -9,6 +9,10 @@ def create_app():
     from .api import register_blueprints
     register_blueprints(app)
 
+    # The Composing Room's terminal + LSP sockets (no-op without flask-sock).
+    from .editor import sockets as editor_sockets
+    editor_sockets.register(app)
+
     @app.after_request
     def cache_policy(resp):
         # API responses must never be cached; hashed build assets can be cached

@@ -112,6 +112,12 @@ CREATE TABLE IF NOT EXISTS feed_vectors (
 );
 CREATE INDEX IF NOT EXISTS idx_feed_vectors_time ON feed_vectors(published_at);
 
+CREATE TABLE IF NOT EXISTS editor_state (
+  key     TEXT PRIMARY KEY,                      -- 'session' | future keys
+  value   TEXT NOT NULL,                         -- JSON payload
+  updated INTEGER NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS editions (
   id       INTEGER PRIMARY KEY AUTOINCREMENT,
   date     TEXT NOT NULL UNIQUE,                -- 'YYYY-MM-DD' local
@@ -150,9 +156,14 @@ DEFAULT_SETTINGS = {
     "anime_sub_pref": "sub",      # 'sub' | 'dub'
     "anime_source_url": "",       # aggregator base URL (blank → config/env default)
     "anime_provider": "",         # adapter-specific provider hint (optional)
+    # The Composing Room (code editor): vim-driven CodeMirror over EDITOR_ROOT.
+    "editor_autosave": False,     # write buffers on blur/idle instead of only :w
+    "editor_leader": " ",         # vim <leader> key (space, like modern nvim rigs)
+    "editor_lsp_enabled": True,   # attach language servers when their binary exists
+    "editor_relative_lines": False,  # relative line numbers (hybrid: current abs)
     # Room configuration.
-    "active_rooms": ["edition", "frontpage", "youtube", "reddit", "hackernews", "archive", "anime"],
-    "max_active_rooms": 7,
+    "active_rooms": ["edition", "frontpage", "youtube", "reddit", "hackernews", "archive", "anime", "editor"],
+    "max_active_rooms": 8,
 }
 
 
@@ -237,6 +248,20 @@ def init_db():
                 "INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)",
                 (key, json.dumps(value)),
             )
+        # Migration: existing DBs seeded before The Composing Room have
+        # active_rooms without 'editor' and max_active_rooms stuck at 7,
+        # which would reject enabling the room. One-time bump for both.
+        row = con.execute("SELECT value FROM settings WHERE key='active_rooms'").fetchone()
+        if row:
+            rooms = json.loads(row["value"])
+            if "editor" not in rooms:
+                rooms.append("editor")
+                con.execute("UPDATE settings SET value=? WHERE key='active_rooms'",
+                            (json.dumps(rooms),))
+                mx = con.execute("SELECT value FROM settings WHERE key='max_active_rooms'").fetchone()
+                if mx and json.loads(mx["value"]) < len(rooms):
+                    con.execute("UPDATE settings SET value=? WHERE key='max_active_rooms'",
+                                (json.dumps(len(rooms)),))
     con.close()
     _ensure_incremental_vacuum()
     try:
@@ -329,6 +354,28 @@ def delete_setting(key):
     con = connect()
     with con:
         con.execute("DELETE FROM settings WHERE key=?", (key,))
+    con.close()
+
+
+# ---- editor (The Composing Room) ----
+# Session blobs (open tabs, cursor positions, pane layout) live in their own
+# tiny KV table so they don't pollute the user-facing settings payload.
+
+def editor_state_get(key, default=None):
+    con = connect()
+    row = con.execute("SELECT value FROM editor_state WHERE key=?", (key,)).fetchone()
+    con.close()
+    return json.loads(row["value"]) if row else default
+
+
+def editor_state_set(key, value):
+    con = connect()
+    with con:
+        con.execute(
+            "INSERT INTO editor_state (key, value, updated) VALUES (?, ?, ?) "
+            "ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated=excluded.updated",
+            (key, json.dumps(value), int(time.time())),
+        )
     con.close()
 
 

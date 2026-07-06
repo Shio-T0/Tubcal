@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { KeyRound, Library, Minus, Newspaper, Palette, Plus, Settings, Trash2, Rss, Tv, Volume2, Layout } from 'lucide-react';
+import { Code2, KeyRound, Library, Minus, Newspaper, Palette, Plus, Settings, Trash2, Rss, Tv, Volume2, Layout } from 'lucide-react';
 
 import { api, useApi } from '../api/client.js';
 import { SectionHead } from '../components/layout/Section.jsx';
@@ -496,6 +496,75 @@ function AnimeSettings() {
   );
 }
 
+function EditorSettings() {
+  const { settings, updateSettings } = useSettings();
+  const editorStatus = useApi('/editor/status');
+  const root = editorStatus.data?.root;
+
+  return (
+    <section className={`${s.section} glass`}>
+      <h2 className={s.sectionTitle}>
+        <Code2 size={17} /> The Composing Room
+      </h2>
+      <p className={s.sectionSub}>
+        The code editor over your local workspace{root ? <> (<code>{root}</code>)</> : null}.
+        Change the root with <code>TUBCAL_EDITOR_ROOT</code> in .env. Nothing leaves this machine.
+      </p>
+
+      <div className={s.row}>
+        <div>
+          <div className={s.rowLabel}>Language servers</div>
+          <div className={s.rowHint}>
+            Attach pyright / tsserver / rust-analyzer / clangd when they exist on PATH.
+            Off keeps the in-editor smarts only.
+          </div>
+        </div>
+        <SegmentedControl
+          options={[{ value: 'on', label: 'On' }, { value: 'off', label: 'Off' }]}
+          value={settings?.editor_lsp_enabled !== false ? 'on' : 'off'}
+          onChange={(v) => updateSettings({ editor_lsp_enabled: v === 'on' })}
+        />
+      </div>
+
+      <div className={s.row}>
+        <div>
+          <div className={s.rowLabel}>Autosave</div>
+          <div className={s.rowHint}>Write buffers shortly after you stop typing, instead of only on :w.</div>
+        </div>
+        <SegmentedControl
+          options={[{ value: 'on', label: 'On' }, { value: 'off', label: 'Off' }]}
+          value={settings?.editor_autosave ? 'on' : 'off'}
+          onChange={(v) => updateSettings({ editor_autosave: v === 'on' })}
+        />
+      </div>
+
+      <div className={s.row}>
+        <div>
+          <div className={s.rowLabel}>Line numbers</div>
+          <div className={s.rowHint}>Relative numbers make vim counts legible (current line stays absolute).</div>
+        </div>
+        <SegmentedControl
+          options={[{ value: 'abs', label: 'Absolute' }, { value: 'rel', label: 'Relative' }]}
+          value={settings?.editor_relative_lines ? 'rel' : 'abs'}
+          onChange={(v) => updateSettings({ editor_relative_lines: v === 'rel' })}
+        />
+      </div>
+
+      <div className={s.row}>
+        <div>
+          <div className={s.rowLabel}>Leader key</div>
+          <div className={s.rowHint}>The which-key menu opens on this key in normal mode.</div>
+        </div>
+        <SegmentedControl
+          options={[{ value: ' ', label: 'Space' }, { value: ',', label: ',' }, { value: '\\', label: '\\' }]}
+          value={settings?.editor_leader ?? ' '}
+          onChange={(v) => updateSettings({ editor_leader: v })}
+        />
+      </div>
+    </section>
+  );
+}
+
 function RoomsSettings() {
   const { settings, updateSettings } = useSettings();
   const toast = useToast();
@@ -686,6 +755,8 @@ export default function SettingsPage() {
         <ArchiveSettings />
 
         <AnimeSettings />
+
+        <EditorSettings />
 
         <section className={`${s.section} glass`}>
           <h2 className={s.sectionTitle}>

@@ -17,6 +17,7 @@ fetches to the platforms themselves.
 # one-time / after dependency changes
 uv sync                                   # backend deps (Python >= 3.12)
 uv sync --extra brain                     # + The Archive (faster-whisper, numpy)
+uv sync --extra editor                    # + Composing Room terminal/LSP (flask-sock)
 cd frontend && npm install                # frontend deps
 
 # run — single-port production mode (Flask serves frontend/dist)
@@ -112,6 +113,25 @@ and answers via a local Ollama server over plain HTTP (`llm.py`, no client lib).
 knowledge memory (the transcript corpus), not conversational memory — each answer is
 fresh. Requires the `brain` extra and a running Ollama server; degrades gracefully when
 absent.
+
+**The Composing Room (`server/api/editor.py` + `server/editor/` + `frontend/src/components/editor/`)**
+is the code editor room (No 08, route `/editor`): CodeMirror 6 with real modal vim
+(`@replit/codemirror-vim`), file tree, tabs/splits, go-to-file, project grep (rg with
+an os.walk fallback), git gutter/branch, a which-key leader menu, session restore
+(`editor_state` table), an integrated PTY terminal, and an optional LSP bridge.
+Security rule: every client path goes through `_safe()` in `server/api/editor.py`,
+which resolves against `config.EDITOR_ROOT` (env `TUBCAL_EDITOR_ROOT`, default
+`~/Projects`) and rejects escapes — traversal, absolute paths, and symlinks out.
+Writes are atomic (temp + `os.replace`) with an mtime precondition (409 on conflict;
+`:w!` forces). The terminal (`server/editor/terminal.py`) and LSP bridge
+(`server/editor/lsp.py`, stdio JSON-RPC ⇄ plain-JSON WebSocket frames) ride on
+`flask-sock` (`editor` extra) and degrade to a pure editor when absent; language
+servers are probed at launch (`lsp.available()` — `which` alone lies for rustup
+shims). The CM theme (`components/editor/cm/theme.js`) uses only `var(--token)`
+references so all skins restyle the buffer with zero JS; xterm's ANSI palette is
+rebuilt from tokens on `data-theme` mutation. While the room holds focus it sets
+`document.body.dataset.editorFocused` so the global vim nav stands down. Tests:
+`tests/test_editor.py` (containment is the part to keep green).
 
 **Frontend (`frontend/src/`):** React 19 + Vite, React Router. `state.jsx` holds all
 shared state as a stack of context providers (`useSettings`, `useSubscriptions`,

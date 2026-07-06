@@ -96,4 +96,11 @@ HOST_INTERVALS = {
 }
 
 # Room ids — mirrors frontend/src/lib/rooms.js ROOM_IDS.
-ROOM_IDS = ["edition", "frontpage", "youtube", "reddit", "hackernews", "archive", "anime", "github"]
+ROOM_IDS = ["edition", "frontpage", "youtube", "reddit", "hackernews", "archive", "anime", "editor", "github"]
+
+# The Composing Room (code editor): all filesystem access is hard-contained to
+# this root — every path from the client resolves inside it or the request 400s.
+EDITOR_ROOT = Path(os.environ.get("TUBCAL_EDITOR_ROOT", str(Path.home() / "Projects"))).resolve()
+EDITOR_MAX_FILE_BYTES = int(os.environ.get("TUBCAL_EDITOR_MAX_FILE_BYTES", str(4 * 1024 * 1024)))
+EDITOR_SEARCH_MAX_RESULTS = 500   # project-grep result cap
+EDITOR_SUBPROC_TIMEOUT = 20       # seconds — rg / git shell-outs

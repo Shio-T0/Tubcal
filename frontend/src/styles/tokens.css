@@ -32,6 +32,7 @@
   --c-foryou: #e6ab5e;
   --c-github: #9a8ec7;
   --c-anime: var(--signal);   /* The Anime room — adopts each skin's accent */
+  --c-editor: #9aae64;        /* The Composing Room — matcha, kin to --rail-2 */
   --success: #9aae64;
   --danger: #c75a44;
 
@@ -52,6 +53,9 @@
   --font-display: 'Fraunces Variable', georgia, serif;
   --font-body: 'Schibsted Grotesk Variable', system-ui, sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+  /* buffer text in the Composing Room — kept apart from --font-mono so a
+     ligature face can be swapped in without restyling every kicker */
+  --font-code: 'IBM Plex Mono', ui-monospace, monospace;
 
   /* spacing */
   --space-1: 4px;
@@ -103,6 +107,7 @@
   --c-foryou: #b06a26;
   --c-github: #7b6fa5;
   --c-anime: var(--signal);
+  --c-editor: #5e7338;
   --success: #5e7338;
   --danger: #b3361f;
 
