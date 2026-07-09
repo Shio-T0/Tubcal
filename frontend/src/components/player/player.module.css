@@ -187,18 +187,13 @@ a.title:hover {
   animation: msgPulse 1.4s ease-in-out infinite;
 }
 
-/* "Tuning in…" — a warm phosphor sweep + amber ring while the stream resolves. */
-.tuning {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-3);
-}
+/* A warm phosphor sweep behind the status readout while a stream resolves/buffers. */
 .tuningSweep {
   position: absolute;
   inset: 0;
   overflow: hidden;
   pointer-events: none;
+  border-radius: inherit;
   background: linear-gradient(
     100deg,
     transparent 30%,
@@ -212,19 +207,173 @@ a.title:hover {
   from { background-position: 140% 0; }
   to { background-position: -40% 0; }
 }
-.tuningRing {
-  width: 30px;
-  height: 30px;
+
+/* ── Stream status readout: a stepped "what it's doing / where it stopped" card
+   shown in the frame whenever the video isn't playing yet (resolving, buffering,
+   or failed). Warm phosphor while live; amber→danger when a stage stalls. ── */
+.status {
+  position: relative;
+  overflow: hidden;
+  width: min(300px, 82%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-5) var(--space-4);
+  border-radius: var(--r-media);
+  background: color-mix(in srgb, var(--paper) 4%, transparent);
+  border: 1px solid color-mix(in srgb, var(--paper) 9%, transparent);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
+}
+.statusFailed {
+  border-color: color-mix(in srgb, var(--danger) 45%, transparent);
+}
+
+.statusHead {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+}
+.statusHeadRing {
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
-  border: 3px solid color-mix(in srgb, var(--paper) 18%, transparent);
+  border: 3px solid color-mix(in srgb, var(--paper) 16%, transparent);
   border-top-color: var(--signal);
   animation: spin 0.8s linear infinite;
 }
-.tuningText {
+.statusHeadIcon {
+  color: var(--danger);
+}
+.statusHeadText {
   font-family: var(--font-mono);
   font-size: 12px;
   letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.statusSteps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.step {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: 12.5px;
+  font-family: var(--font-mono);
   color: var(--text-muted);
+  transition: color 0.2s ease;
+}
+.stepMark {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+}
+.stepLabel {
+  white-space: nowrap;
+}
+/* pending — dim, hollow pip */
+.stepPip {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  border: 1.5px solid color-mix(in srgb, var(--paper) 26%, transparent);
+}
+.step_pending {
+  color: var(--text-muted);
+  opacity: 0.75;
+}
+/* active — amber spinner, brightest label */
+.step_active {
+  color: var(--text-primary);
+}
+.step_active .stepMark {
+  color: var(--signal);
+}
+.stepSpin {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid color-mix(in srgb, var(--signal) 28%, transparent);
+  border-top-color: var(--signal);
+  animation: spin 0.7s linear infinite;
+}
+/* done — green check */
+.step_done {
+  color: var(--text-secondary);
+}
+.step_done .stepMark {
+  color: var(--success);
+  background: color-mix(in srgb, var(--success) 16%, transparent);
+}
+/* error — the stage that stopped */
+.step_error {
+  color: var(--text-primary);
+}
+.step_error .stepMark {
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 18%, transparent);
+}
+
+.statusDetail {
+  margin: 0;
+  max-width: 100%;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text-secondary);
+  word-break: break-word;
+}
+.statusAttempt {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+
+.statusActions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-1);
+}
+.retryBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 8px 18px;
+  border-radius: var(--r-pill);
+  border: 1px solid color-mix(in srgb, var(--signal) 55%, transparent);
+  background: color-mix(in srgb, var(--signal) 15%, transparent);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.05s ease;
+}
+.retryBtn:hover {
+  background: color-mix(in srgb, var(--signal) 26%, transparent);
+  border-color: var(--signal);
+}
+.retryBtn:active {
+  transform: translateY(1px);
+}
+.retryBtn > svg {
+  color: var(--signal);
 }
 
 /* ── fullscreen: the card fills the screen and sheds its docking chrome so the
@@ -252,13 +401,6 @@ a.title:hover {
 @keyframes msgPulse {
   0%, 100% { opacity: 0.5; }
   50% { opacity: 1; }
-}
-
-.frameError {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-3);
 }
 
 /* Quality picker in the expanded meta row. */

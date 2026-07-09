@@ -2,13 +2,16 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import {
+  AlertTriangle,
   CalendarClock,
+  Check,
   ExternalLink,
   GripVertical,
   Maximize2,
   Minimize2,
   PanelRight,
   Radio,
+  RotateCw,
   Volume2,
   VolumeX,
   X,
@@ -28,6 +31,78 @@ import s from './player.module.css';
 const MARGIN = 20;
 const GAP = 12;
 const BAR_H = 34;
+
+// The ordered stages a stream passes through before it plays. The status readout
+// walks these top-to-bottom so a failure shows exactly how far it got.
+const LOAD_STEPS = [
+  { key: 'resolve', label: 'Finding a stream' },
+  { key: 'buffer', label: 'Buffering video' },
+  { key: 'play', label: 'Playing' },
+];
+
+// In-frame status readout shown whenever a video isn't playing yet: a live
+// stepper while it loads, and — if a stage stalls — the reason plus a "Try again"
+// button that replays the whole pipeline. Replaces the old one-line placeholders
+// so the user can always see what it's doing and where it stopped.
+function StreamStatus({ status, attempt, onRetry, item }) {
+  const failed = status.state === 'error';
+  const curIdx = LOAD_STEPS.findIndex((st) => st.key === status.step);
+  const srcLabel = item.platform === 'youtube' ? 'Watch on YouTube' : 'Open source page';
+
+  return (
+    <div className={s.frameMsg}>
+      <div className={`${s.status} ${failed ? s.statusFailed : ''}`}>
+        {!failed && <span className={s.tuningSweep} aria-hidden="true" />}
+        <div className={s.statusHead}>
+          {failed ? (
+            <AlertTriangle className={s.statusHeadIcon} size={22} />
+          ) : (
+            <span className={s.statusHeadRing} aria-hidden="true" />
+          )}
+          <span className={s.statusHeadText}>
+            {failed ? 'Stream stopped' : status.step === 'resolve' ? 'Tuning in…' : 'Buffering…'}
+          </span>
+        </div>
+
+        <ol className={s.statusSteps}>
+          {LOAD_STEPS.map((st, i) => {
+            const state =
+              i < curIdx ? 'done' : i > curIdx ? 'pending' : failed ? 'error' : 'active';
+            return (
+              <li key={st.key} className={`${s.step} ${s[`step_${state}`]}`}>
+                <span className={s.stepMark} aria-hidden="true">
+                  {state === 'done' && <Check size={12} strokeWidth={3} />}
+                  {state === 'active' && <span className={s.stepSpin} />}
+                  {state === 'error' && <X size={12} strokeWidth={3} />}
+                  {state === 'pending' && <span className={s.stepPip} />}
+                </span>
+                <span className={s.stepLabel}>{st.label}</span>
+              </li>
+            );
+          })}
+        </ol>
+
+        {failed && status.detail && <p className={s.statusDetail}>{status.detail}</p>}
+        {attempt > 0 && (
+          <p className={s.statusAttempt}>
+            {failed ? `Attempt ${attempt + 1} failed` : `Attempt ${attempt + 1}…`}
+          </p>
+        )}
+
+        {failed && (
+          <div className={s.statusActions}>
+            <button type="button" className={s.retryBtn} onClick={onRetry}>
+              <RotateCw size={14} /> Try again
+            </button>
+            <a className={s.metaLink} href={item.url} target="_blank" rel="noopener noreferrer">
+              <ExternalLink size={13} /> {srcLabel}
+            </a>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 // One card per video. The <video> is always the same element in the same
 // position in the JSX, so toggling expanded/docked (which only changes inline
@@ -53,6 +128,9 @@ function PlayerCard({ item, expanded, style, dragging, muted, rate, roomForPanel
   const [quality, setQuality] = useState(0); // index into streams
   const [playErr, setPlayErr] = useState(null); // browser MediaError, if any
   const [info, setInfo] = useState(null); // metadata for the panel + live status
+  const [canPlay, setCanPlay] = useState(false); // first playable frame reached
+  const [attempt, setAttempt] = useState(0); // manual-retry counter; bumping re-runs the whole pipeline
+  const everPlayedRef = useRef(false); // has this source ever reached playable? (keeps controls up while re-buffering)
 
   const sapi = streamApi(item);
   const liveStatus = info?.live_status;
@@ -122,8 +200,20 @@ function PlayerCard({ item, expanded, style, dragging, muted, rate, roomForPanel
     return () => {
       alive = false;
     };
+    // `attempt` re-runs resolution when the user hits "Try again".
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [item.id]);
+  }, [item.id, attempt]);
+
+  // "Try again": re-run the entire pipeline from scratch — re-resolve the stream
+  // list, re-mount the <video>, and replay the stepped status so the user can see
+  // exactly where it gets to this time.
+  const retry = () => {
+    everPlayedRef.current = false;
+    setCanPlay(false);
+    setPlayErr(null);
+    setStreams(null);
+    setAttempt((n) => n + 1);
+  };
 
   // Flush the final position when this card unmounts (closed).
   useEffect(() => {
@@ -197,6 +287,7 @@ function PlayerCard({ item, expanded, style, dragging, muted, rate, roomForPanel
     if (!v || !active) return undefined;
     retryRef.current = 0; // fresh source — reset the per-source error retries
     setPlayErr(null);
+    setCanPlay(false); // re-enter "buffering" until this source yields a frame
     if (isHls) {
       const url = sapi.hls(active.itag);
       let hls = null;
@@ -246,8 +337,9 @@ function PlayerCard({ item, expanded, style, dragging, muted, rate, roomForPanel
     v.src = sapi.mp4(active.itag);
     v.play().catch(() => {});
     return undefined;
+    // `attempt` forces a fresh attach even when a retry re-resolves to the same source.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playKey]);
+  }, [playKey, attempt]);
 
   const retryRef = useRef(0);
   const onVideoError = (e) => {
@@ -268,6 +360,36 @@ function PlayerCard({ item, expanded, style, dragging, muted, rate, roomForPanel
     const codes = { 1: 'ABORTED', 2: 'NETWORK', 3: 'DECODE', 4: 'SRC_NOT_SUPPORTED' };
     setPlayErr(me ? `${codes[me.code] || me.code}${me.message ? ` — ${me.message}` : ''}` : 'unknown');
   };
+
+  // First playable frame — leave "buffering" and reveal the controls.
+  const onReady = () => {
+    everPlayedRef.current = true;
+    setCanPlay(true);
+  };
+
+  // Single source of truth for the load pipeline, driving the stepped status
+  // readout: which stage we're at and whether it stalled there.
+  const isAnime = item.platform === 'anime';
+  let loadStatus;
+  if (streams === null) {
+    loadStatus = { step: 'resolve', state: 'active' };
+  } else if (streams.length === 0) {
+    loadStatus = {
+      step: 'resolve',
+      state: 'error',
+      detail: isAnime
+        ? 'No playable stream was found for this episode.'
+        : 'No playable stream was found for this video.',
+    };
+  } else if (playErr) {
+    loadStatus = { step: 'buffer', state: 'error', detail: `Playback failed — ${playErr}.` };
+  } else if (!canPlay && !everPlayedRef.current) {
+    loadStatus = { step: 'buffer', state: 'active' };
+  } else {
+    loadStatus = { step: 'play', state: 'active' };
+  }
+  // Controls take over once we're playing; otherwise the status readout is shown.
+  const showControls = loadStatus.step === 'play';
 
   return (
     <div
@@ -373,6 +495,8 @@ function PlayerCard({ item, expanded, style, dragging, muted, rate, roomForPanel
               playsInline
               onTimeUpdate={onTimeUpdate}
               onLoadedMetadata={onLoadedMeta}
+              onLoadedData={onReady}
+              onCanPlay={onReady}
               onPause={onPauseFlush}
               onEnded={() => onEnded?.()}
               onRateChange={onRateEvt}
@@ -389,7 +513,7 @@ function PlayerCard({ item, expanded, style, dragging, muted, rate, roomForPanel
                 />
               ))}
             </video>
-            {!playErr && (
+            {showControls ? (
               <PlayerControls
                 expanded={expanded}
                 isLive={isLive}
@@ -411,35 +535,12 @@ function PlayerCard({ item, expanded, style, dragging, muted, rate, roomForPanel
                 canVolume={!muted}
                 onVolumePersist={setVolumePref}
               />
-            )}
-            {playErr && (
-              <div className={s.frameMsg}>
-                <div className={s.frameError}>
-                  <span>Playback failed ({playErr}).</span>
-                  <a className={s.metaLink} href={item.url} target="_blank" rel="noopener noreferrer">
-                    <ExternalLink size={13} /> {item.platform === 'youtube' ? 'Watch on YouTube' : 'Open source page'}
-                  </a>
-                </div>
-              </div>
+            ) : (
+              <StreamStatus status={loadStatus} attempt={attempt} onRetry={retry} item={item} />
             )}
           </>
         ) : (
-          <div className={s.frameMsg}>
-            {streams === null ? (
-              <div className={s.tuning}>
-                <span className={s.tuningSweep} aria-hidden="true" />
-                <span className={s.tuningRing} aria-hidden="true" />
-                <span className={s.tuningText}>Tuning in…</span>
-              </div>
-            ) : (
-              <div className={s.frameError}>
-                <span>Couldn’t load a stream for this video.</span>
-                <a className={s.metaLink} href={item.url} target="_blank" rel="noopener noreferrer">
-                  <ExternalLink size={13} /> Watch on YouTube
-                </a>
-              </div>
-            )}
-          </div>
+          <StreamStatus status={loadStatus} attempt={attempt} onRetry={retry} item={item} />
         )}
       </div>
 
