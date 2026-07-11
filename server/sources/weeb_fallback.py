@@ -1,4 +1,4 @@
-"""Desktop-only anime stream fallback via weeb-cli.
+"""Anime stream fallback via weeb-cli's aniworld provider.
 
 When the primary scraper (anipy / allanime) can't resolve a stream — e.g.
 allanime rotates its site crypto and no anipy release handles it yet — we fall
@@ -6,11 +6,13 @@ back to weeb-cli's ``aniworld`` provider, which carries EngSub / EngDub HLS
 streams from an entirely different source. Because two independent sites rarely
 break on the same day, this keeps anime playable through allanime outages.
 
-Scope: weeb-cli pulls native deps (curl_cffi, lxml) that have no Chaquopy
-wheels, so this path is **desktop-only** — on the Android build the import
-simply fails and the fallback is skipped (anime there waits for the anipy fix
-the auto-updater pulls). The import is lazy and fully guarded, so Tubcal runs
-fine whether or not weeb-cli is installed.
+Runs on both builds. Desktop uses the pip-installed weeb-cli; the Android build
+vendors a minimal aniworld subtree into app/src/main/python/weeb_cli (the
+aniworld path needs only requests + bs4, both already present — its heavy deps,
+curl_cffi/lxml, live only in providers we don't use). We instantiate the
+provider class directly (see _provider) instead of using weeb-cli's registry,
+whose filesystem discovery doesn't work under Chaquopy. The import is lazy and
+fully guarded, so Tubcal runs fine whether or not weeb-cli is present.
 
 The return shape matches ``anime_source.watch()`` exactly:
     {"sources": [{"url", "quality", "isM3U8"}], "subtitles": [...], "headers": {...}}
@@ -27,19 +29,24 @@ _PROVIDERS = ["aniworld"]
 
 
 def available():
-    """True if weeb-cli can be imported here (i.e. we're on the desktop build)."""
-    return _sdk() is not None
+    """True if a weeb-cli provider can be instantiated here."""
+    return any(_provider(p) is not None for p in _PROVIDERS)
 
 
-def _sdk():
+# Provider name -> its class. We instantiate the provider class directly rather
+# than going through weeb-cli's registry/SDK: the registry discovers providers by
+# scanning the providers directory with pkgutil.iter_modules, which finds nothing
+# under Chaquopy (Android), where modules are served from the APK asset zip and
+# aren't listed on disk until imported. A direct import both sidesteps discovery
+# and (via the module's @register_provider decorator) is harmless on desktop.
+def _provider(name):
     try:
-        from weeb_cli.sdk import WeebSDK
+        if name == "aniworld":
+            from weeb_cli.providers.de.aniworld import AniWorldProvider
+            return AniWorldProvider()
     except Exception:
         return None
-    try:
-        return WeebSDK(headless=True)
-    except Exception:
-        return None
+    return None
 
 
 def _ratio(a, b):
@@ -99,28 +106,30 @@ def _label(quality, server):
 def resolve(titles, episode_number, want_dub=False):
     """Resolve one episode's streams via weeb-cli, or None if unavailable / no
     match. ``titles`` is the candidate title list (romaji / english / native)."""
-    sdk = _sdk()
-    if not sdk or not titles:
+    if not titles:
         return None
     target = str(episode_number)
     for provider in _PROVIDERS:
+        prov = _provider(provider)
+        if not prov:
+            continue
         for title in titles:
             try:
-                results = sdk.search(title, provider=provider)
+                results = prov.search(title)
             except Exception:
                 results = []
             match = _best(results, titles) if results else None
             if not match:
                 continue
             try:
-                eps = sdk.get_episodes(match.id, provider=provider)
+                eps = prov.get_episodes(match.id)
             except Exception:
                 eps = []
             ep = next((e for e in eps if str(e.number) == target), None)
             if not ep:
                 continue
             try:
-                links = [l for l in sdk.get_streams(match.id, ep.id, provider=provider) if l.url]
+                links = [l for l in prov.get_streams(match.id, ep.id) if l.url]
             except Exception:
                 links = []
             if not links:

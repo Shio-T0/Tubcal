@@ -211,8 +211,8 @@ def _format_anipy(streams):
 
 
 def _fallback_watch(anilist_id, episode, want_dub):
-    """Desktop-only second source (weeb-cli). Returns a watch() payload or None.
-    Guarded so a runtime without weeb-cli (e.g. Android) just skips it."""
+    """Second source (weeb-cli's aniworld). Returns a watch() payload or None.
+    Guarded so a runtime without weeb-cli available just skips it."""
     if not anilist_id:
         return None
     try:
