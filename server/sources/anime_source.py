@@ -60,16 +60,18 @@ def _providers():
     return order
 
 
-def _encode_key(provider, identifier, episode, lang):
+def _encode_key(provider, identifier, episode, lang, anilist_id=None):
     """Opaque, URL-safe handle carrying everything watch() needs to re-resolve a
-    single episode without another search."""
-    payload = {"p": provider, "i": identifier, "e": episode, "l": lang}
+    single episode without another search. The AniList id is included so the
+    desktop fallback (weeb_fallback) can re-find the title on another source if
+    the primary scraper can't produce a stream."""
+    payload = {"p": provider, "i": identifier, "e": episode, "l": lang, "aid": anilist_id}
     return base64.urlsafe_b64encode(json.dumps(payload).encode()).decode()
 
 
 def _decode_key(key):
     d = json.loads(base64.urlsafe_b64decode(key.encode()).decode())
-    return d["p"], d["i"], d["e"], d.get("l", "sub")
+    return d["p"], d["i"], d["e"], d.get("l", "sub"), d.get("aid")
 
 
 def _titles(anilist_id):
@@ -98,7 +100,7 @@ def _best_match(results, titles):
     return results[0] if results else None
 
 
-def _resolve_episodes(titles):
+def _resolve_episodes(titles, anilist_id=None):
     """Search each provider in turn until one yields a matching entry with
     episodes; return the {episodes, total} payload."""
     get_provider, LanguageTypeEnum = _anipy()
@@ -129,7 +131,7 @@ def _resolve_episodes(titles):
             continue
         episodes = [
             {
-                "key": _encode_key(provider, match.identifier, ep, lang.value),
+                "key": _encode_key(provider, match.identifier, ep, lang.value, anilist_id),
                 "number": ep,
                 "title": f"Episode {ep}",
                 "image": None,
@@ -147,7 +149,7 @@ def info(anilist_id):
         raise RuntimeError("could not resolve a title for this anime")
     data, _ = cache.cached(
         f"anime:info:{anilist_id}", config.TTL_ANIME_EPISODES,
-        lambda: _resolve_episodes(titles),
+        lambda: _resolve_episodes(titles, anilist_id),
     )
     return data
 
@@ -157,16 +159,35 @@ def watch(key):
 
     Returns {sources:[{url,quality,isM3U8}], subtitles:[{url,lang}],
     headers:{Referer}} — the aggregator shape the proxy already forwards.
-    """
-    provider, identifier, episode, lang = _decode_key(key)
-    get_provider, LanguageTypeEnum = _anipy()
-    prov = get_provider(provider)
-    lang_enum = LanguageTypeEnum.DUB if lang == "dub" else LanguageTypeEnum.SUB
-    streams = prov.get_video(identifier, episode, lang_enum)
-    if not streams:
-        raise RuntimeError("no playable source for this episode")
-    streams = sorted(streams, key=lambda s: s.resolution or 0, reverse=True)
 
+    Tries the primary scraper (anipy) first; if it can't produce a stream — e.g.
+    allanime rotated its crypto and no anipy release handles it yet — falls back
+    to weeb_fallback (desktop-only). Raises only when both come up empty.
+    """
+    provider, identifier, episode, lang, anilist_id = _decode_key(key)
+    want_dub = lang == "dub"
+
+    streams = None
+    try:
+        get_provider, LanguageTypeEnum = _anipy()
+        prov = get_provider(provider)
+        lang_enum = LanguageTypeEnum.DUB if want_dub else LanguageTypeEnum.SUB
+        streams = prov.get_video(identifier, episode, lang_enum)
+    except Exception:
+        streams = None
+    if streams:
+        return _format_anipy(streams)
+
+    fallback = _fallback_watch(anilist_id, episode, want_dub)
+    if fallback and fallback.get("sources"):
+        return fallback
+
+    raise RuntimeError("no playable source for this episode")
+
+
+def _format_anipy(streams):
+    """Shape anipy's ProviderStream list into the watch() payload."""
+    streams = sorted(streams, key=lambda s: s.resolution or 0, reverse=True)
     referer = next((s.referrer for s in streams if s.referrer), None)
     sources = [
         {
@@ -185,6 +206,23 @@ def watch(key):
                 if url:
                     subtitles.append({"url": url, "lang": getattr(sub, "lang", None) or code})
             break
-
     headers = {"Referer": referer} if referer else {}
     return {"sources": sources, "subtitles": subtitles, "headers": headers}
+
+
+def _fallback_watch(anilist_id, episode, want_dub):
+    """Desktop-only second source (weeb-cli). Returns a watch() payload or None.
+    Guarded so a runtime without weeb-cli (e.g. Android) just skips it."""
+    if not anilist_id:
+        return None
+    try:
+        from . import weeb_fallback
+    except Exception:
+        return None
+    titles = _titles(anilist_id)
+    if not titles:
+        return None
+    try:
+        return weeb_fallback.resolve(titles, episode, want_dub)
+    except Exception:
+        return None
