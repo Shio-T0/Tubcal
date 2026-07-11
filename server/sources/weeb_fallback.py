@@ -58,6 +58,25 @@ def _best(results, titles):
     return results[0] if results else None
 
 
+def _fix_aniworld_lang(provider, quality):
+    """Correct a weeb-cli aniworld language mislabel.
+
+    AniWorld's data-lang-key is 1=GerDub, 2=EngSub ("mit Untertitel Englisch"),
+    3=GerSub ("mit Untertitel Deutsch"), but weeb-cli 3.0.0 hardcodes
+    {1:GerDub, 2:GerSub, 3:EngSub} — keys 2 and 3 swapped. The net effect is that
+    its EngSub/GerSub labels are inverted, so what it calls "EngSub" is really
+    German-subbed. Undo the swap so our English-first ranking picks the genuine
+    English track. weeb-cli is a pinned dep, so this holds until we bump it and
+    re-check (tracked against version 3.0.0)."""
+    if provider != "aniworld" or not quality:
+        return quality
+    if "EngSub" in quality:
+        return quality.replace("EngSub", "GerSub")
+    if "GerSub" in quality:
+        return quality.replace("GerSub", "EngSub")
+    return quality
+
+
 def _rank(quality, want_dub):
     """Sort key over a stream's quality tag: put the wanted English track first,
     English ahead of other languages."""
@@ -106,14 +125,16 @@ def resolve(titles, episode_number, want_dub=False):
                 links = []
             if not links:
                 continue
-            links.sort(key=lambda l: _rank(l.quality, want_dub))
+            # Correct weeb-cli's language mislabel before ranking/labelling.
+            tagged = [(_fix_aniworld_lang(provider, l.quality), l) for l in links]
+            tagged.sort(key=lambda t: _rank(t[0], want_dub))
             sources, referer = [], None
-            for l in links[:3]:
+            for quality, l in tagged[:3]:
                 headers = dict(l.headers or {})
                 referer = referer or headers.get("Referer") or headers.get("referer")
                 sources.append({
                     "url": l.url,
-                    "quality": _label(l.quality, l.server),
+                    "quality": _label(quality, l.server),
                     "isM3U8": ".m3u8" in l.url.lower(),
                 })
             if sources:
