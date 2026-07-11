@@ -1,4 +1,4 @@
-from server import brain, cache, config, db, notifier
+from server import brain, cache, config, db, notifier, updater
 from server import create_app
 
 
@@ -34,6 +34,10 @@ def _backfill_avatars():
 
 
 def main():
+    # Pull the latest anime-scraper fixes before anything imports it: allanime
+    # changes its crypto every so often and the fix ships as an anipy-api
+    # release. Best-effort — never blocks a normal (already-current) start.
+    updater.check_and_update()
     db.init_db()
     app = create_app()
     _warm_caches()

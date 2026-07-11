@@ -9,7 +9,7 @@ dependencies = [
     "feedparser>=6.0",
     "python-dotenv>=1.0",
     "rapidfuzz>=3.14.5",
-    "anipy-api>=3.8.13",
+    "anipy-api>=3.8.14",
 ]
 
 [project.optional-dependencies]
