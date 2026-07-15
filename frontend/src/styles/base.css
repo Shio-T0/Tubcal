@@ -165,6 +165,25 @@ h4 {
   }
 }
 
+/* ── The hand ──────────────────────────────────────────────────────────────
+   The shared ease for the "drawn by hand" reveal on the Anime detail page and
+   the voice actor's file. A pen accelerates away and settles; it never bounces
+   back, so this decelerates with no overshoot.
+
+   The reveal's @keyframes deliberately do NOT live here, even though this is
+   where shared keyframes belong. CSS Modules treats `animation-name` as a local
+   identifier: a .module.css file saying `animation: fadeUp ...` compiles to
+   `animation: _fadeUp_<hash>_1`, which matches no @keyframes declared out here,
+   so the animation silently never runs. (Every `animation: fadeUp` in this
+   codebase is inert for exactly that reason — a missing keyframe degrades to
+   "no animation", which is invisible unless you go looking.) Keyframes for the
+   reveal are therefore declared inside each module beside the rules that use
+   them. Custom properties like --hand are NOT scoped, so this one works fine
+   from here. */
+:root {
+  --hand: cubic-bezier(0.22, 0.68, 0.24, 1);
+}
+
 @keyframes fadeIn {
   from {
     opacity: 0;

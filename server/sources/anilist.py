@@ -160,10 +160,60 @@ def norm_media(m):
     }
 
 
+def _norm_characters(block):
+    """Character edges → a flat cast list, each with every credited voice actor.
+
+    AniList hangs one edge per character, carrying that character's voice actors
+    across *all* dubs at once (Luffy alone has Japanese, English and two Italian
+    VAs), so the language rides on each voice and the client offers the switch.
+
+    On names: `userPreferred` honours the connected account's own AniList
+    name-order setting, which is why it can read "Luffy D. Monkey" rather than
+    "Monkey D. Luffy". There is no fixing that here — AniList stores the given
+    name in `first` for Japanese and Western characters alike ("Eren"/"Yeager"),
+    so reversing would only break the other half. The native name carries the
+    true order, so the client shows it alongside.
+    """
+    out = []
+    for e in ((block or {}).get("edges") or []):
+        n = e.get("node") or {}
+        if not n.get("id"):
+            continue
+        nm = n.get("name") or {}
+        voices = []
+        for r in (e.get("voiceActorRoles") or []):
+            va = r.get("voiceActor") or {}
+            if not va.get("id"):
+                continue
+            vn = va.get("name") or {}
+            voices.append({
+                "id": va["id"],
+                "name": vn.get("userPreferred") or vn.get("full"),
+                "native": vn.get("native"),
+                "image": (va.get("image") or {}).get("large"),
+                "language": va.get("languageV2"),
+                "favourites": va.get("favourites"),
+                # "Young", "eps 299-319" — the texture that makes a cast list read.
+                "notes": r.get("roleNotes"),
+                "dub_group": r.get("dubGroup"),
+            })
+        out.append({
+            "id": n["id"],
+            "name": nm.get("userPreferred") or nm.get("full"),
+            "native": nm.get("native"),
+            "image": (n.get("image") or {}).get("large"),
+            "role": e.get("role"),
+            "favourites": n.get("favourites"),
+            "voices": voices,
+        })
+    return out
+
+
 def _norm_detail(m):
     base = norm_media(m)
     if not base:
         return None
+    base["characters"] = _norm_characters(m.get("characters"))
     base["tags"] = [
         {"name": t["name"], "rank": t.get("rank")}
         for t in (m.get("tags") or [])
@@ -342,6 +392,12 @@ def media(media_id, token=None):
         + " mediaListEntry { id repeat notes startedAt { year month day }"
           " completedAt { year month day } }"
         + " tags { name rank isMediaSpoiler }"
+        # ROLE first so mains lead; 24 is a full programme without a second page.
+        + " characters(sort:[ROLE,RELEVANCE,ID],perPage:24) { edges { role"
+          " node { id name { userPreferred native } image { large } favourites }"
+          " voiceActorRoles(sort:[RELEVANCE,ID]) { roleNotes dubGroup"
+          " voiceActor { id name { userPreferred native } image { large }"
+          " languageV2 favourites } } } }"
         + " relations { edges { relationType node {" + _MEDIA + "} } }"
         + " recommendations(sort:RATING_DESC,perPage:12){ nodes { rating mediaRecommendation {" + _MEDIA + "} } }"
         + " streamingEpisodes { title thumbnail url site }"
@@ -356,6 +412,94 @@ def media(media_id, token=None):
         return _norm_detail(d.get("Media"))
 
     data, _ = cache.cached(key, config.TTL_ANILIST_MEDIA, fetch)
+    return data
+
+
+def _fuzzy_year(d):
+    """AniList FuzzyDate → (year, month, day) with None where unknown. A birthday
+    is very often day+month with no year, which is a fact worth keeping, not a
+    reason to throw the date away."""
+    if not d or not any(d.get(k) for k in ("year", "month", "day")):
+        return None
+    return {"year": d.get("year"), "month": d.get("month"), "day": d.get("day")}
+
+
+def _norm_staff(s):
+    """AniList Staff → the voice actor dossier.
+
+    `characterMedia` is the useful edge for a seiyuu: it yields one entry per
+    (show, role) with the characters they voiced in it, which is what a filmography
+    actually is. `staffMedia` would give production credits instead.
+    """
+    if not s:
+        return None
+    nm = s.get("name") or {}
+    roles = []
+    for e in ((s.get("characterMedia") or {}).get("edges") or []):
+        media = norm_media(e.get("node"))
+        if not media:
+            continue
+        roles.append({
+            "role": e.get("characterRole"),
+            "media": media,
+            "characters": [
+                {
+                    "id": c.get("id"),
+                    "name": (c.get("name") or {}).get("userPreferred"),
+                    "native": (c.get("name") or {}).get("native"),
+                    "image": (c.get("image") or {}).get("large"),
+                    "favourites": c.get("favourites"),
+                }
+                for c in (e.get("characters") or []) if c
+            ],
+        })
+    years = s.get("yearsActive") or []
+    return {
+        "id": s.get("id"),
+        "name": nm.get("userPreferred") or nm.get("full"),
+        "native": nm.get("native"),
+        # AniList stores these comma-joined inside one string often enough that
+        # the client splits defensively; keep whatever came back.
+        "aliases": [a for a in (nm.get("alternative") or []) if a],
+        "image": (s.get("image") or {}).get("large"),
+        "description": s.get("description"),
+        "language": s.get("languageV2"),
+        "occupations": s.get("primaryOccupations") or [],
+        "gender": s.get("gender"),
+        "age": s.get("age"),
+        "home_town": s.get("homeTown"),
+        "blood_type": s.get("bloodType"),
+        "birth": _fuzzy_year(s.get("dateOfBirth")),
+        "death": _fuzzy_year(s.get("dateOfDeath")),
+        # [start] while still working, [start, end] once they've stopped.
+        "years_active": {"start": years[0] if years else None,
+                         "end": years[1] if len(years) > 1 else None},
+        "favourites": s.get("favourites"),
+        "site_url": s.get("siteUrl"),
+        "roles": roles,
+    }
+
+
+def staff(staff_id, token=None):
+    """One voice actor / staff member, with their voiced filmography."""
+    query = (
+        "query ($id:Int){ Staff(id:$id){"
+        " id name { userPreferred native alternative } image { large }"
+        " languageV2 primaryOccupations gender age homeTown bloodType"
+        " yearsActive favourites siteUrl"
+        " dateOfBirth { year month day } dateOfDeath { year month day }"
+        " description(asHtml:false)"
+        " characterMedia(sort:[POPULARITY_DESC],perPage:30){ edges { characterRole"
+        " node {" + _MEDIA + "}"
+        " characters { id name { userPreferred native } image { large } favourites } } }"
+        "} }"
+    )
+
+    def fetch():
+        d = _post(query, {"id": staff_id}, token=token)
+        return _norm_staff(d.get("Staff"))
+
+    data, _ = cache.cached(f"anilist:staff:{staff_id}", config.TTL_ANILIST_STAFF, fetch)
     return data
 
 
@@ -377,8 +521,12 @@ def user_lists(token):
                 "status": lst.get("status"),
                 "custom": lst.get("isCustomList"),
                 "entries": [
+                    # updated_at is AniList's own "entry last touched" stamp (epoch
+                    # seconds) — the closest thing to "when did I last watch this",
+                    # since progress bumps (including Tubcal's auto-mark) write it.
                     {"entry_id": e["id"], "status": e.get("status"), "score": e.get("score"),
-                     "progress": e.get("progress"), "media": norm_media(e.get("media"))}
+                     "progress": e.get("progress"), "updated_at": e.get("updatedAt"),
+                     "media": norm_media(e.get("media"))}
                     for e in lst.get("entries", []) if e.get("media")
                 ],
             })

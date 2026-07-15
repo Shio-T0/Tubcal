@@ -60,6 +60,17 @@ def media(media_id):
         return err(f"AniList media failed: {e}", 502)
 
 
+@anime_bp.get("/staff/<int:staff_id>")
+def staff(staff_id):
+    try:
+        data = anilist.staff(staff_id, token=_token())
+        if not data:
+            return err("not found", 404)
+        return ok(data)
+    except Exception as e:
+        return err(f"AniList staff failed: {e}", 502)
+
+
 @anime_bp.get("/lists")
 def lists():
     try:

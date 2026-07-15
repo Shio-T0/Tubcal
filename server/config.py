@@ -50,6 +50,7 @@ TTL_YT_DISCOVER = 900  # Invidious trending/popular — the "random video" pool
 TTL_ANILIST_SEARCH = 600
 TTL_ANILIST_BROWSE = 1800
 TTL_ANILIST_MEDIA = 3600
+TTL_ANILIST_STAFF = 21600  # a seiyuu's dossier changes far more slowly than a season
 TTL_ANILIST_LIST = 60  # short so list/progress edits reflect quickly
 TTL_ANILIST_THREADS = 300
 TTL_ANIME_EPISODES = 600  # aggregator episode list

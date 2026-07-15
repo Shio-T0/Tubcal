@@ -5,11 +5,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## What this is
 
 Tubcal is a single-user, localhost-only media hub: one Flask backend (bound to
-`127.0.0.1`) that aggregates YouTube, Reddit, Hacker News, and anime (AniList)
-into a React SPA, plus an optional fully-local AI "second brain" (The Archive)
-over watched videos. There is no multi-user concept, no auth beyond optional
-per-provider OAuth, and no cloud component — the only outbound traffic is direct
-fetches to the platforms themselves.
+`127.0.0.1`) that aggregates YouTube, Reddit, Hacker News, GitHub, and anime
+(AniList) into a React SPA, plus an optional fully-local AI "second brain" (The
+Archive) over watched videos and a code-editor room (The Composing Room). There
+is no multi-user concept, no auth beyond optional per-provider OAuth, and no
+cloud component — the only outbound traffic is direct fetches to the platforms
+themselves.
+
+Every feature is a numbered "room". `frontend/src/lib/rooms.js` is the canonical
+registry (id, label, color token, route, `default_enabled`) — the numbers users
+see are computed from list position, not hardcoded, so adding a room means adding
+an entry there plus a page in `pages/`. Rooms are reorderable and toggleable in
+Settings → Rooms; GitHub is the one that ships off by default.
 
 ## Commands
 
@@ -46,10 +53,16 @@ response is wrapped `{ok, data}` / `{ok, error}` by `server/api/__init__.py`'s
 `ok()`/`err()` helpers, and the client unwraps `data` or throws on `ok === false`.
 `/api/*` responses are forced `Cache-Control: no-store`; everything else is the SPA.
 
-**Entrypoint (`main.py`):** `db.init_db()` → `create_app()` → warm the "picked for
-you" cache and backfill channel avatars in background threads → start the notifier
-and brain workers → `app.run()`. Background warming exists so slow shelves are ready
-before first request.
+**Entrypoint (`main.py`):** `updater.check_and_update()` → `db.init_db()` →
+`create_app()` → warm the "picked for you" cache and backfill channel avatars in
+background threads → start the notifier and brain/edition workers → `app.run()`.
+Background warming exists so slow shelves are ready before first request.
+`server/updater.py` upgrades `anipy-api` in place from PyPI on startup (allanime
+rotates its site crypto and the fix ships as a release); it must run *before*
+anything imports anipy, is best-effort/offline-safe, and honors
+`TUBCAL_AUTO_UPDATE=0`. `server/notifier.py` polls upcoming subscribed streams and
+fires a `notify-send` desktop ping ~10 min before one goes live (no-op if
+`notify-send` is absent).
 
 **Caching (`server/cache.py`) is central.** Two layers (in-memory dict + a `cache`
 table in SQLite) so caches survive restarts. Key functions: `cached(key, ttl,
@@ -77,10 +90,22 @@ no ORM.
   `get_discover()` builds "The Projection" recommendation shelf from watch history.
 - `reddit.py` — anonymous access is RSS-only (Reddit blocks anonymous JSON), so
   logged-out data is degraded; OAuth upgrades it. Threaded comments.
-- `hackernews.py` — Firebase API + Algolia search.
+- `hackernews.py` — Firebase API + Algolia search. It is the reference pattern for
+  a source adapter: `normalize(item)` / `get_feed()` / `search()` / `get_item()`,
+  each wrapped in `cache.cached()`.
+- `github.py` — public REST API (repos, releases, activity), following the
+  hackernews shape. Unauthenticated GitHub allows only 60 req/hr/IP, so cache
+  hard; a classic PAT in the `github_token` setting (or `TUBCAL_GITHUB_TOKEN`)
+  raises it to 5000. There is no OAuth flow for GitHub — the token is pasted in.
 - `anilist.py` — GraphQL; reads cached, user writes (progress sync) uncached.
   AniList now 403s *unauthenticated* reads, so `_post` falls back to the connected
-  account's OAuth token when a caller passes none.
+  account's OAuth token when a caller passes none. `media()` carries the cast
+  (characters + every dub's voice actors, so the client owns the language switch);
+  `staff()` backs the voice-actor dossier at `/anime/voice/:id`. Names come from
+  `userPreferred`, which honours the account's own name-order setting — it can read
+  "Luffy D. Monkey", and there is no fixing it here, since AniList stores the given
+  name in `first` for Japanese and Western characters alike. The native name is
+  rendered alongside because it carries the true order.
 - `anime_source.py` — resolves the episode list + playable streams with `anipy_api`
   (the allanime/animekai scraper Shou uses); no external aggregator needed. It maps
   the AniList id to a title via `anilist.media`, searches the provider, and returns
@@ -91,6 +116,16 @@ no ORM.
   POSTs and, once past `ANIME_WATCHED_PERCENT` (default 90), advances AniList
   progress via `anilist.mark_episode_watched` (advance-only, in a background
   thread, once per episode per run) — no extra client call.
+- `weeb_fallback.py` — second anime scraper (weeb-cli's `aniworld` provider,
+  EngSub/EngDub HLS). `anime_source.watch()` falls back to it when anipy/allanime
+  can't resolve, and it returns the identical `{sources,subtitles,headers}` shape
+  so nothing downstream special-cases it. Two independent sites rarely break the
+  same day — that redundancy is the whole point. Imports are lazy and guarded; the
+  provider class is instantiated directly rather than via weeb-cli's registry,
+  whose `pkgutil` discovery finds nothing under Chaquopy on the Android build.
+- `fuzzy.py` — rapidfuzz scoring over recently cached feed items, used as a
+  fallback when a platform's own search returns little or nothing, so a near-miss
+  query still lands without another API hit.
 - `mixer.py` — deterministic weighted round-robin that interleaves platforms into
   the Front Page "For You" feed.
 
@@ -136,10 +171,20 @@ rebuilt from tokens on `data-theme` mutation. While the room holds focus it sets
 **Frontend (`frontend/src/`):** React 19 + Vite, React Router. `state.jsx` holds all
 shared state as a stack of context providers (`useSettings`, `useSubscriptions`,
 `usePlayer`, `useProgress`, `useSaved`, `useAnimeSync`) wrapped by `AppProviders`.
-One page component per "room" in `pages/` (FrontPage, ScreeningRoom, Dispatch, Wire,
-Archive, Anime), CSS Modules per page/component, design tokens in `styles/tokens.css`
-and `styles/themes.css`. Two themes (`dark`/`light`); the saved theme is injected
-server-side into `index.html` on first paint. The video player (`components/player/`)
+One page component per "room" in `pages/` (Edition, FrontPage, ScreeningRoom,
+Dispatch, Wire, Archive, Anime, Composer, Github, plus SavedPage and SettingsPage),
+all lazy-loaded and routed in `App.jsx` — keep the route, the `pages/` component, and
+the `lib/rooms.js` entry in sync. CSS Modules per page/component, design tokens in `styles/tokens.css`
+and `styles/themes.css`. Skins are a registry in `lib/themes.js` (`dark`, `light`,
+`terminal`, `bauhaus`, `blueprint`, `aqua`, `space`) — each is a `[data-theme]`
+block overriding tokens, so component CSS restyles for free via `var(--token)`;
+the saved theme is injected server-side into `index.html` on first paint. Note
+`dark`/`light` are not the only two: `bauhaus` and `aqua` are light-backed as well
+(`--ink` is the background), which matters for anything reading `color-scheme`. A room's view state (active tab,
+filters, search) belongs in the query string, not `useState` — opening a detail
+route unmounts the room, so local state is lost on back. `useParamState` in
+`pages/Anime.jsx` is the reference: it writes with `replace` (a filter toggle is
+not a destination) and drops default values from the URL. The video player (`components/player/`)
 uses `hls.js`. Full keyboard nav + command palette in `components/layout/`.
 
 ## Conventions
@@ -152,3 +197,8 @@ uses `hls.js`. Full keyboard nav + command palette in `components/layout/`.
   DB `settings` table and read via `db.get_setting()`.
 - Tests point the app at a throwaway DB via the `client` fixture in `tests/conftest.py`
   (monkeypatches `config.DB_PATH`); tests never touch `data/tubcal.db`.
+- Heavy or native dependencies (anipy, weeb-cli, rapidfuzz, numpy, faster-whisper,
+  flask-sock) are imported lazily inside the function that needs them and guarded by
+  try/except, so minimal runtimes — including the Android/Chaquopy build — still boot
+  with the feature simply reporting itself unavailable. Never import them at module
+  top level.

@@ -1,0 +1,801 @@
+/* The voice actor's personnel file.
+   A third texture, on purpose: the media page is banner art and the cast sheet is
+   a dotted programme, so this one is a paper record — a mounted photo, a ruled
+   ledger, typed notes. Everything is var(--token), so all seven skins reskin it. */
+
+.back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: var(--space-4);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--paper-faint);
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+.back:hover {
+  color: var(--c-anime);
+}
+
+/* ── The hand ──────────────────────────────────────────────────────────────
+   The file is assembled in front of you, in the order a clerk would do it: the
+   record is set down, the photograph comes up in the tray and is mounted at its
+   corners, the identity is typed in, the ledger is ruled line by line, and the
+   stamp is franked on last. The whole sequence runs about 1.4s, and every
+   duration collapses under prefers-reduced-motion.
+
+   The keyframes are declared here rather than shared from base.css because CSS
+   Modules scopes `animation-name` — a module pointing at a global @keyframes
+   compiles to a hashed name that matches nothing, and the animation silently
+   never runs. See the note in base.css. */
+
+/* Type written across, left to right. */
+@keyframes handInk {
+  from {
+    opacity: 0;
+    clip-path: inset(0 100% 0 0);
+  }
+  55% {
+    opacity: 1;
+  }
+  to {
+    opacity: 1;
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+/* Lifted off the page and set down. */
+@keyframes handSet {
+  from {
+    opacity: 0;
+    transform: translateY(7px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* A photograph coming up in the tray: it arrives colourless and settles. */
+@keyframes handDevelop {
+  from {
+    opacity: 0;
+    filter: saturate(0.15) contrast(0.92) brightness(1.06);
+  }
+  to {
+    opacity: 1;
+    filter: none;
+  }
+}
+
+.file {
+  --file-bg: color-mix(in srgb, var(--c-anime) 3%, var(--ink-2));
+}
+.file > * {
+  animation: handSet 0.55s var(--hand) both;
+}
+.file > *:nth-child(1) {
+  animation-delay: 0.02s;
+}
+.file > *:nth-child(2) {
+  animation-delay: 0.42s;
+}
+.file > *:nth-child(3) {
+  animation-delay: 0.5s;
+}
+
+/* ── The record head ─────────────────────────────────────────────────────── */
+
+.head {
+  --art-c: var(--c-anime);
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  display: flex;
+  gap: var(--space-6);
+  padding: var(--space-5);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-card);
+  background: var(--file-bg);
+  /* A faint ruled grain, like the lined stock a file is typed onto. Sits under
+     everything at 1.6% — you read it as texture, never as lines. */
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0 27px,
+    color-mix(in srgb, var(--paper) 1.6%, transparent) 27px 28px
+  );
+}
+
+/* The show they're known for, bled in from the right.
+   Three things keep this a file rather than a hero banner: it never crosses the
+   text, because the mask fades it out well before the ledger; it is desaturated
+   and dimmed, so it sits *under* the record like a watermark; and it is tinted
+   with the show's own AniList cover colour, so the backdrop belongs to that
+   series rather than to a generic dark wash. */
+.headArt {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-size: cover;
+  background-position: center 22%;
+  opacity: 0.22;
+  filter: saturate(0.7) contrast(1.05);
+  /* Two masks, intersected: fade out to the left before the name, and fade down
+     the vertical so the art thins where the ledger's right-hand column lands.
+     What's left is a bleed in the top-right corner — art where there's room for
+     it, paper where there are facts to read. */
+  -webkit-mask-image: linear-gradient(to left, #000 0%, rgb(0 0 0 / 0.5) 42%, transparent 78%),
+    linear-gradient(to top, rgb(0 0 0 / 0.18) 0%, rgb(0 0 0 / 0.5) 38%, #000 78%);
+  -webkit-mask-composite: source-in;
+  mask-image: linear-gradient(to left, #000 0%, rgb(0 0 0 / 0.5) 42%, transparent 78%),
+    linear-gradient(to top, rgb(0 0 0 / 0.18) 0%, rgb(0 0 0 / 0.5) 38%, #000 78%);
+  mask-composite: intersect;
+  pointer-events: none;
+}
+/* Wash the show's colour over the art so it reads as one atmosphere. */
+.headArt::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to left,
+    color-mix(in srgb, var(--art-c) 40%, transparent),
+    transparent 70%
+  );
+  mix-blend-mode: overlay;
+}
+/* No banner on file: the portrait cover has to be blown up to fill, so blur it
+   hard — at that scale it's a colour field, and pretending otherwise looks cheap. */
+.headArtCover {
+  filter: saturate(0.7) blur(22px);
+  transform: scale(1.15);
+  opacity: 0.3;
+}
+
+/* ── The commemorative stamp ─────────────────────────────────────────────────
+   Franked over the backdrop: the part they're known for, issued as a stamp.
+
+   The perforations are punched out of the card's own silhouette with a mask —
+   a solid layer, then a half-circle repeated along each edge, subtracted with
+   mask-composite. That matters: the teeth are holes, so the backdrop art shows
+   *through* them, and the drop-shadow (applied to the wrapper, which is why the
+   shadow is on the wrapper and not the card) traces the scallops instead of a
+   plain rectangle. A dotted border would fake the look and betray itself the
+   moment it crossed anything. */
+
+.stampWrap {
+  display: none; /* only once there's a gutter to hold it — see the media query */
+  position: absolute;
+  top: 17%;
+  bottom: 21%; /* → a whisker over 60% of the record's height */
+  right: 38px;
+  /* Explicit, not aspect-ratio: an abspos box with top/bottom/right but no left
+     shrink-to-fits its width from content, and the content is width:100% of this
+     box — circular, so it resolves to nothing and the stamp vanishes. Height comes
+     from top/bottom; this width holds it near a 4:5 stamp at the usual heights. */
+  width: 172px;
+  transform: rotate(-3deg);
+  /* drop-shadow follows the punched alpha; box-shadow would square it off. */
+  filter: drop-shadow(0 8px 20px rgb(0 0 0 / 0.5));
+  pointer-events: none;
+  /* Franked last, once there's a record to frank. */
+  animation: frankOn 0.42s var(--hand) 1.3s both;
+}
+@keyframes frankOn {
+  from {
+    opacity: 0;
+    transform: rotate(-3deg) scale(1.5);
+  }
+  70% {
+    opacity: 1;
+  }
+  to {
+    opacity: 1;
+    transform: rotate(-3deg) scale(1);
+  }
+}
+
+.stampCard {
+  --hole: 4.5px;
+  --pitch: 15px;
+  width: 100%;
+  height: 100%;
+  padding: 7px;
+  /* Stamp stock. --paper is the skin's ink colour, so this stays a light stamp on
+     the night skins and flips to a dark one on the day skins, as it should. */
+  background: color-mix(in srgb, var(--paper) 92%, var(--ink));
+  -webkit-mask-image: linear-gradient(#000 0 0),
+    radial-gradient(circle var(--hole) at 50% 0%, #000 97%, transparent 100%),
+    radial-gradient(circle var(--hole) at 50% 100%, #000 97%, transparent 100%),
+    radial-gradient(circle var(--hole) at 0% 50%, #000 97%, transparent 100%),
+    radial-gradient(circle var(--hole) at 100% 50%, #000 97%, transparent 100%);
+  -webkit-mask-size: 100% 100%, var(--pitch) var(--pitch), var(--pitch) var(--pitch),
+    var(--pitch) var(--pitch), var(--pitch) var(--pitch);
+  -webkit-mask-repeat: no-repeat, repeat-x, repeat-x, repeat-y, repeat-y;
+  -webkit-mask-position: 0 0, 0 0, 0 100%, 0 0, 100% 0;
+  -webkit-mask-composite: xor;
+  mask-image: linear-gradient(#000 0 0),
+    radial-gradient(circle var(--hole) at 50% 0%, #000 97%, transparent 100%),
+    radial-gradient(circle var(--hole) at 50% 100%, #000 97%, transparent 100%),
+    radial-gradient(circle var(--hole) at 0% 50%, #000 97%, transparent 100%),
+    radial-gradient(circle var(--hole) at 100% 50%, #000 97%, transparent 100%);
+  mask-size: 100% 100%, var(--pitch) var(--pitch), var(--pitch) var(--pitch),
+    var(--pitch) var(--pitch), var(--pitch) var(--pitch);
+  mask-repeat: no-repeat, repeat-x, repeat-x, repeat-y, repeat-y;
+  mask-position: 0 0, 0 0, 0 100%, 0 0, 100% 0;
+  mask-composite: exclude;
+}
+
+/* The printed area, inset from the perforated margin like real intaglio. */
+.stampInner {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  border: 1px solid color-mix(in srgb, var(--ink) 45%, transparent);
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
+}
+.stampFace {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  object-fit: cover;
+  object-position: center 14%;
+  /* Aged a touch so the print belongs to the paper rather than sitting on it. */
+  filter: saturate(0.88) contrast(1.04);
+}
+.stampCaption {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 4px 6px 3px;
+  border-top: 1px solid color-mix(in srgb, var(--ink) 30%, transparent);
+}
+.stampName {
+  font-size: 10px;
+  line-height: 1.2;
+  color: var(--ink);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+/* The year stands in for a denomination. */
+.stampYear {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.04em;
+  color: color-mix(in srgb, var(--ink) 72%, transparent);
+}
+
+/* Must sit *after* `.stampWrap { display: none }`: a media query carries no extra
+   specificity, so declaring the reveal earlier in the file loses the cascade to
+   the base rule and the stamp never appears.
+   The stamp gets a reserved gutter rather than being laid over the ledger — the
+   vitals just reflow into fewer columns. Below this width there's no room to
+   reserve, so the stamp stays away rather than crowd the record. */
+@media (min-width: 940px) {
+  .head {
+    padding-right: 228px;
+    min-height: 330px;
+  }
+  .stampWrap {
+    display: block;
+  }
+}
+
+.plate {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Photo corners — the picture is mounted onto the file, not printed on it. The
+   corners are real geometry (a rotated square, clipped), so they take the skin's
+   colour and stay crisp at any zoom. */
+.photoWrap {
+  position: relative;
+  padding: 7px;
+}
+.photo,
+.photoFallback {
+  animation: handDevelop 1.15s ease-out 0.16s both;
+  display: block;
+  width: 168px;
+  height: 236px;
+  object-fit: cover;
+  object-position: center 15%;
+  border-radius: 2px;
+  background: var(--ink-3);
+  filter: saturate(0.92) contrast(1.02);
+}
+.photoFallback {
+  display: grid;
+  place-items: center;
+  font-family: var(--font-display);
+  font-size: 56px;
+  color: var(--paper-faint);
+}
+/* Mounted once the photograph has come up — you can't corner a picture that
+   isn't there yet. They go on one at a time, in the order a hand would: top-left,
+   top-right, then the two you have to hold the print down for. */
+.corner {
+  animation: cornerOn 0.34s var(--hand) both;
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--rule-strong);
+  background: color-mix(in srgb, var(--paper) 7%, transparent);
+}
+@keyframes cornerOn {
+  from {
+    opacity: 0;
+    transform: scale(1.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+.cornerTL {
+  top: 0;
+  left: 0;
+  border-right: none;
+  border-bottom: none;
+  clip-path: polygon(0 0, 100% 0, 0 100%);
+  animation-delay: 0.86s;
+}
+.cornerTR {
+  top: 0;
+  right: 0;
+  border-left: none;
+  border-bottom: none;
+  clip-path: polygon(100% 0, 100% 100%, 0 0);
+  animation-delay: 0.92s;
+}
+.cornerBL {
+  bottom: 0;
+  left: 0;
+  border-right: none;
+  border-top: none;
+  clip-path: polygon(0 0, 0 100%, 100% 100%);
+  animation-delay: 0.98s;
+}
+.cornerBR {
+  bottom: 0;
+  right: 0;
+  border-left: none;
+  border-top: none;
+  clip-path: polygon(100% 0, 100% 100%, 0 100%);
+  animation-delay: 1.04s;
+}
+
+/* Rubber-stamped, so it sits a touch off-square. */
+.stamp {
+  animation: rubberOn 0.3s var(--hand) 1.12s both;
+  padding: 3px 10px;
+  border: 1px solid color-mix(in srgb, var(--c-anime) 55%, transparent);
+  border-radius: 3px;
+  color: color-mix(in srgb, var(--c-anime) 85%, var(--paper));
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  transform: rotate(-1.5deg);
+  opacity: 0.85;
+}
+/* Both stamps land rather than fade: they come down from slightly above the page
+   and stop dead. No bounce — a stamp doesn't bounce, it just stops. The final
+   frame carries the resting rotation, so the animation can't undo it. */
+@keyframes rubberOn {
+  from {
+    opacity: 0;
+    transform: rotate(-1.5deg) scale(1.28);
+  }
+  to {
+    opacity: 0.85;
+    transform: rotate(-1.5deg) scale(1);
+  }
+}
+
+.ident {
+  flex: 1;
+  min-width: 0;
+}
+/* Typed in, line by line, each one waiting on the one above it. */
+.fileNo {
+  animation: handInk 0.45s var(--hand) 0.24s both;
+  margin: 0 0 6px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--paper-faint);
+}
+.name {
+  /* The longest stroke on the page, and the one worth watching. */
+  animation: handInk 0.85s var(--hand) 0.32s both;
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(28px, 4vw, 40px);
+  font-weight: 600;
+  line-height: 1.05;
+  color: var(--text-primary);
+  text-wrap: balance;
+}
+.native {
+  animation: handInk 0.5s var(--hand) 0.62s both;
+  margin: 4px 0 0;
+  font-size: 15px;
+  color: var(--paper-dim);
+}
+.aliases {
+  animation: handInk 0.5s var(--hand) 0.72s both;
+  margin: 10px 0 0;
+  font-size: 12.5px;
+  color: var(--paper-dim);
+}
+.aliasLabel {
+  margin-right: 8px;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--paper-faint);
+}
+
+/* The caption for the backdrop. */
+.known {
+  animation: handInk 0.55s var(--hand) 0.82s both;
+  margin: 6px 0 0;
+  font-size: 13px;
+}
+.knownLink {
+  color: var(--text-primary);
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+.knownLink:hover,
+.knownLink:focus-visible {
+  color: var(--c-anime);
+}
+.knownIn {
+  color: var(--paper-dim);
+  font-weight: 400;
+}
+.knownLink:hover .knownIn {
+  color: inherit;
+}
+
+/* ── Vitals ledger ───────────────────────────────────────────────────────── */
+
+/* Wide enough that "Shiogama, Miyagi Prefecture" and "1978 – present" get to stay
+   on one line; a ledger that wraps its own values reads as broken, not as full. */
+.vitals {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(215px, 1fr));
+  gap: 0;
+  margin: var(--space-5) 0 0;
+  border-top: 1px solid var(--rule);
+}
+/* Ruled one line at a time. The row's own bottom rule is inside the wipe, so the
+   line and the fact on it are drawn in a single stroke. */
+.vital {
+  animation: handInk 0.42s var(--hand) both;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: 7px 0;
+  margin-right: var(--space-5);
+  border-bottom: 1px solid var(--rule);
+}
+.vital:nth-child(1) {
+  animation-delay: 0.9s;
+}
+.vital:nth-child(2) {
+  animation-delay: 0.96s;
+}
+.vital:nth-child(3) {
+  animation-delay: 1.02s;
+}
+.vital:nth-child(4) {
+  animation-delay: 1.08s;
+}
+.vital:nth-child(5) {
+  animation-delay: 1.14s;
+}
+.vital:nth-child(6) {
+  animation-delay: 1.2s;
+}
+.vital:nth-child(7) {
+  animation-delay: 1.26s;
+}
+.vital:nth-child(n + 8) {
+  animation-delay: 1.32s;
+}
+.vitalLabel {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--paper-faint);
+  white-space: nowrap;
+}
+.vitalValue {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-primary);
+  text-align: right;
+  min-width: 0;
+}
+.fans {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--c-anime);
+}
+
+.source {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: var(--space-4);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--paper-faint);
+  transition: color 0.15s ease;
+}
+.source:hover {
+  color: var(--c-anime);
+}
+
+/* ── Notes ───────────────────────────────────────────────────────────────── */
+
+.ledgerLabel {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--paper-faint);
+}
+.rolesCount {
+  margin-left: 6px;
+  color: var(--paper-dim);
+}
+
+.bio {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: var(--space-4);
+  margin-top: var(--space-6);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--rule);
+}
+.bioBody {
+  max-width: 74ch; /* a measure you can actually read */
+}
+.bioPara {
+  margin: 0 0 var(--space-3);
+  font-size: 14px;
+  line-height: 1.65;
+  color: var(--text-secondary);
+}
+.bioPara b {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+.bioLink {
+  color: var(--c-anime);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  overflow-wrap: anywhere; /* agency URLs are long and unbreakable */
+}
+.spoilerNote {
+  margin: var(--space-3) 0 0;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--paper-faint);
+}
+.more {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--paper-faint);
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+.more:hover {
+  color: var(--c-anime);
+}
+
+/* ── Filmography ─────────────────────────────────────────────────────────── */
+
+.roles {
+  margin-top: var(--space-6);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--rule);
+}
+.rolesHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+.filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 11px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--rule);
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.filter:hover {
+  border-color: var(--rule-strong);
+  color: var(--text-primary);
+}
+.filterOn {
+  border-color: var(--c-anime);
+  background: color-mix(in srgb, var(--c-anime) 14%, var(--surface));
+  color: var(--text-primary);
+}
+.filterCount {
+  color: var(--paper-faint);
+}
+.filterOn .filterCount {
+  color: var(--text-primary);
+  opacity: 0.75;
+}
+
+.roleGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+  gap: var(--space-5) var(--space-4);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+/* Dealt out. --i is capped in JSX, so a 30-role filmography doesn't turn the tail
+   of the grid into a queue. */
+.role {
+  animation: handSet 0.45s var(--hand) calc(0.55s + var(--i, 0) * 0.045s) both;
+}
+.roleLink {
+  display: block;
+  color: inherit;
+}
+.roleArt {
+  position: relative;
+  margin-bottom: 9px;
+}
+.roleCover,
+.roleCoverFallback {
+  display: block;
+  width: 100%;
+  aspect-ratio: 2 / 3;
+  object-fit: cover;
+  border-radius: var(--r-media);
+  border: 1px solid var(--rule);
+  background: var(--ink-3);
+  transition: transform 0.2s ease, border-color 0.2s ease;
+}
+.roleLink:hover .roleCover,
+.roleLink:focus-visible .roleCover {
+  transform: translateY(-3px);
+  border-color: color-mix(in srgb, var(--c-anime) 50%, var(--rule));
+}
+
+/* The character pinned to the show's corner. The ring is the file's own colour,
+   so the face reads as sitting *on* the cover rather than punched into it. */
+.roleFace,
+.roleFaceFallback {
+  position: absolute;
+  left: -7px;
+  bottom: -7px;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  object-fit: cover;
+  object-position: center 18%;
+  border: 2px solid var(--file-bg);
+  background: var(--ink-3);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.35);
+  transition: transform 0.2s ease;
+}
+.roleFaceFallback {
+  display: grid;
+  place-items: center;
+  font-family: var(--font-display);
+  font-size: 17px;
+  color: var(--paper-faint);
+}
+.roleLink:hover .roleFace {
+  transform: scale(1.06);
+}
+
+.roleBadge {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--ink) 78%, transparent);
+  backdrop-filter: blur(3px);
+  color: var(--paper-dim);
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.roleBadgeMain {
+  background: var(--c-anime);
+  color: var(--ink);
+}
+
+/* Flush left. The pinned face hangs 7px below the cover and the caption starts 9px
+   below it, so the two never actually touch — indenting to "clear" the face only
+   bought a ragged left edge against the show title underneath. */
+.roleChar {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 14.5px;
+  font-weight: 500;
+  line-height: 1.25;
+  color: var(--text-primary);
+}
+.roleCharNative {
+  margin: 1px 0 0;
+  font-size: 10.5px;
+  color: var(--paper-faint);
+}
+.roleShow {
+  margin: 5px 0 0;
+  font-size: 11.5px;
+  line-height: 1.35;
+  color: var(--paper-dim);
+}
+.roleLink:hover .roleShow {
+  color: var(--text-primary);
+}
+.roleMeta {
+  margin: 3px 0 0;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  color: var(--paper-faint);
+}
+.rolesNote {
+  margin: var(--space-5) 0 0;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--paper-faint);
+}
+
+@media (max-width: 720px) {
+  .head {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+  .vitals {
+    text-align: left;
+  }
+  .bio {
+    grid-template-columns: 1fr;
+    gap: var(--space-2);
+  }
+}

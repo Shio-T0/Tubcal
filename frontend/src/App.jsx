@@ -25,6 +25,7 @@ const Wire = lazy(() => import('./pages/Wire.jsx'));
 const Archive = lazy(() => import('./pages/Archive.jsx'));
 const Anime = lazy(() => import('./pages/Anime.jsx'));
 const AnimeDetail = lazy(() => import('./pages/Anime.jsx').then(m => ({ default: m.AnimeDetail })));
+const VoiceActor = lazy(() => import('./pages/VoiceActor.jsx'));
 const Github = lazy(() => import('./pages/Github.jsx'));
 const Composer = lazy(() => import('./pages/Composer.jsx'));
 const SavedPage = lazy(() => import('./pages/SavedPage.jsx'));
@@ -58,6 +59,9 @@ export default function App() {
             <Route path="/github" element={<Github />} />
             <Route path="/archive" element={<Archive />} />
             <Route path="/anime" element={<Anime />} />
+            {/* Static segment outranks /anime/:id in the router's own ranking, so
+                a seiyuu id can never be mistaken for a media id. */}
+            <Route path="/anime/voice/:id" element={<VoiceActor />} />
             <Route path="/anime/:id" element={<AnimeDetail />} />
             <Route path="/editor" element={<Composer />} />
             <Route path="/saved" element={<SavedPage />} />

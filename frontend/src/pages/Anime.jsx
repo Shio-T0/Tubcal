@@ -1,10 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   AlertTriangle, ArrowLeft, ArrowRight, Bookmark, Calendar, Check, CheckCheck,
   ChevronDown, ChevronLeft, ChevronRight, CircleSlash, Clapperboard, CloudOff,
-  Eye, ExternalLink, Flag, Frown, Heart, Meh, Minus, Pause, Play, PlayCircle, Plus,
-  RefreshCw, Repeat, Smile, Star, ThumbsUp, Trash2, Tv, User,
+  Eye, ExternalLink, Flag, Frown, Heart, History, Meh, Minus, Pause, Play, PlayCircle,
+  Plus, RefreshCw, Repeat, Smile, Star, ThumbsUp, Trash2, Tv, User,
 } from 'lucide-react';
 
 import { api, useApi } from '../api/client.js';
@@ -20,13 +20,65 @@ import { Avatar } from '../components/ui/Avatar.jsx';
 import { ActivityFeed, ForumList } from '../components/anime/Discussions.jsx';
 import { ProfileModal, ProfileStudio } from '../components/anime/Profile.jsx';
 import { useHorizontalWheel } from '../lib/useHorizontalWheel.js';
-import { clock } from '../lib/time.js';
+import { compact } from '../lib/format.js';
+import { clock, formatWhen, timeAgo } from '../lib/time.js';
 import { applyOverlay, COMPLETE_RATIO, useAnimeSync, usePlayer, useProgress, useToast } from '../state.jsx';
 import s from './anime.module.css';
 
 // AniList score scales by the viewer's chosen format.
 const SCORE_MAX = { POINT_100: 100, POINT_10_DECIMAL: 10, POINT_10: 10, POINT_5: 5, POINT_3: 3 };
 const SCORE_STEP = { POINT_10_DECIMAL: 0.5 };
+
+/** Component state that lives in the query string instead of in the component.
+ *
+ * Opening a title unmounts this page, so anything held in useState is gone by the
+ * time you press back — you'd land in Browse with your filters cleared. Parking it
+ * in the URL means the history entry itself carries the view, so back (the button,
+ * the browser, or a gesture) restores the shelf and filters you left, and a reload
+ * or a copied link opens the same place.
+ *
+ * Updates replace rather than push: a filter toggle isn't a destination, and
+ * pushing would make back walk through every toggle before leaving the room.
+ * Values equal to `fallback` drop out of the URL so the default view stays clean.
+ */
+function useParamState(key, fallback, { parse = (v) => v, format = String } = {}) {
+  const [params, setParams] = useSearchParams();
+  const raw = params.get(key);
+  const value = raw == null ? fallback : parse(raw);
+
+  const set = useCallback(
+    (next) => {
+      setParams(
+        (prev) => {
+          const cur = prev.get(key) == null ? fallback : parse(prev.get(key));
+          const v = typeof next === 'function' ? next(cur) : next;
+          const p = new URLSearchParams(prev);
+          const s = v == null ? '' : format(v);
+          if (!s || s === format(fallback)) p.delete(key);
+          else p.set(key, s);
+          return p;
+        },
+        { replace: true },
+      );
+    },
+    // parse/format are inline literals at every call site; re-creating `set` when
+    // they change would defeat memoization for no benefit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [key, fallback, setParams],
+  );
+
+  return [value, set];
+}
+
+// A Set of filter keys <-> a comma-separated param, order-stable so the URL
+// doesn't churn as buckets are toggled on and off.
+const SET_PARAM = {
+  parse: (v) => new Set(v.split(',').filter(Boolean)),
+  format: (v) => [...v].sort().join(','),
+};
+// Stable identity: an inline `new Set()` fallback would be a fresh object on every
+// render, so useParamState's `set` could never memoize.
+const EMPTY_SET = new Set();
 
 const ACCENT = { '--accent-local': 'var(--c-anime)' };
 
@@ -387,11 +439,25 @@ function BrowseCard({ media, rank, index = 0, scoreFormat }) {
 }
 
 function BrowseTab() {
-  const [query, setQuery] = useState('');
-  const [kind, setKind] = useState('trending');
+  const [urlQuery, setUrlQuery] = useParamState('q', '');
+  const [rawKind, setKind] = useParamState('kind', 'trending');
+  const kind = BROWSE_KINDS.some((k) => k.value === rawKind) ? rawKind : 'trending';
+
+  // The input keeps its own state so a keystroke is never a history write (browsers
+  // throttle those); only the settled query is published to the URL. Nothing is lost
+  // by waiting — results don't render until the debounce lands, so there's no result
+  // to click on an unpublished query.
+  const [query, setQuery] = useState(urlQuery);
   const q = query.trim();
   const dq = useDebounced(q);
   const searching = dq.length > 0;
+
+  // Deliberately keyed on the settled query alone: `setUrlQuery` is rebuilt whenever
+  // the query string changes, so including it would re-run this on every URL change.
+  // Skipping the no-op write also keeps mount from replacing the entry we came back to.
+  useEffect(() => {
+    if (dq !== urlQuery) setUrlQuery(dq);
+  }, [dq]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const search = useApi(`/anime/search?q=${encodeURIComponent(dq)}`, searching);
   const browse = useApi(`/anime/browse?kind=${kind}`, !searching);
@@ -739,7 +805,7 @@ function ListControls({ media, scoreFormat }) {
   );
 }
 
-function ListEntryCard({ entry, scoreFormat }) {
+function ListEntryCard({ entry, scoreFormat, showSeen = false }) {
   const { overlay, syncState, queueListEdit } = useAnimeSync();
   const m = entry.media;
   const eff = applyOverlay(m.id, entry, overlay);
@@ -763,6 +829,12 @@ function ListEntryCard({ entry, scoreFormat }) {
       <AnimeCard media={{ ...m, list_entry: eff }} corner={behindTag} scoreFormat={scoreFormat} />
       <div className={s.quickRow}>
         <span className={s.quickProg}>{prog}{total ? ` / ${total}` : ''}</span>
+        {/* The stamp the activity filter reads, so a match explains itself on the card. */}
+        {showSeen && entry.updated_at && (
+          <span className={s.quickSeen} title={`Last activity ${formatWhen(entry.updated_at)}`}>
+            {timeAgo(entry.updated_at)}
+          </span>
+        )}
         {status && <SyncBadge status={status} label={false} className={s.quickSync} />}
         {(!total || prog < total) && (
           <button className={s.quickBtn} onClick={bump} title="Mark next episode watched">
@@ -777,6 +849,133 @@ function ListEntryCard({ entry, scoreFormat }) {
 // AniList's natural shelf order; custom lists (no standard status) sort last.
 const STATUS_ORDER = ['CURRENT', 'REPEATING', 'PLANNING', 'COMPLETED', 'PAUSED', 'DROPPED'];
 const groupKey = (g) => g.status || g.name;
+
+// ── Last-activity filter ──────────────────────────────────────────────────────
+// The watched shelves get a "when did I last touch this" filter. The stamp is
+// AniList's own entry `updatedAt`: progress bumps (including Tubcal's auto-mark at
+// 90%), score edits and status changes all write it. It is the closest thing
+// AniList exposes to "when did I last watch this" — not an exact viewing time —
+// so the UI calls it activity rather than claiming more than it knows.
+const DAY = 86400;
+// Cumulative windows ("touched within the last …"), plus a tail bucket for the
+// opposite question: what have I not touched in over a year?
+// Rolling windows, so the labels say "past N" — "this week" would imply a calendar
+// week and quietly lie at both ends of it.
+const ACTIVITY_WINDOWS = [
+  ['1d', 'Past 24h', DAY],
+  ['7d', 'Past week', 7 * DAY],
+  ['30d', 'Past month', 30 * DAY],
+  ['3m', 'Past 3 months', 90 * DAY],
+  ['1y', 'Past year', 365 * DAY],
+  ['older', 'Over a year', null], // the tail: nothing since
+];
+const ACTIVITY_SHELVES = new Set(['CURRENT', 'REPEATING', 'COMPLETED', 'PAUSED', 'DROPPED']);
+const isCustomRange = (v) => typeof v === 'string' && v.includes('..');
+
+/** A predicate over an entry's `updated_at` for the selected window, or null when
+ *  nothing should be filtered out. `now` is injectable so the buckets are testable. */
+function activityMatcher(seen, now = Date.now() / 1000) {
+  if (!seen || seen === 'any') return null;
+  if (isCustomRange(seen)) {
+    const [a, b] = seen.split('..');
+    // Inclusive of both endpoints' full local days; a half-open range is allowed.
+    const from = a ? Date.parse(`${a}T00:00:00`) / 1000 : -Infinity;
+    const to = b ? Date.parse(`${b}T23:59:59`) / 1000 : Infinity;
+    if (Number.isNaN(from) || Number.isNaN(to)) return null; // half-typed date
+    return (t) => t != null && t >= from && t <= to;
+  }
+  const w = ACTIVITY_WINDOWS.find(([k]) => k === seen);
+  if (!w) return null;
+  const cutoff = now - (w[2] ?? 365 * DAY);
+  return w[0] === 'older' ? (t) => t != null && t < cutoff : (t) => t != null && t >= cutoff;
+}
+
+/** The activity panel: one window at a time (they nest, so multi-select would only
+ *  confuse), each chip carrying its own count so the shelf's shape is visible
+ *  before you commit to a filter. Empty windows disable themselves. */
+function ActivityFilter({ entries, seen, setSeen }) {
+  const [custom, setCustom] = useState(() => isCustomRange(seen));
+  const [from, to] = isCustomRange(seen) ? seen.split('..') : ['', ''];
+  const counts = {};
+  for (const [key] of ACTIVITY_WINDOWS) {
+    const m = activityMatcher(key);
+    counts[key] = entries.filter((e) => m(e.updated_at)).length;
+  }
+  // Entries AniList gave no stamp for can't answer the question either way; they
+  // drop out of every window, so say so rather than letting them vanish silently.
+  const untracked = entries.filter((e) => e.updated_at == null).length;
+  const filtering = seen !== 'any';
+  const pick = (key) => { setCustom(false); setSeen(key); };
+  const setRange = (a, b) => setSeen(a || b ? `${a}..${b}` : 'any');
+  const today = new Date().toISOString().slice(0, 10);
+
+  return (
+    <div className={s.seenRow}>
+      <div className={s.seenChips}>
+        <span
+          className={s.seenLabel}
+          title="AniList's last-updated stamp — progress bumps, score edits and status changes all touch it."
+        >
+          <History size={11} /> Last activity
+        </span>
+        <button
+          className={`${s.seenChip} ${seen === 'any' && !custom ? s.seenChipOn : ''}`}
+          onClick={() => pick('any')}
+          aria-pressed={seen === 'any' && !custom}
+        >
+          Any time
+          <span className={s.seenCount}>{entries.length}</span>
+        </button>
+        {ACTIVITY_WINDOWS.map(([key, label]) => {
+          const n = counts[key];
+          const on = seen === key;
+          return (
+            <button
+              key={key}
+              className={`${s.seenChip} ${on ? s.seenChipOn : ''}`}
+              disabled={!n && !on}
+              onClick={() => pick(key)}
+              aria-pressed={on}
+            >
+              {label}
+              <span className={s.seenCount}>{n}</span>
+            </button>
+          );
+        })}
+        <button
+          className={`${s.seenChip} ${custom ? s.seenChipOn : ''}`}
+          onClick={() => setCustom((c) => !c)}
+          aria-pressed={custom}
+        >
+          <Calendar size={11} /> Custom
+        </button>
+      </div>
+
+      {custom && (
+        <div className={s.seenCustom}>
+          <label className={s.seenDate}>
+            <span>from</span>
+            <input type="date" max={to || today} value={from} onChange={(e) => setRange(e.target.value, to)} />
+          </label>
+          <label className={s.seenDate}>
+            <span>to</span>
+            <input type="date" min={from || undefined} max={today} value={to} onChange={(e) => setRange(from, e.target.value)} />
+          </label>
+          {isCustomRange(seen) && (
+            <button className={s.releaseClear} onClick={() => setSeen('any')}>clear</button>
+          )}
+          {!isCustomRange(seen) && <span className={s.seenHint}>pick a date to filter</span>}
+        </div>
+      )}
+
+      {filtering && untracked > 0 && (
+        <span className={s.seenHint}>
+          {untracked} {untracked === 1 ? 'title has' : 'titles have'} no activity stamp and stay hidden while filtering.
+        </span>
+      )}
+    </div>
+  );
+}
 
 // Release-status buckets for the Planning shelf's extra filters. "Announced" is an
 // unaired title with a known date; "TBA" is unaired with no date scheduled yet.
@@ -797,8 +996,9 @@ function releaseClass(m) {
 
 function MyListTab() {
   const lists = useApi('/anime/lists');
-  const [filter, setFilter] = useState('all');
-  const [release, setRelease] = useState(() => new Set()); // empty = no release filter
+  const [filter, setFilter] = useParamState('shelf', 'all');
+  const [release, setRelease] = useParamState('release', EMPTY_SET, SET_PARAM); // empty = no release filter
+  const [seen, setSeen] = useParamState('seen', 'any');
   const scoreFormat = lists.data?.viewer?.score_format;
   const toggleRelease = (key) =>
     setRelease((prev) => {
@@ -838,11 +1038,21 @@ function MyListTab() {
     const c = releaseClass(e.media);
     if (c) planningCounts[c] = (planningCounts[c] || 0) + 1;
   }
-  // Filter a group's entries by the active release buckets (Planning only).
-  const entriesOf = (g) =>
-    groupKey(g) === 'PLANNING' && release.size > 0
-      ? g.entries.filter((e) => release.has(releaseClass(e.media)))
-      : g.entries;
+  // The watched shelves get the last-activity filter; it only applies while one of
+  // them is the selected shelf, so "All" stays an unfiltered overview.
+  const activityShelf = ACTIVITY_SHELVES.has(filter) ? groups.find((g) => groupKey(g) === filter) : null;
+  const matchSeen = activityShelf ? activityMatcher(seen) : null;
+
+  // Filter a group's entries by whichever extra filter its shelf offers.
+  const entriesOf = (g) => {
+    if (groupKey(g) === 'PLANNING' && release.size > 0) {
+      return g.entries.filter((e) => release.has(releaseClass(e.media)));
+    }
+    if (matchSeen && ACTIVITY_SHELVES.has(groupKey(g))) {
+      return g.entries.filter((e) => matchSeen(e.updated_at));
+    }
+    return g.entries;
+  };
 
   return (
     <>
@@ -894,21 +1104,34 @@ function MyListTab() {
         </div>
       )}
 
+      {activityShelf && (
+        <ActivityFilter entries={activityShelf.entries} seen={seen} setSeen={setSeen} />
+      )}
+
       <div className={s.lists}>
         {shown.map((g) => {
           const entries = entriesOf(g);
+          const withSeen = ACTIVITY_SHELVES.has(groupKey(g));
+          const held = entries.length < g.entries.length; // some filter is narrowing this shelf
           return (
             <section key={groupKey(g)} className={s.listGroup}>
               <h3 className={s.listHead}>
                 {STATUS_LABEL[g.status] || g.name}
-                <span className={s.listCount}>{entries.length}</span>
+                <span className={s.listCount}>
+                  {entries.length}
+                  {held && <span className={s.listOf}> of {g.entries.length}</span>}
+                </span>
               </h3>
               {entries.length === 0 ? (
-                <p className={s.muted}>No titles match those release filters.</p>
+                <p className={s.muted}>
+                  {withSeen && matchSeen
+                    ? 'Nothing on this shelf was touched in that window.'
+                    : 'No titles match those release filters.'}
+                </p>
               ) : (
                 <div className={s.grid}>
                   {entries.map((e) => (
-                    <ListEntryCard key={e.entry_id} entry={e} scoreFormat={scoreFormat} />
+                    <ListEntryCard key={e.entry_id} entry={e} scoreFormat={scoreFormat} showSeen={withSeen} />
                   ))}
                 </div>
               )}
@@ -1038,7 +1261,9 @@ function ActiveProfileButton() {
 }
 
 export default function Anime() {
-  const [tab, setTab] = useState('browse');
+  const [rawTab, setTab] = useParamState('tab', 'browse');
+  // A hand-edited or stale ?tab= shouldn't render a blank room.
+  const tab = TABS.some((t) => t.id === rawTab) ? rawTab : 'browse';
   return (
     <>
       <SectionHead
@@ -1074,8 +1299,8 @@ function RelStrip({ title, items, scoreFormat }) {
     <div className={s.relBlock}>
       <h3 className={s.blockLabel}>{title}</h3>
       <div className={s.relRow} ref={ref}>
-        {items.map((m) => (
-          <div key={m.id} className={s.relItem}>
+        {items.map((m, i) => (
+          <div key={m.id} className={s.relItem} style={{ '--i': Math.min(i, 10) }}>
             <AnimeCard media={m} scoreFormat={scoreFormat} />
           </div>
         ))}
@@ -1104,8 +1329,8 @@ function RecStrip({ title, sourceId, recs, canPost, scoreFormat }) {
     <div className={s.relBlock}>
       <h3 className={s.blockLabel}>{title}</h3>
       <div className={s.relRow} ref={ref}>
-        {items.map((r) => (
-          <div key={r.media.id} className={s.relItem}>
+        {items.map((r, i) => (
+          <div key={r.media.id} className={s.relItem} style={{ '--i': Math.min(i, 10) }}>
             <AnimeCard media={r.media} scoreFormat={scoreFormat} />
             {canPost && (
               <button className={s.endorseBtn} onClick={() => endorse(r.media.id)} title="Agree with this recommendation">
@@ -1254,9 +1479,10 @@ function EpisodeList({ media }) {
       {links.length > 0 && (
         <div className={s.deepLinks}>
           <span className={s.deepLinkLabel}>Watch official:</span>
-          {links.map((l) => (
+          {links.map((l, i) => (
             <button
               key={l.url}
+              style={{ '--i': Math.min(i, 9) }}
               className={s.deepLink}
               style={l.color ? { '--ext-c': l.color } : undefined}
               onClick={() => launch(l.url, null)}
@@ -1276,14 +1502,24 @@ function EpisodeList({ media }) {
 
       {list.length > 0 && (
         <div className={s.episodes}>
-          {list.map((e) => {
+          {list.map((e, i) => {
             const local = !!e.key;
             const officialUrl = e.url || seriesLink; // per-episode link, else the series page
             const primary = local
               ? () => playLocal(e)
               : () => officialUrl && launch(officialUrl, e.number);
             return (
-              <div key={e.number} className={s.episode}>
+              // Only the opening screenful is dealt in. Capping --i alone isn't
+              // enough: the animation would still be *created* for all ~1,170 of
+              // One Piece's episodes, and every one past the cap would fire on the
+              // same frame — a thousand elements animating at once, to be watched
+              // by nobody, since they're far below the fold. Past EP_ANIM_MAX the
+              // cards simply start visible.
+              <div
+                key={e.number}
+                className={`${s.episode} ${i < EP_ANIM_MAX ? s.episodeIn : ''}`}
+                style={i < EP_ANIM_MAX ? { '--i': i } : undefined}
+              >
                 <button className={s.epMain} onClick={primary} disabled={!local && !officialUrl}>
                   <div className={s.epThumb}>
                     {e.image || media.cover ? (
@@ -1400,6 +1636,142 @@ function NextEpisodeBanner({ next }) {
   );
 }
 
+// ── Dramatis Personae ─────────────────────────────────────────────────────────
+// The cast as a theatre programme: character on the left, voice on the right, a
+// leader of dots carrying your eye across. Everything else on this page is poster
+// art, so this block earns its keep by being type instead of pictures.
+
+// How many episode cards get dealt in. Roughly the first screenful; the rest of a
+// long-runner's list is below the fold and starts drawn.
+const EP_ANIM_MAX = 18;
+
+const ROLE_LABEL = { MAIN: 'Main', SUPPORTING: 'Supporting', BACKGROUND: 'Background' };
+const CAST_PREVIEW = 8; // a programme's worth before "show all"
+// Japanese tops out at ~3 credits for one character, but the English and French
+// dubs of a long-runner reach six — stacked raw, that one row swamps the sheet.
+const CAST_ALSO_MAX = 2;
+
+/** Languages present in this cast, original first, then by how much of the cast
+ *  each one actually covers — a dub with two credits shouldn't outrank Japanese. */
+function castLanguages(characters) {
+  const n = {};
+  for (const c of characters) for (const v of c.voices) if (v.language) n[v.language] = (n[v.language] || 0) + 1;
+  return Object.keys(n).sort((a, b) => (a === 'Japanese' ? -1 : b === 'Japanese' ? 1 : n[b] - n[a]));
+}
+
+function CastSheet({ characters }) {
+  const langs = castLanguages(characters);
+  const [lang, setLang] = useState(() => (langs.includes('Japanese') ? 'Japanese' : langs[0]));
+  const [all, setAll] = useState(false);
+  const [openRows, setOpenRows] = useState(() => new Set());
+  if (!characters.length) return null;
+
+  const toggleRow = (id) =>
+    setOpenRows((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+
+  // Every character stays on the sheet in every language: switching to a dub that
+  // only covers half the cast shouldn't make rows disappear under the cursor.
+  const shown = all ? characters : characters.slice(0, CAST_PREVIEW);
+
+  return (
+    <section className={s.castBlock}>
+      <div className={s.castHead}>
+        <h3 className={s.blockLabel}>Cast</h3>
+        {langs.length > 1 && (
+          <div className={s.castLangs} role="group" aria-label="Voice language">
+            {langs.map((l) => (
+              <button
+                key={l}
+                className={`${s.castLang} ${l === lang ? s.castLangOn : ''}`}
+                onClick={() => setLang(l)}
+                aria-pressed={l === lang}
+              >
+                {l === 'Japanese' ? <span lang="ja">日本語</span> : l}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <ol className={s.castSheet}>
+        {shown.map((c, i) => {
+          const voices = c.voices.filter((v) => v.language === lang);
+          const [lead, ...also] = voices;
+          const rowOpen = openRows.has(c.id);
+          const alsoShown = rowOpen ? also : also.slice(0, CAST_ALSO_MAX);
+          return (
+            // The stagger is capped: past the tenth line the wait stops growing,
+            // so "show all 24" doesn't leave the tail of the cast drifting in.
+            <li key={c.id} className={s.castRow} style={{ '--row': Math.min(i, 10) }}>
+              <Avatar src={c.image} name={c.name} imgClass={s.castFace} letterClass={s.castFaceFallback} />
+
+              <div className={s.castMid}>
+                {/* One line, so the dot leader lands on the names' own baseline. */}
+                <p className={s.castTop}>
+                  <span className={s.castName}>{c.name}</span>
+                  {lead ? (
+                    <Link to={`/anime/voice/${lead.id}`} className={s.castVoiceName}>
+                      {lead.name}
+                    </Link>
+                  ) : (
+                    <span className={`${s.castVoiceName} ${s.castUncredited}`}>not credited</span>
+                  )}
+                </p>
+                <p className={s.castUnder}>
+                  <span className={s.castSub}>
+                    {c.native && <span className={s.castNative} lang="ja">{c.native}</span>}
+                    <span className={s.castRole}>{ROLE_LABEL[c.role] || c.role}</span>
+                  </span>
+                  <span className={s.castSub}>
+                    {lead?.dub_group && <span className={s.castDub}>{lead.dub_group}</span>}
+                    {lead?.native && <span className={s.castNative} lang="ja">{lead.native}</span>}
+                    {c.favourites > 0 && (
+                      <span className={s.castFav} title={`${c.favourites.toLocaleString()} AniList favourites`}>
+                        <Heart size={9} /> {compact(c.favourites)}
+                      </span>
+                    )}
+                  </span>
+                </p>
+
+                {/* Second and later credits hang under the row, carrying the note
+                    that explains why they exist at all ("Young", "eps 299-319"). */}
+                {alsoShown.map((v) => (
+                  <p key={`${v.id}-${v.notes || ''}`} className={s.castAlso}>
+                    <span className={s.castAlsoNote}>{v.notes || v.dub_group || 'also'}</span>
+                    <Link to={`/anime/voice/${v.id}`} className={s.castAlsoName}>{v.name}</Link>
+                  </p>
+                ))}
+                {also.length > CAST_ALSO_MAX && (
+                  <button className={s.castAlsoMore} onClick={() => toggleRow(c.id)}>
+                    {rowOpen ? 'fewer' : `+${also.length - CAST_ALSO_MAX} more`}
+                  </button>
+                )}
+              </div>
+
+              <Avatar
+                src={lead?.image}
+                name={lead?.name || '?'}
+                imgClass={s.castFace}
+                letterClass={s.castFaceFallback}
+              />
+            </li>
+          );
+        })}
+      </ol>
+
+      {characters.length > CAST_PREVIEW && (
+        <button className={s.castMore} onClick={() => setAll((v) => !v)}>
+          {all ? 'show fewer' : `show all ${characters.length}`}
+        </button>
+      )}
+    </section>
+  );
+}
+
 /** The detail-page header as a full dossier: banner backdrop, poster + trailer,
  *  title block, labeled spec sheet, and both the global average and your rating. */
 function DetailDossier({ m, trailer, onTrailer, scoreFormat, connected }) {
@@ -1501,8 +1873,8 @@ function Synopsis({ html, tags }) {
           <div className={s.tagSection}>
             <span className={s.asideLabel}>Themes &amp; tags</span>
             <div className={s.tagRow}>
-              {topTags.map((t) => (
-                <span key={t.name} className={s.tag}>
+              {topTags.map((t, i) => (
+                <span key={t.name} className={s.tag} style={{ '--i': Math.min(i, 13) }}>
                   {t.name}
                   {t.rank != null && <small>{t.rank}%</small>}
                 </span>
@@ -1546,6 +1918,10 @@ export function AnimeDetail() {
           )}
 
           {m.description && <Synopsis html={m.description} tags={m.tags} />}
+
+          {/* Above the episodes on purpose: the episode list runs to a row per
+              episode (One Piece alone is ~1,170), so anything below it is buried. */}
+          <CastSheet characters={m.characters || []} />
 
           <EpisodeList media={m} />
 
