@@ -4,7 +4,8 @@ import {
   AlertTriangle, ArrowLeft, ArrowRight, Bookmark, Calendar, Check, CheckCheck,
   ChevronDown, ChevronLeft, ChevronRight, CircleSlash, Clapperboard, CloudOff,
   Eye, ExternalLink, Flag, Frown, Heart, History, Meh, Minus, Pause, Play, PlayCircle,
-  Plus, RefreshCw, Repeat, Smile, Star, ThumbsUp, Trash2, Tv, User,
+  Plus, RefreshCw, Repeat, Search, SlidersHorizontal, Smile, Star, Tag, ThumbsUp,
+  Trash2, Tv, User, X,
 } from 'lucide-react';
 
 import { api, useApi } from '../api/client.js';
@@ -81,6 +82,10 @@ const SET_PARAM = {
 const EMPTY_SET = new Set();
 
 const ACCENT = { '--accent-local': 'var(--c-anime)' };
+
+// A link into the Browse finder pre-set to one genre (`g`) or tag (`t`). Lets a
+// genre/tag chip anywhere become "show me more like this" without a second thought.
+const discoverHref = (key, value) => `/anime?tab=browse&${key}=${encodeURIComponent(value)}`;
 
 // AniList averageScore is 0–100; show it as a tidy percent.
 function scoreLabel(n) {
@@ -438,10 +443,308 @@ function BrowseCard({ media, rank, index = 0, scoreFormat }) {
   );
 }
 
+// The order dials the finder offers once a genre or tag is in play. Each carries a
+// quiet caption so the shelf explains what it's showing, the way the browse dials do.
+const DISCOVER_SORTS = [
+  { value: 'popular', label: 'Most popular', caption: 'the best-loved matches first' },
+  { value: 'trending', label: 'Trending now', caption: 'what the house is watching right now' },
+  { value: 'score', label: 'Highest rated', caption: 'the highest scored of the lot' },
+  { value: 'newest', label: 'Newest first', caption: 'freshest premieres up top' },
+  { value: 'oldest', label: 'Oldest first', caption: 'from the very beginning' },
+  { value: 'title', label: 'Title A–Z', caption: 'alphabetical, front to back' },
+];
+
+// AniList files tags under "Category-Subcategory" ("Cast-Main Cast", "Theme-Action").
+// The middot reads far better than the hyphen once it's a heading.
+const prettyCat = (c) => (c || 'Other').replace(/-/g, ' · ');
+
+const toggleInSet = (setter) => (key) =>
+  setter((prev) => {
+    const next = new Set(prev);
+    if (next.has(key)) next.delete(key); else next.add(key);
+    return next;
+  });
+
+/** One tag as a toggle chip, carrying AniList's own description as a hover note —
+ *  the sort of gloss that answers "what *is* Iyashikei" without leaving the page. */
+function TagChip({ tag, on, onToggle }) {
+  return (
+    <button
+      type="button"
+      className={`${s.tagPick} ${on ? s.tagPickOn : ''}`}
+      title={tag.description || undefined}
+      onClick={() => onToggle(tag.name)}
+      aria-pressed={on}
+    >
+      <span className={s.tagPickCheck}>{on && <Check size={10} />}</span>
+      {tag.name}
+    </button>
+  );
+}
+
+/** The finder: the full genre roster as chips, then AniList's tag vocabulary grouped
+ *  by category into collapsible sections with an in-panel search. Selected tags are
+ *  pinned to the top so a choice buried in a collapsed category is always reachable. */
+function AnimeFinder({ coll, genres, tags, toggleGenre, toggleTag, clearGenres, clearTags }) {
+  const [tagQuery, setTagQuery] = useState('');
+  const [openCats, setOpenCats] = useState(() => new Set());
+  const tq = tagQuery.trim().toLowerCase();
+
+  if (coll.loading && !coll.data) {
+    return <div className={s.finderPanel}><Receiving label="pulling the genre index" /></div>;
+  }
+  if (coll.error) {
+    return <div className={s.finderPanel}><ErrorBox message={coll.error} /></div>;
+  }
+  const data = coll.data;
+  if (!data) return null;
+
+  const allGenres = data.genres || [];
+  const groups = data.tag_groups || [];
+  const toggleCat = toggleInSet(setOpenCats);
+
+  // A flat, ranked match list while the tag search has text; otherwise the grouped
+  // accordion. Description matches count too, so "healing" finds Iyashikei.
+  const matches = tq
+    ? (data.tags || []).filter(
+        (t) => t.name.toLowerCase().includes(tq) || (t.description || '').toLowerCase().includes(tq),
+      )
+    : null;
+  const selectedTags = [...tags].sort();
+
+  return (
+    <div className={s.finderPanel}>
+      {/* Genres — the whole roster fits, so it's laid out flat, no folding needed. */}
+      <section className={s.finderSection}>
+        <div className={s.finderSectionHead}>
+          <span className={s.finderLabel}><Clapperboard size={12} /> Genre</span>
+          {genres.size > 0 && (
+            <button className={s.finderMini} onClick={clearGenres}>clear {genres.size}</button>
+          )}
+        </div>
+        <div className={s.genreGrid}>
+          {allGenres.map((g) => {
+            const on = genres.has(g);
+            return (
+              <button
+                key={g}
+                type="button"
+                className={`${s.genreChip} ${on ? s.genreChipOn : ''}`}
+                onClick={() => toggleGenre(g)}
+                aria-pressed={on}
+              >
+                <span className={s.genreCheck}>{on && <Check size={11} />}</span>
+                {g}
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* Tags — hundreds of them, so grouped + searchable, with selections surfaced. */}
+      <section className={s.finderSection}>
+        <div className={s.finderSectionHead}>
+          <span className={s.finderLabel}><Tag size={12} /> Tags</span>
+          <div className={s.tagSearchWrap}>
+            <Search size={13} className={s.tagSearchIcon} />
+            <input
+              className={s.tagSearch}
+              value={tagQuery}
+              onChange={(e) => setTagQuery(e.target.value)}
+              placeholder="filter tags…"
+              spellCheck={false}
+            />
+            {tagQuery && (
+              <button className={s.tagSearchClear} onClick={() => setTagQuery('')} aria-label="Clear tag filter">
+                <X size={12} />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {selectedTags.length > 0 && (
+          <div className={s.tagSelected}>
+            <span className={s.tagSelectedLead}>chosen</span>
+            {selectedTags.map((t) => (
+              <button key={t} type="button" className={s.tagPickOn} onClick={() => toggleTag(t)}>
+                <span className={s.tagPickCheck}><Check size={10} /></span>
+                {t}
+                <X size={10} className={s.tagPickX} />
+              </button>
+            ))}
+            <button className={s.finderMini} onClick={clearTags}>clear</button>
+          </div>
+        )}
+
+        {matches ? (
+          <div className={s.tagMatchWrap}>
+            <span className={s.tagMatchCount}>
+              {matches.length} tag{matches.length === 1 ? '' : 's'} match “{tagQuery.trim()}”
+            </span>
+            {matches.length > 0 ? (
+              <div className={s.tagChips}>
+                {matches.map((t) => (
+                  <TagChip key={t.name} tag={t} on={tags.has(t.name)} onToggle={toggleTag} />
+                ))}
+              </div>
+            ) : (
+              <p className={s.finderEmpty}>Nothing in the vocabulary matches that.</p>
+            )}
+          </div>
+        ) : (
+          <div className={s.tagGroups}>
+            {groups.map((grp) => {
+              const sel = grp.tags.reduce((n, t) => n + (tags.has(t.name) ? 1 : 0), 0);
+              const open = openCats.has(grp.category);
+              return (
+                <div key={grp.category} className={s.tagCat} data-open={open ? '' : undefined}>
+                  <button
+                    type="button"
+                    className={s.tagCatHead}
+                    onClick={() => toggleCat(grp.category)}
+                    aria-expanded={open}
+                  >
+                    <ChevronRight size={13} className={`${s.tagCatCaret} ${open ? s.tagCatCaretOpen : ''}`} />
+                    <span className={s.tagCatName}>{prettyCat(grp.category)}</span>
+                    {sel > 0 && <span className={s.tagCatSel}>{sel}</span>}
+                    <span className={s.tagCatTotal}>{grp.tags.length}</span>
+                  </button>
+                  {open && (
+                    <div className={s.tagChips}>
+                      {grp.tags.map((t) => (
+                        <TagChip key={t.name} tag={t} on={tags.has(t.name)} onToggle={toggleTag} />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
+
+/** The always-visible ledger of what's applied, so the filter is legible even with
+ *  the finder folded away. Every pill removes its own filter; "clear" resets both. */
+function ActiveFilters({ genres, tags, toggleGenre, toggleTag, clearAll }) {
+  return (
+    <div className={s.activeBar}>
+      <span className={s.activeLead}>Filtering by</span>
+      {[...genres].sort().map((g) => (
+        <button key={g} type="button" className={s.activePillG} onClick={() => toggleGenre(g)}>
+          {g}<X size={11} />
+        </button>
+      ))}
+      {[...tags].sort().map((t) => (
+        <button key={t} type="button" className={s.activePillT} onClick={() => toggleTag(t)}>
+          <Tag size={9} />{t}<X size={11} />
+        </button>
+      ))}
+      <button className={s.activeClear} onClick={clearAll}>clear all</button>
+    </div>
+  );
+}
+
+/** Accumulating paginated fetch for the Browse wall. `signature` fingerprints the
+ *  live query (mode + filters + sort + text); the moment it changes the list resets
+ *  to page one. `buildUrl(page)` names the endpoint for a page — always read through
+ *  a ref so a rebuilt closure never forces a refetch on its own. Every backend page
+ *  carries `has_next`, so the scroll knows exactly where the archive ends. */
+function useInfiniteMedia(signature, buildUrl) {
+  const [items, setItems] = useState(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [error, setError] = useState(null);
+  const pageRef = useRef(1);
+  const busyRef = useRef(false);
+  const epochRef = useRef(0); // bumped per fetch; a stale resolve (old query) is ignored
+  const buildRef = useRef(buildUrl);
+  buildRef.current = buildUrl;
+
+  const fetchPage = useCallback(async (p, append) => {
+    // A fresh load (append=false) always supersedes any in-flight page — bumping the
+    // epoch makes the older request's result a no-op — so a query change mid-fetch
+    // can never strand the shelf. Appends are the only thing the busy flag gates.
+    const myEpoch = (epochRef.current += 1);
+    busyRef.current = true;
+    if (append) setLoadingMore(true); else setLoading(true);
+    setError(null);
+    try {
+      const d = await api(buildRef.current(p));
+      if (myEpoch !== epochRef.current) return; // a newer query took over
+      const got = d.items || [];
+      // Append de-dupes on id: a title can drift across a page boundary between
+      // fetches (popularity shifts), and a doubled key would crash the render.
+      setItems((prev) => {
+        if (!append || !prev) return got;
+        const seen = new Set(prev.map((m) => m.id));
+        return [...prev, ...got.filter((m) => !seen.has(m.id))];
+      });
+      setHasMore(!!d.has_next);
+      pageRef.current = p;
+    } catch (e) {
+      if (myEpoch !== epochRef.current) return;
+      setError(e.message);
+      if (!append) setItems([]);
+    } finally {
+      if (myEpoch === epochRef.current) {
+        busyRef.current = false;
+        setLoadingMore(false);
+        setLoading(false);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    setItems(null);
+    setHasMore(false);
+    pageRef.current = 1;
+    fetchPage(1, false);
+  }, [signature, fetchPage]);
+
+  const loadMore = useCallback(() => {
+    if (busyRef.current || !hasMore) return;
+    fetchPage(pageRef.current + 1, true);
+  }, [hasMore, fetchPage]);
+
+  return { items, hasMore, loading, loadingMore, error, loadMore };
+}
+
+/** An off-screen tripwire below the wall: when it nears the viewport it asks for the
+ *  next page. `count` re-arms it after every append (a still-visible sentinel won't
+ *  re-fire on its own), so a tall screen keeps filling until the page is covered. */
+function InfiniteSentinel({ onReach, active, count }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    if (!active || typeof IntersectionObserver === 'undefined') return undefined;
+    const el = ref.current;
+    if (!el) return undefined;
+    const obs = new IntersectionObserver(
+      (entries) => { if (entries.some((e) => e.isIntersecting)) onReach(); },
+      { rootMargin: '800px 0px' }, // start dealing the next page well before it shows
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [onReach, active, count]);
+  return <div ref={ref} aria-hidden="true" className={s.sentinel} />;
+}
+
 function BrowseTab() {
   const [urlQuery, setUrlQuery] = useParamState('q', '');
   const [rawKind, setKind] = useParamState('kind', 'trending');
   const kind = BROWSE_KINDS.some((k) => k.value === rawKind) ? rawKind : 'trending';
+  const [genres, setGenres] = useParamState('g', EMPTY_SET, SET_PARAM);
+  const [tags, setTags] = useParamState('t', EMPTY_SET, SET_PARAM);
+  const [rawSort, setSort] = useParamState('sort', 'popular');
+  const dsort = DISCOVER_SORTS.some((o) => o.value === rawSort) ? rawSort : 'popular';
+  const [panelOpen, setPanelOpen] = useState(false);
+  const filtering = genres.size > 0 || tags.size > 0;
+  const toggleGenre = toggleInSet(setGenres);
+  const toggleTag = toggleInSet(setTags);
+  const clearAll = () => { setGenres(new Set()); setTags(new Set()); };
 
   // The input keeps its own state so a keystroke is never a history write (browsers
   // throttle those); only the settled query is published to the URL. Nothing is lost
@@ -459,43 +762,137 @@ function BrowseTab() {
     if (dq !== urlQuery) setUrlQuery(dq);
   }, [dq]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const search = useApi(`/anime/search?q=${encodeURIComponent(dq)}`, searching);
-  const browse = useApi(`/anime/browse?kind=${kind}`, !searching);
+  // When a genre or tag is in play the discover query owns the shelf (folding in the
+  // text search too); otherwise it's plain text search, else the browse wall. Each
+  // mode is one infinite list, paged in as you scroll.
+  const mode = filtering ? 'discover' : searching ? 'search' : 'browse';
+  const gcsv = encodeURIComponent([...genres].sort().join(','));
+  const tcsv = encodeURIComponent([...tags].sort().join(','));
+  // A fingerprint of everything that changes the result set — changing it resets the
+  // scroll to page one; scrolling alone (which only bumps the page arg) does not.
+  const sig = mode === 'discover'
+    ? `d|${gcsv}|${tcsv}|${dsort}|${dq}`
+    : mode === 'search'
+      ? `s|${dq}`
+      : `b|${kind}`;
+  const buildUrl = useCallback(
+    (p) => {
+      if (mode === 'discover') {
+        return `/anime/discover?genres=${gcsv}&tags=${tcsv}&sort=${dsort}&q=${encodeURIComponent(dq)}&page=${p}`;
+      }
+      if (mode === 'search') return `/anime/search?q=${encodeURIComponent(dq)}&page=${p}`;
+      return `/anime/browse?kind=${kind}&page=${p}`;
+    },
+    [mode, gcsv, tcsv, dsort, dq, kind],
+  );
+  const feed = useInfiniteMedia(sig, buildUrl);
   const me = useApi('/anime/me'); // viewer score format (for "your rating"); 401 when not connected
   const scoreFormat = me.data?.score_format;
+  // The finder vocabulary is only needed once the panel is open; hold it back till then.
+  const coll = useApi('/anime/genres', panelOpen);
 
-  const active = searching ? search : browse;
-  const items = active.data?.items || [];
+  const items = feed.items || [];
   const activeKind = BROWSE_KINDS.find((k) => k.value === kind) || BROWSE_KINDS[0];
+  const activeSort = DISCOVER_SORTS.find((o) => o.value === dsort) || DISCOVER_SORTS[0];
 
-  // Browse opens on a rotating spotlight of the top 5; the wall continues from rank 6.
-  const featured = !searching ? items.slice(0, 5) : [];
+  // The spotlight reel is a feature of the plain browse wall — a filtered or searched
+  // result has no canonical "top 5" to romanticize, so it drops to a clean grid.
+  const showSpotlight = mode === 'browse';
+  const featured = showSpotlight ? items.slice(0, 5) : [];
   const wall = featured.length ? items.slice(featured.length) : items;
+
+  // The editorial caption under the controls, phrased for whichever mode is live.
+  let caption;
+  if (filtering) {
+    const bits = [];
+    if (genres.size) bits.push([...genres].sort().join(' + '));
+    if (tags.size) bits.push(`${tags.size} tag${tags.size === 1 ? '' : 's'}`);
+    caption = `${bits.join(' + ')} · ${activeSort.caption}`;
+  } else if (searching) {
+    caption = `matches for “${dq}”`;
+  } else {
+    caption = activeKind.caption;
+  }
 
   return (
     <>
       <SearchBar value={query} onChange={setQuery} placeholder="search AniList…" />
 
-      {!searching && (
-        <div className={s.browseTools}>
+      <div className={s.finderBar}>
+        <button
+          type="button"
+          className={`${s.filterToggle} ${panelOpen ? s.filterToggleOn : ''}`}
+          onClick={() => setPanelOpen((v) => !v)}
+          aria-expanded={panelOpen}
+        >
+          <SlidersHorizontal size={14} />
+          Genres &amp; tags
+          {filtering && <span className={s.filterBadge}>{genres.size + tags.size}</span>}
+          <ChevronDown size={13} className={panelOpen ? s.flip : undefined} />
+        </button>
+
+        {filtering ? (
+          <label className={s.sortWrap}>
+            <span className={s.sortLabel}>Order</span>
+            <div className={s.sortSelectWrap}>
+              <select className={s.sortSelect} value={dsort} onChange={(e) => setSort(e.target.value)}>
+                {DISCOVER_SORTS.map((o) => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+              <ChevronDown size={13} className={s.sortCaret} aria-hidden="true" />
+            </div>
+          </label>
+        ) : !searching ? (
           <SegmentedControl
             options={BROWSE_KINDS.map((k) => ({ value: k.value, label: k.label }))}
             value={kind}
             onChange={setKind}
           />
-          <span className={s.browseCaption}>
-            {activeKind.caption}
-            {items.length ? <em className={s.browseCount}>{items.length} titles</em> : null}
-          </span>
-        </div>
+        ) : null}
+
+        <span className={s.browseCaption}>
+          {caption}
+          {items.length ? <em className={s.browseCount}>{items.length} titles</em> : null}
+        </span>
+      </div>
+
+      {panelOpen && (
+        <AnimeFinder
+          coll={coll}
+          genres={genres}
+          tags={tags}
+          toggleGenre={toggleGenre}
+          toggleTag={toggleTag}
+          clearGenres={() => setGenres(new Set())}
+          clearTags={() => setTags(new Set())}
+        />
       )}
 
-      {active.error && <ErrorBox message={active.error} />}
-      {active.loading && !active.data && (
-        <Receiving label={searching ? `searching for “${dq}”` : 'pulling the listings'} />
+      {filtering && (
+        <ActiveFilters
+          genres={genres}
+          tags={tags}
+          toggleGenre={toggleGenre}
+          toggleTag={toggleTag}
+          clearAll={clearAll}
+        />
       )}
-      {!active.loading && items.length === 0 && (
-        <p className={s.muted}>{searching ? `No anime match “${dq}”.` : 'Nothing on air here yet.'}</p>
+
+      {feed.error && <ErrorBox message={feed.error} />}
+      {feed.loading && items.length === 0 && (
+        <Receiving
+          label={filtering ? 'sifting the archive' : searching ? `searching for “${dq}”` : 'pulling the listings'}
+        />
+      )}
+      {!feed.loading && !feed.error && items.length === 0 && (
+        <p className={s.muted}>
+          {filtering
+            ? 'No anime match this combination — try loosening a tag.'
+            : searching
+              ? `No anime match “${dq}”.`
+              : 'Nothing on air here yet.'}
+        </p>
       )}
 
       {featured.length > 0 && (
@@ -515,10 +912,27 @@ function BrowseTab() {
             media={m}
             index={i}
             scoreFormat={scoreFormat}
-            rank={!searching && activeKind.ranked ? i + featured.length + 1 : null}
+            rank={showSpotlight && activeKind.ranked ? i + featured.length + 1 : null}
           />
         ))}
       </div>
+
+      {/* Infinite scroll: the sentinel deals the next page; a quiet footer marks the
+          end so the wall never just stops with no word. */}
+      {items.length > 0 && (
+        <>
+          <InfiniteSentinel onReach={feed.loadMore} active={feed.hasMore && !feed.error} count={items.length} />
+          {feed.loadingMore && (
+            <div className={s.moreRow}>
+              <span className={s.moreDot} /><span className={s.moreDot} /><span className={s.moreDot} />
+              <span className={s.moreLabel}>dealing more titles</span>
+            </div>
+          )}
+          {!feed.hasMore && !feed.loadingMore && (
+            <p className={s.endNote}>· that’s every title in this shelf ·</p>
+          )}
+        </>
+      )}
     </>
   );
 }
@@ -1812,7 +2226,9 @@ function DetailDossier({ m, trailer, onTrailer, scoreFormat, connected }) {
 
           {m.genres?.length > 0 && (
             <div className={s.spotlightGenres}>
-              {m.genres.slice(0, 6).map((g) => <span key={g}>{g}</span>)}
+              {m.genres.slice(0, 6).map((g) => (
+                <Link key={g} to={discoverHref('g', g)} title={`Browse ${g} anime`}>{g}</Link>
+              ))}
             </div>
           )}
 
@@ -1874,10 +2290,16 @@ function Synopsis({ html, tags }) {
             <span className={s.asideLabel}>Themes &amp; tags</span>
             <div className={s.tagRow}>
               {topTags.map((t, i) => (
-                <span key={t.name} className={s.tag} style={{ '--i': Math.min(i, 13) }}>
+                <Link
+                  key={t.name}
+                  to={discoverHref('t', t.name)}
+                  className={s.tag}
+                  style={{ '--i': Math.min(i, 13) }}
+                  title={`Browse ${t.name} anime`}
+                >
                   {t.name}
                   {t.rank != null && <small>{t.rank}%</small>}
-                </span>
+                </Link>
               ))}
             </div>
           </div>

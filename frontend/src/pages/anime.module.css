@@ -187,6 +187,470 @@
   color: var(--paper-dim);
 }
 
+/* ── The finder — genre & tag discovery ──────────────────────────────────────
+   A warm cabinet drawer that folds open under the search bar. Everything here is
+   tuned to the Shōwa Set: mono labels in the faint ink, chips that warm to amber
+   when chosen, and a single accent (--c-anime) doing the "on" work throughout. */
+
+/* the control strip: filter toggle · (kind dial | order select) · caption */
+.finderBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3) var(--space-4);
+  margin: var(--space-4) 0 var(--space-4);
+}
+
+/* generic chevron flip (the readMore caret has its own scoped rule) */
+.flip {
+  transform: rotate(180deg);
+}
+
+.filterToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--rule);
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  cursor: pointer;
+  transition: border-color 0.16s ease, background 0.16s ease, color 0.16s ease;
+}
+.filterToggle:hover {
+  border-color: var(--rule-strong);
+  color: var(--text-primary);
+}
+.filterToggle svg {
+  transition: transform 0.2s ease;
+}
+.filterToggleOn {
+  border-color: color-mix(in srgb, var(--c-anime) 55%, var(--rule));
+  background: color-mix(in srgb, var(--c-anime) 9%, var(--surface));
+  color: var(--text-primary);
+}
+/* the count of live filters, riding the toggle in accent */
+.filterBadge {
+  display: inline-grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: var(--r-pill);
+  background: var(--c-anime);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 600;
+}
+
+/* order dial — a native select dressed to match, with our own caret */
+.sortWrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.sortLabel {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--paper-faint);
+}
+.sortSelectWrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+.sortSelect {
+  appearance: none;
+  padding: 6px 30px 6px 12px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--rule);
+  background: var(--surface);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  cursor: pointer;
+  transition: border-color 0.16s ease;
+}
+.sortSelect:hover { border-color: var(--rule-strong); }
+.sortSelect:focus-visible { outline: none; border-color: var(--c-anime); }
+.sortCaret {
+  position: absolute;
+  right: 11px;
+  color: var(--paper-faint);
+  pointer-events: none;
+}
+
+/* the drawer itself */
+.finderPanel {
+  margin-bottom: var(--space-5);
+  padding: var(--space-4) var(--space-5) var(--space-5);
+  border-radius: var(--r-card);
+  border: 1px dashed var(--rule);
+  background: color-mix(in srgb, var(--c-anime) 4%, var(--surface));
+  animation: fadeUp 0.28s ease both;
+}
+.finderSection + .finderSection {
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px dashed var(--rule);
+}
+.finderSectionHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+.finderLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--paper-faint);
+}
+.finderLabel svg { color: var(--c-anime); opacity: 0.8; }
+.finderMini {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--paper-faint);
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+.finderMini:hover { color: var(--danger); }
+
+/* genres — the whole roster, flat */
+.genreGrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+.genreChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px 5px 8px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--rule);
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+.genreChip:hover {
+  border-color: var(--rule-strong);
+  color: var(--text-primary);
+}
+.genreChipOn {
+  border-color: var(--c-anime);
+  background: color-mix(in srgb, var(--c-anime) 16%, var(--surface));
+  color: var(--text-primary);
+}
+/* the check slot collapses to a hairline dot when empty, so chips don't jump width */
+.genreCheck {
+  display: grid;
+  place-items: center;
+  width: 13px;
+  height: 13px;
+  border-radius: 4px;
+  border: 1px solid var(--rule-strong);
+  color: var(--ink);
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.genreChipOn .genreCheck {
+  background: var(--c-anime);
+  border-color: var(--c-anime);
+}
+
+/* tags — searchable vocabulary */
+.tagSearchWrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-width: 180px;
+}
+.tagSearchIcon {
+  position: absolute;
+  left: 9px;
+  color: var(--paper-faint);
+  pointer-events: none;
+}
+.tagSearch {
+  width: 100%;
+  padding: 5px 26px 5px 28px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--rule);
+  background: var(--surface-input);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+}
+.tagSearch:focus-visible { outline: none; border-color: var(--c-anime); }
+.tagSearchClear {
+  position: absolute;
+  right: 8px;
+  display: inline-flex;
+  color: var(--paper-faint);
+  cursor: pointer;
+}
+.tagSearchClear:hover { color: var(--text-primary); }
+
+/* the pinned "chosen" row, so a selection in a folded category is still reachable */
+.tagSelected {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: var(--space-3);
+  padding-bottom: var(--space-3);
+  border-bottom: 1px dashed var(--rule);
+}
+.tagSelectedLead {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--paper-faint);
+}
+
+/* the accordion of categories */
+.tagGroups,
+.tagMatchWrap {
+  max-height: 340px;
+  overflow-y: auto;
+  padding-right: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--rule-strong) transparent;
+}
+.tagGroups::-webkit-scrollbar,
+.tagMatchWrap::-webkit-scrollbar { width: 8px; }
+.tagGroups::-webkit-scrollbar-thumb,
+.tagMatchWrap::-webkit-scrollbar-thumb {
+  background: var(--rule-strong);
+  border-radius: var(--r-pill);
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+.tagCat {
+  border-bottom: 1px solid var(--rule);
+}
+.tagCat:last-child { border-bottom: 0; }
+.tagCatHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 9px 2px;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+.tagCatHead:hover { color: var(--text-primary); }
+.tagCatCaret {
+  color: var(--paper-faint);
+  transition: transform 0.18s ease;
+}
+.tagCatCaretOpen { transform: rotate(90deg); }
+.tagCatName {
+  flex: 1;
+  text-align: left;
+  font-family: var(--font-display);
+  font-size: 13.5px;
+}
+.tagCat[data-open] .tagCatName { color: var(--text-primary); }
+/* count of chosen tags hiding in this category */
+.tagCatSel {
+  display: inline-grid;
+  place-items: center;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 5px;
+  border-radius: var(--r-pill);
+  background: var(--c-anime);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+}
+.tagCatTotal {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--paper-faint);
+}
+.tagChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 2px 0 12px;
+}
+.tagMatchCount {
+  display: block;
+  margin-bottom: var(--space-3);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--paper-faint);
+}
+
+/* one tag chip — smaller + monospace, so a wall of them stays calm */
+.tagPick,
+.tagPickOn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px 4px 6px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--rule);
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+.tagPick:hover {
+  border-color: var(--rule-strong);
+  color: var(--text-primary);
+}
+.tagPickOn {
+  border-color: var(--c-anime);
+  background: color-mix(in srgb, var(--c-anime) 16%, var(--surface));
+  color: var(--text-primary);
+}
+.tagPickCheck {
+  display: grid;
+  place-items: center;
+  width: 12px;
+  height: 12px;
+  border-radius: 4px;
+  border: 1px solid var(--rule-strong);
+  color: var(--ink);
+}
+.tagPickOn .tagPickCheck {
+  background: var(--c-anime);
+  border-color: var(--c-anime);
+}
+.tagPickX { color: var(--paper-faint); margin-left: 1px; }
+.tagPickOn:hover .tagPickX { color: var(--danger); }
+
+.finderEmpty {
+  padding: var(--space-3) 0;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--paper-faint);
+}
+
+/* ── The active-filter ledger — always visible while filtering ──────────────── */
+.activeBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: var(--space-5);
+  animation: fadeUp 0.24s ease both;
+}
+.activeLead {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--paper-faint);
+}
+/* genre pills read as solid amber; tag pills as outlined mono — the same visual
+   grammar the finder uses, so the ledger echoes what you picked without a legend */
+.activePillG,
+.activePillT {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  border-radius: var(--r-pill);
+  cursor: pointer;
+  transition: filter 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.activePillG {
+  background: var(--c-anime);
+  color: var(--ink);
+  font-size: 12px;
+}
+.activePillG:hover { filter: brightness(1.06); }
+.activePillG svg { opacity: 0.7; }
+.activePillT {
+  border: 1px solid color-mix(in srgb, var(--c-anime) 45%, var(--rule));
+  background: color-mix(in srgb, var(--c-anime) 10%, var(--surface));
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+}
+.activePillT:hover { border-color: var(--c-anime); }
+.activePillT svg:first-child { color: var(--c-anime); }
+.activeClear {
+  margin-left: 2px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--paper-faint);
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+.activeClear:hover { color: var(--danger); }
+
+/* ── Infinite scroll — sentinel + "dealing more" footer ─────────────────────── */
+/* A zero-height tripwire; it only needs to exist in the flow below the grid. */
+.sentinel {
+  width: 100%;
+  height: 1px;
+}
+/* three warm dots breathing in sequence while the next page is on its way */
+.moreRow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: var(--space-5) 0 var(--space-4);
+}
+.moreDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--c-anime);
+  opacity: 0.35;
+  animation: moreDot 1.1s ease-in-out infinite;
+}
+.moreDot:nth-child(2) { animation-delay: 0.16s; }
+.moreDot:nth-child(3) { animation-delay: 0.32s; }
+@keyframes moreDot {
+  0%, 100% { opacity: 0.25; transform: translateY(0); }
+  40% { opacity: 0.9; transform: translateY(-3px); }
+}
+.moreLabel {
+  margin-left: 6px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  letter-spacing: 0.04em;
+  color: var(--paper-faint);
+}
+/* the quiet end-of-shelf marker, set like a printer's colophon */
+.endNote {
+  margin: var(--space-5) 0 var(--space-3);
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  color: var(--paper-faint);
+  opacity: 0.7;
+}
+@media (prefers-reduced-motion: reduce) {
+  .moreDot { animation: none; opacity: 0.7; }
+}
+
 /* the lead title as a detailed dossier on the warm cabinet TV */
 .spotlight {
   position: relative;
@@ -347,7 +811,7 @@
   gap: 6px;
   margin-top: 2px;
 }
-.spotlightGenres span {
+.spotlightGenres :is(span, a) {
   padding: 3px 10px;
   border-radius: var(--r-pill);
   border: 1px solid var(--rule-strong);
@@ -355,6 +819,16 @@
   font-size: 11px;
   color: var(--paper-dim);
   backdrop-filter: blur(2px);
+}
+/* On the detail dossier the genres are links into the finder — give them the lift. */
+.spotlightGenres a {
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+.spotlightGenres a:hover {
+  border-color: var(--c-anime);
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--c-anime) 14%, var(--ink));
 }
 .spotlightSynopsis {
   margin: 4px 0 2px;
@@ -1869,25 +2343,25 @@
 }
 
 /* Genres land one after another, left to right. */
-.spotlightGenres span {
+.spotlightGenres :is(span, a) {
   animation: handDrop 0.38s var(--hand) both;
 }
-.spotlightGenres span:nth-child(1) {
+.spotlightGenres :is(span, a):nth-child(1) {
   animation-delay: 0.7s;
 }
-.spotlightGenres span:nth-child(2) {
+.spotlightGenres :is(span, a):nth-child(2) {
   animation-delay: 0.74s;
 }
-.spotlightGenres span:nth-child(3) {
+.spotlightGenres :is(span, a):nth-child(3) {
   animation-delay: 0.78s;
 }
-.spotlightGenres span:nth-child(4) {
+.spotlightGenres :is(span, a):nth-child(4) {
   animation-delay: 0.82s;
 }
-.spotlightGenres span:nth-child(5) {
+.spotlightGenres :is(span, a):nth-child(5) {
   animation-delay: 0.86s;
 }
-.spotlightGenres span:nth-child(n + 6) {
+.spotlightGenres :is(span, a):nth-child(n + 6) {
   animation-delay: 0.9s;
 }
 
@@ -2206,6 +2680,17 @@
   font-size: 10px;
   color: var(--paper-faint);
 }
+/* The synopsis tags are links into the finder — warm on hover, like the genres. */
+a.tag {
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+a.tag:hover {
+  border-color: var(--c-anime);
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--c-anime) 12%, var(--surface-input));
+}
+a.tag:hover small { color: var(--c-anime); }
 
 /* The Anime Channel — trailer reel */
 .channelHead {

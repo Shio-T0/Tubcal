@@ -105,7 +105,16 @@ no ORM.
   `userPreferred`, which honours the account's own name-order setting — it can read
   "Luffy D. Monkey", and there is no fixing it here, since AniList stores the given
   name in `first` for Japanese and Western characters alike. The native name is
-  rendered alongside because it carries the true order.
+  rendered alongside because it carries the true order. `discover()` filters the
+  browse wall by any mix of genres + tags (AniList ANDs `genre_in`/`tag_in`), a sort
+  dial and an optional text query, forcing `isAdult:false`; `genre_collection()`
+  serves the picker's genre roster + tag vocabulary (grouped by category, adult tags
+  dropped, cached a day). Both back the Browse tab's genre/tag finder — and the
+  detail page's genre/tag chips deep-link into it via `?tab=browse&g=`/`&t=`.
+  `search`/`browse`/`discover` are paginated: each returns `{items, has_next}` (from
+  AniList `pageInfo.hasNextPage`) so the Browse wall can infinite-scroll, and each
+  caches via `cache.cached_dynamic` with a short `TTL_ANILIST_EMPTY` on an *empty*
+  page so a transient rate-limit can't strand a shelf blank for the full window.
 - `anime_source.py` — resolves the episode list + playable streams with `anipy_api`
   (the allanime/animekai scraper Shou uses); no external aggregator needed. It maps
   the AniList id to a title via `anilist.media`, searches the provider, and returns

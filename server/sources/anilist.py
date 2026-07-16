@@ -337,21 +337,35 @@ def update_user(token, **fields):
     return d.get("UpdateUser")
 
 
+def _page_payload(pg, ttl_full):
+    """Normalize a Page{pageInfo,media} block into the client's paginated shape
+    {items, has_next}, paired with the TTL it should cache under.
+
+    An empty page gets a deliberately short TTL: a blank result is almost always a
+    transient rate-limit or hiccup rather than the truth, and caching it for the
+    full window would strand a genre shelf empty for half an hour (which is exactly
+    what "only 6 titles and nothing more loads" looked like). `has_next` comes
+    straight from AniList's pageInfo, so the client knows when to stop scrolling."""
+    items = [norm_media(m) for m in (pg.get("media") or [])]
+    payload = {"items": items, "has_next": bool((pg.get("pageInfo") or {}).get("hasNextPage"))}
+    return payload, (ttl_full if items else config.TTL_ANILIST_EMPTY)
+
+
 def search(q, page=1, per_page=30, token=None):
     query = (
         "query ($search:String,$page:Int,$perPage:Int){"
-        " Page(page:$page,perPage:$perPage){ media(search:$search,type:ANIME,sort:SEARCH_MATCH){"
+        " Page(page:$page,perPage:$perPage){ pageInfo{ hasNextPage }"
+        " media(search:$search,type:ANIME,sort:SEARCH_MATCH){"
         + _MEDIA + "} } }"
     )
 
     def fetch():
         d = _post(query, {"search": q, "page": page, "perPage": per_page}, token=token)
-        return [norm_media(m) for m in (d.get("Page") or {}).get("media", [])]
+        return _page_payload(d.get("Page") or {}, config.TTL_ANILIST_SEARCH)
 
     # mediaListEntry depends on the token, so split the cache by auth state.
     auth = "auth" if token else "anon"
-    items, _ = cache.cached(f"anilist:search:{auth}:{q.lower()}:{page}", config.TTL_ANILIST_SEARCH, fetch)
-    return items
+    return cache.cached_dynamic(f"anilist:search:{auth}:{q.lower()}:{page}", fetch)
 
 
 def browse(kind="trending", page=1, per_page=30, token=None):
@@ -371,17 +385,113 @@ def browse(kind="trending", page=1, per_page=30, token=None):
         season_decl = ",$season:MediaSeason,$seasonYear:Int"  # AniList rejects unused vars
     query = (
         "query ($page:Int,$perPage:Int,$sort:[MediaSort]" + season_decl + "){"
-        " Page(page:$page,perPage:$perPage){ media(" + season_filter + "type:ANIME,sort:$sort){"
+        " Page(page:$page,perPage:$perPage){ pageInfo{ hasNextPage }"
+        " media(" + season_filter + "type:ANIME,sort:$sort){"
         + _MEDIA + "} } }"
     )
 
     def fetch():
         d = _post(query, variables, token=token)
-        return [norm_media(m) for m in (d.get("Page") or {}).get("media", [])]
+        return _page_payload(d.get("Page") or {}, config.TTL_ANILIST_BROWSE)
 
     auth = "auth" if token else "anon"
-    items, _ = cache.cached(f"anilist:browse:{auth}:{kind}:{page}", config.TTL_ANILIST_BROWSE, fetch)
-    return items
+    return cache.cached_dynamic(f"anilist:browse:{auth}:{kind}:{page}", fetch)
+
+
+# The sort dials the discover picker offers, keyed by the value the client sends.
+# POPULARITY leads because a genre/tag browse is "show me the well-loved ones";
+# the rest cover the other honest questions a filtered shelf gets asked.
+_DISCOVER_SORTS = {
+    "popular": "POPULARITY_DESC",
+    "trending": "TRENDING_DESC",
+    "score": "SCORE_DESC",
+    "newest": "START_DATE_DESC",
+    "oldest": "START_DATE",
+    "title": "TITLE_ROMAJI",
+}
+
+
+def genre_collection():
+    """AniList's full genre list + tag vocabulary, for the discover picker.
+
+    Two collections in one round-trip. Tags carry a category (so the picker can
+    group them the way AniList's own filters do) and a description (shown on hover
+    — the sort of thing that answers "what does 'Iyashikei' even mean" without a
+    detour). Adult-only genres/tags are dropped here so the comfy home picker never
+    surfaces them; the discover query is SFW-only to match.
+    """
+
+    def fetch():
+        d = _post(
+            "query { GenreCollection"
+            " MediaTagCollection { name description category isAdult } }"
+        )
+        genres = [g for g in (d.get("GenreCollection") or []) if g and g != "Hentai"]
+        tags = [
+            {
+                "name": t["name"],
+                "description": t.get("description"),
+                "category": t.get("category") or "Other",
+            }
+            for t in (d.get("MediaTagCollection") or [])
+            if t and t.get("name") and not t.get("isAdult")
+        ]
+        # Group tags by category, categories alphabetized and tags within each kept
+        # in AniList's own order (already relevance-sorted). The picker renders these
+        # as collapsible sections, so the shape is done here, once, cached.
+        cats = {}
+        for t in tags:
+            cats.setdefault(t["category"], []).append(t)
+        grouped = [
+            {"category": c, "tags": cats[c]}
+            for c in sorted(cats, key=lambda c: (c.lower()))
+        ]
+        return {"genres": genres, "tags": tags, "tag_groups": grouped}
+
+    data, _ = cache.cached("anilist:genres", config.TTL_ANILIST_GENRES, fetch)
+    return data
+
+
+def discover(genres=None, tags=None, sort="popular", search=None,
+             page=1, per_page=30, token=None):
+    """Browse anime filtered by any mix of genres, tags and a text query.
+
+    Genres and tags are ANDed by AniList (genre_in + tag_in narrow together), which
+    is the intuitive reading of picking several: "slice-of-life *and* iyashikei",
+    not "either". `isAdult:false` keeps the shelf SFW to match the picker. When a
+    search term rides along, we still honour the chosen sort unless it's the default
+    popularity dial, in which case relevance (SEARCH_MATCH) wins — a typed query
+    wants its best match first.
+    """
+    genres = [g for g in (genres or []) if g]
+    tags = [t for t in (tags or []) if t]
+    search = (search or "").strip() or None
+    sort_key = "SEARCH_MATCH" if (search and sort == "popular") else _DISCOVER_SORTS.get(sort, "POPULARITY_DESC")
+
+    decl = ["$page:Int", "$perPage:Int", "$sort:[MediaSort]"]
+    args = ["type:ANIME", "isAdult:false", "sort:$sort"]
+    variables = {"page": page, "perPage": per_page, "sort": [sort_key]}
+    if genres:
+        decl.append("$genres:[String]"); args.append("genre_in:$genres"); variables["genres"] = genres
+    if tags:
+        decl.append("$tags:[String]"); args.append("tag_in:$tags"); variables["tags"] = tags
+    if search:
+        decl.append("$search:String"); args.append("search:$search"); variables["search"] = search
+    query = (
+        "query (" + ",".join(decl) + "){"
+        " Page(page:$page,perPage:$perPage){ pageInfo{ hasNextPage }"
+        " media(" + ",".join(args) + "){"
+        + _MEDIA + "} } }"
+    )
+
+    def fetch():
+        d = _post(query, variables, token=token)
+        return _page_payload(d.get("Page") or {}, config.TTL_ANILIST_BROWSE)
+
+    auth = "auth" if token else "anon"
+    ck = "g:" + ",".join(sorted(genres)) + "|t:" + ",".join(sorted(tags)) + \
+        f"|s:{sort}|q:{(search or '').lower()}|p:{page}"
+    return cache.cached_dynamic(f"anilist:discover:{auth}:{ck}", fetch)
 
 
 def media(media_id, token=None):

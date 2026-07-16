@@ -34,7 +34,7 @@ def search():
         return ok({"items": []})
     page = int(request.args.get("page") or 1)
     try:
-        return ok({"items": anilist.search(q, page=page, token=_token())})
+        return ok(anilist.search(q, page=page, token=_token()))
     except Exception as e:
         return err(f"AniList search failed: {e}", 502)
 
@@ -44,9 +44,43 @@ def browse():
     kind = request.args.get("kind") or "trending"
     page = int(request.args.get("page") or 1)
     try:
-        return ok({"items": anilist.browse(kind, page=page, token=_token()), "kind": kind})
+        return ok({**anilist.browse(kind, page=page, token=_token()), "kind": kind})
     except Exception as e:
         return err(f"AniList browse failed: {e}", 502)
+
+
+@anime_bp.get("/genres")
+def genres():
+    """The genre list + tag vocabulary that drives the discover picker."""
+    try:
+        return ok(anilist.genre_collection())
+    except Exception as e:
+        return err(f"AniList genres failed: {e}", 502)
+
+
+@anime_bp.get("/discover")
+def discover():
+    """Browse filtered by any mix of genres, tags, a sort dial and a text query."""
+    def _csv(name):
+        raw = request.args.get(name) or ""
+        return [x.strip() for x in raw.split(",") if x.strip()]
+
+    genre_list = _csv("genres")
+    tag_list = _csv("tags")
+    sort = request.args.get("sort") or "popular"
+    q = (request.args.get("q") or "").strip() or None
+    page = int(request.args.get("page") or 1)
+    # Nothing selected and no query is just the trending wall — let /browse own that
+    # so a stray /discover call doesn't fan out into an unfiltered fetch.
+    if not genre_list and not tag_list and not q:
+        return ok({"items": [], "empty": True})
+    try:
+        data = anilist.discover(
+            genres=genre_list, tags=tag_list, sort=sort, search=q,
+            page=page, token=_token())
+        return ok({**data, "genres": genre_list, "tags": tag_list, "sort": sort})
+    except Exception as e:
+        return err(f"AniList discover failed: {e}", 502)
 
 
 @anime_bp.get("/media/<int:media_id>")

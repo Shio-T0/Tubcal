@@ -52,7 +52,13 @@ TTL_ANILIST_BROWSE = 1800
 TTL_ANILIST_MEDIA = 3600
 TTL_ANILIST_STAFF = 21600  # a seiyuu's dossier changes far more slowly than a season
 TTL_ANILIST_LIST = 60  # short so list/progress edits reflect quickly
+# An empty browse/search/discover page is almost always a transient rate-limit,
+# not the truth — cache it only briefly so a blank shelf self-heals on the next look.
+TTL_ANILIST_EMPTY = 30
 TTL_ANILIST_THREADS = 300
+# The genre list + tag vocabulary is effectively static (AniList adds a tag every
+# few months), so hold it for a day — it drives the discover picker.
+TTL_ANILIST_GENRES = 86400
 TTL_ANIME_EPISODES = 600  # aggregator episode list
 # GitHub (60 req/hr unauthenticated → cache aggressively)
 TTL_GITHUB_FEED = 600  # 10 min for subscribed repo/user activity
