@@ -65,6 +65,11 @@ TTL_GITHUB_FEED = 600  # 10 min for subscribed repo/user activity
 TTL_GITHUB_SEARCH = 300  # 5 min for search results
 TTL_GITHUB_ITEM = 1800  # 30 min for a single repo detail
 TTL_GITHUB_TRENDING = 1800  # 30 min — trending is a search call, keep it cheap
+# The Workbench (No 09): per-language shelves. Podcast/blog feeds move slowly;
+# the release stamp barely moves at all.
+TTL_DEV_PODCASTS = 21600  # 6 h — a show posts weekly at best
+TTL_DEV_UPDATES = 1800  # 30 min — blogs + GitHub releases merged
+TTL_DEV_RELEASE = 21600  # 6 h — the "current stable" stamp
 
 # Invidious instances (override via TUBCAL_INVIDIOUS env, comma-separated).
 # Used for trending/popular/search — things YouTube RSS can't provide.
@@ -115,6 +120,7 @@ ROOM_IDS = [
     "anime",
     "editor",
     "github",
+    "dev",
 ]
 
 # The Composing Room (code editor): all filesystem access is hard-contained to

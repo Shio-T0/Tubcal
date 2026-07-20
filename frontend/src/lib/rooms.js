@@ -11,6 +11,7 @@ export const ROOMS = [
   { id: 'anime',     label: 'The Anime', color: 'var(--c-anime)', route: '/anime', default_enabled: true },
   { id: 'editor',    label: 'The Composing Room', color: 'var(--c-editor)', route: '/editor', default_enabled: true },
   { id: 'github',    label: 'GitHub', color: 'var(--c-github)', route: '/github', default_enabled: false },
+  { id: 'dev',       label: 'The Workbench', color: 'var(--c-dev)', route: '/dev', default_enabled: true },
 ];
 
 export const ROOM_IDS = ROOMS.map(r => r.id);

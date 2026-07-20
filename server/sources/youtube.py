@@ -230,23 +230,51 @@ def search_channel(channel_id, query):
     return {"items": items, "stale": True}
 
 
-def _collect_streams(data, is_live):
-    """Pick the muxed (audio+video) renditions playable in our player.
+# The progressive muxed rendition (itag 18) covers 360p, so the adaptive ladder
+# only needs to add heights above it.
+_ADAPTIVE_FLOOR = 360
 
-      - "mp4"  progressive https mp4 — a plain <video src> (only itag 18 / 360p);
-      - "hls"  m3u8 renditions up to 1080p — needs hls.js + segment proxying.
-    We keep progressive 360p as the floor and HLS only above it, so the quality
-    list has no duplicate 360p and tops out at the best HLS rendition. For a live
-    broadcast YouTube only exposes HLS, so we keep every muxed m3u8 rung.
 
-    Multi-audio handling: when a video ships dubbed audio tracks, YouTube exposes
-    one muxed rendition per language at every height (e.g. 96-0 … 96-22), tagging
-    the creator's real track with format_note "(original)". Picking blindly would
-    surface — and default to — a dubbed track, so on such videos we keep only the
-    original-language renditions. (Progressive itag 18 always carries the original
-    audio, so it's exempt.)
+def _pick_audio(formats):
+    """The creator's original AAC (mp4a) audio, best bitrate first.
+
+    Dubbed language tracks and DRC (dynamic-range-compressed) variants are dropped
+    — the adaptive player only ever muxes the original audio. Each returned format
+    is fragmented mp4 with an `sidx`, so it can back a byte-range HLS media
+    playlist (see fmp4.py). Returns [] when no usable AAC track is present.
     """
-    formats = data.get("formats", [])
+    cands = []
+    for f in formats:
+        acodec = f.get("acodec") or ""
+        if f.get("vcodec") not in (None, "none"):
+            continue  # a muxed format, not audio-only
+        if not acodec.startswith("mp4a") or f.get("ext") != "m4a":
+            continue  # only AAC-in-mp4, which we can index as fMP4
+        if (f.get("protocol") or "") != "https" or not f.get("url"):
+            continue
+        if str(f.get("format_id") or "").endswith("-drc"):
+            continue  # a loudness-normalized duplicate of another track
+        # yt-dlp tags the creator's track "original"/"default"; a track flagged as
+        # neither is a dub, kept only if the video has no original-tagged track.
+        note = (f.get("format_note") or "").lower()
+        is_original = "original" in note or "default" in note
+        cands.append((is_original, f.get("abr") or 0, {
+            "itag": str(f.get("format_id")),
+            "url": f["url"],
+            "acodec": acodec,
+            "bandwidth": int((f.get("abr") or 128) * 1000),
+        }))
+    if not cands:
+        return []
+    if any(orig for orig, _, _ in cands):
+        cands = [c for c in cands if c[0]]  # keep only the original-language track
+    cands.sort(key=lambda c: c[1], reverse=True)
+    return [c[2] for c in cands]
+
+
+def _collect_live_streams(formats):
+    """Live broadcasts are HLS-only — keep every muxed m3u8 rung, and on a
+    multi-language stream keep only the creator's original-audio renditions."""
     multi_audio = any(
         "original" in (f.get("format_note") or "").lower() for f in formats
     )
@@ -254,31 +282,85 @@ def _collect_streams(data, is_live):
     for f in formats:
         if f.get("vcodec") in (None, "none") or f.get("acodec") in (None, "none"):
             continue
-        if not f.get("url"):
+        if not f.get("url") or not (f.get("protocol") or "").startswith("m3u8"):
             continue
-        proto = f.get("protocol") or ""
-        h = f.get("height") or 0
         note = (f.get("format_note") or "").lower()
-        if proto.startswith("m3u8") and (h > 360 or is_live):
-            if multi_audio and "original" not in note:
-                continue  # a dubbed track — skip it, keep only the original
-            kind = "hls"
-        elif proto.startswith("http") and f.get("ext") == "mp4":
-            kind = "mp4"
-        else:
+        if multi_audio and "original" not in note:
             continue
+        h = f.get("height") or 0
         streams.append({
             "url": f["url"],
             "quality": f"{h}p" if h else (f.get("format_note") or ""),
             "itag": str(f.get("format_id")),
-            "kind": kind,
+            "kind": "hls",
             "type": "video/mp4",
             "height": h,
         })
     streams.sort(key=lambda s: s["height"], reverse=True)
-    for s in streams:
-        s.pop("height", None)
     return streams
+
+
+def _collect_streams(data):
+    """Resolve the playable quality ladder and the original audio track.
+
+    Returns ``(streams, audio)``. `streams` is highest-first; each entry is one of:
+      - "mp4"  progressive muxed https mp4 (itag 18 / 360p) — an instant, hls.js-
+        free floor played as a plain <video src>;
+      - "hls"  an adaptive avc1 video-only rendition above 360p (``adaptive: True``).
+        YouTube now ships higher qualities only as adaptive DASH, so these are
+        muxed with the original audio *in the browser* via a synthesized byte-range
+        HLS master (see fmp4.py + server/api/feeds.py) — no ffmpeg, no third party.
+
+    A live broadcast has no adaptive DASH, so it stays on the muxed-HLS path and
+    returns an empty `audio` list (its renditions are already muxed).
+    """
+    formats = data.get("formats", [])
+    if data.get("live_status") == "is_live":
+        return _collect_live_streams(formats), []
+
+    audio = _pick_audio(formats)
+    streams = []
+    for f in formats:
+        # Progressive muxed mp4 floor — the quickest possible start.
+        if (
+            f.get("vcodec") not in (None, "none")
+            and f.get("acodec") not in (None, "none")
+            and f.get("url")
+            and (f.get("protocol") or "").startswith("http")
+            and f.get("ext") == "mp4"
+        ):
+            h = f.get("height") or 0
+            streams.append({
+                "url": f["url"], "quality": f"{h}p" if h else "360p",
+                "itag": str(f.get("format_id")), "kind": "mp4",
+                "type": "video/mp4", "height": h,
+            })
+    # Adaptive avc1 renditions above the floor, each pairable with the original
+    # audio. Skip them if there's nothing to pair with — a video-only stream is
+    # useless to the player. avc1 only (H.264): universally MSE-decodable and the
+    # container we index; VP9/AV1 are left out on purpose.
+    if audio:
+        abw = audio[0]["bandwidth"]
+        for f in formats:
+            if not (f.get("vcodec") or "").startswith("avc1"):
+                continue
+            if f.get("acodec") not in (None, "none") or f.get("ext") != "mp4":
+                continue
+            if (f.get("protocol") or "") != "https" or not f.get("url"):
+                continue
+            h = f.get("height") or 0
+            if h <= _ADAPTIVE_FLOOR:
+                continue
+            vbr = f.get("vbr") or f.get("tbr") or 0
+            streams.append({
+                "url": f["url"], "quality": f"{h}p",
+                "itag": str(f.get("format_id")), "kind": "hls",
+                "type": "video/mp4", "height": h, "width": f.get("width"),
+                "vcodec": f.get("vcodec"), "adaptive": True,
+                "bandwidth": int(vbr * 1000) + abw if vbr else abw,
+            })
+    streams.sort(key=lambda s: s.get("height") or 0, reverse=True)
+    return streams, audio
 
 
 def _ytdlp_info(video_id):
@@ -308,8 +390,7 @@ def _ytdlp_info(video_id):
 
     # live_status ∈ {is_live, is_upcoming, was_live, post_live, not_live, None}
     live_status = data.get("live_status")
-    is_live = live_status == "is_live"
-    streams = _collect_streams(data, is_live)
+    streams, audio = _collect_streams(data)
     # A finished/normal video with no stream is a real failure; an upcoming one
     # legitimately has none yet, so don't treat that as an error.
     if not streams and live_status != "is_upcoming":
@@ -326,6 +407,7 @@ def _ytdlp_info(video_id):
         "live_status": live_status,
         "scheduled_at": data.get("release_timestamp"),
         "streams": streams,
+        "audio": audio,
     }
 
 
@@ -343,7 +425,15 @@ def video_info(video_id):
 
     def fetch():
         try:
-            return _ytdlp_info(video_id), 1800
+            info = _ytdlp_info(video_id)
+            # A resolve that yielded only the 360p floor (no adaptive ladder) is
+            # degraded — YouTube dropped the higher renditions this time. Cache it
+            # briefly so the next open re-resolves and usually recovers the ladder,
+            # instead of stranding the video at 360p for the full window.
+            streams = info.get("streams") or []
+            has_ladder = len(streams) > 1 or any(s.get("height", 0) > _ADAPTIVE_FLOOR for s in streams)
+            live = info.get("live_status") in ("is_live", "is_upcoming")
+            return info, 1800 if (has_ladder or live) else 120
         except Exception:
             inv = invidious.video_streams(video_id)  # streams + title + duration
             return {
@@ -358,6 +448,7 @@ def video_info(video_id):
                 "live_status": None,
                 "scheduled_at": None,
                 "streams": inv.get("streams") or [],
+                "audio": [],
                 "degraded": True,
             }, 90
 
@@ -372,6 +463,7 @@ def video_streams(video_id):
         "title": info.get("title", ""),
         "duration": info.get("duration"),
         "streams": info.get("streams") or [],
+        "audio": info.get("audio") or [],
     }
 
 

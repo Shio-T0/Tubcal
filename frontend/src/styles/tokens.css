@@ -33,6 +33,7 @@
   --c-github: #9a8ec7;
   --c-anime: var(--signal);   /* The Anime room — adopts each skin's accent */
   --c-editor: #9aae64;        /* The Composing Room — matcha, kin to --rail-2 */
+  --c-dev: #8fae9b;           /* The Workbench — verdigris, patina on the tools */
   --success: #9aae64;
   --danger: #c75a44;
 
@@ -108,6 +109,7 @@
   --c-github: #7b6fa5;
   --c-anime: var(--signal);
   --c-editor: #5e7338;
+  --c-dev: #47705a;
   --success: #5e7338;
   --danger: #b3361f;
 

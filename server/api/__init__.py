@@ -16,6 +16,7 @@ def register_blueprints(app):
     from .oauth import oauth_bp
     from .brain import brain_bp
     from .anime import anime_bp
+    from .dev import dev_bp
     from .edition import edition_bp
     from .editor import editor_bp
 
@@ -25,5 +26,6 @@ def register_blueprints(app):
     app.register_blueprint(oauth_bp)
     app.register_blueprint(brain_bp)
     app.register_blueprint(anime_bp)
+    app.register_blueprint(dev_bp)
     app.register_blueprint(edition_bp)
     app.register_blueprint(editor_bp)

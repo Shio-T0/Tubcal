@@ -1,0 +1,1011 @@
+/* No 09 — The Workbench.
+   A service-manual metaphor on the Shōwa bench: a shelf of bound language
+   manuals on the left, the open manual on the right. Graph-paper panels,
+   punched binder holes, dotted spec leaders, a rubber "current stable" stamp.
+   Everything derives from the skin tokens + one per-language accent (--lang-c),
+   so all seven skins restyle the room for free. */
+
+.bench {
+  --lang-c: var(--c-dev);
+  --lang-soft: color-mix(in srgb, var(--lang-c) 14%, transparent);
+  --lang-faint: color-mix(in srgb, var(--lang-c) 7%, transparent);
+  --graph-line: color-mix(in srgb, var(--paper) 5%, transparent);
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: var(--space-5);
+  align-items: start;
+  margin-top: var(--space-4);
+}
+
+/* ------------------------------------------------------------- the shelf */
+
+.shelf {
+  position: sticky;
+  top: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-2);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-card);
+  background:
+    linear-gradient(180deg, var(--surface), transparent 60%),
+    var(--ink-2);
+}
+
+.shelfLabel,
+.shelfCount {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--paper-faint);
+  text-align: center;
+}
+
+.spines {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.spine {
+  --spine-c: var(--c-dev);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-height: 128px;
+  padding: var(--space-3) 0 var(--space-2);
+  border: 1px solid color-mix(in srgb, var(--spine-c) 36%, var(--rule));
+  border-left: 4px solid var(--spine-c);
+  border-radius: 6px 10px 10px 6px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--spine-c) 10%, transparent), transparent 55%),
+    var(--surface);
+  color: var(--paper-dim);
+  cursor: pointer;
+  transition: transform 0.22s ease, background 0.22s ease, color 0.22s ease,
+    box-shadow 0.22s ease;
+}
+
+.spine:hover {
+  color: var(--paper);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--spine-c) 16%, transparent), transparent 60%),
+    var(--surface-hover);
+  transform: translateX(3px);
+}
+
+.spineOpen {
+  color: var(--paper);
+  border-color: color-mix(in srgb, var(--spine-c) 70%, var(--rule));
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--spine-c) 22%, transparent), transparent 70%),
+    var(--surface-hover);
+  transform: translateX(7px);
+  box-shadow: -6px 6px 16px color-mix(in srgb, var(--spine-c) 12%, transparent);
+}
+
+.spineName {
+  writing-mode: vertical-rl;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.spineMascot {
+  font-size: 15px;
+  filter: saturate(0.85);
+}
+
+/* ------------------------------------------------------------ the manual */
+
+.manual {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  min-width: 0;
+}
+
+.manual > * {
+  animation: leafIn 0.45s ease both;
+}
+
+.manual > *:nth-child(2) { animation-delay: 0.05s; }
+.manual > *:nth-child(3) { animation-delay: 0.1s; }
+.manual > *:nth-child(4) { animation-delay: 0.15s; }
+.manual > *:nth-child(5) { animation-delay: 0.2s; }
+.manual > *:nth-child(6) { animation-delay: 0.25s; }
+
+@keyframes leafIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ----------------------------------------------------------- the dossier */
+
+.dossier {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-5);
+  overflow: hidden;
+  padding: var(--space-5) var(--space-6) var(--space-5) 56px;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--r-card);
+  background:
+    /* punched binder holes down the left margin */
+    radial-gradient(circle 5px at 26px 30px, var(--ink) 4px, transparent 5px),
+    radial-gradient(circle 5px at 26px 50%, var(--ink) 4px, transparent 5px),
+    radial-gradient(circle 5px at 26px calc(100% - 30px), var(--ink) 4px, transparent 5px),
+    /* margin rule, like a ledger page */
+    linear-gradient(90deg, transparent 43px, color-mix(in srgb, var(--lang-c) 34%, transparent) 43px, color-mix(in srgb, var(--lang-c) 34%, transparent) 44px, transparent 44px),
+    linear-gradient(180deg, var(--lang-faint), transparent 45%),
+    var(--ink-2);
+}
+
+.dossierMascot {
+  position: absolute;
+  right: -18px;
+  bottom: -30px;
+  font-size: 150px;
+  line-height: 1;
+  opacity: 0.07;
+  filter: saturate(0.6);
+  pointer-events: none;
+  user-select: none;
+}
+
+.dossierMain {
+  min-width: 0;
+}
+
+.dossierEyebrow {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--lang-c);
+}
+
+.dossierName {
+  margin: 4px 0 2px;
+  font-family: var(--font-display);
+  font-size: clamp(34px, 5vw, 48px);
+  font-weight: 620;
+  letter-spacing: -0.015em;
+  color: var(--paper);
+}
+
+.dossierTagline {
+  margin: 0 0 var(--space-4);
+  max-width: 52ch;
+  font-size: 14.5px;
+  line-height: 1.5;
+  color: var(--paper-dim);
+}
+
+.specs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 6px var(--space-6);
+  margin: 0 0 var(--space-4);
+  max-width: 620px;
+}
+
+.specRow {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  font-size: 12.5px;
+}
+
+.specLabel {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--paper-faint);
+  white-space: nowrap;
+}
+
+.specDots {
+  flex: 1;
+  min-width: 16px;
+  border-bottom: 2px dotted color-mix(in srgb, var(--paper) 22%, transparent);
+  transform: translateY(-3px);
+}
+
+.specVal {
+  margin: 0;
+  color: var(--paper);
+  text-align: right;
+}
+
+.siteLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--lang-c);
+  text-decoration: none;
+  border-bottom: 1px solid color-mix(in srgb, var(--lang-c) 40%, transparent);
+  padding-bottom: 1px;
+}
+
+.siteLink:hover {
+  border-bottom-color: var(--lang-c);
+}
+
+/* the rubber stamp */
+
+.stampWell {
+  display: flex;
+  align-items: flex-start;
+  padding-top: var(--space-3);
+}
+
+.stamp {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: var(--space-3) var(--space-4);
+  border: 2px solid color-mix(in srgb, var(--lang-c) 72%, transparent);
+  outline: 1px solid color-mix(in srgb, var(--lang-c) 28%, transparent);
+  outline-offset: 3px;
+  border-radius: 6px;
+  transform: rotate(-2.5deg);
+  color: var(--lang-c);
+  text-decoration: none;
+  opacity: 0.92;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+a.stamp:hover {
+  transform: rotate(-1deg) scale(1.03);
+  opacity: 1;
+}
+
+.stampGhost {
+  border-style: dashed;
+  opacity: 0.45;
+}
+
+.stampKicker {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+
+.stampTag {
+  font-family: var(--font-mono);
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.stampDate {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  opacity: 0.8;
+}
+
+/* ---------------------------------------------------------- panels & tabs */
+
+.panel {
+  position: relative;
+  padding: var(--space-5);
+  border: 1px solid var(--rule);
+  border-radius: 4px var(--r-card) var(--r-card) var(--r-card);
+  background:
+    /* graph paper, faint */
+    linear-gradient(var(--graph-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--graph-line) 1px, transparent 1px),
+    linear-gradient(180deg, var(--surface), transparent 70%),
+    var(--ink-2);
+  background-size: 24px 24px, 24px 24px, auto, auto;
+}
+
+.secTabRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin: calc(-1 * var(--space-5)) calc(-1 * var(--space-5)) var(--space-4);
+  padding: 0 var(--space-5);
+  transform: translateY(-1px);
+}
+
+.secTab {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding: 6px 14px 5px;
+  border: 1px solid var(--rule-strong);
+  border-top: none;
+  border-radius: 0 0 10px 10px;
+  background: color-mix(in srgb, var(--lang-c) 9%, var(--ink-3));
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--paper);
+}
+
+.secNo {
+  color: var(--lang-c);
+  font-weight: 700;
+}
+
+.secNote {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--paper-faint);
+  text-align: right;
+  padding-top: 8px;
+}
+
+.empty {
+  margin: var(--space-2) 0;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  color: var(--paper-faint);
+}
+
+/* ----------------------------------------------------- SEC 01 — filmstrip */
+
+.filmstrip {
+  display: flex;
+  gap: var(--space-3);
+  overflow-x: auto;
+  padding: var(--space-1) 2px var(--space-3);
+  scrollbar-width: thin;
+}
+
+.filmCard {
+  flex: 0 0 236px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+}
+
+.filmThumbWrap {
+  position: relative;
+  display: block;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: 8px;
+  border: 1px solid var(--rule);
+  /* sprocket strip along the top edge — it is a filmstrip, after all */
+  padding-top: 8px;
+  background:
+    radial-gradient(circle 2px at 8px 4px, var(--paper-faint) 1.6px, transparent 2px) left top / 16px 8px repeat-x,
+    var(--ink);
+}
+
+.filmThumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  border-radius: 0 0 7px 7px;
+  transition: transform 0.3s ease;
+}
+
+.filmCard:hover .filmThumb {
+  transform: scale(1.04);
+}
+
+.filmLen {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: rgba(10, 6, 3, 0.78);
+  color: #eee2c8;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+}
+
+.filmPlay {
+  position: absolute;
+  inset: 8px 0 0;
+  display: grid;
+  place-items: center;
+  color: #f4ead2;
+  background: color-mix(in srgb, var(--lang-c) 26%, rgba(12, 7, 3, 0.35));
+  opacity: 0;
+  transition: opacity 0.22s ease;
+}
+
+.filmCard:hover .filmPlay,
+.filmCard:focus-visible .filmPlay {
+  opacity: 1;
+}
+
+.filmTitle {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--paper);
+}
+
+.filmMeta {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--paper-faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ------------------------------------------------------ SEC 02 — the radio */
+
+.radio {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid color-mix(in srgb, var(--lang-c) 30%, var(--rule));
+  border-radius: 12px;
+  background:
+    /* speaker-grille lines on the right */
+    repeating-linear-gradient(90deg, transparent 0 6px, color-mix(in srgb, var(--paper) 4%, transparent) 6px 7px) right / 88px 100% no-repeat,
+    linear-gradient(180deg, var(--lang-faint), transparent 65%),
+    var(--ink-3);
+}
+
+.radioIdle {
+  border-style: dashed;
+}
+
+.radioDial {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 2px solid var(--rule-strong);
+  background:
+    conic-gradient(from 210deg, var(--lang-c) 0 40deg, transparent 40deg 360deg),
+    var(--surface);
+  flex: none;
+}
+
+.radioIdleText {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  color: var(--paper-faint);
+}
+
+.radioArt {
+  width: 52px;
+  height: 52px;
+  border-radius: 9px;
+  object-fit: cover;
+  border: 1px solid var(--rule);
+  flex: none;
+}
+
+.radioBtn {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, var(--lang-c) 60%, var(--rule-strong));
+  background: color-mix(in srgb, var(--lang-c) 18%, transparent);
+  color: var(--paper);
+  cursor: pointer;
+  flex: none;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.radioBtn:hover {
+  background: color-mix(in srgb, var(--lang-c) 30%, transparent);
+  transform: scale(1.05);
+}
+
+.radioMain {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.radioTitle {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--paper);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.radioSeekRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.radioSeek {
+  flex: 1;
+  min-width: 0;
+  accent-color: var(--lang-c);
+  height: 4px;
+}
+
+.radioTime {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--paper-faint);
+  flex: none;
+}
+
+.radioShow {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--lang-c);
+}
+
+.episodes {
+  display: flex;
+  flex-direction: column;
+}
+
+.episode {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 9px var(--space-2);
+  border-bottom: 1px dashed var(--rule);
+  border-radius: 6px;
+  transition: background 0.15s ease;
+}
+
+.episode:last-child {
+  border-bottom: none;
+}
+
+.episode:hover {
+  background: var(--surface);
+}
+
+.episodeOn {
+  background: var(--lang-faint);
+}
+
+.epPlay {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid var(--rule-strong);
+  background: var(--surface);
+  color: var(--paper-dim);
+  cursor: pointer;
+  flex: none;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.epPlay:hover,
+.episodeOn .epPlay {
+  color: var(--lang-c);
+  border-color: color-mix(in srgb, var(--lang-c) 60%, var(--rule-strong));
+}
+
+.epMain {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.epTitle {
+  font-size: 13px;
+  font-weight: 550;
+  color: var(--paper);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.epMeta {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--paper-faint);
+}
+
+.epLink {
+  color: var(--paper-faint);
+  flex: none;
+  display: grid;
+  place-items: center;
+  padding: 6px;
+}
+
+.epLink:hover {
+  color: var(--lang-c);
+}
+
+/* ---------------------------------------------------- SEC 03 — change log */
+
+.logGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  gap: var(--space-6);
+}
+
+.logGridSolo {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.logCol {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.logColHead {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--paper-faint);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--rule-strong);
+  margin-bottom: var(--space-2);
+}
+
+.releaseRow {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  padding: 8px 0 8px var(--space-3);
+  border-left: 2px solid color-mix(in srgb, var(--lang-c) 45%, transparent);
+  margin-left: 4px;
+  text-decoration: none;
+  color: inherit;
+}
+
+.releaseRow:hover .releaseTitle {
+  color: var(--lang-c);
+}
+
+.releaseTag {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--lang-c);
+  white-space: nowrap;
+}
+
+.releaseTag em {
+  font-style: normal;
+  font-weight: 400;
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+
+.releaseTitle {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--paper);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: color 0.15s ease;
+}
+
+.releaseDate {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--paper-faint);
+  white-space: nowrap;
+}
+
+.postRow {
+  display: grid;
+  grid-template-columns: 118px minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: var(--space-3);
+  padding: 8px 0;
+  border-bottom: 1px dotted var(--rule);
+  text-decoration: none;
+  color: inherit;
+}
+
+.postRow:last-child {
+  border-bottom: none;
+}
+
+.postRow:hover .postTitle {
+  color: var(--lang-c);
+}
+
+.postSource {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--paper-faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.postTitle {
+  font-size: 13px;
+  color: var(--paper);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: color 0.15s ease;
+}
+
+.postDate {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--paper-faint);
+  white-space: nowrap;
+}
+
+/* ------------------------------------------------ SEC 04 — reference shelf */
+
+.docGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: var(--space-3);
+}
+
+.docCard {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: var(--space-4);
+  border: 1px solid var(--rule);
+  border-top: 4px solid color-mix(in srgb, var(--lang-c) 55%, var(--rule-strong));
+  border-radius: 4px 4px 10px 10px;
+  background: var(--surface);
+  text-decoration: none;
+  color: inherit;
+  transition: transform 0.2s ease, background 0.2s ease, border-color 0.2s ease;
+}
+
+.docCard:hover {
+  background: var(--surface-hover);
+  border-top-color: var(--lang-c);
+  transform: translateY(-3px);
+}
+
+/* each kind of volume gets its own top-edge finish */
+.docCard[data-kind='reference'] { border-top-style: double; border-top-width: 6px; }
+.docCard[data-kind='practice'] { border-top-style: dashed; }
+.docCard[data-kind='tool'] { border-top-style: dotted; }
+
+.docKind {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--lang-c);
+}
+
+.docTitle {
+  font-family: var(--font-display);
+  font-size: 16.5px;
+  font-weight: 600;
+  color: var(--paper);
+  letter-spacing: -0.01em;
+}
+
+.docNote {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--paper-dim);
+}
+
+/* --------------------------------------------------- SEC 05 — the floor */
+
+.floor {
+  display: flex;
+  flex-direction: column;
+}
+
+.repoRow {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-4);
+  padding: 10px var(--space-2);
+  border-bottom: 1px dashed var(--rule);
+  border-radius: 6px;
+  text-decoration: none;
+  color: inherit;
+  transition: background 0.15s ease;
+}
+
+.repoRow:last-child {
+  border-bottom: none;
+}
+
+.repoRow:hover {
+  background: var(--surface);
+}
+
+.repoRank {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  color: color-mix(in srgb, var(--lang-c) 75%, var(--paper-faint));
+  flex: none;
+  width: 24px;
+}
+
+.repoMain {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.repoName {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--paper);
+}
+
+.repoRow:hover .repoName {
+  color: var(--lang-c);
+}
+
+.repoDesc {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--paper-dim);
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.repoStats {
+  display: flex;
+  gap: var(--space-3);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--paper-faint);
+  flex: none;
+}
+
+.repoStats span {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+/* ------------------------------------------------------------ quality bar */
+
+.bench :focus-visible {
+  outline: 2px solid var(--lang-c);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .manual > * {
+    animation: none;
+  }
+  .spine,
+  .filmThumb,
+  .docCard,
+  .stamp,
+  .radioBtn {
+    transition: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .bench {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .shelf {
+    position: static;
+    flex-direction: row;
+    align-items: center;
+    overflow-x: auto;
+  }
+
+  .shelfLabel {
+    writing-mode: vertical-rl;
+    flex: none;
+  }
+
+  .shelfCount {
+    display: none;
+  }
+
+  .spines {
+    flex-direction: row;
+    flex: 1;
+  }
+
+  .spine {
+    min-height: 0;
+    min-width: 96px;
+    flex-direction: row;
+    padding: var(--space-2) var(--space-3);
+    border-left: 1px solid color-mix(in srgb, var(--spine-c) 36%, var(--rule));
+    border-bottom: 4px solid var(--spine-c);
+    border-radius: 10px 10px 6px 6px;
+  }
+
+  .spine:hover,
+  .spineOpen {
+    transform: translateY(-3px);
+  }
+
+  .spineName {
+    writing-mode: horizontal-tb;
+  }
+
+  .dossier {
+    grid-template-columns: minmax(0, 1fr);
+    padding-left: 48px;
+  }
+
+  .stampWell {
+    padding-top: 0;
+  }
+
+  .logGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .postRow {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .postSource {
+    display: none;
+  }
+}

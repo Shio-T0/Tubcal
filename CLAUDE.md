@@ -88,6 +88,19 @@ no ORM.
 - `youtube.py` — RSS for subscriptions (no API key needed), `invidious.py` for
   trending/search, `yt-dlp` (must be on PATH) for stream resolution and captions.
   `get_discover()` builds "The Projection" recommendation shelf from watch history.
+  Quality ladder: YouTube's default player clients now expose at most one muxed
+  rendition (progressive itag 18 / 360p) — every higher resolution ships only as
+  *adaptive* DASH (separate avc1 video-only + AAC audio). So `_collect_streams`
+  keeps 360p as an instant floor and, for each avc1 height above it, emits an
+  `adaptive` HLS entry pointing at a *synthesized* master playlist. `server/sources/fmp4.py`
+  parses each rendition's `sidx` into byte-range segments and `server/api/feeds.py`
+  serves a master (one video variant + the original audio as an alternate group)
+  plus per-track `#EXT-X-BYTERANGE` media playlists; hls.js muxes video+audio in
+  the browser, fetching straight from googlevideo through the existing segment
+  proxy — no ffmpeg, no account, no third party, native seeking. `_pick_audio`
+  keeps only the creator's original track (dubs/DRC dropped). A resolve that
+  yields only the 360p floor is cached briefly (self-heals on the next open).
+  Live broadcasts have no DASH, so they stay on YouTube's own muxed HLS.
 - `reddit.py` — anonymous access is RSS-only (Reddit blocks anonymous JSON), so
   logged-out data is degraded; OAuth upgrades it. Threaded comments.
 - `hackernews.py` — Firebase API + Algolia search. It is the reference pattern for
@@ -132,6 +145,19 @@ no ORM.
   same day — that redundancy is the whole point. Imports are lazy and guarded; the
   provider class is instantiated directly rather than via weeb-cli's registry,
   whose `pkgutil` discovery finds nothing under Chaquopy on the Android build.
+- `dev.py` — The Workbench (No 09, route `/dev`): one programming language per
+  "service manual". `LANGUAGES` is a pure-curation registry (facts, docs, podcast
+  RSS dials, core-team blog feeds, GitHub repo, per-language accent) — adding a
+  language is adding one dict, no new endpoints or UI. Shelves are one endpoint
+  each under `/api/dev/<lang>/…` (videos via `invidious.search`, podcasts + blog
+  updates via a namespace-agnostic RSS/Atom parser (`parse_feed`), trending repos
+  via `github.trending(language=…)`), so each loads and fails independently. The
+  "current stable" stamp is best-effort: GitHub `releases/latest`, falling back to
+  a per-language `tag_re` over `/tags` (CPython finals only) or Go's own
+  `go.dev/dl/?mode=json` — golang/go's tag listing is lexicographic garbage.
+  Podcast episodes play in the page's own "bench radio" `<audio>`; videos open in
+  the normal in-app player since Invidious items are already yt-shaped. Tests:
+  `tests/test_dev.py` (network edge monkeypatched).
 - `fuzzy.py` — rapidfuzz scoring over recently cached feed items, used as a
   fallback when a platform's own search returns little or nothing, so a near-miss
   query still lands without another API hit.
@@ -181,7 +207,8 @@ rebuilt from tokens on `data-theme` mutation. While the room holds focus it sets
 shared state as a stack of context providers (`useSettings`, `useSubscriptions`,
 `usePlayer`, `useProgress`, `useSaved`, `useAnimeSync`) wrapped by `AppProviders`.
 One page component per "room" in `pages/` (Edition, FrontPage, ScreeningRoom,
-Dispatch, Wire, Archive, Anime, Composer, Github, plus SavedPage and SettingsPage),
+Dispatch, Wire, Archive, Anime, Composer, Github, Workbench, plus SavedPage and
+SettingsPage),
 all lazy-loaded and routed in `App.jsx` — keep the route, the `pages/` component, and
 the `lib/rooms.js` entry in sync. CSS Modules per page/component, design tokens in `styles/tokens.css`
 and `styles/themes.css`. Skins are a registry in `lib/themes.js` (`dark`, `light`,

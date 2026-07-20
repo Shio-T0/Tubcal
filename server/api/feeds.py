@@ -1,4 +1,5 @@
 import base64
+import hashlib
 import logging
 import re
 import threading
@@ -8,7 +9,7 @@ from flask import Blueprint, Response, current_app, request, stream_with_context
 
 from . import err, ok
 from .. import cache, config, db, httpc
-from ..sources import anilist, github, hackernews, invidious, mixer, reddit, youtube
+from ..sources import anilist, fmp4, github, hackernews, invidious, mixer, reddit, youtube
 
 feeds_bp = Blueprint("feeds", __name__, url_prefix="/api")
 
@@ -172,9 +173,12 @@ def youtube_channel_search(channel_id):
 @feeds_bp.get("/youtube/stream/<video_id>")
 def youtube_stream(video_id):
     try:
-        return ok(youtube.video_streams(video_id))
+        data = youtube.video_streams(video_id)
     except Exception as e:
         return err(f"Stream resolve failed: {e}", 502)
+    # The client only needs the quality ladder; the audio track is resolved
+    # server-side when it builds an adaptive HLS master, so don't ship those URLs.
+    return ok({k: v for k, v in data.items() if k != "audio"})
 
 
 # Headers worth relaying from the upstream CDN response to the browser.
@@ -282,9 +286,83 @@ def _rewrite_hls(text, base_url):
     return "\n".join(out) + "\n"
 
 
+def _hls_response(text):
+    return Response(text, content_type="application/vnd.apple.mpegurl")
+
+
+def _index_fmp4(url):
+    """Fetch just the head of a fragmented-mp4 rendition and parse its `sidx` into
+    (init_end, segments). A 256 KiB prefix comfortably covers ftyp+moov+sidx for
+    YouTube's fragmented-mode files. Cached (keyed by URL) since the byte layout is
+    fixed for the life of the stream URL."""
+    key = "yt:fmp4:" + hashlib.sha1(url.encode()).hexdigest()[:16]
+
+    def fetch():
+        resp = httpc.get(
+            url, headers={"Range": "bytes=0-262143"}, timeout=20, allow_redirects=True,
+        )
+        init_end, segs = fmp4.parse_sidx(resp.content)
+        return init_end, segs
+
+    return cache.cached(key, 1800, fetch)[0]
+
+
+def _adaptive_master(video_id, itag, video):
+    """A synthetic HLS master pairing one adaptive avc1 video rendition with the
+    original audio, so hls.js muxes them in the browser (no ffmpeg, direct from
+    googlevideo). The two media playlists are served by the endpoints below."""
+    data = youtube.video_streams(video_id)
+    audio = data.get("audio") or []
+    if not audio:
+        return err("No audio track for adaptive stream", 502)
+    master = fmp4.master_playlist(
+        f"/api/youtube/hls/{video_id}/{itag}/v.m3u8",
+        f"/api/youtube/hls/{video_id}/{itag}/a.m3u8",
+        vcodec=video.get("vcodec") or "",
+        acodec=audio[0].get("acodec") or "",
+        width=video.get("width"),
+        height=video.get("height"),
+        bandwidth=video.get("bandwidth") or audio[0].get("bandwidth") or 0,
+    )
+    return _hls_response(master)
+
+
+def _adaptive_media(video_id, itag, track):
+    """A byte-range HLS media playlist for the video ('v') or audio ('a') half of
+    an adaptive stream. Every segment addresses the one googlevideo URL through
+    the shared segment proxy, which forwards hls.js's per-fragment Range header."""
+    if track == "v":
+        src = _find_stream(video_id, itag, kind="hls")
+        url = src.get("url") if src and src.get("adaptive") else None
+    else:
+        audio = (youtube.video_streams(video_id).get("audio") or [None])
+        url = audio[0]["url"] if audio[0] else None
+    if not url:
+        return err("No adaptive stream", 404)
+    try:
+        init_end, segments = _index_fmp4(url)
+    except Exception as e:
+        return err(f"Segment index failed: {e}", 502)
+    return _hls_response(fmp4.media_playlist(_seg_proxy_url(url), init_end, segments))
+
+
+@feeds_bp.get("/youtube/hls/<video_id>/<itag>/v.m3u8")
+def youtube_hls_adaptive_video(video_id, itag):
+    return _adaptive_media(video_id, itag, "v")
+
+
+@feeds_bp.get("/youtube/hls/<video_id>/<itag>/a.m3u8")
+def youtube_hls_adaptive_audio(video_id, itag):
+    return _adaptive_media(video_id, itag, "a")
+
+
 @feeds_bp.get("/youtube/hls/<video_id>/<itag>.m3u8")
 def youtube_hls_playlist(video_id, itag):
-    """Serve a rewritten HLS media playlist for one rendition (up to 1080p).
+    """Serve the HLS master/playlist for one rendition.
+
+    Adaptive renditions (YouTube's higher qualities, which ship only as DASH) get
+    a synthesized master over their fragmented-mp4 video + the original audio. The
+    live/native case fetches and rewrites YouTube's own muxed media playlist.
 
     Like the progressive path, a cached manifest URL can expire; if the fetch
     fails or comes back as anything but a real playlist (an expired URL returns
@@ -298,6 +376,8 @@ def youtube_hls_playlist(video_id, itag):
             return err(f"Stream resolve failed: {e}", 502)
         if not target:
             return err("No HLS stream", 404)
+        if target.get("adaptive"):
+            return _adaptive_master(video_id, itag, target)
         try:
             resp = httpc.session.get(
                 target["url"], headers={"User-Agent": config.BROWSER_UA}, timeout=20
@@ -351,7 +431,7 @@ def youtube_video_info(video_id):
         info = youtube.video_info(video_id)
     except Exception as e:
         return err(f"Video info failed: {e}", 502)
-    meta = {k: v for k, v in info.items() if k != "streams"}
+    meta = {k: v for k, v in info.items() if k not in ("streams", "audio")}
     meta["has_streams"] = bool(info.get("streams"))
     return ok(meta)
 

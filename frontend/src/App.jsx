@@ -27,6 +27,7 @@ const Anime = lazy(() => import('./pages/Anime.jsx'));
 const AnimeDetail = lazy(() => import('./pages/Anime.jsx').then(m => ({ default: m.AnimeDetail })));
 const VoiceActor = lazy(() => import('./pages/VoiceActor.jsx'));
 const Github = lazy(() => import('./pages/Github.jsx'));
+const Workbench = lazy(() => import('./pages/Workbench.jsx'));
 const Composer = lazy(() => import('./pages/Composer.jsx'));
 const SavedPage = lazy(() => import('./pages/SavedPage.jsx'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage.jsx'));
@@ -57,6 +58,7 @@ export default function App() {
             <Route path="/reddit/r/:sub" element={<SubredditPage />} />
             <Route path="/hackernews" element={<Wire />} />
             <Route path="/github" element={<Github />} />
+            <Route path="/dev" element={<Workbench />} />
             <Route path="/archive" element={<Archive />} />
             <Route path="/anime" element={<Anime />} />
             {/* Static segment outranks /anime/:id in the router's own ranking, so
