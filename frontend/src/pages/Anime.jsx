@@ -24,7 +24,19 @@ import { useHorizontalWheel } from '../lib/useHorizontalWheel.js';
 import { compact } from '../lib/format.js';
 import { clock, formatWhen, timeAgo } from '../lib/time.js';
 import { applyOverlay, COMPLETE_RATIO, useAnimeSync, usePlayer, useProgress, useToast } from '../state.jsx';
+import { useAnimeCalc } from '../components/anime/WatchCalculator.jsx';
 import s from './anime.module.css';
+
+/** A whisper-quiet keycap in a card's corner: the discoverable hint that hovering
+ *  this title and tapping C tallies its next episode into the Reckoner. Revealed on
+ *  hover by the card's own CSS; inert (aria-hidden) to assistive tech. */
+function CalcCue() {
+  return (
+    <span className={s.calcCue} aria-hidden="true" title="Tap C to tally the next episode">
+      C
+    </span>
+  );
+}
 
 // AniList score scales by the viewer's chosen format.
 const SCORE_MAX = { POINT_100: 100, POINT_10_DECIMAL: 10, POINT_10: 10, POINT_5: 5, POINT_3: 3 };
@@ -197,8 +209,9 @@ function NextEpBadge({ media }) {
 }
 
 export function AnimeCard({ media, corner, scoreFormat }) {
+  const { hoverProps } = useAnimeCalc();
   return (
-    <Link to={`/anime/${media.id}`} className={s.card} style={{ '--cover-c': media.color || 'var(--c-anime)' }}>
+    <Link to={`/anime/${media.id}`} className={s.card} style={{ '--cover-c': media.color || 'var(--c-anime)' }} {...hoverProps(media)}>
       <div className={s.cardCoverWrap}>
         {media.cover ? (
           <img className={s.cardCover} src={media.cover} alt="" loading="lazy" />
@@ -208,6 +221,7 @@ export function AnimeCard({ media, corner, scoreFormat }) {
         {corner && <span className={s.cardCorner}>{corner}</span>}
         <CoverRatings media={media} scoreFormat={scoreFormat} className={s.ratingsBL} />
         <NextEpBadge media={media} />
+        <CalcCue />
       </div>
       <div className={s.cardTitle}>{media.title}</div>
       <div className={s.cardMeta}>{metaLine(media)}</div>
@@ -415,11 +429,13 @@ function SpotlightCarousel({ items, kind, ranked, label, scoreFormat }) {
 /** Richer poster tile for Browse & Search: hover lifts, the cover breathes,
  *  and a veil rises to show the genre dyes. `rank` is set only for true orderings. */
 function BrowseCard({ media, rank, index = 0, scoreFormat }) {
+  const { hoverProps } = useAnimeCalc();
   return (
     <Link
       to={`/anime/${media.id}`}
       className={s.pcard}
       style={{ '--cover-c': media.color || 'var(--c-anime)', '--i': index }}
+      {...hoverProps(media)}
     >
       <div className={s.pcardCover}>
         {media.cover ? (
@@ -431,6 +447,7 @@ function BrowseCard({ media, rank, index = 0, scoreFormat }) {
         {rank != null && <span className={s.pcardRank}>{rank}</span>}
         <CoverRatings media={media} scoreFormat={scoreFormat} className={s.ratingsTR} />
         <NextEpBadge media={media} />
+        <CalcCue />
         {media.genres?.length > 0 && (
           <div className={s.pcardReveal}>
             {media.genres.slice(0, 3).map((g) => <span key={g}>{g}</span>)}
@@ -2190,6 +2207,7 @@ function CastSheet({ characters }) {
  *  title block, labeled spec sheet, and both the global average and your rating. */
 function DetailDossier({ m, trailer, onTrailer, scoreFormat, connected }) {
   const { episodes, status, season, fans } = mediaSpecs(m);
+  const { hoverProps, add } = useAnimeCalc();
   const mine = personalScore(m, scoreFormat);
   const myStatus = m.list_entry && (STATUS_LABEL[m.list_entry.status] || 'On your list');
   const myProgress = m.list_entry?.progress
@@ -2197,7 +2215,7 @@ function DetailDossier({ m, trailer, onTrailer, scoreFormat, connected }) {
     : null;
 
   return (
-    <header className={s.dossier}>
+    <header className={s.dossier} {...hoverProps(m)}>
       {m.banner && <div className={s.dossierArt} style={{ backgroundImage: `url(${m.banner})` }} />}
       <div className={s.dossierScrim} />
       <span className={s.spotlightScan} aria-hidden="true" />
@@ -2215,6 +2233,10 @@ function DetailDossier({ m, trailer, onTrailer, scoreFormat, connected }) {
             </button>
           )}
           {connected && <FavouriteButton mediaId={m.id} initial={m.is_favourite} />}
+          {/* Explicit, keyboard-reachable twin of the hover+C gesture. */}
+          <button className={s.dossierTally} onClick={() => add(m)} title="Add the next unwatched episode to the Reckoner">
+            <Plus size={14} /> Tally next episode <kbd className={s.tallyKey}>C</kbd>
+          </button>
         </div>
 
         <div className={s.dossierMain}>

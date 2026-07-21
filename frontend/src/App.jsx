@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react';
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Navigate, Outlet, Route, Routes } from 'react-router-dom';
 
 import Backdrop from './components/layout/Backdrop.jsx';
 import CommandPalette from './components/layout/CommandPalette.jsx';
@@ -8,6 +8,7 @@ import Masthead from './components/layout/Masthead.jsx';
 import OfflineBanner from './components/layout/OfflineBanner.jsx';
 import PlayerLayer from './components/player/PlayerLayer.jsx';
 import { Spinner } from './components/ui/index.jsx';
+import { AnimeCalcProvider } from './components/anime/WatchCalculator.jsx';
 import { AppProviders } from './state.jsx';
 
 // FrontPage is the "/" landing — keep it eager so first paint has no chunk wait.
@@ -40,6 +41,17 @@ function RouteFallback() {
   );
 }
 
+// The Anime room's routes share one layout so the watch-time calculator (The
+// Reckoner) is a single instance living across browse, detail and voice-actor
+// pages — hover a title anywhere in here, tap C, and the same tally grows.
+function AnimeSection() {
+  return (
+    <AnimeCalcProvider>
+      <Outlet />
+    </AnimeCalcProvider>
+  );
+}
+
 export default function App() {
   return (
     <AppProviders>
@@ -60,11 +72,13 @@ export default function App() {
             <Route path="/github" element={<Github />} />
             <Route path="/dev" element={<Workbench />} />
             <Route path="/archive" element={<Archive />} />
-            <Route path="/anime" element={<Anime />} />
-            {/* Static segment outranks /anime/:id in the router's own ranking, so
-                a seiyuu id can never be mistaken for a media id. */}
-            <Route path="/anime/voice/:id" element={<VoiceActor />} />
-            <Route path="/anime/:id" element={<AnimeDetail />} />
+            <Route element={<AnimeSection />}>
+              <Route path="/anime" element={<Anime />} />
+              {/* Static segment outranks /anime/:id in the router's own ranking, so
+                  a seiyuu id can never be mistaken for a media id. */}
+              <Route path="/anime/voice/:id" element={<VoiceActor />} />
+              <Route path="/anime/:id" element={<AnimeDetail />} />
+            </Route>
             <Route path="/editor" element={<Composer />} />
             <Route path="/saved" element={<SavedPage />} />
             <Route path="/settings" element={<SettingsPage />} />

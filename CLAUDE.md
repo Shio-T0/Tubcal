@@ -223,6 +223,21 @@ route unmounts the room, so local state is lost on back. `useParamState` in
 not a destination) and drops default values from the URL. The video player (`components/player/`)
 uses `hls.js`. Full keyboard nav + command palette in `components/layout/`.
 
+The three anime routes (`/anime`, `/anime/:id`, `/anime/voice/:id`) are wrapped in a
+shared layout route (`AnimeSection` in `App.jsx`) whose only job is to mount one
+`AnimeCalcProvider` (`components/anime/WatchCalculator.jsx`) across the whole section
+— "The Reckoner", a watch-time calculator docked in the page's side margin. Hovering
+any `AnimeCard`/`BrowseCard`/detail dossier arms it (via `useAnimeCalc().hoverProps`,
+tracked in a ref so the card wall never re-renders on hover); tapping `C` tallies the
+next *unwatched* episode (progress from `list_entry` + the sync overlay, capped at
+aired-so-far = `next_episode - 1`), each further `C` extends the run. It sums per-episode
+`duration` (AniList's field; falls back to 24 min, flagged "estimated") into a total and
+a live "start now, finish at…" wall-clock, and persists the plan to `localStorage`. The
+`C` handler stands down for modifiers, text fields, an expanded player/editor, and the
+1s window after a `g` (so the `g c` → editor room-jump chord still wins). The dock seats
+itself in the margin when it fits (≥ `PANEL_W` of side space past the 1280px shell) and
+floats/rails otherwise.
+
 ## Conventions
 
 - Backend API endpoints return `ok(data)` / `err(msg, status)` — never bare `jsonify`.
