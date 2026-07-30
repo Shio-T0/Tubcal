@@ -8,7 +8,7 @@ resolution-markers = [
 
 [[package]]
 name = "anipy-api"
-version = "3.8.14"
+version = "3.8.21"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "beautifulsoup4" },
@@ -24,9 +24,9 @@ dependencies = [
     { name = "simpleeval" },
     { name = "urllib3" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/c1/fc/d2bfaf8d7185769e9b10a8d793509bec5cbbc6ad959add27099de5f58b6a/anipy_api-3.8.14.tar.gz", hash = "sha256:7c4fdc305bb21a29396c48a8f9128d13cfd01ba9abcd10f7e374d942e00fb4a5", size = 36064, upload-time = "2026-07-10T11:15:02.692Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/6b/c4/0d8004816df1b86ab267fbd7ef74b74408bbb24db0c4d9c4ca13759ec090/anipy_api-3.8.21.tar.gz", hash = "sha256:cdc59ccc5fc41c801ccc800f2b017c9297e6a1a41612ca22ed8bc9c8e5850f5d", size = 34426, upload-time = "2026-07-28T16:21:46.825Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/98/70/971f8fe9187593d1a3e4f45284eb8f3419af7066271f7677fa4fd25d3263/anipy_api-3.8.14-py3-none-any.whl", hash = "sha256:5af05b341de39431cdcd031c7ecc1be164ed225319bd228651f6e206fe8ff88a", size = 47997, upload-time = "2026-07-10T11:15:03.656Z" },
+    { url = "https://files.pythonhosted.org/packages/1f/12/575f53af8bba5e148e09079dc6b8169a27ffd48a3a4b1f07a24f276a7761/anipy_api-3.8.21-py3-none-any.whl", hash = "sha256:7a1acc60b3b0d2260cb925b7ec5eb3e5fea845326a24f168c290edc00ca146d5", size = 46477, upload-time = "2026-07-28T16:21:47.652Z" },
 ]
 
 [[package]]
@@ -1736,7 +1736,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "anipy-api", specifier = ">=3.8.14" },
+    { name = "anipy-api", specifier = ">=3.8.21" },
     { name = "faster-whisper", marker = "extra == 'brain'", specifier = ">=1.0" },
     { name = "feedparser", specifier = ">=6.0" },
     { name = "flask", specifier = ">=3.0" },
