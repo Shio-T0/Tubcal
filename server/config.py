@@ -29,7 +29,7 @@ ANIME_SOURCE_URL = os.environ.get(
 ).rstrip("/")
 ANIME_PROVIDER = os.environ.get("TUBCAL_ANIME_PROVIDER", "")
 # Auto-mark an episode watched on AniList once this % of it has played (0 = off).
-ANIME_WATCHED_PERCENT = int(os.environ.get("TUBCAL_ANIME_WATCHED_PERCENT", "85"))
+ANIME_WATCHED_PERCENT = int(os.environ.get("TUBCAL_ANIME_WATCHED_PERCENT", "80"))
 
 BROWSER_UA = (
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "

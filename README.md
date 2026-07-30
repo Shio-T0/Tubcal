@@ -128,7 +128,7 @@ instead (stored in the DB, not the environment).
 | `TUBCAL_EDITOR_MAX_FILE_BYTES` | `4194304` | Refuse to open files larger than this. |
 | `TUBCAL_GITHUB_TOKEN` | *(none)* | A classic PAT — lifts GitHub's 60 req/hr/IP ceiling to 5000. Can be pasted into Settings instead. |
 | `TUBCAL_ANIME_PROVIDER` | *(auto)* | Prefer one anime scraper: `allanime` or `animekai`. |
-| `TUBCAL_ANIME_WATCHED_PERCENT` | `85` | Auto-mark an episode watched on AniList past this %. `0` disables. |
+| `TUBCAL_ANIME_WATCHED_PERCENT` | `80` | Auto-mark an episode watched on AniList past this %. `0` disables. |
 | `TUBCAL_AUTO_UPDATE` | `1` | Set `0` to stop upgrading `anipy-api` from PyPI on startup. |
 
 ### Connecting accounts (all optional)

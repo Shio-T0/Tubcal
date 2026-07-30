@@ -135,7 +135,7 @@ no ORM.
   `TUBCAL_ANIME_SOURCE` / `anime_source_url` setting is now inert.
   Auto-watched: the anime player reports progress under item ids
   `anime:<anilist_id>:<episode>`, so `feeds.post_progress` piggybacks on those
-  POSTs and, once past `ANIME_WATCHED_PERCENT` (default 90), advances AniList
+  POSTs and, once past `ANIME_WATCHED_PERCENT` (default 80), advances AniList
   progress via `anilist.mark_episode_watched` (advance-only, in a background
   thread, once per episode per run) — no extra client call.
 - `weeb_fallback.py` — second anime scraper (weeb-cli's `aniworld` provider,
