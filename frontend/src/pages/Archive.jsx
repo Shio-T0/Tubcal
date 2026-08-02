@@ -53,7 +53,10 @@ function AskBlock({ ready, onJump }) {
     setState({ loading: true, answer: null, citations: [], error: null });
     try {
       const d = await api('/brain/ask', { method: 'POST', body: JSON.stringify({ question }) });
-      setState({ loading: false, answer: d.answer, citations: d.citations || [], error: null, empty: d.empty });
+      setState({
+        loading: false, answer: d.answer, citations: d.citations || [],
+        expanded: new Set(d.expanded || []), error: null, empty: d.empty,
+      });
     } catch (err) {
       setState({ loading: false, answer: null, citations: [], error: err.message });
     }
@@ -96,8 +99,15 @@ function AskBlock({ ready, onJump }) {
                 <button
                   key={c.n}
                   className={s.cite}
+                  // Sources the model chose to re-read with their surrounding
+                  // transcript, rather than just the retrieved 45s window.
+                  data-deep={state.expanded?.has(c.n) || undefined}
                   onClick={() => onJump(c, c.t_start)}
-                  title={`${c.title} · ${clock(c.t_start)}`}
+                  title={
+                    state.expanded?.has(c.n)
+                      ? `${c.title} · ${clock(c.t_start)} · read in context`
+                      : `${c.title} · ${clock(c.t_start)}`
+                  }
                 >
                   <span className={s.citeN}>{c.n}</span>
                   <span className={s.citeTitle}>{c.title}</span>

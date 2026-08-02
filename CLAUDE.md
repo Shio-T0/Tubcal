@@ -85,9 +85,23 @@ data (transcripts, chunk vectors as float32 blobs, queue/status). `data/` also h
 no ORM.
 
 **Sources (`server/sources/`)** each own one platform's quirks:
-- `youtube.py` — RSS for subscriptions (no API key needed), `invidious.py` for
-  trending/search, `yt-dlp` (must be on PATH) for stream resolution and captions.
+- `youtube.py` — RSS for subscriptions (no API key needed), `innertube.py` for
+  search, `invidious.py` for trending (and as the search fallback), `yt-dlp` (must
+  be on PATH) for stream resolution and captions.
   `get_discover()` builds "The Projection" recommendation shelf from watch history.
+  `youtube.search()` owns the search routing: `innertube.py` talks to YouTube's own
+  `youtubei/v1/search` with the WEB client context — one unauthenticated POST,
+  sub-second, no key and no middleman — and Invidious sits behind it only as a
+  fallback, since its public instances now answer search with 401/403/429 far more
+  often than with results. Pagination is by continuation token (the response's
+  single `continuationItemRenderer`), passed back through `?continuation=`;
+  `?page=N` is still carried so the token-less Invidious fallback can keep
+  numbering. A *genuinely* empty result is distinguished from an unreadable
+  response (`twoColumnSearchResultsRenderer` present = a real results page) so an
+  ordinary no-match query returns `[]` fast instead of grinding through every dead
+  instance to report the same emptiness — that cascade was the "signal lost —
+  All Invidious instances failed" error. Thin result sets are topped up by
+  `_fuzzy_augment` from cached subscription feeds. Tests: `tests/test_search.py`.
   Quality ladder: YouTube's default player clients now expose at most one muxed
   rendition (progressive itag 18 / 360p) — every higher resolution ships only as
   *adaptive* DASH (separate avc1 video-only + AAC audio). So `_collect_streams`
@@ -173,7 +187,16 @@ and `GET /api/edition/latest` is a single row read. `cluster.py` is pure functio
 = dot, salience, layout) — extend it there and keep it I/O-free; it has the deepest
 test coverage (`tests/test_edition.py`). LLM synthesis is capped (≤6 calls/build),
 time-boxed, and gated by `_validate_synthesis` with a template fallback — never let
-unvalidated model output into a payload. Degrades: no numpy/Ollama → "wire" edition
+unvalidated model output into a payload. The **lede alone** gets a transcript block:
+if its top-ranked item is already transcribed in The Archive, `_transcript_block`
+attaches that video's stored TL;DR plus the `EDITION_TRANSCRIPT_CHUNKS` parts most
+relevant to the headline (`search.rank_doc_chunks` — doc-scoped cosine, returned in
+transcript order), capped at `EDITION_TRANSCRIPT_CHARS`, so the copy desk writes from
+what was *said* rather than from a title and whatever description the platform
+published. Falls back to the transcript's opening when the doc has no usable vectors,
+and to no block at all otherwise; it never raises, and it costs one embed call, not an
+extra chat call. Columns deliberately stay on the cheap prompt. The story records
+`transcript_of` (the item id read in full, or null). Degrades: no numpy/Ollama → "wire" edition
 (URL hard-links only) → embed model adds semantic clusters → chat model adds prose.
 
 **The Archive (`server/brain/`)** is optional and fully local. A background `worker`
@@ -183,6 +206,24 @@ and answers via a local Ollama server over plain HTTP (`llm.py`, no client lib).
 knowledge memory (the transcript corpus), not conversational memory — each answer is
 fresh. Requires the `brain` extra and a running Ollama server; degrades gracefully when
 absent.
+
+`summarize.ask()` is two-stage, because a retrieved chunk is a ~45s keyhole and the
+sentence that answers the question is often just past its edge. Stage 1 hands the
+model the numbered excerpts and asks (JSON-only, `temperature=0`) which
+`BRAIN_ASK_EXPAND` (default 3, `0` disables) are worth a closer read; stage 2 re-renders
+those with `BRAIN_ASK_EXPAND_RADIUS` chunks either side attached
+(`db.brain_chunk_window`) and asks for the answer. So it is two LLM calls per question,
+both local. Anything malformed from stage 1 — bad JSON, wrong types, out-of-range
+indices, an unreachable Ollama — falls back to the top-scoring excerpts rather than
+failing the ask; validate model output, never trust it (same rule as The Edition).
+Each excerpt carries its provenance: title, **channel**, timestamp span, position in
+the video (`part n/total`), video length, watch date, rewatch count, transcript
+language, retrieval score, and — once per video, on its first excerpt — that video's
+stored TL;DR. Those come from `db.brain_context()`, a small keyed-by-item_id lookup
+kept deliberately *out* of `brain_all_vectors()`, which scans the whole corpus on every
+query and must stay narrow. Windows are deduped against every other excerpt's chunks so
+no passage is ever sent twice. The response's `expanded` list marks which citations got
+the deep read; the UI rings those chips. Tests: `tests/test_brain_ask.py`.
 
 **The Composing Room (`server/api/editor.py` + `server/editor/` + `frontend/src/components/editor/`)**
 is the code editor room (No 08, route `/editor`): CodeMirror 6 with real modal vim
@@ -243,6 +284,19 @@ floats/rails otherwise.
 - Backend API endpoints return `ok(data)` / `err(msg, status)` — never bare `jsonify`.
 - New external fetches go through `server/httpc.py` and are wrapped in `server/cache.py`
   with a TTL constant added to `server/config.py`.
+- **Cookie containment.** `httpc`'s `session` is shared process-wide, so its jar
+  accumulates whatever hosts set — scraping a YouTube channel page seeds
+  `VISITOR_INFO1_LIVE`/`YSC`/`__Secure-YNID`, which requests then merges into every
+  later call to that host. For anonymous reads that is a linkability leak: one
+  stable pseudonymous id spanning search, feeds and playback. So `httpc.get`/`post`
+  take `anonymous=True`, routing through `anon_session` whose policy neither stores
+  nor sends cookies; an *explicit* `Cookie` header still goes out, which is what
+  keeps the YouTube consent cookie (`SOCS`) working. Every YouTube read is
+  anonymous — the only deliberate exception is `get_account_channel_ids`, which
+  carries the user's own OAuth bearer token. Playback (googlevideo) is anonymous
+  too, defensively: that's a different domain so the youtube.com jar never reached
+  it, but the property shouldn't depend on that. `tests/test_httpc_anon.py` AST-sweeps
+  `youtube.py` and fails if any call site is neither anonymous nor authenticated.
 - Configuration is env-driven through `server/config.py` (all optional, `.env` copied
   from `.env.example`); user-facing settings that can change at runtime are stored in the
   DB `settings` table and read via `db.get_setting()`.

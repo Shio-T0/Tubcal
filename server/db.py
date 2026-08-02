@@ -694,10 +694,62 @@ def brain_all_vectors():
     display fields — the corpus brute-force semantic search scans."""
     con = connect()
     rows = con.execute(
-        "SELECT c.item_id, c.t_start, c.t_end, c.text, c.embedding, "
+        "SELECT c.item_id, c.idx, c.t_start, c.t_end, c.text, c.embedding, "
         "       d.title, d.source_name, d.thumbnail "
         "FROM brain_chunks c JOIN brain_docs d ON d.id = c.doc_id "
         "WHERE c.embedding IS NOT NULL"
+    ).fetchall()
+    con.close()
+    return [dict(r) for r in rows]
+
+
+def brain_context(item_ids):
+    """Per-video context for a handful of chunk hits, keyed by item_id:
+    display fields, the LLM TL;DR, transcript language, chunk count, and when
+    the reader actually watched it. Deliberately *not* folded into
+    `brain_all_vectors` — that query scans the whole corpus on every search, so
+    it stays narrow; this one only ever sees the top-k item ids."""
+    ids = list(dict.fromkeys(i for i in (item_ids or []) if i))
+    if not ids:
+        return {}
+    marks = ",".join("?" * len(ids))
+    con = connect()
+    rows = con.execute(
+        "SELECT d.item_id, d.title, d.source_name, d.url, d.duration, d.lang, "
+        "       d.summary, d.indexed_at, h.watched_at, h.watch_count, "
+        "       (SELECT COUNT(*) FROM brain_chunks c WHERE c.doc_id = d.id) AS chunk_count "
+        "FROM brain_docs d LEFT JOIN history h ON h.item_id = d.item_id "
+        f"WHERE d.item_id IN ({marks})",
+        ids,
+    ).fetchall()
+    con.close()
+    return {r["item_id"]: dict(r) for r in rows}
+
+
+def brain_doc_vectors(item_id):
+    """One doc's embedded chunks — the corpus narrowed to a single video, for
+    when the caller already knows which video it wants to read."""
+    con = connect()
+    rows = con.execute(
+        "SELECT idx, t_start, t_end, text, embedding FROM brain_chunks "
+        "WHERE item_id=? AND embedding IS NOT NULL ORDER BY idx",
+        (item_id,),
+    ).fetchall()
+    con.close()
+    return [dict(r) for r in rows]
+
+
+def brain_chunk_window(item_id, idx, radius):
+    """The chunks surrounding one hit (idx ± radius), in transcript order.
+
+    Lets the ask flow zoom in on a promising excerpt and read what was actually
+    said either side of it — retrieval returns a 45-second keyhole, and the
+    sentence that answers the question is often just past its edge."""
+    con = connect()
+    rows = con.execute(
+        "SELECT idx, t_start, t_end, text FROM brain_chunks "
+        "WHERE item_id=? AND idx BETWEEN ? AND ? ORDER BY idx",
+        (item_id, int(idx) - int(radius), int(idx) + int(radius)),
     ).fetchall()
     con.close()
     return [dict(r) for r in rows]

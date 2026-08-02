@@ -54,6 +54,7 @@ def fetch_channel_avatar(channel_id):
         html = httpc.get(
             f"https://www.youtube.com/channel/{channel_id}",
             headers={"Accept-Language": "en-US,en;q=0.9", "Cookie": _CONSENT_COOKIE},
+            anonymous=True,
         ).text
     except Exception:
         return None
@@ -83,7 +84,7 @@ def resolve_channel(raw):
             html = httpc.get(url, headers={
                 "Accept-Language": "en-US,en;q=0.9",
                 "Cookie": _CONSENT_COOKIE,
-            }).text
+            }, anonymous=True).text
         except requests.HTTPError:
             raise LookupError(f"Channel @{handle} not found on YouTube")
         for pattern in _EXTRACT_PATTERNS:
@@ -99,7 +100,7 @@ def resolve_channel(raw):
 
     # Validate against the RSS feed — its title is the canonical channel name.
     try:
-        rss = httpc.get(RSS_URL.format(channel_id)).text
+        rss = httpc.get(RSS_URL.format(channel_id), anonymous=True).text
     except requests.HTTPError:
         raise LookupError(f"Channel {channel_id} has no public video feed")
     parsed = feedparser.parse(rss)
@@ -119,7 +120,7 @@ def channel_about(channel_id):
     def fetch():
         title = channel_id
         try:
-            rss = httpc.get(RSS_URL.format(channel_id)).text
+            rss = httpc.get(RSS_URL.format(channel_id), anonymous=True).text
             title = feedparser.parse(rss).feed.get("title") or channel_id
         except Exception:
             pass
@@ -135,7 +136,7 @@ def channel_about(channel_id):
 
 def _channel_items(channel_id):
     def fetch():
-        rss = httpc.get(RSS_URL.format(channel_id)).text
+        rss = httpc.get(RSS_URL.format(channel_id), anonymous=True).text
         parsed = feedparser.parse(rss)
         channel_title = parsed.feed.get("title", "")
         items = []
@@ -228,6 +229,81 @@ def search_channel(channel_id, query):
     q = (query or "").strip().lower()
     items = [i for i in _channel_items(channel_id) if q in i["title"].lower()]
     return {"items": items, "stale": True}
+
+
+def _fuzzy_augment(items, query):
+    """Top up a thin result set with near-miss titles from the cached
+    subscription feeds — a local, zero-request safety net for a typo'd query."""
+    from .fuzzy import fuzzy_filter
+    from .. import db
+
+    subs = db.list_subscriptions("youtube")
+    if not subs:
+        return items
+    candidates = []
+    for s in subs[:5]:
+        cached_feed = cache.peek(f"yt:rss:{s['source_id']}")
+        if cached_feed:
+            candidates.extend(cached_feed)
+    if not candidates:
+        return items
+    seen = {i["id"] for i in items}
+    for hit, _score in fuzzy_filter(candidates, query, threshold=60, limit=10):
+        if hit["id"] not in seen:
+            seen.add(hit["id"])
+            items.append(hit)
+    return items
+
+
+def search(query, page=1, continuation=None):
+    """YouTube-wide video search.
+
+    InnerTube (YouTube's own API — see `sources/innertube.py`) is the fast path:
+    one direct POST, sub-second, no key. Invidious is kept strictly as a fallback
+    because its public instances now answer search with 401/403/429 far more often
+    than they answer with results, and probing through the dead ones is what made
+    search feel slow even when it eventually worked.
+
+    Paginates by continuation token; `page` is carried through only so the client
+    can keep numbering pages (and so the Invidious fallback, which has no tokens,
+    still works).
+    """
+    from . import innertube, invidious
+
+    q = (query or "").strip()
+    if not q:
+        return {"items": [], "page": page, "has_more": False, "continuation": None}
+    page = max(1, int(page or 1))
+
+    result = None
+    # Only page 1 or a real token can go through InnerTube — a bare page=3 with
+    # no token (e.g. an old client) has to take the Invidious path.
+    if continuation or page == 1:
+        try:
+            result = innertube.search(q, continuation=continuation)
+        except Exception:
+            result = None
+
+    if result is None:
+        inv = invidious.search(q, page=page)
+        result = {
+            "items": inv["items"],
+            "continuation": None,
+            "has_more": inv.get("has_more", False),
+            "stale": inv.get("stale", False),
+        }
+
+    items = result["items"]
+    if page == 1 and len(items) < 5:
+        items = _fuzzy_augment(items, q)
+
+    return {
+        "items": items,
+        "page": page,
+        "has_more": result.get("has_more", False),
+        "continuation": result.get("continuation"),
+        "stale": result.get("stale", False),
+    }
 
 
 # The progressive muxed rendition (itag 18) covers 360p, so the adaptive ladder
@@ -609,7 +685,7 @@ def get_live_and_upcoming(channel_ids):
 
 
 def _playlist_items_rss(plid):
-    rss = httpc.get(PLAYLIST_RSS_URL.format(plid)).text
+    rss = httpc.get(PLAYLIST_RSS_URL.format(plid), anonymous=True).text
     parsed = feedparser.parse(rss)
     title = parsed.feed.get("title", "")
     items = []
@@ -650,7 +726,7 @@ def _video_author(video_id):
             "https://www.youtube.com/oembed?format=json&url="
             + quote(f"https://www.youtube.com/watch?v={video_id}", safe="")
         )
-        data = httpc.get(url).json()
+        data = httpc.get(url, anonymous=True).json()
         channel_id = None
         m = re.search(r"/channel/(UC[A-Za-z0-9_-]{22})", data.get("author_url") or "")
         if m:

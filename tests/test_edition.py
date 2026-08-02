@@ -241,6 +241,104 @@ def test_template_story_stitches_and_marks_unsynthesized():
     assert "snippet" not in story["items"][0]        # scratch field stripped
 
 
+# ---- lede transcript context (needs the throwaway DB) ----
+
+@pytest.fixture
+def lede_items(client):
+    """A two-item lead cluster whose leading video is already in the Archive."""
+    from server import db
+    doc = db.brain_enqueue({"id": "yt:vid", "title": "The Interview",
+                            "source": "Some Channel", "extra": {"video_id": "vid"}})
+    db.brain_save_transcript("yt:vid", "en", "opening words and then much more", 900.0)
+    db.brain_save_chunks(doc["id"], "yt:vid", [
+        {"idx": 0, "t_start": 0.0, "t_end": 45.0, "text": "opening words",
+         "embedding": None},
+        {"idx": 7, "t_start": 450.0, "t_end": 495.0,
+         "text": "the deal closed at forty million", "embedding": None},
+    ])
+    db.brain_set_summary("yt:vid", "They discuss\nthe acquisition.")
+    db.brain_mark_ready("yt:vid")
+    return [_item("yt:vid", platform="youtube", score=90),
+            _item("hn:9", score=5)]
+
+
+def test_lede_prompt_carries_the_transcript(lede_items, monkeypatch):
+    from server.brain import edition
+    monkeypatch.setattr(edition.search, "rank_doc_chunks", lambda *a, **kw: [
+        {"idx": 7, "t_start": 450.0, "t_end": 495.0,
+         "text": "the deal closed at forty million", "score": 0.9},
+    ])
+    block, n = edition._transcript_block(edition._rank_items(lede_items), "acquisition", "embed")
+
+    assert n == 1                                    # the video leads the cluster
+    assert 'TRANSCRIPT of [1] — what was actually said in "The Interview"' in block
+    assert "Summary: They discuss the acquisition." in block   # flattened
+    assert "7:30 — the deal closed at forty million" in block
+
+
+def test_transcript_falls_back_to_the_opening_without_vectors(lede_items, monkeypatch):
+    from server.brain import edition
+    monkeypatch.setattr(edition.search, "rank_doc_chunks", lambda *a, **kw: [])
+    block, n = edition._transcript_block(edition._rank_items(lede_items), "q", "embed")
+    assert "opening words and then much more…" in block and n == 1
+
+
+def test_transcript_block_is_absent_when_nothing_is_archived(client, monkeypatch):
+    from server.brain import edition
+    items = edition._rank_items([_item("hn:1"), _item("rd:2", platform="reddit")])
+    assert edition._transcript_block(items, "q", "embed") == (None, None)
+
+
+def test_transcript_block_skips_docs_still_processing(lede_items, client):
+    from server import db
+    from server.brain import edition
+    db.brain_set_status("yt:vid", "transcribing")
+    assert edition._transcript_block(edition._rank_items(lede_items), "q", "embed") == (None, None)
+
+
+def test_transcript_block_survives_a_broken_archive(lede_items, monkeypatch):
+    from server.brain import edition
+
+    def boom(*a, **kw):
+        raise RuntimeError("db is gone")
+
+    monkeypatch.setattr(edition.db, "brain_get", boom)
+    assert edition._transcript_block(edition._rank_items(lede_items), "q", "embed") == (None, None)
+
+
+def test_synthesis_only_reads_transcripts_for_the_lede(lede_items, monkeypatch):
+    """Columns must stay on the cheap prompt — the block is a lede privilege."""
+    import json
+
+    from server.brain import edition
+    seen = []
+
+    def fake_chat(system, prompt, model, **kw):
+        seen.append(prompt)
+        return json.dumps({"headline": "H", "dek": "d",
+                           "body": " ".join(["word"] * 60), "cited": [1]})
+
+    monkeypatch.setattr(edition.llm, "chat", fake_chat)
+    monkeypatch.setattr(edition.search, "rank_doc_chunks", lambda *a, **kw: [
+        {"idx": 7, "t_start": 450.0, "t_end": 495.0, "text": "the deal closed", "score": 0.9},
+    ])
+
+    lede = edition._synthesize_story(lede_items, 1.0, "m", time.time(), embed_model="embed")
+    column = edition._synthesize_story(lede_items, 1.0, "m", time.time())
+
+    assert "TRANSCRIPT of [1]" in seen[0] and lede["transcript_of"] == "yt:vid"
+    assert "TRANSCRIPT" not in seen[1] and column["transcript_of"] is None
+
+
+def test_transcript_block_is_capped(lede_items, monkeypatch):
+    from server import config, db
+    from server.brain import edition
+    db.brain_save_transcript("yt:vid", "en", "verbose " * 5000, 900.0)
+    monkeypatch.setattr(edition.search, "rank_doc_chunks", lambda *a, **kw: [])
+    block, _ = edition._transcript_block(edition._rank_items(lede_items), "q", "embed")
+    assert len(block) <= config.EDITION_TRANSCRIPT_CHARS + 200  # + the header line
+
+
 # ---- API (throwaway DB via the client fixture) ----
 
 def test_latest_404_before_first_build(client):

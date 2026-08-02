@@ -19,7 +19,6 @@ from urllib.parse import quote
 import requests
 
 from .. import cache, config, httpc
-from .fuzzy import fuzzy_filter
 
 # Order = preference; _api_get tries each in turn until one answers (see the note
 # there on why we don't pin a 'winning' instance). Most public instances now block
@@ -35,6 +34,9 @@ _DEFAULT_INSTANCES = [
     "https://yewtu.be",
 ]
 
+_UNROUTABLE_TLDS = {"ygg", "i2p", "onion", "loki"}
+
+
 def _discovered_instances():
     """Extra https candidates from the official directory, cached ~6h.
 
@@ -43,11 +45,18 @@ def _discovered_instances():
     never fatal.
     """
     def fetch():
-        data = httpc.get("https://api.invidious.io/instances.json", timeout=12).json()
+        data = httpc.get("https://api.invidious.io/instances.json", timeout=12,
+                         anonymous=True).json()
         out = []
         for name, info in data:
-            if info.get("type") == "https":
-                out.append(f"https://{name}")
+            if info.get("type") != "https":
+                continue
+            # Overlay-network hosts (.ygg / .i2p / .onion) are in the directory
+            # but can never resolve from a normal connection — probing one costs
+            # a DNS failure per call, on the fallback path, for nothing.
+            if name.rsplit(".", 1)[-1].lower() in _UNROUTABLE_TLDS:
+                continue
+            out.append(f"https://{name}")
         return out
 
     try:
@@ -136,7 +145,7 @@ def _api_get(path):
     for base in _ordered_instances(family):
         url = f"{base}/api/v1{path}"
         try:
-            resp = httpc.get(url, timeout=_REQUEST_TIMEOUT)
+            resp = httpc.get(url, timeout=_REQUEST_TIMEOUT, anonymous=True)
             data = resp.json()
             # Invidious answers HTTP 200 with {"error": ...} when its backend
             # ("companion") can't serve an endpoint — treat that as a miss so we
@@ -238,7 +247,8 @@ def popular():
 
 
 def search(query, page=1):
-    """One page of YouTube-wide video search via Invidious. `page` is 1-based;
+    """One page of YouTube-wide video search via Invidious — the *fallback* path;
+    `youtube.search` calls InnerTube first. `page` is 1-based;
     Invidious returns a fresh slice of results per page (no continuation token),
     so `has_more` is simply whether this page came back non-empty."""
     q = (query or "").strip()
@@ -253,27 +263,8 @@ def search(query, page=1):
     # Invidious pages run ~20 results; a full-length page means there's very
     # likely another. An empty page is the end.
     has_more = len(items) >= 15
-
-    # Fuzzy fallback (first page only): if the API returned few results, augment
-    # with near-miss titles from the cached subscription feed. Later pages skip
-    # this — it isn't paginated and would repeat the same local hits.
-    if page == 1 and len(items) < 5:
-        from .. import db
-        subs = db.list_subscriptions("youtube")
-        if subs:
-            fuzzy_candidates = []
-            for s in subs[:5]:
-                cached_feed = cache.peek(f"yt:rss:{s['source_id']}")
-                if cached_feed:
-                    fuzzy_candidates.extend(cached_feed)
-            if fuzzy_candidates:
-                fuzzy_hits = fuzzy_filter(fuzzy_candidates, query, threshold=60, limit=10)
-                seen_ids = {i["id"] for i in items}
-                for hit_item, score in fuzzy_hits:
-                    if hit_item["id"] not in seen_ids:
-                        seen_ids.add(hit_item["id"])
-                        items.append(hit_item)
-
+    # The thin-results fuzzy top-up lives in `youtube.search`, which owns the
+    # routing between this and InnerTube — it applies to both paths.
     return {"items": items, "page": page, "has_more": has_more, "stale": stale}
 
 
@@ -401,7 +392,7 @@ def video_streams(video_id):
         last_err = None
         for base in _instances():
             try:
-                resp = httpc.get(f"{base}/api/v1/videos/{video_id}", timeout=15)
+                resp = httpc.get(f"{base}/api/v1/videos/{video_id}", timeout=15, anonymous=True)
                 data = resp.json()
                 if isinstance(data, dict) and data.get("error"):
                     raise ValueError(data["error"])

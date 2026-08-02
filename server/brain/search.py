@@ -50,9 +50,44 @@ def embed_chunks(chunks, model):
     return chunks
 
 
+def rank_doc_chunks(item_id, query, model, k=6):
+    """The parts of ONE video's transcript that bear on `query`, returned in
+    transcript order (reading order beats score order for prose).
+
+    Same cosine as `semantic_search`, scoped to a single doc — used by The
+    Edition to quote the lead story's video without shipping the whole
+    transcript. Returns [] whenever it can't (no embeddings, numpy or Ollama
+    missing); callers treat that as "no transcript context available"."""
+    try:
+        import numpy as np
+    except ImportError:
+        return []
+
+    rows = db.brain_doc_vectors(item_id)
+    if not rows:
+        return []
+    try:
+        qv = np.asarray(llm.embed([query], model)[0], dtype="float32")
+    except Exception:
+        return []
+    qn = np.linalg.norm(qv) or 1.0
+
+    scored = []
+    for r in rows:
+        v = _unpack(r["embedding"])
+        if v.shape != qv.shape:
+            continue
+        score = float(qv.dot(v) / (qn * (np.linalg.norm(v) or 1.0)))
+        scored.append((score, r))
+    scored.sort(key=lambda x: x[0], reverse=True)
+    top = sorted(scored[:k], key=lambda x: x[1]["idx"])
+    return [{"idx": r["idx"], "t_start": r["t_start"], "t_end": r["t_end"],
+             "text": r["text"], "score": round(s, 4)} for s, r in top]
+
+
 def semantic_search(query, model, k=None):
     """Rank stored chunks against a query embedding (cosine). Returns
-    [{item_id, t_start, t_end, text, title, source_name, thumbnail, score}]."""
+    [{item_id, idx, t_start, t_end, snippet, title, source_name, thumbnail, score}]."""
     import numpy as np
 
     k = k or config.BRAIN_SEARCH_TOPK
@@ -75,6 +110,7 @@ def semantic_search(query, model, k=None):
     for score, r in scored[:k]:
         out.append({
             "item_id": r["item_id"],
+            "idx": r["idx"],
             "t_start": r["t_start"],
             "t_end": r["t_end"],
             "snippet": r["text"],

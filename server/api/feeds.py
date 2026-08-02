@@ -247,7 +247,7 @@ def youtube_stream_data(video_id):
             return err(f"Stream resolve failed: {e}", 502)
         if not target:
             return err("No playable stream", 502)
-        upstream = httpc.session.get(
+        upstream = httpc.anon_session.get(
             target["url"], headers=_fwd_headers(), stream=True, timeout=20, allow_redirects=True,
         )
         if upstream.status_code < 400 or attempt == 1:
@@ -300,6 +300,7 @@ def _index_fmp4(url):
     def fetch():
         resp = httpc.get(
             url, headers={"Range": "bytes=0-262143"}, timeout=20, allow_redirects=True,
+            anonymous=True,
         )
         init_end, segs = fmp4.parse_sidx(resp.content)
         return init_end, segs
@@ -379,7 +380,7 @@ def youtube_hls_playlist(video_id, itag):
         if target.get("adaptive"):
             return _adaptive_master(video_id, itag, target)
         try:
-            resp = httpc.session.get(
+            resp = httpc.anon_session.get(
                 target["url"], headers={"User-Agent": config.BROWSER_UA}, timeout=20
             )
             if resp.status_code == 200 and resp.text.lstrip().startswith("#EXTM3U"):
@@ -408,7 +409,7 @@ def youtube_hls_segment():
         return err("bad token")
     if "googlevideo.com" not in (urlparse(url).hostname or ""):  # only proxy YouTube CDN
         return err("forbidden host", 403)
-    upstream = httpc.session.get(
+    upstream = httpc.anon_session.get(
         url, headers=_fwd_headers(), stream=True, timeout=20, allow_redirects=True,
     )
     return _relay(upstream, default_ct="video/mp2t")
@@ -511,8 +512,9 @@ def youtube_search():
         page = int(request.args.get("page") or 1)
     except ValueError:
         page = 1
+    continuation = (request.args.get("continuation") or "").strip() or None
     try:
-        return ok(invidious.search(q, page=page))
+        return ok(youtube.search(q, page=page, continuation=continuation))
     except Exception as e:
         return err(f"Search failed: {e}", 502)
 
@@ -717,7 +719,7 @@ def search_all():
         return err("q required")
     results = {"youtube": [], "reddit": [], "hackernews": [], "github": []}
     try:
-        results["youtube"] = invidious.search(q).get("items", [])[:8]
+        results["youtube"] = youtube.search(q).get("items", [])[:8]
     except Exception:
         pass
     try:

@@ -16,7 +16,7 @@ import threading
 import time
 
 from .. import config, db
-from . import cluster, feed_index, llm
+from . import cluster, feed_index, llm, search
 
 POLL_SECONDS = 600        # builder heartbeat (one paper a day, like a paper)
 SYNTH_DEADLINE = 240      # seconds of LLM budget per build before templating the rest
@@ -33,6 +33,13 @@ _SYNTH_SYSTEM = (
     '{"headline": string (at most 12 words), "dek": string (one sentence), '
     '"body": string (60-120 words), "cited": [item numbers actually used]}. '
     "Voice: calm, concrete, specific. No hype, no 'in this video' filler."
+)
+_SYNTH_TRANSCRIPT_NOTE = (
+    " One item may carry a TRANSCRIPT block: what was actually said in that "
+    "source, taken from the reader's own archive. Treat it as the strongest "
+    "evidence you have — report what the speaker said and the specifics they "
+    "gave, rather than paraphrasing the title. Cite it under that item's number; "
+    "timestamps are there to orient you and must not appear in the prose."
 )
 
 
@@ -108,8 +115,67 @@ def _validate_synthesis(text, n_items):
     return headline, dek, body, cited
 
 
-def _synthesize_story(items, salience_score, model, now):
-    """Grounded synthesis for one cluster; template fallback on any failure."""
+def _clock(seconds):
+    s = max(int(seconds or 0), 0)
+    return f"{s // 60}:{s % 60:02d}"
+
+
+def _transcript_block(ranked, headline, embed_model):
+    """The Archive's record of this story's video, if it holds one.
+
+    A feed item gives the copy desk a title and whatever description the
+    platform felt like publishing; the transcript gives it the thing itself. So
+    for the lead story we look up the top-ranked item that has already been
+    transcribed and quote the parts that bear on the headline — the relevant
+    parts, not the opening minutes, since the vectors are already sitting there.
+
+    Returns (block_text, item_number) or (None, None). Never raises: the paper
+    goes out with or without this."""
+    for n, i in enumerate(ranked, start=1):
+        item_id = i.get("id")
+        if not item_id:
+            continue
+        try:
+            doc = db.brain_get(item_id)
+        except Exception:
+            return None, None
+        if not doc or doc.get("status") != "ready":
+            continue
+
+        parts = []
+        if doc.get("summary"):
+            parts.append("Summary: " + " ".join(doc["summary"].split()))
+
+        picks = []
+        if embed_model:
+            try:
+                picks = search.rank_doc_chunks(
+                    item_id, headline, embed_model, k=config.EDITION_TRANSCRIPT_CHUNKS)
+            except Exception:
+                picks = []
+        if picks:
+            parts += [f"{_clock(p['t_start'])} — {' '.join(p['text'].split())}"
+                      for p in picks]
+        elif doc.get("transcript"):
+            # No usable vectors: fall back to the opening, which at least
+            # states what the video is about.
+            parts.append(" ".join(doc["transcript"].split())
+                         [:config.EDITION_TRANSCRIPT_CHARS] + "…")
+        if not parts:
+            continue
+
+        body = "\n".join(parts)[:config.EDITION_TRANSCRIPT_CHARS]
+        head = (f"TRANSCRIPT of [{n}] — what was actually said in "
+                f"\"{doc.get('title') or i.get('title') or 'Untitled'}\":")
+        return f"{head}\n{body}", n
+    return None, None
+
+
+def _synthesize_story(items, salience_score, model, now, embed_model=None):
+    """Grounded synthesis for one cluster; template fallback on any failure.
+
+    `embed_model` is passed only for the lede, and only enables the transcript
+    block — synthesis itself is identical for every story."""
     ranked = _rank_items(items)[:6]  # keep the prompt small — no num_ctx games
     lines = []
     for n, i in enumerate(ranked, start=1):
@@ -119,11 +185,19 @@ def _synthesize_story(items, salience_score, model, now):
         if i.get("snippet"):
             line += f" — {i['snippet']}"
         lines.append(line)
-    prompt = "Story items:\n\n" + "\n\n".join(lines) + "\n\nWrite the story JSON now."
+    prompt = "Story items:\n\n" + "\n\n".join(lines)
+
+    system, sourced = _SYNTH_SYSTEM, None
+    if embed_model is not None:
+        block, sourced = _transcript_block(ranked, ranked[0].get("title") or "", embed_model)
+        if block:
+            prompt += "\n\n" + block
+            system += _SYNTH_TRANSCRIPT_NOTE
+    prompt += "\n\nWrite the story JSON now."
 
     for _attempt in range(2):  # one retry, then template — never a blocked build
         try:
-            text = llm.chat(_SYNTH_SYSTEM, prompt, model,
+            text = llm.chat(system, prompt, model,
                             temperature=0.15, fmt="json")
             headline, dek, body, cited = _validate_synthesis(text, len(ranked))
             return {
@@ -132,6 +206,8 @@ def _synthesize_story(items, salience_score, model, now):
                 "body": body,
                 "cited": [ranked[c - 1]["id"] for c in cited],
                 "synthesized": True,
+                # Which item (if any) the copy desk read in full, not just billed.
+                "transcript_of": ranked[sourced - 1]["id"] if sourced else None,
                 "salience": round(salience_score, 3),
                 "items": [_strip(i) for i in _rank_items(items)],
             }
@@ -216,9 +292,12 @@ def _build():
     chat_model = _chat_model()
     chat_ok = llm.available() and llm.has_model(chat_model)
 
-    def write(c, budget_left):
+    def write(c, budget_left, lead=False):
         if chat_ok and budget_left:
-            return _synthesize_story(c["items"], c["salience"], chat_model, now)
+            # Only the lede gets the transcript treatment: it is the one story
+            # worth the extra context, and `vectors` proves the embed stack is up.
+            return _synthesize_story(c["items"], c["salience"], chat_model, now,
+                                     embed_model if (lead and vectors is not None) else None)
         return _template_story(c["items"], c["salience"])
 
     to_write = ([slots["lede"]] if slots["lede"] else []) + slots["columns"]
@@ -227,7 +306,7 @@ def _build():
     for c in to_write:
         in_budget = (time.monotonic() - t0) < SYNTH_DEADLINE and \
             len([s for s in stories if s.get("synthesized")]) < config.EDITION_MAX_SYNTH
-        stories.append(write(c, in_budget))
+        stories.append(write(c, in_budget, lead=(not stories and bool(slots["lede"]))))
 
     lede = stories[0] if slots["lede"] and stories else None
     columns = stories[1:] if slots["lede"] else stories

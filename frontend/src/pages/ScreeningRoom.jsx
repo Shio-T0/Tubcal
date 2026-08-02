@@ -199,8 +199,10 @@ function ChannelChips({ subs, onAdd, activeId }) {
   );
 }
 
-/** YouTube-wide search that accumulates pages (Invidious ?page=N), so a
- *  "load more" button can extend results beyond the first page. */
+/** YouTube-wide search that accumulates pages, so a "load more" button can
+ *  extend results beyond the first. The backend paginates by continuation token
+ *  (YouTube's own InnerTube API); ?page=N is still sent so the Invidious
+ *  fallback — which has no tokens — can keep numbering. */
 function useYoutubeSearch(query) {
   const [pages, setPages] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -244,8 +246,11 @@ function useYoutubeSearch(query) {
   const loadMore = () => {
     if (!hasMore || loadingMore || !query) return;
     const next = (last?.page || pages.length) + 1;
+    const cont = last?.continuation
+      ? `&continuation=${encodeURIComponent(last.continuation)}`
+      : '';
     setLoadingMore(true);
-    api(`/youtube/search?q=${encodeURIComponent(query)}&page=${next}`)
+    api(`/youtube/search?q=${encodeURIComponent(query)}&page=${next}${cont}`)
       .then((d) => setPages((p) => [...p, d]))
       .catch(() => {})
       .finally(() => setLoadingMore(false));

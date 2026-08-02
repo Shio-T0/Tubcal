@@ -15,6 +15,11 @@ BRAIN_DIR = DATA_DIR / "brain"
 OLLAMA_URL = os.environ.get("TUBCAL_OLLAMA_URL", "http://127.0.0.1:11434").rstrip("/")
 BRAIN_CHUNK_SECONDS = 45  # group transcript segments into ~this many seconds
 BRAIN_SEARCH_TOPK = 12  # chunks returned by semantic search
+# "Ask" runs a zoom pass: the model names the few excerpts worth reading more of,
+# and those get re-read with their neighbouring chunks attached. 0 disables it
+# (one LLM call per question instead of two).
+BRAIN_ASK_EXPAND = int(os.environ.get("TUBCAL_BRAIN_ASK_EXPAND", "3"))
+BRAIN_ASK_EXPAND_RADIUS = 2  # chunks either side of a chosen hit (~±90s)
 TTL_BRAIN_DIGEST = 1800  # digest is expensive — cache it (SWR)
 
 HOST = "127.0.0.1"
@@ -46,6 +51,8 @@ TTL_REDDIT_COMMENTS = 300
 TTL_YT_RSS = 600
 TTL_YT_ACCOUNT_SUBS = 1800
 TTL_YT_DISCOVER = 900  # Invidious trending/popular — the "random video" pool
+TTL_YT_SEARCH = 900  # InnerTube search pages (query results move slowly)
+TTL_YT_SEARCH_EMPTY = 60  # a genuinely-empty page, kept brief in case it wasn't
 # AniList (90 req/min cap → cache reads). Writes are user-initiated and not cached.
 TTL_ANILIST_SEARCH = 600
 TTL_ANILIST_BROWSE = 1800
@@ -89,6 +96,10 @@ EDITION_SIM = 0.80  # cosine threshold for joining a story cluster. Short
 # same-story pairs land ~0.85+. (0.62 blobbed 40 items.)
 EDITION_MAX_SYNTH = 6  # hard cap on LLM story writes per build (lede + columns)
 EDITION_SNIPPET = 400  # chars of snippet fed to embedding / synthesis
+# Lead story only: when its video is already transcribed in The Archive, the copy
+# desk gets what was actually said instead of just a title + description.
+EDITION_TRANSCRIPT_CHUNKS = 6  # transcript parts quoted into the lede prompt
+EDITION_TRANSCRIPT_CHARS = 4000  # hard cap on that block (keeps 8B contexts sane)
 
 # Minimum spacing between requests to a host (seconds).
 # Reddit 429s aggressively on unauthenticated RSS — keep this generous;

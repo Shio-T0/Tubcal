@@ -185,6 +185,17 @@
   background: var(--surface-hover);
 }
 
+/* Read with its surrounding transcript, not just the retrieved window. */
+.cite[data-deep] {
+  border-color: color-mix(in srgb, var(--signal) 45%, var(--rule));
+}
+
+.cite[data-deep] .citeTime::after {
+  content: '+';
+  margin-left: 2px;
+  opacity: 0.7;
+}
+
 .citeN {
   font-family: var(--font-mono);
   font-size: 10px;

@@ -12,6 +12,7 @@ misreported as "not found". Instead of guessing a static interval, we read
 the limiter's own headers and remember when a host is next available.
 """
 
+import http.cookiejar
 import threading
 import time
 from urllib.parse import urlparse
@@ -30,6 +31,29 @@ session = requests.Session()
 _adapter = HTTPAdapter(pool_connections=32, pool_maxsize=64)
 session.mount("https://", _adapter)
 session.mount("http://", _adapter)
+
+
+class _BlockCookies(http.cookiejar.DefaultCookiePolicy):
+    """A cookie policy that refuses to store or send anything."""
+
+    def set_ok(self, cookie, request):
+        return False
+
+    def return_ok(self, cookie, request):
+        return False
+
+
+# `session` is shared, so its jar accumulates whatever a host sets — scraping a
+# YouTube channel page seeds VISITOR_INFO1_LIVE / YSC / __Secure-YNID, and
+# requests then merges those into *every* later call to that host. For an
+# anonymous read that's a linkability leak: it hands the platform one stable
+# pseudonymous id spanning searches, feeds and playback. `anon_session` carries
+# the same pooling but a jar that neither stores nor sends, so a request made
+# through it stays unlinkable to the rest of the session.
+anon_session = requests.Session()
+anon_session.mount("https://", _adapter)
+anon_session.mount("http://", _adapter)
+anon_session.cookies.set_policy(_BlockCookies())
 
 _host_locks = {}
 _host_last = {}
@@ -71,9 +95,14 @@ def _note_rate_limit(host, resp):
             pass
 
 
-def get(url, *, ua=config.BROWSER_UA, headers=None, timeout=15, **kwargs):
+def get(url, *, ua=config.BROWSER_UA, headers=None, timeout=15, anonymous=False, **kwargs):
+    """GET via the shared session. `anonymous=True` routes through a jar that
+    neither sends nor stores cookies — see `anon_session`. An explicit `Cookie`
+    header still goes out (the YouTube consent cookie relies on that); what's
+    suppressed is the *ambient* jar, in both directions."""
     hdrs = dict(headers or {})
     hdrs.setdefault("User-Agent", ua)
+    sess = anon_session if anonymous else session
 
     host = urlparse(url).hostname or ""
 
@@ -92,9 +121,9 @@ def get(url, *, ua=config.BROWSER_UA, headers=None, timeout=15, **kwargs):
             if wait > 0:
                 time.sleep(wait)
             _host_last[host] = time.time()
-            resp = session.get(url, headers=hdrs, timeout=timeout, **kwargs)
+            resp = sess.get(url, headers=hdrs, timeout=timeout, **kwargs)
     else:
-        resp = session.get(url, headers=hdrs, timeout=timeout, **kwargs)
+        resp = sess.get(url, headers=hdrs, timeout=timeout, **kwargs)
 
     _note_rate_limit(host, resp)
 
@@ -106,9 +135,13 @@ def get(url, *, ua=config.BROWSER_UA, headers=None, timeout=15, **kwargs):
     return resp
 
 
-def post(url, *, ua=config.BROWSER_UA, headers=None, timeout=15, **kwargs):
+def post(url, *, ua=config.BROWSER_UA, headers=None, timeout=15, anonymous=False, **kwargs):
+    """POST via the shared session. `anonymous=True` routes through a jar that
+    neither sends nor stores cookies — use it for unauthenticated reads that
+    shouldn't be linkable to the rest of this process's traffic."""
     hdrs = dict(headers or {})
     hdrs.setdefault("User-Agent", ua)
-    resp = session.post(url, headers=hdrs, timeout=timeout, **kwargs)
+    sess = anon_session if anonymous else session
+    resp = sess.post(url, headers=hdrs, timeout=timeout, **kwargs)
     resp.raise_for_status()
     return resp
