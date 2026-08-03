@@ -230,6 +230,10 @@ needs a restart. There's no linter configured and no frontend tests; the deepest
 coverage sits where a bug would be silent — edition clustering, editor path
 containment, and the fMP4 index parser.
 
+## License
+
+MIT — see [LICENSE](LICENSE).
+
 ---
 
 <div align="center">
