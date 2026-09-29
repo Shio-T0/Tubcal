@@ -3521,3 +3521,413 @@ a.castAlsoName:focus-visible {
   border-bottom-width: 2px;
   border-radius: 4px;
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   The whole-of-AniList expansion: search modes, exclusion chips, list tools,
+   list-entry privacy, recommendation votes, the spoiler guard, and the pieces
+   shared.jsx hands every page (compact hearts, markdown spoilers).
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* eight tabs don't fit a phone — let the dial scroll instead of wrapping */
+.tabs {
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-bottom: 2px;
+}
+.tabs::-webkit-scrollbar {
+  display: none;
+}
+
+/* ── search in ── */
+.searchIn {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin: calc(var(--space-2) * -1) 0 var(--space-3);
+}
+.searchInLabel {
+  margin-right: 6px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--paper-faint);
+}
+.searchInBtn,
+.searchInOn {
+  padding: 3px 11px;
+  border-radius: var(--r-pill);
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  border: 1px solid transparent;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+.searchInBtn:hover {
+  color: var(--text-primary);
+  border-color: var(--rule);
+}
+.searchInOn {
+  color: var(--text-primary);
+  border-color: color-mix(in srgb, var(--c-anime) 50%, var(--rule));
+  background: color-mix(in srgb, var(--c-anime) 12%, var(--surface));
+}
+
+/* ── exclusion: a chip you've ruled out ── */
+.finderHint {
+  margin-right: auto;
+  margin-left: 10px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--paper-faint);
+}
+.genreChipNo {
+  border-color: color-mix(in srgb, var(--danger) 55%, var(--rule));
+  background: color-mix(in srgb, var(--danger) 9%, var(--surface));
+  color: var(--text-secondary);
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in srgb, var(--danger) 60%, transparent);
+}
+.genreChipNo .genreCheck {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
+}
+.tagPickNo {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px 4px 6px;
+  border-radius: var(--r-pill);
+  border: 1px solid color-mix(in srgb, var(--danger) 55%, var(--rule));
+  background: color-mix(in srgb, var(--danger) 9%, var(--surface));
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in srgb, var(--danger) 60%, transparent);
+  cursor: pointer;
+}
+.tagPickNo .tagPickCheck {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
+}
+.activePillX,
+.activePillA {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  border-radius: var(--r-pill);
+  font-size: 11.5px;
+  cursor: pointer;
+}
+.activePillX {
+  border: 1px solid color-mix(in srgb, var(--danger) 50%, var(--rule));
+  color: var(--text-secondary);
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in srgb, var(--danger) 55%, transparent);
+  font-family: var(--font-mono);
+}
+.activePillA {
+  border: 1px solid var(--rule-strong);
+  background: var(--surface);
+  color: var(--text-primary);
+}
+.activePillA:hover,
+.activePillX:hover {
+  border-color: var(--danger);
+}
+
+/* ── My List toolbar + bulk select ── */
+.listToolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  margin: 0 0 var(--space-4);
+}
+.listSearch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--rule);
+  background: var(--surface-input);
+  color: var(--paper-faint);
+}
+.listSearch input {
+  width: 13rem;
+  border: none;
+  outline: none;
+  background: none;
+  color: var(--text-primary);
+  font-size: 13px;
+}
+.listSearch button {
+  display: grid;
+  place-items: center;
+  color: var(--paper-faint);
+}
+.toolSpacer {
+  flex: 1;
+}
+.listTool {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--rule);
+  background: var(--surface);
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+.listTool:hover {
+  color: var(--text-primary);
+  border-color: var(--rule-strong);
+}
+.listToolOn {
+  color: var(--text-primary);
+  border-color: color-mix(in srgb, var(--c-anime) 55%, var(--rule));
+  background: color-mix(in srgb, var(--c-anime) 12%, var(--surface));
+}
+.filterPillCustom {
+  border-style: dashed;
+}
+.customTag {
+  margin-left: 8px;
+  padding: 1px 7px;
+  border-radius: var(--r-pill);
+  border: 1px dashed var(--rule-strong);
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--paper-faint);
+  vertical-align: middle;
+}
+.selectAll {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--paper-dim);
+  border-bottom: 1px dotted var(--rule-strong);
+}
+.selectAll:hover {
+  color: var(--c-anime);
+}
+.register {
+  border-top: 1px solid var(--rule-strong);
+}
+.listEntry {
+  position: relative;
+}
+.listEntryPicked > a:first-of-type > div:first-child {
+  outline: 3px solid var(--c-anime);
+  outline-offset: 2px;
+}
+.pickBox {
+  position: absolute;
+  z-index: 4;
+  top: 8px;
+  left: 8px;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--ink) 80%, transparent);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  cursor: pointer;
+}
+.pickBox input {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--c-anime);
+  cursor: pointer;
+}
+
+/* ── list-entry editor: category scores, custom lists, privacy ── */
+.advScores,
+.customLists,
+.privacy {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  grid-column: 1 / -1;
+}
+.advRow {
+  display: grid;
+  grid-template-columns: minmax(90px, 9rem) 1fr 2.5rem;
+  align-items: center;
+  gap: 10px;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+.advRow input {
+  accent-color: var(--cover-c, var(--c-anime));
+}
+.advRow b {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-primary);
+  text-align: right;
+}
+.customChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.custom,
+.customOn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: var(--r-pill);
+  border: 1px dashed var(--rule-strong);
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.customOn {
+  border-style: solid;
+  border-color: color-mix(in srgb, var(--cover-c, var(--c-anime)) 60%, var(--rule));
+  background: color-mix(in srgb, var(--cover-c, var(--c-anime)) 15%, var(--surface));
+  color: var(--text-primary);
+}
+.privacyRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.privacyRow input {
+  margin-top: 3px;
+  accent-color: var(--cover-c, var(--c-anime));
+}
+.privacyRow b {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+/* ── the dossier's studio link ── */
+.specLink {
+  color: inherit;
+  border-bottom: 1px solid color-mix(in srgb, var(--cover-c) 60%, transparent);
+}
+.specLink:hover {
+  color: var(--c-anime);
+}
+
+/* ── recommendation votes under a strip card ── */
+.recVote {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;
+}
+.recAgree {
+  min-width: 3ch;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+.recVoteBtn,
+.recVoteOn {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1px solid var(--rule);
+  color: var(--paper-dim);
+}
+.recVoteBtn:hover:not(:disabled) {
+  color: var(--text-primary);
+  border-color: var(--rule-strong);
+}
+.recVoteOn {
+  background: var(--c-anime);
+  border-color: transparent;
+  color: var(--ink);
+}
+
+/* ── the discussion block's thread/activity switch ── */
+.talkHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+.talkHead .blockLabel {
+  margin: 0;
+}
+
+/* ── the spoiler guard ── */
+.epHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.guardBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: var(--space-3);
+  padding: 3px 10px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--rule);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--paper-faint);
+}
+.guardOn {
+  color: var(--text-primary);
+  border-color: color-mix(in srgb, var(--cover-c) 50%, var(--rule));
+}
+.epVeiled {
+  filter: blur(9px) saturate(0.5);
+  transform: scale(1.12);
+}
+.epTitleVeiled {
+  font-style: italic;
+  color: var(--paper-faint);
+}
+
+/* ── shared.jsx: compact hearts, favourite counts, markdown spoilers ── */
+.favBtnCompact {
+  padding: 6px 9px;
+  animation: none;
+}
+.favCount {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 400;
+  opacity: 0.8;
+}
+.mdSpoiler {
+  display: inline;
+  padding: 0 6px;
+  border-radius: 4px;
+  background: var(--ink-3);
+  color: var(--paper-faint);
+  font: inherit;
+  font-size: 0.9em;
+  font-style: italic;
+  cursor: pointer;
+}
+.mdSpoilerOpen {
+  background: color-mix(in srgb, var(--accent-strong) 12%, transparent);
+  color: inherit;
+  font-style: normal;
+  cursor: text;
+}

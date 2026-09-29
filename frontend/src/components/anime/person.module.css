@@ -1,0 +1,351 @@
+/* People: faces, names, the hover card, follow, and the person card.
+   A face wears its owner's AniList profile colour as a ring (--ring); a face with
+   no picture gets initials on a tint of its own (--hue, from the name). */
+
+.av {
+  position: relative;
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: var(--sz);
+  height: var(--sz);
+  border-radius: 50%;
+  background: var(--ink-3, var(--surface));
+  box-shadow: 0 0 0 1px var(--rule);
+  vertical-align: middle;
+}
+/* absolutely placed: a % height inside an auto-sized grid track would fall back
+   to the picture's own height, and a tall avatar would spill out of its circle */
+.av img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.ringed {
+  box-shadow: 0 0 0 var(--ringW, 2px) var(--ring), 0 0 0 calc(var(--ringW, 2px) + 1px) var(--ink);
+}
+.initials {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: calc(var(--sz) * 0.38);
+  letter-spacing: 0.02em;
+  color: hsl(var(--hue) 55% 78%);
+  background:
+    radial-gradient(circle at 30% 25%, hsl(var(--hue) 50% 40% / 0.9), hsl(calc(var(--hue) + 40) 45% 22% / 0.95));
+}
+.xs { --sz: 20px; --ringW: 1.5px; }
+.sm { --sz: 32px; }
+.md { --sz: 40px; }
+.lg { --sz: 64px; --ringW: 3px; }
+.xl { --sz: 112px; --ringW: 4px; }
+.donor {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  display: grid;
+  place-items: center;
+  width: calc(var(--sz) * 0.32);
+  height: calc(var(--sz) * 0.32);
+  min-width: 18px;
+  min-height: 18px;
+  border-radius: 50%;
+  background: var(--signal, var(--c-anime));
+  color: var(--ink);
+  box-shadow: 0 0 0 2px var(--ink);
+}
+
+/* ── a name that opens a profile ───────────────────────────────────────────── */
+
+.link {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  max-width: 100%;
+  color: var(--paper);
+  font-weight: 600;
+  vertical-align: middle;
+}
+.linkName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-underline-offset: 3px;
+  transition: text-decoration-color 0.15s ease, color 0.15s ease;
+}
+.link:hover .linkName,
+.link:focus-visible .linkName {
+  color: var(--c-anime);
+  text-decoration-color: color-mix(in srgb, var(--c-anime) 60%, transparent);
+}
+
+/* ── the hover card ────────────────────────────────────────────────────────── */
+
+.card {
+  position: fixed;
+  z-index: 400;
+  overflow: hidden;
+  border-radius: var(--r-card);
+  border: 1px solid var(--rule-strong);
+  background: var(--ink-2, var(--surface));
+  box-shadow: var(--shadow-modal);
+  animation: cardIn 0.18s var(--hand) both;
+}
+.cardBanner {
+  height: 64px;
+  background:
+    linear-gradient(to bottom, transparent 30%, color-mix(in srgb, var(--ink-2, var(--ink)) 85%, transparent)),
+    linear-gradient(120deg, color-mix(in srgb, var(--accent) 55%, var(--ink)), color-mix(in srgb, var(--accent) 18%, var(--ink)));
+  background-size: cover;
+  background-position: center;
+}
+.cardBody {
+  padding: 0 14px 13px;
+}
+.cardAv {
+  margin-top: -32px;
+  --ring: var(--accent) !important;
+}
+.cardHead {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  margin-top: 6px;
+}
+.cardName {
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 640;
+  color: var(--paper);
+}
+.cardName:hover {
+  color: var(--accent);
+}
+.cardNote {
+  margin: 8px 0 0;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--paper-faint);
+}
+.cardStats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  margin: 10px 0 0;
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+}
+.cardStats div {
+  padding: 6px 8px;
+  text-align: center;
+}
+.cardStats div + div {
+  border-left: 1px solid var(--rule);
+}
+.cardStats dt {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--paper-faint);
+}
+.cardStats dd {
+  margin: 1px 0 0;
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 620;
+  color: var(--paper);
+}
+.cardActions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 11px;
+}
+.cardOpen {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--paper-dim);
+}
+.cardOpen:hover {
+  color: var(--accent);
+}
+
+/* ── badges ───────────────────────────────────────────────────────────────── */
+
+.badges {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.badges em {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 7px;
+  border-radius: var(--r-pill);
+  font-style: normal;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  border: 1px solid var(--rule);
+  color: var(--paper-dim);
+}
+.badgeYou {
+  color: var(--c-anime) !important;
+  border-color: color-mix(in srgb, var(--c-anime) 50%, transparent) !important;
+}
+.badgeMutual {
+  color: var(--success, var(--c-anime)) !important;
+  border-color: color-mix(in srgb, var(--success, var(--c-anime)) 45%, transparent) !important;
+}
+.badgeFollows {
+  color: var(--paper) !important;
+}
+.badgeDonor {
+  color: var(--signal, var(--c-anime)) !important;
+  border-color: color-mix(in srgb, var(--signal, var(--c-anime)) 45%, transparent) !important;
+}
+
+/* ── follow ───────────────────────────────────────────────────────────────── */
+
+.follow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: var(--r-pill);
+  background: var(--accent, var(--c-anime));
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 650;
+  transition: transform 0.15s var(--hand), filter 0.15s ease, background 0.15s ease;
+}
+.follow:hover:not(:disabled) {
+  transform: translateY(-1px);
+  filter: brightness(1.08);
+}
+.followOn {
+  background: transparent;
+  color: var(--paper);
+  box-shadow: inset 0 0 0 1px var(--rule-strong);
+}
+.followOn:hover:not(:disabled) {
+  filter: none;
+  color: var(--danger);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--danger) 50%, transparent);
+}
+.followCompact {
+  padding: 5px 11px;
+  font-size: 12px;
+}
+.follow:disabled {
+  opacity: 0.6;
+}
+
+/* ── the person card (people grids) ───────────────────────────────────────── */
+
+.person {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: var(--r-card);
+  border: 1px solid var(--rule);
+  background: var(--surface);
+  transition: transform 0.2s var(--hand), border-color 0.2s ease, box-shadow 0.2s ease;
+  animation: rise 0.35s var(--hand) calc(var(--i, 0) * 0.03s) both;
+}
+.person:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--rule));
+  box-shadow: var(--shadow-card);
+}
+.personLink {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 0 12px 10px;
+  text-align: center;
+  color: inherit;
+}
+.personBanner {
+  align-self: stretch;
+  height: 58px;
+  margin: 0 -12px;
+  background:
+    linear-gradient(to bottom, transparent 40%, color-mix(in srgb, var(--surface) 90%, transparent)),
+    linear-gradient(120deg, color-mix(in srgb, var(--accent) 50%, var(--ink)), color-mix(in srgb, var(--accent) 12%, var(--ink)));
+  background-size: cover;
+  background-position: center;
+}
+.personAv {
+  margin-top: -34px;
+  --ring: var(--accent) !important;
+}
+.personName {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-display);
+  font-size: 16.5px;
+  font-weight: 630;
+  color: var(--paper);
+}
+.personStats {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--paper-faint);
+}
+.personStats b {
+  color: var(--paper-dim);
+  font-weight: 600;
+}
+.personActions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: auto;
+  padding: 8px 10px 11px;
+  border-top: 1px dashed var(--rule);
+}
+.personCompare {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--paper-dim);
+  padding: 5px 8px;
+  border-radius: var(--r-pill);
+}
+.personCompare:hover {
+  color: var(--accent);
+  background: var(--surface-hover);
+}
+
+@keyframes cardIn {
+  from { opacity: 0; transform: translateY(4px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes rise {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .card, .person { animation: none; }
+}

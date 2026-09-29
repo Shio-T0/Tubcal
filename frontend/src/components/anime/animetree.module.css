@@ -1,0 +1,457 @@
+/* The Anime's index — a file tree in a slim cabinet down the left. Folders in the
+   display face with their icon, files hanging off a hairline guide by little
+   "├─" ticks, the open file lit in the room's amber. */
+
+.layout {
+  --tree-w: 216px;
+  --tree-gap: 26px;
+  display: grid;
+  grid-template-columns: var(--tree-w) minmax(0, 1fr);
+  gap: var(--tree-gap);
+  align-items: start;
+}
+.layoutRail {
+  --tree-w: 48px;
+}
+/* Wide screens: hang the index in the shell's empty left margin, so the content
+   keeps the shell's full width (and the Reckoner still docks in the right one). */
+@media (min-width: 1780px) {
+  .layout {
+    margin-left: calc(-1 * (var(--tree-w) + var(--tree-gap)));
+  }
+}
+@media (max-width: 900px) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-3);
+  }
+}
+.main {
+  min-width: 0;
+}
+
+/* ── the tree ─────────────────────────────────────────────────────────────── */
+.tree {
+  position: sticky;
+  top: 14px;
+  max-height: calc(100vh - 28px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 8px 6px 10px;
+  border-radius: var(--r-card);
+  border: 1px solid var(--rule);
+  background:
+    linear-gradient(to bottom, color-mix(in srgb, var(--c-anime) 5%, transparent), transparent 120px),
+    var(--surface);
+  scrollbar-width: thin;
+  animation: slideIn 0.35s var(--hand) both;
+}
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 4px 7px 10px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--rule);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--paper-faint);
+}
+.head button {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  color: var(--paper-faint);
+}
+.head button:hover {
+  color: var(--text-primary);
+  background: var(--surface-hover);
+}
+.folders,
+.files {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.folder + .folder {
+  margin-top: 1px;
+}
+.folderRow {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  align-items: center;
+}
+.caret,
+.caretSpacer {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 26px;
+  color: var(--paper-faint);
+  border-radius: 5px;
+}
+.caret svg {
+  transition: transform 0.18s var(--hand);
+}
+.caretOpen svg {
+  transform: rotate(90deg);
+}
+.caret:hover {
+  color: var(--text-primary);
+}
+.folderLink {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  padding: 5px 8px 5px 4px;
+  border-radius: 8px;
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 560;
+  color: var(--text-secondary);
+  transition: color 0.14s ease, background 0.14s ease;
+}
+.folderLink span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.folderLink svg {
+  flex: none;
+  color: var(--paper-faint);
+  transition: color 0.14s ease;
+}
+.folderLink:hover {
+  color: var(--text-primary);
+  background: var(--surface-hover);
+}
+.folderActive .folderLink {
+  color: var(--text-primary);
+}
+.folderActive .folderLink svg {
+  color: var(--c-anime);
+}
+/* a folder that is itself the open page (Channel) lights like a file */
+.folderLink[aria-current='page'] {
+  background: color-mix(in srgb, var(--c-anime) 14%, transparent);
+}
+
+/* files hang off a guide line with a tick each — the tree's "├─" */
+.files {
+  margin: 1px 0 6px 13px;
+  padding-left: 10px;
+  border-left: 1px solid var(--rule);
+}
+.file {
+  animation: fileIn 0.22s ease calc(var(--i, 0) * 0.018s) both;
+}
+@keyframes fileIn {
+  from {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.file a {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 26px;
+  padding: 3px 8px;
+  border-radius: 7px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  transition: background 0.14s ease, color 0.14s ease;
+}
+.file a::before {
+  content: '';
+  position: absolute;
+  left: -10px;
+  top: 50%;
+  width: 7px;
+  height: 1px;
+  background: var(--rule-strong);
+}
+.file a:hover {
+  color: var(--text-primary);
+  background: var(--surface-hover);
+}
+.fileOpen a {
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--c-anime) 15%, transparent);
+  box-shadow: inset 2px 0 0 var(--c-anime);
+}
+.fileOpen a::before {
+  background: var(--c-anime);
+  height: 2px;
+}
+.fileName {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.custom {
+  font-style: italic;
+}
+.note {
+  font-style: normal;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.06em;
+  color: var(--paper-faint);
+}
+.count {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--paper-faint);
+}
+.fileOpen .count {
+  color: var(--text-secondary);
+}
+.badge {
+  margin-left: auto;
+  display: grid;
+  place-items: center;
+  min-width: 18px;
+  height: 17px;
+  padding: 0 5px;
+  border-radius: var(--r-pill);
+  background: var(--accent-strong);
+  color: #fff;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 700;
+}
+.box {
+  display: grid;
+  place-items: center;
+  width: 12px;
+  height: 12px;
+  flex: none;
+  border-radius: 3px;
+  border: 1px solid var(--rule-strong);
+  color: var(--ink);
+}
+.fileOpen .box {
+  background: var(--c-anime);
+  border-color: var(--c-anime);
+}
+/* a switch (toggle) reads as a setting, not a place: no highlight block */
+.fileOpen a:has(.box) {
+  background: transparent;
+  box-shadow: none;
+}
+.sep {
+  padding: 7px 8px 2px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--paper-faint);
+}
+
+/* ── folded to a rail of icons ────────────────────────────────────────────── */
+.rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 4px;
+  overflow: visible; /* the flyouts reach out past the rail */
+}
+.railSlot {
+  position: relative;
+}
+.flyout {
+  position: absolute;
+  z-index: 40;
+  left: calc(100% + 8px);
+  top: -6px;
+  min-width: 200px;
+  padding: 8px 6px 6px;
+  border-radius: var(--r-card);
+  border: 1px solid var(--rule-strong);
+  background: var(--ink-2);
+  box-shadow: var(--shadow-modal);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateX(-4px);
+  transition: opacity 0.14s ease, transform 0.14s ease, visibility 0s linear 0.14s;
+}
+/* a hair of invisible bridge so the pointer can cross the gap to the flyout */
+.flyout::before {
+  content: '';
+  position: absolute;
+  right: 100%;
+  top: 0;
+  width: 10px;
+  height: 100%;
+}
+.railSlot:hover .flyout,
+.railSlot:focus-within .flyout {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+  transition: opacity 0.14s ease, transform 0.14s ease;
+}
+.flyoutTitle {
+  display: block;
+  padding: 0 8px 6px;
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.flyout .files {
+  margin-top: 0;
+}
+.railToggle,
+.railItem {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 34px;
+  border-radius: 9px;
+  color: var(--paper-faint);
+  transition: color 0.14s ease, background 0.14s ease;
+}
+.railToggle {
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--rule);
+  border-radius: 9px 9px 0 0;
+}
+.railToggle:hover,
+.railItem:hover {
+  color: var(--text-primary);
+  background: var(--surface-hover);
+}
+.railOn {
+  color: var(--c-anime);
+  background: color-mix(in srgb, var(--c-anime) 14%, transparent);
+}
+
+/* ── the path line (what used to be a whole header) ───────────────────────── */
+.path {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  margin: 2px 0 var(--space-4);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  letter-spacing: 0.04em;
+  color: var(--paper-faint);
+}
+.path a {
+  color: var(--paper-dim);
+}
+.path a:hover {
+  color: var(--c-anime);
+}
+.path b {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+.path i {
+  font-style: normal;
+  color: var(--c-anime);
+}
+
+/* ── a phone: two rows of chips ───────────────────────────────────────────── */
+.mobile {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.chips,
+.subChips {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-bottom: 2px;
+}
+.chips::-webkit-scrollbar,
+.subChips::-webkit-scrollbar {
+  display: none;
+}
+.chip,
+.chipOn,
+.sub,
+.subOn {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--rule);
+  white-space: nowrap;
+}
+.chip,
+.chipOn {
+  padding: 6px 12px;
+  font-family: var(--font-display);
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+.chipOn {
+  color: var(--ink);
+  background: var(--c-anime);
+  border-color: transparent;
+}
+.sub,
+.subOn {
+  padding: 4px 10px;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+.subOn {
+  color: var(--text-primary);
+  border-color: color-mix(in srgb, var(--c-anime) 55%, var(--rule));
+  background: color-mix(in srgb, var(--c-anime) 14%, var(--surface));
+}
+.sub em,
+.subOn em {
+  font-style: normal;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--paper-faint);
+}
+.sub b,
+.subOn b {
+  padding: 0 5px;
+  border-radius: var(--r-pill);
+  background: var(--accent-strong);
+  color: #fff;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tree,
+  .file {
+    animation: none;
+  }
+}

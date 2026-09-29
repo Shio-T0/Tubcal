@@ -2,12 +2,14 @@ import { useEffect, useRef, useState } from 'react';
 import {
   Captions,
   Check,
+  ChevronRight,
   Maximize2,
   Minimize2,
   Pause,
   Play,
   RotateCcw,
   RotateCw,
+  SkipForward,
   Volume1,
   Volume2,
   VolumeX,
@@ -24,9 +26,32 @@ function VolumeIcon({ muted, volume, size = 18 }) {
   return <Volume2 size={size} />;
 }
 
+/** "Most replayed" as a soft ridge above the filament: a smoothed area through one
+ *  point per slice, drawn in a 1000×100 box and stretched to the bar. */
+function Heat({ values }) {
+  const n = values.length;
+  const pts = values.map((v, i) => [((i + 0.5) / n) * 1000, 100 - Math.max(0, Math.min(1, v)) * 94]);
+  let d = `M0,100 L0,${pts[0][1].toFixed(1)}`;
+  for (let i = 0; i < n - 1; i += 1) {
+    const [x, y] = pts[i];
+    const [nx, ny] = pts[i + 1];
+    d += ` Q${x.toFixed(1)},${y.toFixed(1)} ${((x + nx) / 2).toFixed(1)},${((y + ny) / 2).toFixed(1)}`;
+  }
+  d += ` L1000,${pts[n - 1][1].toFixed(1)} L1000,100 Z`;
+  return (
+    <svg className={s.heat} viewBox="0 0 1000 100" preserveAspectRatio="none" aria-hidden="true">
+      <path d={d} />
+    </svg>
+  );
+}
+
+export const chapterAt = (chapters, t) => (chapters || []).find((c) => t >= c.start && t < c.end) || null;
+
 /** The seek bar: a phosphor filament with buffered shading, a draggable bead, a
- *  hover time-chip, and a faint "resume" tick where you last left off. */
-function Scrubber({ current, duration, buffered, resumeAt, disabled, onSeek, onScrub }) {
+ *  hover time-chip, and a faint "resume" tick where you last left off. With
+ *  chapters it's cut into segments (the chip names the one under the pointer),
+ *  and "most replayed" rises over it as a ridge. */
+function Scrubber({ current, duration, buffered, resumeAt, disabled, onSeek, onScrub, heatmap, chapters }) {
   const trackRef = useRef(null);
   const [hover, setHover] = useState(false);
   const [scrubbing, setScrubbing] = useState(false);
@@ -92,9 +117,13 @@ function Scrubber({ current, duration, buffered, resumeAt, disabled, onSeek, onS
       onMouseLeave={() => setHover(false)}
       onKeyDown={key}
     >
+      {heatmap?.length > 0 && duration > 0 && <Heat values={heatmap} />}
       <div className={s.track} ref={trackRef}>
         <span className={s.buf} style={{ width: `${bufPct}%` }} />
         <span className={s.played} style={{ width: `${pct}%` }} />
+        {duration > 0 && (chapters || []).slice(1).map((c) => (
+          <span key={c.start} className={s.notch} style={{ left: `${(c.start / duration) * 100}%` }} />
+        ))}
         {showResume && (
           <span
             className={s.ghost}
@@ -107,7 +136,8 @@ function Scrubber({ current, duration, buffered, resumeAt, disabled, onSeek, onS
       {active && duration > 0 && (
         <>
           <span className={s.guide} style={{ left: `${hoverRatio * 100}%` }} />
-          <span className={s.chip} style={{ left: `${hoverRatio * 100}%` }}>
+          <span className={s.chip} style={{ left: `${Math.min(92, Math.max(8, hoverRatio * 100))}%` }}>
+            {chapterAt(chapters, hoverRatio * duration) && <b>{chapterAt(chapters, hoverRatio * duration).title}</b>}
             {clock(hoverRatio * duration)}
           </span>
         </>
@@ -158,6 +188,11 @@ export default function PlayerControls({
   resumeAt,
   canVolume,
   onVolumePersist,
+  heatmap,
+  chapters,
+  onChapters,
+  next,
+  onNext,
 }) {
   const [idle, setIdle] = useState(false);
   const [scrubbing, setScrubbing] = useState(false);
@@ -194,7 +229,7 @@ export default function PlayerControls({
   }, [ctl.playing, hasMenuOpen, scrubbing]);
 
   // ── transient center bloom ──────────────────────────────────────────────────
-  const flash = (node) => setHud({ node, key: Date.now() });
+  const flash = (node, wide = false) => setHud({ node, wide, key: Date.now() });
   useEffect(() => {
     if (!hud) return undefined;
     const t = setTimeout(() => setHud(null), 620);
@@ -257,18 +292,42 @@ export default function PlayerControls({
     flash(<VolumeIcon muted={willMute} volume={ctl.volume} size={36} />);
   };
   const toggleCC = () => setCcIndex((i) => (i >= 0 ? -1 : 0));
+  const nudgeSpeed = (d) => {
+    const at = SPEEDS.indexOf(rate);
+    const r = SPEEDS[Math.max(0, Math.min(SPEEDS.length - 1, (at < 0 ? SPEEDS.indexOf(1) : at) + d))];
+    onRate(r);
+    flash(<span className={s.hudText}>{r}×</span>);
+  };
+  // Next chapter, or back to this one's start (the one before, if you're at the top).
+  const jumpChapter = (d) => {
+    if (!chapters?.length) return;
+    const t = ctl.current;
+    const i = chapters.findIndex((c) => t >= c.start && t < c.end);
+    let target;
+    if (d > 0) target = chapters[i + 1];
+    else target = i >= 0 && t - chapters[i].start > 3 ? chapters[i] : chapters[Math.max(0, i - 1)];
+    if (!target) return;
+    ctl.seek(target.start);
+    flash(<span className={`${s.hudText} ${s.hudChapter}`}>{target.title}</span>, true);
+  };
 
   // ── keyboard (only the expanded card owns the keys) ─────────────────────────
   const kref = useRef();
-  kref.current = { actToggle, actSkip, nudgeVol, actMute, toggleCC, ctl, subtitles, setShowKeys, wake };
+  kref.current = { actToggle, actSkip, nudgeVol, actMute, toggleCC, nudgeSpeed, jumpChapter, onNext, ctl, subtitles, setShowKeys, wake };
   useEffect(() => {
     if (!expanded) return undefined;
     const onKey = (e) => {
-      if (e.ctrlKey || e.metaKey || e.altKey) return;
       const el = e.target;
       if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)) return;
       const h = kref.current;
       const k = e.key;
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && (k === 'ArrowLeft' || k === 'ArrowRight')) {
+        e.preventDefault();
+        h.jumpChapter(k === 'ArrowRight' ? 1 : -1);
+        h.wake();
+        return;
+      }
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
       if (k === ' ' || k === 'k') { e.preventDefault(); h.actToggle(); }
       else if (k === 'ArrowLeft') { e.preventDefault(); h.actSkip(-5); }
       else if (k === 'ArrowRight') { e.preventDefault(); h.actSkip(5); }
@@ -280,6 +339,9 @@ export default function PlayerControls({
       else if (k === 'f') { h.ctl.toggleFullscreen(); }
       else if (k === 'c') { if (h.subtitles.length) h.toggleCC(); }
       else if (k === '?') { h.setShowKeys((v) => !v); }
+      else if (k === '>') { h.nudgeSpeed(1); }
+      else if (k === '<') { h.nudgeSpeed(-1); }
+      else if (k === 'N' && h.onNext) { h.onNext(); }
       else if (/^[0-9]$/.test(k) && h.ctl.duration) {
         e.preventDefault();
         h.ctl.seek(h.ctl.duration * (Number(k) / 10));
@@ -348,7 +410,7 @@ export default function PlayerControls({
       />
 
       {buffering && <div className={s.ring} aria-hidden="true" />}
-      {hud && <div className={s.hud} key={hud.key}>{hud.node}</div>}
+      {hud && <div className={`${s.hud} ${hud.wide ? s.hudWide : ''}`} key={hud.key}>{hud.node}</div>}
       {ripple && (
         <div className={`${s.edge} ${ripple.side === 'left' ? s.edgeLeft : s.edgeRight}`} key={ripple.key}>
           {ripple.side === 'left' ? '«10' : '10»'}
@@ -365,6 +427,10 @@ export default function PlayerControls({
             <div><dt>↑ / ↓</dt><dd>volume</dd></div>
             <div><dt>0–9</dt><dd>jump to %</dd></div>
             <div><dt>M · F · C</dt><dd>mute · fullscreen · captions</dd></div>
+            <div><dt>&lt; / &gt;</dt><dd>slower · faster</dd></div>
+            <div><dt>Ctrl ← / →</dt><dd>previous · next chapter</dd></div>
+            <div><dt>Shift N</dt><dd>next in Up next</dd></div>
+            <div><dt>Esc</dt><dd>keep playing in the corner</dd></div>
           </dl>
         </div>
       )}
@@ -378,6 +444,8 @@ export default function PlayerControls({
           disabled={isLive}
           onSeek={ctl.seek}
           onScrub={setScrubbing}
+          heatmap={isLive ? null : heatmap}
+          chapters={isLive ? null : chapters}
         />
 
         <div className={s.row}>
@@ -391,6 +459,11 @@ export default function PlayerControls({
             <button className={s.btn} onClick={() => actSkip(10)} aria-label="Forward 10 seconds" title="Forward 10s (l)">
               <span className={s.skip}><RotateCw key={spinFwd} size={19} className={s.spinFwd} /><i>10</i></span>
             </button>
+            {next && (
+              <button className={s.btn} onClick={onNext} aria-label="Play next" title={`Next: ${next.title} (Shift N)`}>
+                <SkipForward size={18} fill="currentColor" />
+              </button>
+            )}
 
             {isLive ? (
               <span className={s.liveTag}><span className={s.liveDot} /> LIVE</span>
@@ -405,6 +478,12 @@ export default function PlayerControls({
                 </span>
                 <span className={s.timeSep}>/</span>
                 <span>{clock(ctl.duration)}</span>
+              </button>
+            )}
+            {!isLive && chapterAt(chapters, ctl.current) && (
+              <button className={s.chapter} onClick={onChapters} title="All chapters (Ctrl ← / → to step)">
+                <span>{chapterAt(chapters, ctl.current).title}</span>
+                <ChevronRight size={14} />
               </button>
             )}
           </div>

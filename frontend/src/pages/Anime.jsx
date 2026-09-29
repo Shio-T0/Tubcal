@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useCallback, useEffect, useState } from 'react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
-  AlertTriangle, ArrowLeft, ArrowRight, Bookmark, Calendar, Check, CheckCheck,
-  ChevronDown, ChevronLeft, ChevronRight, CircleSlash, Clapperboard, CloudOff,
-  Eye, ExternalLink, Flag, Frown, Heart, History, Meh, Minus, Pause, Play, PlayCircle,
-  Plus, RefreshCw, Repeat, Search, SlidersHorizontal, Smile, Star, Tag, ThumbsUp,
-  Trash2, Tv, User, X,
+  ArrowLeft, ArrowRight, Calendar, Check,
+  ChevronDown, ChevronLeft, ChevronRight, Clapperboard, Dices,
+  Eye, EyeOff, ExternalLink, Flag, Frown, Heart, History, ListChecks, Meh, Minus, Play,
+  PlayCircle, Plus, Radar, Repeat, Search, SlidersHorizontal, Smile, Sparkles, Star, Tag,
+  ThumbsDown, ThumbsUp, Trash2, Tv, User, X,
 } from 'lucide-react';
 
 import { api, useApi } from '../api/client.js';
@@ -13,13 +13,27 @@ import {
   ErrorBox,
   Receiving,
   SearchBar,
-  SectionHead,
   useDebounced,
 } from '../components/layout/Section.jsx';
 import { Button, EmptyState, SegmentedControl } from '../components/ui/index.jsx';
+import { openCurtainCall } from '../components/anime/CurtainCallHost.jsx';
 import { Avatar } from '../components/ui/Avatar.jsx';
-import { ActivityFeed, ForumList } from '../components/anime/Discussions.jsx';
-import { ProfileModal, ProfileStudio } from '../components/anime/Profile.jsx';
+import { ActivityFeed } from '../components/anime/Activity.jsx';
+import { ForumList } from '../components/anime/Forum.jsx';
+import { SOCIAL_MODES, SocialDesk } from '../components/anime/SocialDesk.jsx';
+import Seasons from '../components/anime/Seasons.jsx';
+import Schedule from '../components/anime/Schedule.jsx';
+import Ledger from '../components/anime/Ledger.jsx';
+import Community from '../components/anime/Community.jsx';
+import { PeopleGrid } from '../components/anime/People.jsx';
+import { AdvancedFilters, advancedPills, useAdvancedFilters } from '../components/anime/Filters.jsx';
+import {
+  BulkBar, ExportMenu, GatheringDust, LIST_SORTS, LedgerRow, SequelRadar, TonightsPick, matchesText, sortEntries,
+} from '../components/anime/ListTools.jsx';
+import {
+  BroadcastLog, CommunityNumbers, CreditsRoll, FranchiseGuide, InfoLedger, LinksShelf, RELATION_LABEL,
+  RankRibbons, ReviewsBlock, useExtras,
+} from '../components/anime/DetailExtras.jsx';
 import { useHorizontalWheel } from '../lib/useHorizontalWheel.js';
 import { compact } from '../lib/format.js';
 import { clock, formatWhen, timeAgo } from '../lib/time.js';
@@ -27,213 +41,16 @@ import { applyOverlay, COMPLETE_RATIO, useAnimeSync, usePlayer, useProgress, use
 import { useAnimeCalc } from '../components/anime/WatchCalculator.jsx';
 import s from './anime.module.css';
 
-/** A whisper-quiet keycap in a card's corner: the discoverable hint that hovering
- *  this title and tapping C tallies its next episode into the Reckoner. Revealed on
- *  hover by the card's own CSS; inert (aria-hidden) to assistive tech. */
-function CalcCue() {
-  return (
-    <span className={s.calcCue} aria-hidden="true" title="Tap C to tally the next episode">
-      C
-    </span>
-  );
-}
+import {
+  AnimeCard, CalcCue, CoverRatings, EMPTY_SET, FavToggle, InfiniteSentinel, MEDIA_STATUS, NextEpBadge, SyncBadge,
+  SCORE_MAX, SCORE_STEP, SET_PARAM, STATUS_LABEL, STATUS_META, airingDateLabel,
+  discoverHref, fmtCountdown, metaLine, personalScore, stripHtml, titleCase, toggleInSet,
+  trailerItem, useCountdownTick, useInfinite, useParamState,
+} from '../components/anime/shared.jsx';
 
-// AniList score scales by the viewer's chosen format.
-const SCORE_MAX = { POINT_100: 100, POINT_10_DECIMAL: 10, POINT_10: 10, POINT_5: 5, POINT_3: 3 };
-const SCORE_STEP = { POINT_10_DECIMAL: 0.5 };
+export { AnimeCard, trailerItem };
 
-/** Component state that lives in the query string instead of in the component.
- *
- * Opening a title unmounts this page, so anything held in useState is gone by the
- * time you press back — you'd land in Browse with your filters cleared. Parking it
- * in the URL means the history entry itself carries the view, so back (the button,
- * the browser, or a gesture) restores the shelf and filters you left, and a reload
- * or a copied link opens the same place.
- *
- * Updates replace rather than push: a filter toggle isn't a destination, and
- * pushing would make back walk through every toggle before leaving the room.
- * Values equal to `fallback` drop out of the URL so the default view stays clean.
- */
-function useParamState(key, fallback, { parse = (v) => v, format = String } = {}) {
-  const [params, setParams] = useSearchParams();
-  const raw = params.get(key);
-  const value = raw == null ? fallback : parse(raw);
 
-  const set = useCallback(
-    (next) => {
-      setParams(
-        (prev) => {
-          const cur = prev.get(key) == null ? fallback : parse(prev.get(key));
-          const v = typeof next === 'function' ? next(cur) : next;
-          const p = new URLSearchParams(prev);
-          const s = v == null ? '' : format(v);
-          if (!s || s === format(fallback)) p.delete(key);
-          else p.set(key, s);
-          return p;
-        },
-        { replace: true },
-      );
-    },
-    // parse/format are inline literals at every call site; re-creating `set` when
-    // they change would defeat memoization for no benefit.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [key, fallback, setParams],
-  );
-
-  return [value, set];
-}
-
-// A Set of filter keys <-> a comma-separated param, order-stable so the URL
-// doesn't churn as buckets are toggled on and off.
-const SET_PARAM = {
-  parse: (v) => new Set(v.split(',').filter(Boolean)),
-  format: (v) => [...v].sort().join(','),
-};
-// Stable identity: an inline `new Set()` fallback would be a fresh object on every
-// render, so useParamState's `set` could never memoize.
-const EMPTY_SET = new Set();
-
-const ACCENT = { '--accent-local': 'var(--c-anime)' };
-
-// A link into the Browse finder pre-set to one genre (`g`) or tag (`t`). Lets a
-// genre/tag chip anywhere become "show me more like this" without a second thought.
-const discoverHref = (key, value) => `/anime?tab=browse&${key}=${encodeURIComponent(value)}`;
-
-// AniList averageScore is 0–100; show it as a tidy percent.
-function scoreLabel(n) {
-  return n ? `${n}%` : null;
-}
-
-// Your own score arrives in your chosen AniList format; render it the way you set it.
-function personalScore(media, format) {
-  const v = media.list_entry?.score;
-  if (!v) return null;
-  if (format === 'POINT_10_DECIMAL') return v.toFixed(1);
-  return String(v); // POINT_100 / POINT_10 / POINT_5 / POINT_3 are already whole
-}
-
-/** The score cluster pinned to a cover: the global average always, plus *your*
- *  rating (persimmon, with a person glyph) when the title is on your list.
- *  `className` positions the cluster (top-right on browse, bottom-left elsewhere). */
-function CoverRatings({ media, scoreFormat, className }) {
-  const mine = personalScore(media, scoreFormat);
-  if (!scoreLabel(media.score) && !mine) return null;
-  return (
-    <div className={`${s.ratings} ${className || ''}`}>
-      {scoreLabel(media.score) && (
-        <span className={s.rateGlobal} title="AniList average">
-          <Star size={10} fill="currentColor" /> {scoreLabel(media.score)}
-        </span>
-      )}
-      {mine && (
-        <span className={s.rateMine} title="Your rating">
-          <User size={10} /> {mine}
-        </span>
-      )}
-    </div>
-  );
-}
-
-function metaLine(m) {
-  const bits = [];
-  if (m.format) bits.push(m.format);
-  if (m.episodes) bits.push(`${m.episodes} ep`);
-  if (m.year) bits.push(m.year);
-  return bits.join(' · ');
-}
-
-/** A trailer plays through Tubcal's existing YouTube player (AniList stores a YT id). */
-export function trailerItem(media) {
-  const tr = media.trailer;
-  if (!tr || tr.site !== 'youtube') return null;
-  return {
-    id: `yt:${tr.id}`,
-    platform: 'youtube',
-    title: `${media.title} — Trailer`,
-    url: `https://www.youtube.com/watch?v=${tr.id}`,
-    thumbnail: tr.thumbnail,
-    source: media.title,
-    published_at: 0,
-    extra: { video_id: tr.id },
-  };
-}
-
-/** Format a remaining-millisecond span as a compact "2d 4h" / "3h 12m" / "5m 02s". */
-function fmtCountdown(ms) {
-  const total = Math.max(0, Math.floor(ms / 1000));
-  const d = Math.floor(total / 86400);
-  const h = Math.floor((total % 86400) / 3600);
-  const m = Math.floor((total % 3600) / 60);
-  const sec = total % 60;
-  if (d > 0) return `${d}d ${h}h`;
-  if (h > 0) return `${h}h ${m}m`;
-  if (m > 0) return `${m}m ${String(sec).padStart(2, '0')}s`;
-  return `${sec}s`;
-}
-
-/** A precise local date/time for an airing timestamp ("Sat, Jun 28 · 11:30 PM"). */
-function airingDateLabel(at) {
-  return new Date(at * 1000).toLocaleString([], {
-    weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
-  });
-}
-
-/** Keep a countdown live: re-render the caller every second within the final hour,
- *  every half-minute otherwise, and stop once the moment has passed. */
-function useCountdownTick(atMs) {
-  const [, force] = useState(0);
-  const remaining = atMs ? atMs - Date.now() : 0;
-  const fast = remaining > 0 && remaining < 3_600_000;
-  const done = remaining <= 0;
-  useEffect(() => {
-    if (!atMs || done) return undefined;
-    const t = setInterval(() => force((n) => n + 1), fast ? 1000 : 30_000);
-    return () => clearInterval(t);
-  }, [atMs, fast, done]);
-}
-
-/** A live "next episode" countdown chip pinned to a media cover. Renders nothing
- *  unless the title has a scheduled upcoming episode still in the future. */
-function NextEpBadge({ media }) {
-  const atMs = media.next_airing_at ? media.next_airing_at * 1000 : 0;
-  useCountdownTick(atMs);
-  if (!atMs) return null;
-  const ms = atMs - Date.now();
-  if (ms <= 0) return null;
-  return (
-    <span className={s.airBadge} title={`Episode ${media.next_episode ?? ''} airs ${airingDateLabel(media.next_airing_at)}`}>
-      <span className={s.airPulse} aria-hidden="true" />
-      {media.next_episode ? `EP ${media.next_episode}` : 'Next'} · {fmtCountdown(ms)}
-    </span>
-  );
-}
-
-export function AnimeCard({ media, corner, scoreFormat }) {
-  const { hoverProps } = useAnimeCalc();
-  return (
-    <Link to={`/anime/${media.id}`} className={s.card} style={{ '--cover-c': media.color || 'var(--c-anime)' }} {...hoverProps(media)}>
-      <div className={s.cardCoverWrap}>
-        {media.cover ? (
-          <img className={s.cardCover} src={media.cover} alt="" loading="lazy" />
-        ) : (
-          <div className={s.cardCoverFallback}><Tv size={26} /></div>
-        )}
-        {corner && <span className={s.cardCorner}>{corner}</span>}
-        <CoverRatings media={media} scoreFormat={scoreFormat} className={s.ratingsBL} />
-        <NextEpBadge media={media} />
-        <CalcCue />
-      </div>
-      <div className={s.cardTitle}>{media.title}</div>
-      <div className={s.cardMeta}>{metaLine(media)}</div>
-    </Link>
-  );
-}
-
-/** AniList synopses arrive as HTML; flatten to one clean line for previews. */
-function stripHtml(html) {
-  if (!html) return '';
-  return html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
-}
 
 // Each browse dial has its own voice + whether its order is a true ranking.
 const BROWSE_KINDS = [
@@ -243,22 +60,13 @@ const BROWSE_KINDS = [
   { value: 'top', label: 'Top rated', caption: 'the highest scored ever aired', ranked: true },
 ];
 
-const MEDIA_STATUS = {
-  RELEASING: 'Airing now',
-  FINISHED: 'Complete',
-  NOT_YET_RELEASED: 'Upcoming',
-  CANCELLED: 'Cancelled',
-  HIATUS: 'On hiatus',
-};
-
-const titleCase = (s) => (s ? s[0] + s.slice(1).toLowerCase() : s);
 
 function SpecRow({ label, value }) {
   if (!value) return null;
   return (
     <div className={s.specRow}>
       <dt className={s.specLabel}>{label}</dt>
-      <dd className={s.specValue} title={value}>{value}</dd>
+      <dd className={s.specValue} title={typeof value === 'string' ? value : undefined}>{value}</dd>
     </div>
   );
 }
@@ -475,25 +283,24 @@ const DISCOVER_SORTS = [
 // The middot reads far better than the hyphen once it's a heading.
 const prettyCat = (c) => (c || 'Other').replace(/-/g, ' · ');
 
-const toggleInSet = (setter) => (key) =>
-  setter((prev) => {
-    const next = new Set(prev);
-    if (next.has(key)) next.delete(key); else next.add(key);
-    return next;
-  });
-
 /** One tag as a toggle chip, carrying AniList's own description as a hover note —
  *  the sort of gloss that answers "what *is* Iyashikei" without leaving the page. */
-function TagChip({ tag, on, onToggle }) {
+// A finder chip is three-state: required, excluded, or not in play. One click
+// requires it, a second excludes it (AniList's genre_not_in / tag_not_in), a
+// third lets it go — so "no ecchi, please" is as easy to say as "romance".
+const chipState = (key, inc, exc) => (inc.has(key) ? 'on' : exc.has(key) ? 'x' : null);
+const CHIP_HINT = { on: 'required — click to exclude', x: 'excluded — click to clear', null: 'click to require' };
+
+function TagChip({ tag, state, onToggle }) {
   return (
     <button
       type="button"
-      className={`${s.tagPick} ${on ? s.tagPickOn : ''}`}
-      title={tag.description || undefined}
+      className={`${s.tagPick} ${state === 'on' ? s.tagPickOn : state === 'x' ? s.tagPickNo : ''}`}
+      title={`${tag.description ? `${tag.description}\n\n` : ''}${CHIP_HINT[state]}`}
       onClick={() => onToggle(tag.name)}
-      aria-pressed={on}
+      aria-pressed={state === 'on' ? true : state === 'x' ? 'mixed' : false}
     >
-      <span className={s.tagPickCheck}>{on && <Check size={10} />}</span>
+      <span className={s.tagPickCheck}>{state === 'on' ? <Check size={10} /> : state === 'x' ? <Minus size={10} /> : null}</span>
       {tag.name}
     </button>
   );
@@ -502,7 +309,7 @@ function TagChip({ tag, on, onToggle }) {
 /** The finder: the full genre roster as chips, then AniList's tag vocabulary grouped
  *  by category into collapsible sections with an in-panel search. Selected tags are
  *  pinned to the top so a choice buried in a collapsed category is always reachable. */
-function AnimeFinder({ coll, genres, tags, toggleGenre, toggleTag, clearGenres, clearTags }) {
+function AnimeFinder({ coll, genres, tags, xGenres, xTags, toggleGenre, toggleTag, clearGenres, clearTags }) {
   const [tagQuery, setTagQuery] = useState('');
   const [openCats, setOpenCats] = useState(() => new Set());
   const tq = tagQuery.trim().toLowerCase();
@@ -527,7 +334,7 @@ function AnimeFinder({ coll, genres, tags, toggleGenre, toggleTag, clearGenres, 
         (t) => t.name.toLowerCase().includes(tq) || (t.description || '').toLowerCase().includes(tq),
       )
     : null;
-  const selectedTags = [...tags].sort();
+  const selectedTags = [...tags, ...xTags].sort();
 
   return (
     <div className={s.finderPanel}>
@@ -535,22 +342,24 @@ function AnimeFinder({ coll, genres, tags, toggleGenre, toggleTag, clearGenres, 
       <section className={s.finderSection}>
         <div className={s.finderSectionHead}>
           <span className={s.finderLabel}><Clapperboard size={12} /> Genre</span>
-          {genres.size > 0 && (
-            <button className={s.finderMini} onClick={clearGenres}>clear {genres.size}</button>
+          <span className={s.finderHint}>click once to require · twice to exclude</span>
+          {genres.size + xGenres.size > 0 && (
+            <button className={s.finderMini} onClick={clearGenres}>clear {genres.size + xGenres.size}</button>
           )}
         </div>
         <div className={s.genreGrid}>
           {allGenres.map((g) => {
-            const on = genres.has(g);
+            const st = chipState(g, genres, xGenres);
             return (
               <button
                 key={g}
                 type="button"
-                className={`${s.genreChip} ${on ? s.genreChipOn : ''}`}
+                className={`${s.genreChip} ${st === 'on' ? s.genreChipOn : st === 'x' ? s.genreChipNo : ''}`}
                 onClick={() => toggleGenre(g)}
-                aria-pressed={on}
+                aria-pressed={st === 'on' ? true : st === 'x' ? 'mixed' : false}
+                title={CHIP_HINT[st]}
               >
-                <span className={s.genreCheck}>{on && <Check size={11} />}</span>
+                <span className={s.genreCheck}>{st === 'on' ? <Check size={11} /> : st === 'x' ? <Minus size={11} /> : null}</span>
                 {g}
               </button>
             );
@@ -582,13 +391,17 @@ function AnimeFinder({ coll, genres, tags, toggleGenre, toggleTag, clearGenres, 
         {selectedTags.length > 0 && (
           <div className={s.tagSelected}>
             <span className={s.tagSelectedLead}>chosen</span>
-            {selectedTags.map((t) => (
-              <button key={t} type="button" className={s.tagPickOn} onClick={() => toggleTag(t)}>
-                <span className={s.tagPickCheck}><Check size={10} /></span>
-                {t}
-                <X size={10} className={s.tagPickX} />
-              </button>
-            ))}
+            {selectedTags.map((t) => {
+              const excluded = xTags.has(t);
+              return (
+                <button key={t} type="button" className={excluded ? s.tagPickNo : s.tagPickOn} onClick={() => toggleTag(t)}
+                        title={CHIP_HINT[excluded ? 'x' : 'on']}>
+                  <span className={s.tagPickCheck}>{excluded ? <Minus size={10} /> : <Check size={10} />}</span>
+                  {t}
+                  <X size={10} className={s.tagPickX} />
+                </button>
+              );
+            })}
             <button className={s.finderMini} onClick={clearTags}>clear</button>
           </div>
         )}
@@ -601,7 +414,7 @@ function AnimeFinder({ coll, genres, tags, toggleGenre, toggleTag, clearGenres, 
             {matches.length > 0 ? (
               <div className={s.tagChips}>
                 {matches.map((t) => (
-                  <TagChip key={t.name} tag={t} on={tags.has(t.name)} onToggle={toggleTag} />
+                  <TagChip key={t.name} tag={t} state={chipState(t.name, tags, xTags)} onToggle={toggleTag} />
                 ))}
               </div>
             ) : (
@@ -611,7 +424,7 @@ function AnimeFinder({ coll, genres, tags, toggleGenre, toggleTag, clearGenres, 
         ) : (
           <div className={s.tagGroups}>
             {groups.map((grp) => {
-              const sel = grp.tags.reduce((n, t) => n + (tags.has(t.name) ? 1 : 0), 0);
+              const sel = grp.tags.reduce((n, t) => n + (tags.has(t.name) || xTags.has(t.name) ? 1 : 0), 0);
               const open = openCats.has(grp.category);
               return (
                 <div key={grp.category} className={s.tagCat} data-open={open ? '' : undefined}>
@@ -629,7 +442,7 @@ function AnimeFinder({ coll, genres, tags, toggleGenre, toggleTag, clearGenres, 
                   {open && (
                     <div className={s.tagChips}>
                       {grp.tags.map((t) => (
-                        <TagChip key={t.name} tag={t} on={tags.has(t.name)} onToggle={toggleTag} />
+                        <TagChip key={t.name} tag={t} state={chipState(t.name, tags, xTags)} onToggle={toggleTag} />
                       ))}
                     </div>
                   )}
@@ -645,18 +458,28 @@ function AnimeFinder({ coll, genres, tags, toggleGenre, toggleTag, clearGenres, 
 
 /** The always-visible ledger of what's applied, so the filter is legible even with
  *  the finder folded away. Every pill removes its own filter; "clear" resets both. */
-function ActiveFilters({ genres, tags, toggleGenre, toggleTag, clearAll }) {
+function ActiveFilters({ genres, tags, xGenres, xTags, dropGenre, dropTag, extra, clearAll }) {
   return (
     <div className={s.activeBar}>
       <span className={s.activeLead}>Filtering by</span>
       {[...genres].sort().map((g) => (
-        <button key={g} type="button" className={s.activePillG} onClick={() => toggleGenre(g)}>
+        <button key={g} type="button" className={s.activePillG} onClick={() => dropGenre(g)}>
           {g}<X size={11} />
         </button>
       ))}
       {[...tags].sort().map((t) => (
-        <button key={t} type="button" className={s.activePillT} onClick={() => toggleTag(t)}>
+        <button key={t} type="button" className={s.activePillT} onClick={() => dropTag(t)}>
           <Tag size={9} />{t}<X size={11} />
+        </button>
+      ))}
+      {[...xGenres, ...xTags].sort().map((t) => (
+        <button key={`x-${t}`} type="button" className={s.activePillX} onClick={() => (xGenres.has(t) ? dropGenre(t) : dropTag(t))}>
+          <Minus size={9} />{t}<X size={11} />
+        </button>
+      ))}
+      {extra.map((p) => (
+        <button key={p.key} type="button" className={s.activePillA} onClick={p.remove}>
+          {p.label}<X size={11} />
         </button>
       ))}
       <button className={s.activeClear} onClick={clearAll}>clear all</button>
@@ -664,104 +487,74 @@ function ActiveFilters({ genres, tags, toggleGenre, toggleTag, clearAll }) {
   );
 }
 
-/** Accumulating paginated fetch for the Browse wall. `signature` fingerprints the
- *  live query (mode + filters + sort + text); the moment it changes the list resets
- *  to page one. `buildUrl(page)` names the endpoint for a page — always read through
- *  a ref so a rebuilt closure never forces a refetch on its own. Every backend page
- *  carries `has_next`, so the scroll knows exactly where the archive ends. */
-function useInfiniteMedia(signature, buildUrl) {
-  const [items, setItems] = useState(null);
-  const [hasMore, setHasMore] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [error, setError] = useState(null);
-  const pageRef = useRef(1);
-  const busyRef = useRef(false);
-  const epochRef = useRef(0); // bumped per fetch; a stale resolve (old query) is ignored
-  const buildRef = useRef(buildUrl);
-  buildRef.current = buildUrl;
+// What the search box searches: AniList's anime by default, or its people,
+// studios and users. Empty queries on the people modes show the most loved.
+const SEARCH_IN = [
+  { value: 'anime', label: 'Anime' },
+  { value: 'characters', label: 'Characters' },
+  { value: 'staff', label: 'Voices & staff' },
+  { value: 'studios', label: 'Studios' },
+  { value: 'users', label: 'Users' },
+];
 
-  const fetchPage = useCallback(async (p, append) => {
-    // A fresh load (append=false) always supersedes any in-flight page — bumping the
-    // epoch makes the older request's result a no-op — so a query change mid-fetch
-    // can never strand the shelf. Appends are the only thing the busy flag gates.
-    const myEpoch = (epochRef.current += 1);
-    busyRef.current = true;
-    if (append) setLoadingMore(true); else setLoading(true);
-    setError(null);
-    try {
-      const d = await api(buildRef.current(p));
-      if (myEpoch !== epochRef.current) return; // a newer query took over
-      const got = d.items || [];
-      // Append de-dupes on id: a title can drift across a page boundary between
-      // fetches (popularity shifts), and a doubled key would crash the render.
-      setItems((prev) => {
-        if (!append || !prev) return got;
-        const seen = new Set(prev.map((m) => m.id));
-        return [...prev, ...got.filter((m) => !seen.has(m.id))];
-      });
-      setHasMore(!!d.has_next);
-      pageRef.current = p;
-    } catch (e) {
-      if (myEpoch !== epochRef.current) return;
-      setError(e.message);
-      if (!append) setItems([]);
-    } finally {
-      if (myEpoch === epochRef.current) {
-        busyRef.current = false;
-        setLoadingMore(false);
-        setLoading(false);
-      }
-    }
-  }, []);
-
-  useEffect(() => {
-    setItems(null);
-    setHasMore(false);
-    pageRef.current = 1;
-    fetchPage(1, false);
-  }, [signature, fetchPage]);
-
-  const loadMore = useCallback(() => {
-    if (busyRef.current || !hasMore) return;
-    fetchPage(pageRef.current + 1, true);
-  }, [hasMore, fetchPage]);
-
-  return { items, hasMore, loading, loadingMore, error, loadMore };
-}
-
-/** An off-screen tripwire below the wall: when it nears the viewport it asks for the
- *  next page. `count` re-arms it after every append (a still-visible sentinel won't
- *  re-fire on its own), so a tall screen keeps filling until the page is covered. */
-function InfiniteSentinel({ onReach, active, count }) {
-  const ref = useRef(null);
-  useEffect(() => {
-    if (!active || typeof IntersectionObserver === 'undefined') return undefined;
-    const el = ref.current;
-    if (!el) return undefined;
-    const obs = new IntersectionObserver(
-      (entries) => { if (entries.some((e) => e.isIntersecting)) onReach(); },
-      { rootMargin: '800px 0px' }, // start dealing the next page well before it shows
-    );
-    obs.observe(el);
-    return () => obs.disconnect();
-  }, [onReach, active, count]);
-  return <div ref={ref} aria-hidden="true" className={s.sentinel} />;
+function PeopleResults({ kind, q }) {
+  const enabled = kind !== 'users' || !!q;
+  const feed = useInfinite(`${kind}|${q}`, (p) => `/anime/people?kind=${kind}&q=${encodeURIComponent(q)}&page=${p}`, { enabled });
+  const items = feed.items || [];
+  const label = SEARCH_IN.find((x) => x.value === kind)?.label.toLowerCase();
+  if (!enabled) return <p className={s.muted}>Type a username to find someone on AniList.</p>;
+  return (
+    <>
+      <p className={s.browseCaption}>
+        {q ? `${label} matching “${q}”` : `the most favourited ${label} on AniList`}
+        {items.length ? <em className={s.browseCount}>{items.length} shown</em> : null}
+      </p>
+      {feed.error && <ErrorBox message={feed.error} />}
+      {feed.loading && !items.length && <Receiving label={`looking through ${label}`} />}
+      {!feed.loading && !feed.error && !items.length && <p className={s.muted}>Nobody matches “{q}”.</p>}
+      {items.length > 0 && <PeopleGrid kind={kind} items={items} ranked={!q} />}
+      {items.length > 0 && (
+        <InfiniteSentinel onReach={feed.loadMore} active={feed.hasMore && !feed.error} count={items.length} />
+      )}
+    </>
+  );
 }
 
 function BrowseTab() {
   const [urlQuery, setUrlQuery] = useParamState('q', '');
+  const [rawIn, setSearchIn] = useParamState('in', 'anime');
+  const searchIn = SEARCH_IN.some((x) => x.value === rawIn) ? rawIn : 'anime';
   const [rawKind, setKind] = useParamState('kind', 'trending');
   const kind = BROWSE_KINDS.some((k) => k.value === rawKind) ? rawKind : 'trending';
   const [genres, setGenres] = useParamState('g', EMPTY_SET, SET_PARAM);
   const [tags, setTags] = useParamState('t', EMPTY_SET, SET_PARAM);
+  const [xGenres, setXGenres] = useParamState('xg', EMPTY_SET, SET_PARAM);
+  const [xTags, setXTags] = useParamState('xt', EMPTY_SET, SET_PARAM);
   const [rawSort, setSort] = useParamState('sort', 'popular');
   const dsort = DISCOVER_SORTS.some((o) => o.value === rawSort) ? rawSort : 'popular';
-  const [panelOpen, setPanelOpen] = useState(false);
-  const filtering = genres.size > 0 || tags.size > 0;
-  const toggleGenre = toggleInSet(setGenres);
-  const toggleTag = toggleInSet(setTags);
-  const clearAll = () => { setGenres(new Set()); setTags(new Set()); };
+  const af = useAdvancedFilters();
+  const [panel, setPanel] = useState(null); // 'finder' | 'more' | null
+  const chipCount = genres.size + tags.size + xGenres.size + xTags.size;
+  const filtering = chipCount > 0 || af.count > 0;
+
+  // One click requires, a second excludes, a third clears (see chipState).
+  const cycle = (inc, setInc, exc, setExc) => (key) => {
+    if (inc.has(key)) {
+      setInc((prev) => { const n = new Set(prev); n.delete(key); return n; });
+      setExc((prev) => new Set(prev).add(key));
+    } else if (exc.has(key)) {
+      setExc((prev) => { const n = new Set(prev); n.delete(key); return n; });
+    } else {
+      setInc((prev) => new Set(prev).add(key));
+    }
+  };
+  const toggleGenre = cycle(genres, setGenres, xGenres, setXGenres);
+  const toggleTag = cycle(tags, setTags, xTags, setXTags);
+  const without = (key) => (prev) => { const n = new Set(prev); n.delete(key); return n; };
+  const dropGenre = (g) => { setGenres(without(g)); setXGenres(without(g)); };
+  const dropTag = (t) => { setTags(without(t)); setXTags(without(t)); };
+  const clearChips = () => { setGenres(new Set()); setTags(new Set()); setXGenres(new Set()); setXTags(new Set()); };
+  const clearAll = () => { clearChips(); af.clear(); };
 
   // The input keeps its own state so a keystroke is never a history write (browsers
   // throttle those); only the settled query is published to the URL. Nothing is lost
@@ -779,34 +572,40 @@ function BrowseTab() {
     if (dq !== urlQuery) setUrlQuery(dq);
   }, [dq]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // When a genre or tag is in play the discover query owns the shelf (folding in the
+  // When any filter is in play the discover query owns the shelf (folding in the
   // text search too); otherwise it's plain text search, else the browse wall. Each
   // mode is one infinite list, paged in as you scroll.
-  const mode = filtering ? 'discover' : searching ? 'search' : 'browse';
-  const gcsv = encodeURIComponent([...genres].sort().join(','));
-  const tcsv = encodeURIComponent([...tags].sort().join(','));
+  const mode = searchIn !== 'anime' ? 'people' : filtering ? 'discover' : searching ? 'search' : 'browse';
+  const csv = (set) => encodeURIComponent([...set].sort().join(','));
+  const gcsv = csv(genres);
+  const tcsv = csv(tags);
+  const xgcsv = csv(xGenres);
+  const xtcsv = csv(xTags);
   // A fingerprint of everything that changes the result set — changing it resets the
   // scroll to page one; scrolling alone (which only bumps the page arg) does not.
   const sig = mode === 'discover'
-    ? `d|${gcsv}|${tcsv}|${dsort}|${dq}`
+    ? `d|${gcsv}|${tcsv}|${xgcsv}|${xtcsv}|${af.query}|${dsort}|${dq}`
     : mode === 'search'
       ? `s|${dq}`
       : `b|${kind}`;
   const buildUrl = useCallback(
     (p) => {
       if (mode === 'discover') {
-        return `/anime/discover?genres=${gcsv}&tags=${tcsv}&sort=${dsort}&q=${encodeURIComponent(dq)}&page=${p}`;
+        return `/anime/discover?genres=${gcsv}&tags=${tcsv}&xg=${xgcsv}&xt=${xtcsv}${af.query ? `&${af.query}` : ''}`
+          + `&sort=${dsort}&q=${encodeURIComponent(dq)}&page=${p}`;
       }
       if (mode === 'search') return `/anime/search?q=${encodeURIComponent(dq)}&page=${p}`;
       return `/anime/browse?kind=${kind}&page=${p}`;
     },
-    [mode, gcsv, tcsv, dsort, dq, kind],
+    [mode, gcsv, tcsv, xgcsv, xtcsv, af.query, dsort, dq, kind],
   );
-  const feed = useInfiniteMedia(sig, buildUrl);
+  const feed = useInfinite(sig, buildUrl, { enabled: mode !== 'people' });
   const me = useApi('/anime/me'); // viewer score format (for "your rating"); 401 when not connected
   const scoreFormat = me.data?.score_format;
-  // The finder vocabulary is only needed once the panel is open; hold it back till then.
-  const coll = useApi('/anime/genres', panelOpen);
+  // The finder vocabulary (and the streaming-service roster) is only needed once a
+  // panel is open or a service filter needs naming; hold it back till then.
+  const coll = useApi('/anime/genres', panel !== null || af.v.svc.size > 0);
+  const services = coll.data?.services || [];
 
   const items = feed.items || [];
   const activeKind = BROWSE_KINDS.find((k) => k.value === kind) || BROWSE_KINDS[0];
@@ -824,200 +623,172 @@ function BrowseTab() {
     const bits = [];
     if (genres.size) bits.push([...genres].sort().join(' + '));
     if (tags.size) bits.push(`${tags.size} tag${tags.size === 1 ? '' : 's'}`);
+    if (xGenres.size + xTags.size) bits.push(`${xGenres.size + xTags.size} excluded`);
+    if (af.count) bits.push(`${af.count} filter${af.count === 1 ? '' : 's'}`);
     caption = `${bits.join(' + ')} · ${activeSort.caption}`;
   } else if (searching) {
     caption = `matches for “${dq}”`;
   } else {
     caption = activeKind.caption;
   }
+  const togglePanel = (p) => setPanel((cur) => (cur === p ? null : p));
 
   return (
     <>
-      <SearchBar value={query} onChange={setQuery} placeholder="search AniList…" />
-
-      <div className={s.finderBar}>
-        <button
-          type="button"
-          className={`${s.filterToggle} ${panelOpen ? s.filterToggleOn : ''}`}
-          onClick={() => setPanelOpen((v) => !v)}
-          aria-expanded={panelOpen}
-        >
-          <SlidersHorizontal size={14} />
-          Genres &amp; tags
-          {filtering && <span className={s.filterBadge}>{genres.size + tags.size}</span>}
-          <ChevronDown size={13} className={panelOpen ? s.flip : undefined} />
-        </button>
-
-        {filtering ? (
-          <label className={s.sortWrap}>
-            <span className={s.sortLabel}>Order</span>
-            <div className={s.sortSelectWrap}>
-              <select className={s.sortSelect} value={dsort} onChange={(e) => setSort(e.target.value)}>
-                {DISCOVER_SORTS.map((o) => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
-                ))}
-              </select>
-              <ChevronDown size={13} className={s.sortCaret} aria-hidden="true" />
-            </div>
-          </label>
-        ) : !searching ? (
-          <SegmentedControl
-            options={BROWSE_KINDS.map((k) => ({ value: k.value, label: k.label }))}
-            value={kind}
-            onChange={setKind}
-          />
-        ) : null}
-
-        <span className={s.browseCaption}>
-          {caption}
-          {items.length ? <em className={s.browseCount}>{items.length} titles</em> : null}
-        </span>
-      </div>
-
-      {panelOpen && (
-        <AnimeFinder
-          coll={coll}
-          genres={genres}
-          tags={tags}
-          toggleGenre={toggleGenre}
-          toggleTag={toggleTag}
-          clearGenres={() => setGenres(new Set())}
-          clearTags={() => setTags(new Set())}
-        />
-      )}
-
-      {filtering && (
-        <ActiveFilters
-          genres={genres}
-          tags={tags}
-          toggleGenre={toggleGenre}
-          toggleTag={toggleTag}
-          clearAll={clearAll}
-        />
-      )}
-
-      {feed.error && <ErrorBox message={feed.error} />}
-      {feed.loading && items.length === 0 && (
-        <Receiving
-          label={filtering ? 'sifting the archive' : searching ? `searching for “${dq}”` : 'pulling the listings'}
-        />
-      )}
-      {!feed.loading && !feed.error && items.length === 0 && (
-        <p className={s.muted}>
-          {filtering
-            ? 'No anime match this combination — try loosening a tag.'
-            : searching
-              ? `No anime match “${dq}”.`
-              : 'Nothing on air here yet.'}
-        </p>
-      )}
-
-      {featured.length > 0 && (
-        <SpotlightCarousel
-          items={featured}
-          kind={kind}
-          ranked={activeKind.ranked}
-          label={activeKind.label}
-          scoreFormat={scoreFormat}
-        />
-      )}
-
-      <div className={s.posterGrid}>
-        {wall.map((m, i) => (
-          <BrowseCard
-            key={m.id}
-            media={m}
-            index={i}
-            scoreFormat={scoreFormat}
-            rank={showSpotlight && activeKind.ranked ? i + featured.length + 1 : null}
-          />
+      <SearchBar
+        value={query}
+        onChange={setQuery}
+        placeholder={searchIn === 'anime' ? 'search AniList…' : `search ${SEARCH_IN.find((x) => x.value === searchIn).label.toLowerCase()}…`}
+      />
+      <div className={s.searchIn} role="group" aria-label="Search in">
+        <span className={s.searchInLabel}>search in</span>
+        {SEARCH_IN.map((x) => (
+          <button key={x.value} type="button" className={searchIn === x.value ? s.searchInOn : s.searchInBtn}
+                  onClick={() => setSearchIn(x.value)} aria-pressed={searchIn === x.value}>
+            {x.label}
+          </button>
         ))}
       </div>
 
-      {/* Infinite scroll: the sentinel deals the next page; a quiet footer marks the
-          end so the wall never just stops with no word. */}
-      {items.length > 0 && (
+      {mode === 'people' ? (
+        <PeopleResults kind={searchIn} q={dq} />
+      ) : (
         <>
-          <InfiniteSentinel onReach={feed.loadMore} active={feed.hasMore && !feed.error} count={items.length} />
-          {feed.loadingMore && (
-            <div className={s.moreRow}>
-              <span className={s.moreDot} /><span className={s.moreDot} /><span className={s.moreDot} />
-              <span className={s.moreLabel}>dealing more titles</span>
-            </div>
+          <div className={s.finderBar}>
+            <button
+              type="button"
+              className={`${s.filterToggle} ${panel === 'finder' ? s.filterToggleOn : ''}`}
+              onClick={() => togglePanel('finder')}
+              aria-expanded={panel === 'finder'}
+            >
+              <SlidersHorizontal size={14} />
+              Genres &amp; tags
+              {chipCount > 0 && <span className={s.filterBadge}>{chipCount}</span>}
+              <ChevronDown size={13} className={panel === 'finder' ? s.flip : undefined} />
+            </button>
+            <button
+              type="button"
+              className={`${s.filterToggle} ${panel === 'more' ? s.filterToggleOn : ''}`}
+              onClick={() => togglePanel('more')}
+              aria-expanded={panel === 'more'}
+            >
+              <Calendar size={14} />
+              Year, format &amp; more
+              {af.count > 0 && <span className={s.filterBadge}>{af.count}</span>}
+              <ChevronDown size={13} className={panel === 'more' ? s.flip : undefined} />
+            </button>
+
+            {filtering ? (
+              <label className={s.sortWrap}>
+                <span className={s.sortLabel}>Order</span>
+                <div className={s.sortSelectWrap}>
+                  <select className={s.sortSelect} value={dsort} onChange={(e) => setSort(e.target.value)}>
+                    {DISCOVER_SORTS.map((o) => (
+                      <option key={o.value} value={o.value}>{o.label}</option>
+                    ))}
+                  </select>
+                  <ChevronDown size={13} className={s.sortCaret} aria-hidden="true" />
+                </div>
+              </label>
+            ) : !searching ? (
+              <SegmentedControl
+                options={BROWSE_KINDS.map((k) => ({ value: k.value, label: k.label }))}
+                value={kind}
+                onChange={setKind}
+              />
+            ) : null}
+
+            <span className={s.browseCaption}>
+              {caption}
+              {items.length ? <em className={s.browseCount}>{items.length} titles</em> : null}
+            </span>
+          </div>
+
+          {panel === 'finder' && (
+            <AnimeFinder
+              coll={coll}
+              genres={genres}
+              tags={tags}
+              xGenres={xGenres}
+              xTags={xTags}
+              toggleGenre={toggleGenre}
+              toggleTag={toggleTag}
+              clearGenres={() => { setGenres(new Set()); setXGenres(new Set()); }}
+              clearTags={() => { setTags(new Set()); setXTags(new Set()); }}
+            />
           )}
-          {!feed.hasMore && !feed.loadingMore && (
-            <p className={s.endNote}>· that’s every title in this shelf ·</p>
+          {panel === 'more' && <AdvancedFilters af={af} services={services} />}
+
+          {filtering && (
+            <ActiveFilters
+              genres={genres}
+              tags={tags}
+              xGenres={xGenres}
+              xTags={xTags}
+              dropGenre={dropGenre}
+              dropTag={dropTag}
+              extra={advancedPills(af, services)}
+              clearAll={clearAll}
+            />
+          )}
+
+          {feed.error && <ErrorBox message={feed.error} />}
+          {feed.loading && items.length === 0 && (
+            <Receiving
+              label={filtering ? 'sifting the archive' : searching ? `searching for “${dq}”` : 'pulling the listings'}
+            />
+          )}
+          {!feed.loading && !feed.error && items.length === 0 && (
+            <p className={s.muted}>
+              {filtering
+                ? 'No anime match this combination — try loosening a filter.'
+                : searching
+                  ? `No anime match “${dq}”.`
+                  : 'Nothing on air here yet.'}
+            </p>
+          )}
+
+          {featured.length > 0 && (
+            <SpotlightCarousel
+              items={featured}
+              kind={kind}
+              ranked={activeKind.ranked}
+              label={activeKind.label}
+              scoreFormat={scoreFormat}
+            />
+          )}
+
+          <div className={s.posterGrid}>
+            {wall.map((m, i) => (
+              <BrowseCard
+                key={m.id}
+                media={m}
+                index={i}
+                scoreFormat={scoreFormat}
+                rank={showSpotlight && activeKind.ranked ? i + featured.length + 1 : null}
+              />
+            ))}
+          </div>
+
+          {/* Infinite scroll: the sentinel deals the next page; a quiet footer marks the
+              end so the wall never just stops with no word. */}
+          {items.length > 0 && (
+            <>
+              <InfiniteSentinel onReach={feed.loadMore} active={feed.hasMore && !feed.error} count={items.length} />
+              {feed.loadingMore && (
+                <div className={s.moreRow}>
+                  <span className={s.moreDot} /><span className={s.moreDot} /><span className={s.moreDot} />
+                  <span className={s.moreLabel}>dealing more titles</span>
+                </div>
+              )}
+              {!feed.hasMore && !feed.loadingMore && (
+                <p className={s.endNote}>· that’s every title in this shelf ·</p>
+              )}
+            </>
           )}
         </>
       )}
     </>
-  );
-}
-
-const STATUS_LABEL = {
-  CURRENT: 'Watching',
-  PLANNING: 'Planning',
-  COMPLETED: 'Completed',
-  PAUSED: 'Paused',
-  DROPPED: 'Dropped',
-  REPEATING: 'Rewatching',
-};
-
-// Status pills, in the order AniList presents them, each with its own glyph.
-const STATUS_META = [
-  ['CURRENT', 'Watching', Eye],
-  ['PLANNING', 'Planning', Bookmark],
-  ['COMPLETED', 'Completed', CheckCheck],
-  ['PAUSED', 'Paused', Pause],
-  ['DROPPED', 'Dropped', CircleSlash],
-  ['REPEATING', 'Rewatching', Repeat],
-];
-
-// Sync-state glyph: edits land locally at once, so this is how you tell whether a
-// change is still only on this machine (pending), being pushed (syncing), or
-// failed. Absent when everything is in sync with AniList.
-const SYNC_META = {
-  pending: [CloudOff, 'Not yet synced'],
-  syncing: [RefreshCw, 'Syncing to AniList…'],
-  error: [AlertTriangle, 'Sync failed — kept locally'],
-};
-
-function SyncBadge({ status, label = true, className }) {
-  const meta = SYNC_META[status];
-  if (!meta) return null;
-  const [Icon, text] = meta;
-  return (
-    <span
-      className={`${s.syncBadge} ${s[`sync_${status}`] || ''} ${className || ''}`}
-      title={text}
-      data-status={status}
-    >
-      <Icon size={12} className={status === 'syncing' ? s.spin : undefined} aria-hidden="true" />
-      {label && <span>{text}</span>}
-    </span>
-  );
-}
-
-/** Worst-of sync status across every media with a pending/in-flight edit, for the
- *  room header — at a glance you know the whole room is settled or still flushing. */
-function AnimeSyncStatus() {
-  const { syncState } = useAnimeSync();
-  const vals = Object.values(syncState || {});
-  if (!vals.length) return null;
-  const status = vals.includes('syncing')
-    ? 'syncing'
-    : vals.includes('pending')
-      ? 'pending'
-      : vals.includes('error')
-        ? 'error'
-        : null;
-  if (!status) return null;
-  const n = vals.filter((v) => v === status).length;
-  return (
-    <span className={s.syncSummary}>
-      <SyncBadge status={status} />
-      {n > 1 && <em className={s.syncCount}>{n}</em>}
-    </span>
   );
 }
 
@@ -1092,11 +863,14 @@ function ScoreField({ scoreFormat, value, disabled, onSet }) {
 
 /** Status / progress / score editor for a media's AniList list entry — the
  *  "Your list" panel: status pills, a progress meter, an adaptive score control,
- *  and a foldout for rewatches, dates and notes. */
-function ListControls({ media, scoreFormat }) {
+ *  and a foldout for rewatches, dates, notes, category scores, custom lists and
+ *  privacy. `viewer` carries the account's custom lists and scoring categories. */
+function ListControls({ media, scoreFormat, viewer }) {
   const { overlay, syncState, queueListEdit, removeListEntry } = useAnimeSync();
   const [more, setMore] = useState(false);
   const entry = applyOverlay(media.id, media.list_entry, overlay);
+  const cats = viewer?.advanced_scoring || [];
+  const customLists = viewer?.custom_lists || [];
   const status = syncState[media.id];
   const prog = entry?.progress || 0;
   const total = media.episodes;
@@ -1157,6 +931,11 @@ function ListControls({ media, scoreFormat }) {
               {total > 0 && prog < total && entry.status !== 'COMPLETED' && (
                 <button className={s.finishBtn} onClick={finish}>
                   <Flag size={12} /> Finish — mark all {total} watched
+                </button>
+              )}
+              {entry.status === 'COMPLETED' && media.status === 'FINISHED' && (
+                <button className={s.finishBtn} onClick={() => openCurtainCall(media.id)}>
+                  <Sparkles size={12} /> Curtain call — rate it, talk the finale, what's next
                 </button>
               )}
             </div>
@@ -1224,6 +1003,68 @@ function ListControls({ media, scoreFormat }) {
                   onBlur={(e) => { if (e.target.value !== (entry.notes || '')) save({ notes: e.target.value }); }}
                 />
               </label>
+
+              {/* Per-category scores, only when the account uses AniList's
+                  advanced scoring (Story, Characters, Visuals…). */}
+              {cats.length > 0 && (
+                <div className={s.advScores}>
+                  <span className={s.listLabel}>Scored by category</span>
+                  {cats.map((c) => {
+                    const v = Number(entry.advanced_scores?.[c] || 0);
+                    return (
+                      <label key={c} className={s.advRow}>
+                        <span>{c}</span>
+                        <input
+                          type="range"
+                          min="0"
+                          max={SCORE_MAX[scoreFormat] || 10}
+                          step={SCORE_STEP[scoreFormat] || 1}
+                          defaultValue={v}
+                          onChange={(e) => save({ advanced_scores: { ...(entry.advanced_scores || {}), [c]: Number(e.target.value) } })}
+                        />
+                        <b>{v || '—'}</b>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+
+              {customLists.length > 0 && (
+                <div className={s.customLists}>
+                  <span className={s.listLabel}>Custom lists</span>
+                  <div className={s.customChips}>
+                    {customLists.map((c) => {
+                      const on = (entry.custom_lists || []).includes(c);
+                      return (
+                        <button
+                          key={c}
+                          type="button"
+                          className={on ? s.customOn : s.custom}
+                          aria-pressed={on}
+                          onClick={() => save({
+                            custom_lists: on
+                              ? (entry.custom_lists || []).filter((x) => x !== c)
+                              : [...(entry.custom_lists || []), c],
+                          })}
+                        >
+                          {on ? <Check size={11} /> : <Plus size={11} />} {c}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              <div className={s.privacy}>
+                <label className={s.privacyRow}>
+                  <input type="checkbox" checked={!!entry.private} onChange={(e) => save({ private: e.target.checked })} />
+                  <span><b>Private</b> — hidden from your public list and activity</span>
+                </label>
+                <label className={s.privacyRow}>
+                  <input type="checkbox" checked={!!entry.hidden} onChange={(e) => save({ hidden: e.target.checked })} />
+                  <span><b>Hide from status lists</b> — show only under its custom lists</span>
+                </label>
+              </div>
             </div>
           )}
 
@@ -1236,7 +1077,7 @@ function ListControls({ media, scoreFormat }) {
   );
 }
 
-function ListEntryCard({ entry, scoreFormat, showSeen = false }) {
+function ListEntryCard({ entry, scoreFormat, showSeen = false, select = null }) {
   const { overlay, syncState, queueListEdit } = useAnimeSync();
   const m = entry.media;
   const eff = applyOverlay(m.id, entry, overlay);
@@ -1255,7 +1096,12 @@ function ListEntryCard({ entry, scoreFormat, showSeen = false }) {
     queueListEdit(m, { progress: prog + 1 });
   };
   return (
-    <div className={s.listEntry}>
+    <div className={`${s.listEntry} ${select?.on ? s.listEntryPicked : ''}`}>
+      {select && (
+        <label className={s.pickBox} title="Select for bulk edit">
+          <input type="checkbox" checked={select.on} onChange={select.toggle} aria-label={`Select ${m.title}`} />
+        </label>
+      )}
       {/* feed the optimistic entry through so the card's "your rating" stays live */}
       <AnimeCard media={{ ...m, list_entry: eff }} corner={behindTag} scoreFormat={scoreFormat} />
       <div className={s.quickRow}>
@@ -1427,14 +1273,26 @@ function releaseClass(m) {
 
 function MyListTab() {
   const lists = useApi('/anime/lists');
-  const [filter, setFilter] = useParamState('shelf', 'all');
+  const [filter] = useParamState('shelf', 'all');
   const [release, setRelease] = useParamState('release', EMPTY_SET, SET_PARAM); // empty = no release filter
   const [seen, setSeen] = useParamState('seen', 'any');
+  const [lsort, setLsort] = useParamState('lsort', 'default');
+  const [view, setView] = useParamState('view', 'posters');
+  const [tool, setTool] = useParamState('tool', ''); // '' | 'pick' | 'radar'
+  const [lq, setLq] = useState('');
+  const [bulk, setBulk] = useState(false);
+  const [selected, setSelected] = useState(() => new Set());
   const scoreFormat = lists.data?.viewer?.score_format;
   const toggleRelease = (key) =>
     setRelease((prev) => {
       const next = new Set(prev);
       if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  const toggleSelected = (id) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
       return next;
     });
   if (lists.loading && !lists.data) return <Receiving label="opening your shelves" />;
@@ -1459,6 +1317,12 @@ function MyListTab() {
     });
   if (groups.length === 0) return <p className={s.muted}>Your AniList anime list is empty.</p>;
 
+  // Every title once, whichever shelves it sits on — what the pick, the dust
+  // check and the export work from.
+  const seenIds = new Set();
+  const uniq = [];
+  for (const g of groups) for (const e of g.entries) if (!seenIds.has(e.media.id)) { seenIds.add(e.media.id); uniq.push(e); }
+
   const shown = filter === 'all' ? groups : groups.filter((g) => groupKey(g) === filter);
 
   // The Planning shelf gets an extra release-status filter; tally each bucket so the
@@ -1473,41 +1337,64 @@ function MyListTab() {
   // them is the selected shelf, so "All" stays an unfiltered overview.
   const activityShelf = ACTIVITY_SHELVES.has(filter) ? groups.find((g) => groupKey(g) === filter) : null;
   const matchSeen = activityShelf ? activityMatcher(seen) : null;
+  const text = lq.trim();
 
-  // Filter a group's entries by whichever extra filter its shelf offers.
+  // Filter a group's entries by whichever extra filter its shelf offers, then the
+  // in-list search, then the chosen order.
   const entriesOf = (g) => {
+    let out = g.entries;
     if (groupKey(g) === 'PLANNING' && release.size > 0) {
-      return g.entries.filter((e) => release.has(releaseClass(e.media)));
+      out = out.filter((e) => release.has(releaseClass(e.media)));
+    } else if (matchSeen && ACTIVITY_SHELVES.has(groupKey(g))) {
+      out = out.filter((e) => matchSeen(e.updated_at));
     }
-    if (matchSeen && ACTIVITY_SHELVES.has(groupKey(g))) {
-      return g.entries.filter((e) => matchSeen(e.updated_at));
-    }
-    return g.entries;
+    if (text) out = out.filter((e) => matchesText(e, text));
+    return sortEntries(out, lsort);
   };
+  const toggleTool = (t) => setTool((cur) => (cur === t ? '' : t));
 
+  // Shelves are chosen from the index on the left (its My List folder carries each
+  // shelf with its count), so the page opens straight onto the tools and titles.
   return (
     <>
-      <div className={s.filterRow}>
-        <button
-          className={`${s.filterPill} ${filter === 'all' ? s.filterPillOn : ''}`}
-          onClick={() => setFilter('all')}
-        >
-          All
+      <div className={s.listToolbar}>
+        <label className={s.listSearch}>
+          <Search size={13} />
+          <input value={lq} onChange={(e) => setLq(e.target.value)} placeholder="find on your list…" spellCheck={false} />
+          {lq && <button type="button" onClick={() => setLq('')} aria-label="Clear"><X size={12} /></button>}
+        </label>
+        <label className={s.sortWrap}>
+          <span className={s.sortLabel}>Order</span>
+          <div className={s.sortSelectWrap}>
+            <select className={s.sortSelect} value={lsort} onChange={(e) => setLsort(e.target.value)}>
+              {LIST_SORTS.map(([v, label]) => <option key={v} value={v}>{label}</option>)}
+            </select>
+            <ChevronDown size={13} className={s.sortCaret} aria-hidden="true" />
+          </div>
+        </label>
+        <SegmentedControl
+          options={[{ value: 'posters', label: 'Posters' }, { value: 'rows', label: 'Rows' }]}
+          value={view}
+          onChange={setView}
+        />
+        <span className={s.toolSpacer} />
+        <button type="button" className={`${s.listTool} ${tool === 'pick' ? s.listToolOn : ''}`} onClick={() => toggleTool('pick')}>
+          <Dices size={13} /> Pick for me
         </button>
-        {groups.map((g) => {
-          const key = groupKey(g);
-          return (
-            <button
-              key={key}
-              className={`${s.filterPill} ${filter === key ? s.filterPillOn : ''}`}
-              onClick={() => setFilter(key)}
-            >
-              {STATUS_LABEL[g.status] || g.name}
-              <span className={s.filterCount}>{g.entries.length}</span>
-            </button>
-          );
-        })}
+        <button type="button" className={`${s.listTool} ${tool === 'radar' ? s.listToolOn : ''}`} onClick={() => toggleTool('radar')}>
+          <Radar size={13} /> Sequel radar
+        </button>
+        <button type="button" className={`${s.listTool} ${bulk ? s.listToolOn : ''}`}
+                onClick={() => { setBulk((v) => !v); setSelected(new Set()); }}>
+          <ListChecks size={13} /> Bulk edit
+        </button>
+        <ExportMenu lists={groups} userName={lists.data?.viewer?.name} />
       </div>
+
+      {tool === 'pick' && <TonightsPick entries={uniq} onClose={() => setTool('')} />}
+      {tool === 'radar' && <SequelRadar />}
+      {(filter === 'all' || filter === 'CURRENT') && !text && <GatheringDust entries={uniq} />}
+      {bulk && <BulkBar selected={selected} onClear={() => setSelected(new Set())} onDone={lists.reload} />}
 
       {filter === 'PLANNING' && planning && (
         <div className={s.releaseRow}>
@@ -1544,14 +1431,30 @@ function MyListTab() {
           const entries = entriesOf(g);
           const withSeen = ACTIVITY_SHELVES.has(groupKey(g));
           const held = entries.length < g.entries.length; // some filter is narrowing this shelf
+          if (text && !entries.length) return null;
+          const allOn = bulk && entries.length > 0 && entries.every((e) => selected.has(e.entry_id));
           return (
             <section key={groupKey(g)} className={s.listGroup}>
               <h3 className={s.listHead}>
                 {STATUS_LABEL[g.status] || g.name}
+                {g.custom && <span className={s.customTag}>custom</span>}
                 <span className={s.listCount}>
                   {entries.length}
                   {held && <span className={s.listOf}> of {g.entries.length}</span>}
                 </span>
+                {bulk && entries.length > 0 && (
+                  <button
+                    type="button"
+                    className={s.selectAll}
+                    onClick={() => setSelected((prev) => {
+                      const next = new Set(prev);
+                      for (const e of entries) (allOn ? next.delete(e.entry_id) : next.add(e.entry_id));
+                      return next;
+                    })}
+                  >
+                    {allOn ? 'deselect shelf' : 'select shelf'}
+                  </button>
+                )}
               </h3>
               {entries.length === 0 ? (
                 <p className={s.muted}>
@@ -1559,10 +1462,29 @@ function MyListTab() {
                     ? 'Nothing on this shelf was touched in that window.'
                     : 'No titles match those release filters.'}
                 </p>
+              ) : view === 'rows' ? (
+                <div className={s.register}>
+                  {entries.map((e) => (
+                    <LedgerRow
+                      key={e.entry_id}
+                      entry={e}
+                      scoreFormat={scoreFormat}
+                      selectable={bulk}
+                      selected={selected.has(e.entry_id)}
+                      onSelect={toggleSelected}
+                    />
+                  ))}
+                </div>
               ) : (
                 <div className={s.grid}>
                   {entries.map((e) => (
-                    <ListEntryCard key={e.entry_id} entry={e} scoreFormat={scoreFormat} showSeen={withSeen} />
+                    <ListEntryCard
+                      key={e.entry_id}
+                      entry={e}
+                      scoreFormat={scoreFormat}
+                      showSeen={withSeen || lsort === 'updated'}
+                      select={bulk ? { on: selected.has(e.entry_id), toggle: () => toggleSelected(e.entry_id) } : null}
+                    />
                   ))}
                 </div>
               )}
@@ -1641,80 +1563,30 @@ function TrailerChannel() {
 }
 
 function DiscussionsTab() {
-  const [mode, setMode] = useState('forum');
-  return (
-    <>
-      <div className={s.browseBar}>
-        <SegmentedControl
-          options={[{ value: 'forum', label: 'Forum' }, { value: 'activity', label: 'Activity' }]}
-          value={mode}
-          onChange={setMode}
-        />
-      </div>
-      {mode === 'forum' ? <ForumList /> : <ActivityFeed />}
-    </>
-  );
+  const [rawMode] = useParamState('d', 'forum');
+  // Forum / Everyone / Following / Inbox / Your people are the index's Social folder.
+  return <SocialDesk mode={SOCIAL_MODES.includes(rawMode) ? rawMode : 'forum'} />;
 }
 
-const TABS = [
-  { id: 'browse', label: 'Browse & Search' },
-  { id: 'list', label: 'My List' },
-  { id: 'channel', label: 'The Anime Channel' },
-  { id: 'discuss', label: 'Discussions' },
-];
-
-// A compact chip in the section header showing the connected AniList account; opens
-// the profile studio to edit your own settings.
-function ActiveProfileButton() {
-  const me = useApi('/anime/me');
-  const [studio, setStudio] = useState(false);
-  const [viewing, setViewing] = useState(null);
-  const u = me.data;
-  if (!u) return null;
-  return (
-    <>
-      <button type="button" className={s.activeProfile} onClick={() => setStudio(true)}>
-        <Avatar src={u.avatar?.large || u.avatar} name={u.name} imgClass={s.apAvatar} letterClass={s.apAvatarFallback} />
-        <span className={s.apMeta}>
-          <span className={s.apKicker}>Active profile</span>
-          <span className={s.apName}>{u.name}</span>
-        </span>
-      </button>
-      {studio && (
-        <ProfileStudio
-          onClose={() => setStudio(false)}
-          onView={(name) => { setStudio(false); setViewing(name); }}
-        />
-      )}
-      {viewing && <ProfileModal name={viewing} onClose={() => setViewing(null)} />}
-    </>
-  );
-}
+// Each view is its own room within the room — and each has its own layout, so a
+// visit reads differently from the last: a poster wall, a broadcast guide, a
+// timetable, box-file shelves, a ledger, a letters page, a TV channel, a forum.
+// The index on the left (components/anime/AnimeTree.jsx) is how you move between
+// them; this component only renders the one the URL names.
+const VIEWS = new Set(['browse', 'seasons', 'schedule', 'list', 'ledger', 'community', 'channel', 'discuss']);
 
 export default function Anime() {
-  const [rawTab, setTab] = useParamState('tab', 'browse');
+  const [rawTab] = useParamState('tab', 'browse');
   // A hand-edited or stale ?tab= shouldn't render a blank room.
-  const tab = TABS.some((t) => t.id === rawTab) ? rawTab : 'browse';
+  const tab = VIEWS.has(rawTab) ? rawTab : 'browse';
   return (
     <>
-      <SectionHead
-        kicker="No 06 — The Anime"
-        title="The picture scroll"
-        note="Browse and search AniList, keep your list in sync, and watch — all on this machine."
-        color="var(--c-anime)"
-      >
-        <AnimeSyncStatus />
-        <ActiveProfileButton />
-      </SectionHead>
-      <div className={s.tabs} style={ACCENT}>
-        <SegmentedControl
-          options={TABS.map((t) => ({ value: t.id, label: t.label }))}
-          value={tab}
-          onChange={setTab}
-        />
-      </div>
       {tab === 'browse' && <BrowseTab />}
+      {tab === 'seasons' && <Seasons />}
+      {tab === 'schedule' && <Schedule />}
       {tab === 'list' && <MyListTab />}
+      {tab === 'ledger' && <Ledger />}
+      {tab === 'community' && <Community />}
       {tab === 'channel' && <TrailerChannel />}
       {tab === 'discuss' && <DiscussionsTab />}
     </>
@@ -1723,16 +1595,19 @@ export default function Anime() {
 
 // ── Detail page ────────────────────────────────────────────────────────────────
 
-function RelStrip({ title, items, scoreFormat }) {
+function RelStrip({ title, relations, scoreFormat }) {
   const ref = useHorizontalWheel();
+  // Adaptation/source edges point at manga, which have no page in this room.
+  const items = relations.filter((r) => r.media && r.media.type !== 'MANGA');
   if (!items.length) return null;
   return (
     <div className={s.relBlock}>
       <h3 className={s.blockLabel}>{title}</h3>
       <div className={s.relRow} ref={ref}>
-        {items.map((m, i) => (
-          <div key={m.id} className={s.relItem} style={{ '--i': Math.min(i, 10) }}>
-            <AnimeCard media={m} scoreFormat={scoreFormat} />
+        {items.map((r, i) => (
+          <div key={r.media.id} className={s.relItem} style={{ '--i': Math.min(i, 10) }}>
+            {/* The relation rides on the cover's corner: "Sequel", "Side story"… */}
+            <AnimeCard media={r.media} scoreFormat={scoreFormat} corner={RELATION_LABEL[r.relation] || null} />
           </div>
         ))}
       </div>
@@ -1740,22 +1615,50 @@ function RelStrip({ title, items, scoreFormat }) {
   );
 }
 
-function RecStrip({ title, sourceId, recs, canPost, scoreFormat }) {
-  const ref = useHorizontalWheel();
+/** One community pairing on the detail page, with your own up/down vote on it. */
+function RecVote({ sourceId, rec, canPost }) {
   const toast = useToast();
-  const items = recs.filter((r) => r.media);
-  if (!items.length) return null;
-  const endorse = async (recId) => {
+  const [vote, setVote] = useState(rec.user_rating || 'NO_RATING');
+  const [rating, setRating] = useState(rec.rating || 0);
+  const [busy, setBusy] = useState(false);
+  const cast = async (want) => {
+    const next = vote === want ? 'NO_RATING' : want;
+    setBusy(true);
     try {
-      await api('/anime/recommend', {
+      const res = await api('/anime/recommend', {
         method: 'POST',
-        body: JSON.stringify({ media_id: sourceId, recommend_id: recId }),
+        body: JSON.stringify({ media_id: sourceId, recommend_id: rec.media.id, rating: next }),
       });
-      toast('Recommendation sent to AniList', 'success');
+      setVote(res.user_rating || next);
+      setRating(res.rating);
     } catch (e) {
       toast(e.message, 'error');
     }
+    setBusy(false);
   };
+  return (
+    <div className={s.recVote}>
+      <span className={s.recAgree} title="Net agreement on AniList">{rating > 0 ? `+${rating}` : rating}</span>
+      {canPost && (
+        <>
+          <button type="button" className={vote === 'RATE_UP' ? s.recVoteOn : s.recVoteBtn} disabled={busy}
+                  onClick={() => cast('RATE_UP')} aria-pressed={vote === 'RATE_UP'} title="Good pairing">
+            <ThumbsUp size={12} />
+          </button>
+          <button type="button" className={vote === 'RATE_DOWN' ? s.recVoteOn : s.recVoteBtn} disabled={busy}
+                  onClick={() => cast('RATE_DOWN')} aria-pressed={vote === 'RATE_DOWN'} title="Doesn't fit">
+            <ThumbsDown size={12} />
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
+function RecStrip({ title, sourceId, recs, canPost, scoreFormat }) {
+  const ref = useHorizontalWheel();
+  const items = recs.filter((r) => r.media);
+  if (!items.length) return null;
   return (
     <div className={s.relBlock}>
       <h3 className={s.blockLabel}>{title}</h3>
@@ -1763,11 +1666,7 @@ function RecStrip({ title, sourceId, recs, canPost, scoreFormat }) {
         {items.map((r, i) => (
           <div key={r.media.id} className={s.relItem} style={{ '--i': Math.min(i, 10) }}>
             <AnimeCard media={r.media} scoreFormat={scoreFormat} />
-            {canPost && (
-              <button className={s.endorseBtn} onClick={() => endorse(r.media.id)} title="Agree with this recommendation">
-                <ThumbsUp size={12} /> agree
-              </button>
-            )}
+            <RecVote sourceId={sourceId} rec={r} canPost={canPost} />
           </div>
         ))}
       </div>
@@ -1808,6 +1707,8 @@ function epSubtitle(title, number) {
   return cleaned && cleaned !== String(number) ? cleaned : null;
 }
 
+const SPOILER_KEY = 'tubcal.anime.spoilerGuard';
+
 function EpisodeList({ media }) {
   // The aggregator is optional now — it only enables local playback when up.
   const eps = useApi(`/anime/episodes/${media.id}`);
@@ -1815,6 +1716,17 @@ function EpisodeList({ media }) {
   const { progress } = useProgress();
   const { overlay, queueListEdit } = useAnimeSync();
   const entry = applyOverlay(media.id, media.list_entry, overlay);
+  // Spoiler guard: past your progress, episode art and titles stay veiled (they
+  // routinely give the plot away). Remembered on this machine, on by default.
+  const [guard, setGuard] = useState(() => {
+    try { return localStorage.getItem(SPOILER_KEY) !== '0'; } catch { return true; }
+  });
+  const toggleGuard = () => setGuard((g) => {
+    try { localStorage.setItem(SPOILER_KEY, g ? '0' : '1'); } catch { /* private mode */ }
+    return !g;
+  });
+  const seenUpTo = entry?.progress || 0;
+  const veiled = (n) => guard && !!entry && n > seenUpTo;
 
   // Playback state per episode, keyed exactly like the player reports it, so the
   // per-episode progress bars match the Screening Room tiles' resume indicator.
@@ -1892,7 +1804,15 @@ function EpisodeList({ media }) {
 
   return (
     <div className={s.relBlock}>
-      <h3 className={s.blockLabel}>Episodes</h3>
+      <div className={s.epHead}>
+        <h3 className={s.blockLabel}>Episodes</h3>
+        {entry && (
+          <button type="button" className={`${s.guardBtn} ${guard ? s.guardOn : ''}`} onClick={toggleGuard}
+                  aria-pressed={guard} title="Hide art and titles of episodes you haven't watched yet">
+            {guard ? <EyeOff size={12} /> : <Eye size={12} />} spoiler guard {guard ? 'on' : 'off'}
+          </button>
+        )}
+      </div>
 
       {cont && (
         <button className={s.continueBtn} onClick={() => playLocal(cont.ep)}>
@@ -1954,7 +1874,7 @@ function EpisodeList({ media }) {
                 <button className={s.epMain} onClick={primary} disabled={!local && !officialUrl}>
                   <div className={s.epThumb}>
                     {e.image || media.cover ? (
-                      <img src={e.image || media.cover} alt="" loading="lazy" />
+                      <img src={e.image || media.cover} alt="" loading="lazy" className={veiled(e.number) ? s.epVeiled : undefined} />
                     ) : (
                       <Tv size={18} />
                     )}
@@ -1988,7 +1908,9 @@ function EpisodeList({ media }) {
                   </div>
                   <div className={s.epMeta}>
                     <span className={s.epNum}>Episode {e.number}</span>
-                    {e.title && <span className={s.epTitle}>{e.title}</span>}
+                    {e.title && (veiled(e.number)
+                      ? <span className={`${s.epTitle} ${s.epTitleVeiled}`}>title hidden until you get here</span>
+                      : <span className={s.epTitle}>{e.title}</span>)}
                   </div>
                 </button>
                 {/* When local play is primary, the official launch is the secondary action. */}
@@ -2008,44 +1930,6 @@ function EpisodeList({ media }) {
         </div>
       )}
     </div>
-  );
-}
-
-/** Heart toggle that adds/removes the title from your AniList favourites. */
-function FavouriteButton({ mediaId, initial }) {
-  const toast = useToast();
-  const [fav, setFav] = useState(!!initial);
-  const [busy, setBusy] = useState(false);
-
-  const toggle = async () => {
-    setBusy(true);
-    const prev = fav;
-    setFav(!prev); // optimistic
-    try {
-      const res = await api('/anime/favourite', {
-        method: 'POST',
-        body: JSON.stringify({ media_id: mediaId }),
-      });
-      setFav(res.is_favourite);
-      toast(res.is_favourite ? 'Added to favorites' : 'Removed from favorites', 'success');
-    } catch (e) {
-      setFav(prev); // revert
-      toast(e.message, 'error');
-    }
-    setBusy(false);
-  };
-
-  return (
-    <button
-      className={s.favBtn}
-      data-on={fav ? '' : undefined}
-      disabled={busy}
-      onClick={toggle}
-      aria-pressed={fav}
-    >
-      <Heart size={15} fill={fav ? 'currentColor' : 'none'} />
-      {fav ? 'Favorited' : 'Add to favorites'}
-    </button>
   );
 }
 
@@ -2143,7 +2027,7 @@ function CastSheet({ characters }) {
               <div className={s.castMid}>
                 {/* One line, so the dot leader lands on the names' own baseline. */}
                 <p className={s.castTop}>
-                  <span className={s.castName}>{c.name}</span>
+                  <Link to={`/anime/character/${c.id}`} className={s.castName}>{c.name}</Link>
                   {lead ? (
                     <Link to={`/anime/voice/${lead.id}`} className={s.castVoiceName}>
                       {lead.name}
@@ -2205,7 +2089,7 @@ function CastSheet({ characters }) {
 
 /** The detail-page header as a full dossier: banner backdrop, poster + trailer,
  *  title block, labeled spec sheet, and both the global average and your rating. */
-function DetailDossier({ m, trailer, onTrailer, scoreFormat, connected }) {
+function DetailDossier({ m, trailer, onTrailer, scoreFormat, connected, rankings }) {
   const { episodes, status, season, fans } = mediaSpecs(m);
   const { hoverProps, add } = useAnimeCalc();
   const mine = personalScore(m, scoreFormat);
@@ -2232,7 +2116,7 @@ function DetailDossier({ m, trailer, onTrailer, scoreFormat, connected }) {
               <Play size={15} fill="currentColor" /> Play trailer
             </button>
           )}
-          {connected && <FavouriteButton mediaId={m.id} initial={m.is_favourite} />}
+          {connected && <FavToggle kind="anime" id={m.id} initial={m.is_favourite} count={m.favourites} />}
           {/* Explicit, keyboard-reachable twin of the hover+C gesture. */}
           <button className={s.dossierTally} onClick={() => add(m)} title="Add the next unwatched episode to the Reckoner">
             <Plus size={14} /> Tally next episode <kbd className={s.tallyKey}>C</kbd>
@@ -2257,7 +2141,12 @@ function DetailDossier({ m, trailer, onTrailer, scoreFormat, connected }) {
           <NextEpisodeBanner next={m.next_airing} />
 
           <dl className={s.specSheet}>
-            <SpecRow label="Studio" value={m.studios?.[0]} />
+            <SpecRow
+              label="Studio"
+              value={m.studio_refs?.[0]
+                ? <Link to={`/anime/studio/${m.studio_refs[0].id}`} className={s.specLink}>{m.studio_refs[0].name}</Link>
+                : m.studios?.[0]}
+            />
             <SpecRow label="Format" value={m.format} />
             <SpecRow label="Episodes" value={episodes} />
             <SpecRow label="Status" value={status} />
@@ -2276,6 +2165,7 @@ function DetailDossier({ m, trailer, onTrailer, scoreFormat, connected }) {
               </span>
             )}
           </div>
+          <RankRibbons rankings={rankings} />
         </div>
       </div>
     </header>
@@ -2336,8 +2226,11 @@ export function AnimeDetail() {
   const navigate = useNavigate();
   const { open } = usePlayer();
   const detail = useApi(`/anime/media/${id}`);
+  const extras = useExtras(id);
   const me = useApi('/anime/me');
+  const [talk, setTalk] = useState('threads');
   const m = detail.data;
+  const ext = extras.data;
 
   const trailer = m && trailerItem(m);
 
@@ -2352,12 +2245,19 @@ export function AnimeDetail() {
 
       {m && (
         <article className={s.detail} style={{ '--cover-c': m.color || 'var(--c-anime)' }}>
-          <DetailDossier m={m} trailer={trailer} onTrailer={() => open(trailer)} scoreFormat={me.data?.score_format} connected={!!me.data} />
+          <DetailDossier
+            m={m}
+            trailer={trailer}
+            onTrailer={() => open(trailer)}
+            scoreFormat={me.data?.score_format}
+            connected={!!me.data}
+            rankings={ext?.rankings}
+          />
 
           {me.data && (
             <div className={s.yourList}>
               <h3 className={s.blockLabel}>Your list</h3>
-              <ListControls media={m} scoreFormat={me.data.score_format} />
+              <ListControls media={m} scoreFormat={me.data.score_format} viewer={me.data} />
             </div>
           )}
 
@@ -2369,6 +2269,12 @@ export function AnimeDetail() {
 
           <EpisodeList media={m} />
 
+          <BroadcastLog schedule={ext?.schedule} total={m.episodes} />
+
+          {/* Loads itself only when scrolled near — the one section that can cost
+              several AniList requests the first time a franchise is seen. */}
+          <FranchiseGuide mediaId={m.id} />
+
           <RecStrip
             title="Recommended if you like this"
             sourceId={m.id}
@@ -2378,13 +2284,26 @@ export function AnimeDetail() {
           />
           <RelStrip
             title="Related"
-            items={(m.relations || []).map((r) => r.media).filter(Boolean)}
+            relations={m.relations || []}
             scoreFormat={me.data?.score_format}
           />
 
+          <InfoLedger m={m} ext={ext} />
+          <CreditsRoll staff={ext?.staff} />
+          <CommunityNumbers ext={ext} />
+          <ReviewsBlock media={m} ext={ext} connected={!!me.data} onChanged={extras.reload} />
+          <LinksShelf links={ext?.links} />
+
           <div className={s.relBlock}>
-            <h3 className={s.blockLabel}>Discussion</h3>
-            <ForumList mediaId={m.id} />
+            <div className={s.talkHead}>
+              <h3 className={s.blockLabel}>Discussion</h3>
+              <SegmentedControl
+                options={[{ value: 'threads', label: 'Forum threads' }, { value: 'activity', label: 'Recent activity' }]}
+                value={talk}
+                onChange={setTalk}
+              />
+            </div>
+            {talk === 'threads' ? <ForumList mediaId={m.id} /> : <ActivityFeed mediaId={m.id} />}
           </div>
         </article>
       )}

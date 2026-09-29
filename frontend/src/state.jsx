@@ -33,10 +33,10 @@ export function applyOverlay(mediaId, baseEntry, overlay) {
 // A video counts as "finished" once you're within the last 5% of it.
 export const COMPLETE_RATIO = 0.95;
 
-function recordWatch(item) {
+function recordWatch(item, toast) {
   api('/history', { method: 'POST', body: JSON.stringify({ item }) }).catch((err) => {
     console.error('[history] POST failed', err);
-    toast('Failed to record watch history', 'error');
+    toast?.('Failed to record watch history', 'error');
   });
 }
 
@@ -118,7 +118,7 @@ export function AppProviders({ children }) {
 
   const openVideo = useCallback((item, opts = {}) => {
     if (!item) return;
-    recordWatch(item);
+    recordWatch(item, toast);
     if (opts.start != null) {
       seekTargets.current[item.id] = opts.start;       // applied on mount
       setSeekSignal({ id: item.id, t: opts.start, n: Date.now() }); // and if already open
@@ -431,6 +431,14 @@ export function AppProviders({ children }) {
           body: JSON.stringify({ media_id: Number(id), ...patch }),
         });
         setAnimeOverlay((o) => ({ ...o, [id]: { ...(o[id] || {}), ...(entry || {}) } }));
+        // Just finished it? (AniList completes an entry itself when progress reaches
+        // the last episode.) Tell whoever's listening — the curtain call — unless
+        // the entry was already completed before this edit.
+        const touchesEnd = 'progress' in patch || patch.status === 'COMPLETED';
+        if (entry?.status === 'COMPLETED' && touchesEnd && slot.prior !== 'COMPLETED') {
+          window.dispatchEvent(new CustomEvent('anime-completed', { detail: { mediaId: Number(id), entry } }));
+        }
+        slot.prior = entry?.status || slot.prior;
         if (Object.keys(animePending.current[id]?.patch || {}).length) {
           flushAnime(id); // more edits queued while we were syncing
         } else {
@@ -456,6 +464,10 @@ export function AppProviders({ children }) {
       if (id == null) return;
       setAnimeOverlay((o) => ({ ...o, [id]: { ...(o[id] || {}), ...patch } }));
       const slot = animePending.current[id] || (animePending.current[id] = { patch: {}, timer: null });
+      // The status before any of our edits, when the caller knows it (a card or
+      // detail page passes its list_entry) — so re-saving a finished show isn't
+      // mistaken for finishing it.
+      if (slot.prior === undefined && media?.list_entry) slot.prior = media.list_entry.status ?? null;
       slot.patch = { ...slot.patch, ...patch };
       setOneSync(id, 'pending');
       if (slot.timer) clearTimeout(slot.timer);

@@ -14,6 +14,7 @@ import { useApi } from '../api/client.js';
 import { ErrorBox, Receiving } from '../components/layout/Section.jsx';
 import { Avatar } from '../components/ui/Avatar.jsx';
 import { compact } from '../lib/format.js';
+import { FavToggle, metaLine } from '../components/anime/shared.jsx';
 import s from './voiceactor.module.css';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -179,7 +180,9 @@ export default function VoiceActor() {
   const { id } = useParams();
   const navigate = useNavigate();
   const va = useApi(`/anime/staff/${id}`);
+  const me = useApi('/anime/me');
   const [onlyMain, setOnlyMain] = useState(false);
+  const [allCredits, setAllCredits] = useState(false);
   const d = va.data;
 
   // Signature comes off the untouched list: AniList's own popularity order is the
@@ -303,11 +306,14 @@ export default function VoiceActor() {
                 />
               </dl>
 
-              {d.site_url && (
-                <a className={s.source} href={d.site_url} target="_blank" rel="noreferrer">
-                  AniList record <ExternalLink size={11} />
-                </a>
-              )}
+              <div className={s.fileActions}>
+                {me.data && <FavToggle kind="staff" id={d.id} initial={d.is_favourite} count={d.favourites} />}
+                {d.site_url && (
+                  <a className={s.source} href={d.site_url} target="_blank" rel="noreferrer">
+                    AniList record <ExternalLink size={11} />
+                  </a>
+                )}
+              </div>
             </div>
           </header>
 
@@ -337,6 +343,37 @@ export default function VoiceActor() {
               <p className={s.rolesNote}>
                 Most popular first, as ranked by AniList.
               </p>
+            </section>
+          )}
+
+          {/* Production credits — directing, writing, music, theme songs. For a
+              seiyuu this is usually their singing; for everyone else it's the work. */}
+          {d.credits?.length > 0 && (
+            <section className={s.roles}>
+              <div className={s.rolesHead}>
+                <span className={s.ledgerLabel}>
+                  Production credits <span className={s.rolesCount}>{d.credits.length}</span>
+                </span>
+              </div>
+              <ol className={s.creditList}>
+                {(allCredits ? d.credits : d.credits.slice(0, 12)).map((c, i) => (
+                  <li key={c.media.id} className={s.credit} style={{ '--i': Math.min(i, 12) }}>
+                    <Link to={`/anime/${c.media.id}`} className={s.creditCover}>
+                      {c.media.cover ? <img src={c.media.cover} alt="" loading="lazy" /> : <span />}
+                    </Link>
+                    <span className={s.creditInfo}>
+                      <Link to={`/anime/${c.media.id}`} className={s.creditTitle}>{c.media.title}</Link>
+                      <span className={s.creditMeta}>{metaLine(c.media)}</span>
+                      <span className={s.creditRoles}>{c.roles.join(' · ')}</span>
+                    </span>
+                  </li>
+                ))}
+              </ol>
+              {d.credits.length > 12 && (
+                <button className={s.filter} onClick={() => setAllCredits((v) => !v)}>
+                  {allCredits ? 'fewer' : `all ${d.credits.length} credits`}
+                </button>
+              )}
             </section>
           )}
         </article>

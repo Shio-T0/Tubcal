@@ -9,7 +9,7 @@ import AddSubscriptionModal from '../components/modals/AddSubscriptionModal.jsx'
 import { Button, SegmentedControl } from '../components/ui/index.jsx';
 import { useSettings, useSubscriptions, useToast } from '../state.jsx';
 import { THEMES } from '../lib/themes.js';
-import { ROOMS } from '../lib/rooms.js';
+import { ROOMS, knownActiveIds } from '../lib/rooms.js';
 import s from './settings.module.css';
 
 function SkinPicker({ value, onChange }) {
@@ -97,23 +97,6 @@ function SubscriptionRows({ group }) {
           </button>
         </div>
       ))}
-    </div>
-  );
-}
-
-function WeightStepper({ label, value, onChange }) {
-  return (
-    <div className={s.row}>
-      <span className={s.rowLabel}>{label}</span>
-      <div className={s.stepper}>
-        <button className={s.stepperBtn} disabled={value <= 0} onClick={() => onChange(value - 1)}>
-          <Minus size={13} />
-        </button>
-        <span className={s.stepperValue}>{value}</span>
-        <button className={s.stepperBtn} disabled={value >= 5} onClick={() => onChange(value + 1)}>
-          <Plus size={13} />
-        </button>
-      </div>
     </div>
   );
 }
@@ -406,7 +389,7 @@ function ArchiveSettings() {
 
       <ModelLine
         label="LLM (summaries & answers)"
-        value={settings?.brain_llm_model || 'llama3.1:8b'}
+        value={settings?.brain_llm_model || 'qwen3.5:9b'}
         installed={installed}
         onChange={(v) => updateSettings({ brain_llm_model: v })}
       />
@@ -569,7 +552,8 @@ function RoomsSettings() {
   const { settings, updateSettings } = useSettings();
   const toast = useToast();
 
-  const activeRoomIds = settings?.active_rooms || ['edition', 'frontpage', 'youtube', 'reddit', 'hackernews', 'archive', 'anime'];
+  // Retired ids (the old Front Page, The Anime) are ignored so they can't eat the cap.
+  const activeRoomIds = knownActiveIds(settings?.active_rooms);
   const maxActive = settings?.max_active_rooms ?? 6;
 
   const toggleRoom = (roomId) => {
@@ -601,7 +585,7 @@ function RoomsSettings() {
         <Layout size={17} /> Rooms
       </h2>
       <p className={s.sectionSub}>
-        Choose which rooms appear in the masthead. Disabled rooms are still accessible via direct URL.
+        Choose which rooms appear in the hub's masthead (and on the home screen's Hub card). Disabled rooms are still accessible via direct URL. The Anime lives beside the hub, not in it.
       </p>
 
       <div className={s.row}>
@@ -674,10 +658,6 @@ export default function SettingsPage() {
     if (connected || oauthError) setParams({}, { replace: true });
   }, [params, setParams, toast]);
 
-  const weights = settings?.foryou_weights || { youtube: 2, reddit: 2, hackernews: 1 };
-  const setWeight = (key, value) =>
-    updateSettings({ foryou_weights: { ...weights, [key]: value } });
-
   return (
     <>
       <SectionHead
@@ -713,15 +693,6 @@ export default function SettingsPage() {
               Repaint the whole station. The Shōwa set is home; the rest are other machines.
             </div>
             <SkinPicker value={settings?.theme || 'dark'} onChange={(theme) => updateSettings({ theme })} />
-          </div>
-          <div>
-            <div className={s.rowLabel} style={{ marginBottom: 4 }}>For You mix</div>
-            <div className={s.rowHint} style={{ marginBottom: 12 }}>
-              How many items each platform contributes per cycle of the mixed feed.
-            </div>
-            <WeightStepper label="YouTube" value={weights.youtube ?? 2} onChange={(v) => setWeight('youtube', v)} />
-            <WeightStepper label="Reddit" value={weights.reddit ?? 2} onChange={(v) => setWeight('reddit', v)} />
-            <WeightStepper label="Hacker News" value={weights.hackernews ?? 1} onChange={(v) => setWeight('hackernews', v)} />
           </div>
         </section>
 

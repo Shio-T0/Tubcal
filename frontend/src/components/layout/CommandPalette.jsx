@@ -1,19 +1,31 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
-import { Bookmark, Clapperboard, Code2, CornerDownLeft, Hash, Newspaper, Play, Radio, ScrollText, Search, Settings } from 'lucide-react';
+import {
+  Bookmark, Clapperboard, Code2, CornerDownLeft, GitBranch, Hash, History, Library, Newspaper, Play, Radio, ScrollText,
+  Search, Settings, Tv, Wrench,
+} from 'lucide-react';
 
 import { api } from '../../api/client.js';
+import { ROOMS } from '../../lib/rooms.js';
 import { usePlayer } from '../../state.jsx';
 import s from './CommandPalette.module.css';
 
+// Every room in the registry (whether or not it's switched on — the palette is the
+// way in either way), then the places that aren't rooms.
+const ROOM_ICONS = {
+  edition: ScrollText, youtube: Clapperboard, reddit: Radio, hackernews: Hash, archive: Library,
+  editor: Code2, github: GitBranch, dev: Wrench,
+};
 const NAV = [
-  { id: 'nav:/edition', label: 'The Edition', icon: <ScrollText size={15} />, to: '/edition' },
-  { id: 'nav:/', label: 'Front Page', icon: <Newspaper size={15} />, to: '/' },
-  { id: 'nav:/youtube', label: 'Screening Room', icon: <Clapperboard size={15} />, to: '/youtube' },
-  { id: 'nav:/reddit', label: 'The Dispatch', icon: <Radio size={15} />, to: '/reddit' },
-  { id: 'nav:/hackernews', label: 'The Wire', icon: <Hash size={15} />, to: '/hackernews' },
-  { id: 'nav:/editor', label: 'The Composing Room', icon: <Code2 size={15} />, to: '/editor' },
+  ...ROOMS.map((r) => {
+    const Icon = ROOM_ICONS[r.id] || ScrollText;
+    return { id: `nav:${r.route}`, label: r.label, icon: <Icon size={15} />, to: r.route };
+  }),
+  { id: 'nav:/youtube/history', label: 'Screening Room — watch history', icon: <History size={15} />, to: '/youtube/history' },
+  { id: 'nav:/youtube?v=latest', label: 'Screening Room — latest uploads', icon: <Clapperboard size={15} />, to: '/youtube?v=latest' },
+  { id: 'nav:/anime', label: 'The Anime', icon: <Tv size={15} />, to: '/anime' },
+  { id: 'nav:/', label: 'Home — choose Hub or Anime', icon: <Newspaper size={15} />, to: '/' },
   { id: 'nav:/saved', label: 'Saved', icon: <Bookmark size={15} />, to: '/saved' },
   { id: 'nav:/settings', label: 'Settings', icon: <Settings size={15} />, to: '/settings' },
 ];
@@ -104,8 +116,14 @@ export default function CommandPalette() {
         setOpen(true);
       }
     };
+    // The hub console's search button (and anything else) can ask for it too.
+    const onAsk = () => setOpen(true);
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    window.addEventListener('tubcal:palette', onAsk);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('tubcal:palette', onAsk);
+    };
   }, [open]);
 
   useEffect(() => {

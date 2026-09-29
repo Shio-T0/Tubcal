@@ -66,6 +66,15 @@ TTL_ANILIST_THREADS = 300
 # The genre list + tag vocabulary is effectively static (AniList adds a tag every
 # few months), so hold it for a day — it drives the discover picker.
 TTL_ANILIST_GENRES = 86400
+# The weekly airing timetable: slots move only when a broadcaster reschedules.
+TTL_ANILIST_SCHEDULE = 1800
+# A title's relation edges (sequels, side stories…) barely ever change; the
+# sequel radar and watch-order guide fan out over them, so hold them half a day.
+TTL_ANILIST_RELATIONS = 43200
+TTL_ANILIST_PEOPLE = 21600  # character / studio pages, favourites-ranked shelves
+TTL_ANILIST_REVIEWS = 600
+TTL_ANILIST_SOCIAL = 300  # follower lists, the following feed
+TTL_ANILIST_STATS = 600  # list-derived statistics (also dropped on any list edit)
 TTL_ANIME_EPISODES = 600  # aggregator episode list
 # GitHub (60 req/hr unauthenticated → cache aggressively)
 TTL_GITHUB_FEED = 600  # 10 min for subscribed repo/user activity
@@ -120,15 +129,15 @@ HOST_INTERVALS = {
     "yewtu.be": 1.0,
 }
 
-# Room ids — mirrors frontend/src/lib/rooms.js ROOM_IDS.
+# Room ids — mirrors frontend/src/lib/rooms.js ROOM_IDS. These are the hub's rooms;
+# "/" is the channel chooser and The Anime is its own section beside the hub, so
+# neither is a room any more.
 ROOM_IDS = [
     "edition",
-    "frontpage",
     "youtube",
     "reddit",
     "hackernews",
     "archive",
-    "anime",
     "editor",
     "github",
     "dev",

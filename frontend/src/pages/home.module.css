@@ -1,0 +1,446 @@
+/* "/" — the channel chooser. The front panel of the living-room set: two wooden
+   bezels, each holding a curved phosphor screen, a numbered channel dial in the
+   corner. Channel 1 (the Hub) glows amber and lists its rooms like a programme
+   guide; Channel 2 (Anime) glows persimmon over a drifting wall of this season's
+   covers. */
+
+.home {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: calc(100vh - var(--space-7));
+  padding-top: var(--space-4);
+}
+
+.topline {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-4);
+  width: 100%;
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--rule);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--paper-faint);
+}
+.power {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--signal);
+}
+.led {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--signal);
+  box-shadow: 0 0 10px var(--signal);
+  animation: ledPulse 2.4s ease-in-out infinite;
+}
+@keyframes ledPulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+.wordmark {
+  margin: var(--space-6) 0 var(--space-6);
+  font-family: var(--font-display);
+  font-variation-settings: 'opsz' 144, 'SOFT' 40, 'WONK' 1;
+  font-weight: 640;
+  font-size: clamp(64px, 12vw, 132px);
+  line-height: 0.9;
+  letter-spacing: -0.02em;
+  color: var(--paper);
+  text-align: center;
+  animation: rise 0.7s var(--hand) both;
+}
+.wordmark em {
+  font-style: italic;
+  color: var(--signal);
+}
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ── the two sets ─────────────────────────────────────────────────────────── */
+.channels {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-6);
+  width: 100%;
+}
+.set {
+  --ch: var(--signal);
+  padding: 14px;
+  border-radius: 30px;
+  /* the wooden cabinet */
+  background:
+    repeating-linear-gradient(92deg, transparent 0 7px, color-mix(in srgb, var(--paper) 2.5%, transparent) 7px 8px),
+    linear-gradient(160deg, var(--ink-3), var(--ink-2) 55%, var(--ink));
+  border: 1px solid var(--rule-strong);
+  box-shadow: var(--shadow-card), inset 0 1px 0 color-mix(in srgb, var(--paper) 10%, transparent);
+  animation: rise 0.7s var(--hand) 0.12s both;
+  transition: transform 0.25s var(--hand), box-shadow 0.25s ease;
+}
+.hub {
+  --ch: var(--signal);
+}
+.anime {
+  --ch: var(--accent-strong);
+  animation-delay: 0.22s;
+}
+.set:hover,
+.set:focus-within {
+  transform: translateY(-4px);
+  box-shadow: 0 26px 60px rgba(0, 0, 0, 0.45), 0 0 0 1px color-mix(in srgb, var(--ch) 40%, transparent);
+}
+
+/* the curved phosphor screen */
+.screen {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-height: 460px;
+  height: 100%;
+  padding: var(--space-5);
+  border-radius: 22px / 26px;
+  overflow: hidden;
+  background:
+    radial-gradient(120% 90% at 50% 0%, color-mix(in srgb, var(--ch) 16%, transparent), transparent 65%),
+    var(--ink);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--ch) 22%, transparent),
+    inset 0 0 60px rgba(0, 0, 0, 0.55);
+  isolation: isolate;
+}
+.scan {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: repeating-linear-gradient(to bottom, transparent 0 2px, rgba(0, 0, 0, 0.14) 2px 3px);
+  mix-blend-mode: multiply;
+}
+
+/* ── the channel's headline (the big click) ──────────────────────────────── */
+.head {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: start;
+  gap: var(--space-4);
+  color: inherit;
+  border-radius: 14px;
+  outline: none;
+}
+.head:focus-visible {
+  box-shadow: 0 0 0 2px var(--ch);
+}
+.dial {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background:
+    repeating-conic-gradient(from 0deg, color-mix(in srgb, var(--paper) 10%, transparent) 0 6deg, transparent 6deg 12deg),
+    radial-gradient(circle at 35% 30%, var(--ink-3), var(--ink));
+  border: 2px solid color-mix(in srgb, var(--ch) 65%, var(--rule-strong));
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.45), 0 0 18px color-mix(in srgb, var(--ch) 30%, transparent);
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--ch);
+  transition: transform 0.4s var(--hand);
+}
+.set:hover .dial {
+  transform: rotate(-24deg);
+}
+.headText {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.kicker {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ch);
+}
+.title {
+  font-family: var(--font-display);
+  font-size: clamp(40px, 5vw, 58px);
+  font-weight: 650;
+  line-height: 1;
+  color: var(--text-primary);
+}
+.title i {
+  font-style: normal;
+  font-family: var(--font-body);
+  font-size: 0.42em;
+  font-weight: 500;
+  color: var(--paper-dim);
+  vertical-align: middle;
+  margin-left: 6px;
+}
+.note {
+  max-width: 34ch;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+.arrow {
+  margin-top: 16px;
+  color: var(--paper-faint);
+  transition: transform 0.25s var(--hand), color 0.2s ease;
+}
+.head:hover .arrow {
+  transform: translateX(5px);
+  color: var(--ch);
+}
+.head:hover .title {
+  color: var(--ch);
+}
+
+/* ── Channel 1's programme guide ─────────────────────────────────────────── */
+.rooms {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: auto;
+}
+.room {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px 10px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--room-c, var(--ch));
+  background: color-mix(in srgb, var(--surface) 70%, transparent);
+  color: inherit;
+  animation: rise 0.5s var(--hand) calc(0.3s + var(--i, 0) * 0.04s) both;
+  transition: background 0.18s ease, transform 0.18s ease, border-color 0.18s ease;
+}
+.room:hover,
+.room:focus-visible {
+  background: color-mix(in srgb, var(--room-c, var(--ch)) 14%, var(--surface));
+  border-color: color-mix(in srgb, var(--room-c, var(--ch)) 50%, var(--rule));
+  transform: translateX(3px);
+  outline: none;
+}
+.roomNo {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  color: var(--paper-faint);
+}
+.roomName {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 560;
+  color: var(--text-primary);
+}
+
+/* ── Channel 2's cover wall and doors ────────────────────────────────────── */
+.mosaic {
+  position: absolute;
+  inset: -30% -20% -20%;
+  z-index: 0;
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 10px;
+  transform: rotate(-8deg);
+  opacity: 0.3;
+  filter: saturate(0.8);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 5%, black 45%, black 80%, transparent);
+  mask-image: linear-gradient(to bottom, transparent 5%, black 45%, black 80%, transparent);
+  animation: drift 60s linear infinite;
+}
+.mosaic img {
+  width: 100%;
+  aspect-ratio: 2 / 3;
+  object-fit: cover;
+  border-radius: 10px;
+  animation: fadeCover 0.8s ease calc(var(--i, 0) * 0.05s) both;
+}
+.set:hover .mosaic {
+  opacity: 0.4;
+}
+@keyframes drift {
+  from {
+    transform: rotate(-8deg) translateY(0);
+  }
+  to {
+    transform: rotate(-8deg) translateY(-12%);
+  }
+}
+@keyframes fadeCover {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+/* a scrim over the cover wall wherever there's text: dark behind the headline and
+   the footer, letting the covers show through only in the middle band */
+.anime .screen::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(to bottom,
+    color-mix(in srgb, var(--ink) 94%, transparent) 0%,
+    color-mix(in srgb, var(--ink) 80%, transparent) 36%,
+    color-mix(in srgb, var(--ink) 25%, transparent) 58%,
+    color-mix(in srgb, var(--ink) 55%, transparent) 78%,
+    color-mix(in srgb, var(--ink) 94%, transparent) 100%);
+}
+.doors {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: auto;
+}
+.door {
+  padding: 8px 14px;
+  border-radius: var(--r-pill);
+  border: 1px solid color-mix(in srgb, var(--ch) 40%, var(--rule));
+  background: color-mix(in srgb, var(--ink) 70%, transparent);
+  backdrop-filter: blur(4px);
+  font-size: 13px;
+  color: var(--text-primary);
+  animation: rise 0.5s var(--hand) calc(0.35s + var(--i, 0) * 0.04s) both;
+  transition: background 0.18s ease, border-color 0.18s ease;
+}
+.door:hover,
+.door:focus-visible {
+  background: color-mix(in srgb, var(--ch) 22%, var(--ink));
+  border-color: var(--ch);
+  outline: none;
+}
+
+/* ── footers + key hints ─────────────────────────────────────────────────── */
+.foot {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--rule);
+  font-size: 12.5px;
+}
+.foot a {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--text-secondary);
+}
+.foot a:hover {
+  color: var(--ch);
+}
+.footNote {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--paper-faint);
+}
+.keys {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: auto;
+}
+.keys em {
+  margin: 0 4px;
+  font-style: normal;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--paper-faint);
+}
+.keys kbd,
+.hint kbd {
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 5px;
+  border: 1px solid var(--rule-strong);
+  border-bottom-width: 2px;
+  background: var(--ink-3);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--paper);
+}
+.hint {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  margin-top: var(--space-6);
+  font-size: 12.5px;
+  color: var(--paper-faint);
+}
+.hint kbd:not(:first-child) {
+  margin-left: 1px;
+}
+
+@media (max-width: 900px) {
+  .channels {
+    grid-template-columns: 1fr;
+  }
+  .screen {
+    min-height: 0;
+  }
+  .keys,
+  .hint {
+    display: none;
+  }
+}
+@media (max-width: 520px) {
+  .rooms {
+    grid-template-columns: 1fr;
+  }
+  .topline span:nth-child(2) {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wordmark,
+  .set,
+  .room,
+  .door,
+  .mosaic,
+  .mosaic img,
+  .led {
+    animation: none;
+  }
+}

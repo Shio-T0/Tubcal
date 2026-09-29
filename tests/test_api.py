@@ -61,7 +61,7 @@ def test_settings_active_rooms_validation(client):
     """Settings validate active_rooms: can't exceed max, must be valid ids."""
     # Set max to 3 and try to set 4 rooms
     client.put("/api/settings", json={"max_active_rooms": 3})
-    r = client.put("/api/settings", json={"active_rooms": ["youtube", "reddit", "hackernews", "frontpage"]})
+    r = client.put("/api/settings", json={"active_rooms": ["youtube", "reddit", "hackernews", "edition"]})
     assert r.status_code == 400
     assert "exceeds" in r.get_json()["error"]
 
@@ -89,7 +89,7 @@ def test_settings_active_rooms_validation(client):
     assert r.status_code == 200
 
     # Reset
-    client.put("/api/settings", json={"active_rooms": ["youtube", "reddit", "hackernews", "frontpage", "archive", "anime"], "max_active_rooms": 6})
+    client.put("/api/settings", json={"active_rooms": ["youtube", "reddit", "hackernews", "edition", "archive", "editor"], "max_active_rooms": 6})
 
 
 def test_fuzzy_filter_exact_match():
@@ -141,3 +141,14 @@ def test_subscriptions_accepts_github(client):
     assert row["source_id"] == "test/repo"
     # Clean up
     db.delete_subscription(row["id"])
+
+def test_retired_rooms_are_dropped_from_saved_settings(client):
+    """The Front Page and The Anime stopped being hub rooms; a DB that still lists
+    them must come back clean, or they'd count against max_active_rooms."""
+    from server import db
+
+    db.set_setting("active_rooms", ["edition", "frontpage", "youtube", "anime", "editor"])
+    db.init_db()
+    assert db.get_setting("active_rooms") == ["edition", "youtube", "editor"]
+    r = client.put("/api/settings", json={"active_rooms": ["edition", "anime"]})
+    assert r.status_code == 400 and "unknown room id: anime" in r.get_json()["error"]

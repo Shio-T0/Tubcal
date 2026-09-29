@@ -8,6 +8,14 @@ FIREBASE = "https://hacker-news.firebaseio.com/v0"
 ALGOLIA = "https://hn.algolia.com/api/v1"
 PAGE_SIZE = 30
 
+# The front-page lists Firebase publishes, by the name the Wire uses for them.
+LISTS = {
+    "top": "topstories", "best": "beststories", "new": "newstories",
+    "ask": "askstories", "show": "showstories", "job": "jobstories",
+}
+# Search windows: how far back a search looks, in seconds.
+SEARCH_RANGES = {"day": 86400, "week": 7 * 86400, "month": 31 * 86400, "year": 366 * 86400}
+
 
 def _domain(url):
     if not url:
@@ -44,8 +52,10 @@ def _fetch_item(hn_id):
 
 
 def get_feed(list_name="top", page=0):
+    endpoint = LISTS.get(list_name, LISTS["top"])
+
     def fetch_ids():
-        return httpc.get(f"{FIREBASE}/{list_name}stories.json").json()
+        return httpc.get(f"{FIREBASE}/{endpoint}.json").json()
 
     ids, stale = cache.cached(f"hn:list:{list_name}", config.TTL_HN_LIST, fetch_ids)
     start = page * PAGE_SIZE
@@ -56,12 +66,27 @@ def get_feed(list_name="top", page=0):
     return {"items": items, "has_more": start + PAGE_SIZE < len(ids), "stale": stale}
 
 
-def search(query):
-    def fetch():
-        url = f"{ALGOLIA}/search?query={quote(query)}&tags=story&hitsPerPage=30"
-        return httpc.get(url).json()
+def search_url(query, sort="relevance", range_=None, now=None):
+    """Pure: the Algolia request for a Wire search — relevance or newest first,
+    optionally only stories from the last day/week/month/year."""
+    endpoint = "search_by_date" if sort == "date" else "search"
+    url = f"{ALGOLIA}/{endpoint}?query={quote(query)}&tags=story&hitsPerPage=30"
+    span = SEARCH_RANGES.get(range_)
+    if span:
+        import time as _t
+        since = int((now if now is not None else _t.time()) - span)
+        url += f"&numericFilters={quote(f'created_at_i>{since}')}"
+    return url
 
-    data, stale = cache.cached(f"hn:search:{query.lower()}", 300, fetch)
+
+def search(query, sort="relevance", range_=None):
+    sort = "date" if sort == "date" else "relevance"
+    range_ = range_ if range_ in SEARCH_RANGES else None
+
+    def fetch():
+        return httpc.get(search_url(query, sort, range_)).json()
+
+    data, stale = cache.cached(f"hn:search:{sort}:{range_ or 'all'}:{query.lower()}", 300, fetch)
     items = []
     for hit in data.get("hits", []):
         hn_id = hit.get("objectID")
@@ -151,6 +176,8 @@ def get_item(hn_id):
         "published_at": data.get("created_at_i"),
         "score": data.get("points"),
         "comments_count": count(comments),
-        "extra": {"hn_id": data["id"], "domain": _domain(data.get("url")), "type": "story"},
+        # Ask HN / Show HN / jobs carry their own text (HN's HTML), links don't.
+        "text_html": data.get("text") or "",
+        "extra": {"hn_id": data["id"], "domain": _domain(data.get("url")), "type": data.get("type") or "story"},
     }
     return {"story": story, "comments": comments, "stale": stale}

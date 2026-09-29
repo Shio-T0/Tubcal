@@ -12,11 +12,18 @@ is no multi-user concept, no auth beyond optional per-provider OAuth, and no
 cloud component — the only outbound traffic is direct fetches to the platforms
 themselves.
 
-Every feature is a numbered "room". `frontend/src/lib/rooms.js` is the canonical
-registry (id, label, color token, route, `default_enabled`) — the numbers users
-see are computed from list position, not hardcoded, so adding a room means adding
-an entry there plus a page in `pages/`. Rooms are reorderable and toggleable in
-Settings → Rooms; GitHub is the one that ships off by default.
+The app has two "channels", chosen at `/` (`pages/Home.jsx`, a TV-style chooser):
+**the Hub** and **the Anime**. The Hub is a set of numbered "rooms" beside the hub
+console; `frontend/src/lib/rooms.js` is their canonical registry (id, label, color
+token, route, `default_enabled`) — the numbers users see are computed from list
+position, not hardcoded, so adding a room means adding an entry there plus a page in
+`pages/` (and the id to `config.ROOM_IDS`). Rooms are toggleable in Settings → Rooms;
+GitHub is the one that ships off by default. The Anime is *not* a room: it's its own
+section with its own top bar (`components/anime/AnimeMasthead.jsx`) and index (see
+below). The old Front Page room is gone; `db.init_db` strips retired ids from the
+saved `active_rooms`. Global chords `Space g h` (Hub → /edition) and `Space g a` (the
+Anime) live in `components/layout/KeyboardShortcuts.jsx`; Space stays native in text
+fields, the editor, the expanded player, media, and keyboard-focused controls.
 
 ## Commands
 
@@ -142,6 +149,23 @@ no ORM.
   AniList `pageInfo.hasNextPage`) so the Browse wall can infinite-scroll, and each
   caches via `cache.cached_dynamic` with a short `TTL_ANILIST_EMPTY` on an *empty*
   page so a transient rate-limit can't strand a shelf blank for the full window.
+  **Rate budget:** AniList currently allows 30 requests/min (not the documented 90).
+  `_post` records `X-RateLimit-Remaining` and, on a 429, starts a cooldown during
+  which calls fail fast (so stale cache is served at once); the fan-out walkers
+  (`relations_batch`, the schedule/season page loops) check `_budget()` between
+  batches and stop early, returning partial results. `relations_batch` caches each
+  title's relation edges on its own key via `cache.cached_many` (12h) and fetches
+  misses `id_in` 25 at a time — the sequel radar (`sequel_radar`/`find_sequels`) and
+  the watch-order guide (`franchise`/`build_franchise`, main line = largest
+  SEQUEL/PREQUEL cluster of TV/ONA/movies) both walk it. Other pure, unit-tested
+  pieces: `build_media_filter` (every finder filter → GraphQL; enums validated since
+  one bad enum fails the whole query), `compute_stats` (the Ledger, computed from the
+  list itself because AniList's own statistics come back empty for some accounts),
+  `compare_lists` (affinity = Pearson of shared scores), `norm_notification`,
+  `validate_review`. Detail-page extras (rankings, stats, staff, trends, reviews,
+  links, schedule) are a *second* request (`media_extras`) to stay under AniList's
+  query-complexity limit. Field names were verified against a live introspection
+  dump; re-introspect rather than guess when adding a query. Tests: `tests/test_anilist.py`.
 - `anime_source.py` — resolves the episode list + playable streams with `anipy_api`
   (the allanime/animekai scraper Shou uses); no external aggregator needed. It maps
   the AniList id to a title via `anilist.media`, searches the provider, and returns
@@ -247,11 +271,20 @@ rebuilt from tokens on `data-theme` mutation. While the room holds focus it sets
 **Frontend (`frontend/src/`):** React 19 + Vite, React Router. `state.jsx` holds all
 shared state as a stack of context providers (`useSettings`, `useSubscriptions`,
 `usePlayer`, `useProgress`, `useSaved`, `useAnimeSync`) wrapped by `AppProviders`.
-One page component per "room" in `pages/` (Edition, FrontPage, ScreeningRoom,
-Dispatch, Wire, Archive, Anime, Composer, Github, Workbench, plus SavedPage and
-SettingsPage),
-all lazy-loaded and routed in `App.jsx` — keep the route, the `pages/` component, and
-the `lib/rooms.js` entry in sync. CSS Modules per page/component, design tokens in `styles/tokens.css`
+One page component per "room" in `pages/` (Edition, ScreeningRoom, Dispatch, Wire,
+Archive, Composer, Github, Workbench, plus SavedPage and SettingsPage), all
+lazy-loaded and routed in `App.jsx` under `HubLayout` (the hub console + its own
+Suspense) — keep the route, the `pages/` component, and the `lib/rooms.js` entry in
+sync. The hub has no masthead: `components/layout/HubConsole.jsx` (`HubFrame`) is a
+sticky panel down the left — wordmark, Channel 1/2 switch, a search button that opens
+the command palette (`openPalette()` fires `tubcal:palette`), the rooms as numbered
+preset keys, Saved/Settings/skin — so every room's page starts at the top of the
+screen. The room you're in opens its own index under it: a room opts in by adding a
+component to `PLACES` there (only the Screening Room has one so far). Like the anime
+index it hangs in the shell's left margin on ≥1780px, folds to an icon rail
+(`tubcal.hub.console.rail`), and becomes a top bar on phones. Skins restyle it through
+the `.tc-console`/`.tc-nav`/`.tc-navitem(-on)`/`.tc-navno`/`.tc-topline`/`.tc-wordmark`
+hooks at the end of `styles/themes.css`. `Home` (eager) is `/`; the Anime routes sit under `AnimeSection`. CSS Modules per page/component, design tokens in `styles/tokens.css`
 and `styles/themes.css`. Skins are a registry in `lib/themes.js` (`dark`, `light`,
 `terminal`, `bauhaus`, `blueprint`, `aqua`, `space`) — each is a `[data-theme]`
 block overriding tokens, so component CSS restyles for free via `var(--token)`;
@@ -260,12 +293,135 @@ the saved theme is injected server-side into `index.html` on first paint. Note
 (`--ink` is the background), which matters for anything reading `color-scheme`. A room's view state (active tab,
 filters, search) belongs in the query string, not `useState` — opening a detail
 route unmounts the room, so local state is lost on back. `useParamState` in
-`pages/Anime.jsx` is the reference: it writes with `replace` (a filter toggle is
-not a destination) and drops default values from the URL. The video player (`components/player/`)
+`lib/urlState.js` (re-exported by `components/anime/shared.jsx`) is the reference: it writes with `replace` (a filter toggle is
+not a destination) and drops default values from the URL. It builds every write on
+`latestParams()` (the live `window.location`), because React Router's functional
+`setSearchParams` gets the *render's* params — two writes in one handler would
+otherwise clobber each other; any hand-rolled `setSearchParams` should do the same. The video player (`components/player/`)
 uses `hls.js`. Full keyboard nav + command palette in `components/layout/`.
 
-The three anime routes (`/anime`, `/anime/:id`, `/anime/voice/:id`) are wrapped in a
-shared layout route (`AnimeSection` in `App.jsx`) whose only job is to mount one
+The player (`PlayerLayer.jsx`) keeps one `<video>` per open video and only restyles
+the card between expanded and docked, so playback never restarts. Expanded is a
+theatre: a dark backdrop with the thumbnail blurred into an ambient glow, the picture
+sized to the largest 16:9 that fits with `WatchInfo.jsx` under it (title, channel face
++ subscribers + `SubscribeButton`, Save / copy-link-at-this-second / YouTube, the
+window buttons), and `NotesPanel.jsx` beside it (a sheet over it under 1100px):
+About (stats, the description through `richText.jsx`, tags, the up-next queue),
+Chapters, Comments (`VideoComments.jsx`), and the Archive's Transcript (follows the
+playhead) and Summary. `richText.jsx` makes descriptions and comments live without
+ever injecting HTML — Invidious comment HTML is walked with an allow-list: a
+timestamp seeks, a link to another video opens it in the player (details fetched
+first via `watchLinks.js`), a hashtag or channel opens it in the Screening Room.
+Video metadata comes from `youtube.video_meta` (pure, tested): chapters, the
+"most replayed" heatmap (normalised 0–1 per slice, drawn as a ridge over the seek
+bar in `PlayerControls.jsx`, which also cuts the bar at chapter breaks), subscriber
+count, comment count, tags. The card and the notes share that one request through
+`lib/useShared.js`. Comments are `/youtube/comments/<id>?sort=top|new&continuation=`
+(`{comments, continuation, count}`); each carries the author's face and channel id
+and the creator/verified/member/hearted/edited marks. Keys while expanded: Space/K,
+J/L, arrows, 0–9, M/F/C, `<`/`>` speed, Ctrl+←/→ chapters, Shift+N next, `?` help,
+Esc to the corner.
+
+The Screening Room (`pages/ScreeningRoom.jsx`, `/youtube`) opens on a control bar
+(search all of YouTube — `?q=` —, the views, add channel, refresh) with no title or
+blurb. Views are `?v=`: the programme (the newest upload on a big screen beside a "just
+in" list and anything live, then continue watching, the Projection, one shelf per
+channel busiest-first with "quiet lately" ones folded into chips, and a random reel),
+`latest` (every upload in day groups, `?ch=` channel filter, `?hw=1` hide watched,
+play-all, mark-seen) and `live`. Its pieces live in `components/screening/`: `tiles.jsx`
+(`VideoTile`, `VideoRow`, `Shelf`, `Wall` — anything that shows a YouTube video uses
+these, SavedPage included), `feed.js` (`useShared`, a small deduping client cache so the
+console index and the page share one feed request; `useSeen` — "new" is per channel,
+until you watch it or open the channel, kept in localStorage `tubcal.screening.seen`),
+and `ScreeningIndex.jsx` (the console index: views with counts, up next, channels with
+new counts). Tiles carry an up-next button (`QueueButton`) that feeds `usePlayer`'s
+queue, which auto-advances when a video ends. Channel, playlist and history pages keep
+their tab/sort/search in the URL too.
+
+The Edition (`pages/Edition.jsx`) is laid out as a front page: a nameplate (issue +
+date and sources/status in its ears) over a strip of page-turns, the back-issues
+drawer (`?d=` for any past paper), a read-progress bar and Recompose; then the lede
+(large, picture, drop cap when there's copy) with two more stories down a rail, the
+remaining columns ruled in a row, and In Brief grouped by the room each line came
+from. A "wire" paper (no model) has no dek/body, so every story shows its numbers
+(points, comments, age, source) in the dek's place. Each story has per-platform
+actions (Watch / Up next, Read ↗ + the HN discussion, the Reddit post) and a
+section kicker ("The Wire · domain"). Opened stories are ticked per paper in
+localStorage `tubcal.edition.read`. Layout switches on the page's own width
+(container queries), not the viewport.
+
+The Wire (`pages/Wire.jsx`) is a teletype board over HN's six lists (`?l=`
+top/best/new/ask/show/job — `hackernews.LISTS`; the last one chosen is also saved
+as the `hn_list` setting) and an Algolia search (`?q=`, `?by=date`, `?t=` day/week/
+month/year window → `hackernews.search_url`). Lines show domain, a points-per-hour
+heat gauge and comment counts with "+N" since your last visit; read stories dim.
+The open story is `?s=<hn_id>` (pushes history): its discussion opens beside the
+board in `components/wire/HNReader.jsx` when the page is ≥980px wide, otherwise as a
+`ReaderSheet` — the same sheet the Edition and Saved use for HN stories. The reader:
+article button, Ask/Show post text (`story.text_html`), OP marks, click-a-rail to
+fold, fold-all, and comments new since your last visit marked with a chip that
+walks through them (`components/wire/seen.js`, localStorage `tubcal.wire.seen`).
+HN HTML goes through `HnHtml.jsx` (allow-list walk, ">" paragraphs drawn as quotes,
+HN item links opened in the reader). Tests: `tests/test_wire.py`.
+
+The Anime's views (Browse, Seasons, Schedule, My List, Ledger, Community, Channel,
+Social) have no header or tab strip: they're chosen from the index, a file tree down
+the left built in `components/anime/AnimeTree.jsx` (`buildTree` is the one place the
+views and their sub-places — shelves with counts, next season, Ledger anchors, the
+inbox badge — are listed; `AnimeLayout` renders index + path bar + page for every
+anime route). On ≥1780px screens the index hangs in the shell's empty left margin so
+content keeps the full 1280 shell; it folds to an icon rail (with flyouts) and becomes
+chip rows on phones. Views live in `components/anime/` with their own CSS module and a
+deliberately different layout; `pages/Anime.jsx`'s default export only renders the
+view the URL names; card/badge/URL-state helpers they all share are in
+`components/anime/shared.jsx` (not in `pages/Anime.jsx`), charts in
+`components/anime/charts.jsx` (single-series in `--c-anime`, CSS tooltips via
+`data-tip`, a table twin for each). Heavy detail-page sections (the franchise guide)
+load on `useInView` to save AniList budget.
+
+Social (`?tab=discuss`, `components/anime/SocialDesk.jsx`) is a desk bar (you, your
+counts, the faces you follow, Inbox / Post / New thread) over one of: the forum
+(`Forum.jsx` — master-detail: thread list left, `ThreadView` from `Thread.jsx` in a
+sticky pane right; the open thread is `?t=` and *pushes* history so Back closes it;
+read receipts per thread in localStorage), the activity stream (`Activity.jsx` —
+a timeline; anime-only via `anilist._activity_filter`, a person's own stream adds
+messages), the inbox, or people (following / followers / find). People are drawn
+one way everywhere by `Person.jsx`: `PersonAvatar` (ring = their AniList profile
+colour, initials fallback, supporter mark — `_norm_user` carries `color`/`donator`
+for this), `UserLink` (name → `/anime/user/:name`, with a lazy hover card from
+`/user/<name>/card`), `FollowButton`, `PersonCard`; `asPerson()` turns `/anime/me`
+into the same shape. Full pages: `/anime/user/:name` (`pages/AnimeUser.jsx`, the
+profile; your own opens `ProfileStudio`), `/anime/thread/:id` and
+`/anime/activity/:id` (`pages/AnimeThread.jsx`, where inbox rows land). Every
+writing box is `MarkdownComposer` (`Composer.jsx`): toolbar + shortcuts, localStorage
+drafts, and a live preview of the post *as others will see it* — rendered in the
+browser per keystroke (`markdown.js`, AniList's dialect) then swapped for AniList's
+own render on a pause (`POST /anime/markdown`, ≥8s apart per box, memoised
+server-side in `_MD_MEMO`). All AniList HTML goes through `RichText.jsx`'s
+`sanitizeAniHtml`/`AniHtml` (allow-list, veiled spoilers, AniList links routed
+in-app). Posting returns AniList's rendered HTML, so new comments/replies/statuses
+are inserted in place instead of refetching.
+
+The curtain call (`components/anime/CurtainCall.jsx`) is the screen after you
+finish a season: rate it (a 1–10 tile row with words, or stars/faces, in the
+viewer's own score format), the finale's episode thread (`ThreadView` with
+`composerFirst`; or start that thread if AniList has none), an inline `ReviewForm`
+(its score seeded from the rating, drafts kept in localStorage), and the next ≤3
+sequels one tap from Planning/Watching — or a "終 · series finished" card. The
+trigger lives in `state.jsx`'s `flushAnime`: an edit touching progress/status that
+comes back from AniList as COMPLETED (AniList completes an entry itself when
+progress reaches the finale) dispatches `anime-completed` unless the entry was
+already completed. `CurtainCallHost.jsx` (mounted at the app root, lazy-loads the
+screen) queues those, waits while the player is expanded, and shows an automatic
+call once per title and only for a FINISHED season; the title page's "Curtain call"
+button opens it by hand (`openCurtainCall`). Data: `GET /anime/finale/<id>` →
+`anilist.finale` = media() + viewer score format + `episode_thread` (Release
+Discussion threads matched by `match_episode_thread`) + `sequel_chain` (SEQUEL hops
+via `pick_sequel` over the cached `relations_batch`) + your list status for each.
+
+The anime routes (`/anime`, `/anime/:id`, `/anime/voice/:id`, `/anime/character/:id`,
+`/anime/studio/:id`) are wrapped in a shared layout route (`AnimeSection` in `App.jsx`) that
+renders the Anime top bar and `AnimeLayout`, and mounts one
 `AnimeCalcProvider` (`components/anime/WatchCalculator.jsx`) across the whole section
 — "The Reckoner", a watch-time calculator docked in the page's side margin. Hovering
 any `AnimeCard`/`BrowseCard`/detail dossier arms it (via `useAnimeCalc().hoverProps`,
@@ -307,3 +463,6 @@ floats/rails otherwise.
   try/except, so minimal runtimes — including the Android/Chaquopy build — still boot
   with the feature simply reporting itself unavailable. Never import them at module
   top level.
+## Important
+Maintain ~/Projects/papercuts.md, a global log shared by all my Claude sessions of anything that slowed down development. When you lose time to one mid-session, append date · symptom · fix · project. Check this file first when tooling fails mysteriously.
+

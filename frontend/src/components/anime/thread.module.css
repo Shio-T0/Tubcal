@@ -1,0 +1,422 @@
+/* A thread: the opening post as a card, the replies as a tree hanging from it,
+   each branch joined to its parent by a line you can click to fold. */
+
+.thread {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.page {
+  max-width: 900px;
+}
+.pane {
+  padding: var(--space-4) var(--space-5) var(--space-6);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-card);
+  background: var(--surface);
+}
+
+.loading {
+  padding: var(--space-6) 0;
+}
+.muted {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: var(--space-3) 0;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  color: var(--paper-faint);
+}
+
+/* ── head ─────────────────────────────────────────────────────────────────── */
+
+.top {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.back {
+  display: none;
+  align-self: flex-start;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid var(--rule);
+  color: var(--paper-dim);
+}
+.back:hover {
+  color: var(--paper);
+  border-color: var(--rule-strong);
+}
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.tag,
+.tagPin,
+.tagLock {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 9px;
+  border-radius: var(--r-pill);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  color: var(--paper-dim);
+  border: 1px solid var(--rule);
+}
+.tagPin {
+  color: var(--signal, var(--c-anime));
+  border-color: color-mix(in srgb, var(--signal, var(--c-anime)) 45%, transparent);
+}
+.tagLock {
+  color: var(--paper-faint);
+}
+.mediaTag {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 320px;
+  padding: 2px 10px 2px 2px;
+  border-radius: var(--r-pill);
+  background: color-mix(in srgb, var(--c-anime) 12%, transparent);
+  color: var(--c-anime);
+  font-size: 12px;
+  font-weight: 600;
+}
+.mediaTag img {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.mediaTag span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mediaTag:hover {
+  background: color-mix(in srgb, var(--c-anime) 20%, transparent);
+}
+.title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-variation-settings: 'opsz' 96, 'SOFT' 30;
+  font-size: clamp(22px, 2.4vw, 30px);
+  font-weight: 640;
+  line-height: 1.18;
+  color: var(--paper);
+  text-wrap: balance;
+}
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 16px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--paper-faint);
+}
+.meta > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.last {
+  color: var(--paper-dim);
+}
+
+/* ── the opening post ─────────────────────────────────────────────────────── */
+
+.opPost {
+  position: relative;
+  padding: var(--space-4) var(--space-5) var(--space-3);
+  border-radius: var(--r-card);
+  border: 1px solid var(--rule);
+  background:
+    linear-gradient(to right, color-mix(in srgb, var(--c-anime) 7%, transparent), transparent 40%),
+    var(--ink-2, var(--surface));
+  box-shadow: inset 3px 0 0 var(--c-anime);
+}
+.pane .opPost {
+  background:
+    linear-gradient(to right, color-mix(in srgb, var(--c-anime) 7%, transparent), transparent 40%),
+    var(--ink);
+}
+.opHead {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  margin-bottom: 10px;
+}
+.opName {
+  font-size: 15px;
+}
+.opBadge {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--paper-faint);
+}
+.body {
+  font-size: 15px;
+}
+.opActs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: var(--space-4);
+  padding-top: var(--space-3);
+  border-top: 1px dashed var(--rule);
+}
+
+.pill,
+.pillQuiet {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--rule);
+  font-size: 12.5px;
+  color: var(--paper-dim);
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+.pill:hover {
+  color: var(--paper);
+  border-color: var(--rule-strong);
+}
+.pillOn {
+  color: var(--c-anime);
+  border-color: color-mix(in srgb, var(--c-anime) 50%, transparent);
+  background: color-mix(in srgb, var(--c-anime) 10%, transparent);
+}
+.pillQuiet {
+  margin-left: auto;
+  border-color: transparent;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--paper-faint);
+}
+.pillQuiet:hover {
+  color: var(--paper);
+}
+
+/* ── the conversation ─────────────────────────────────────────────────────── */
+
+.convoHead {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-top: var(--space-2);
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--rule);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--paper-faint);
+}
+.convoCount {
+  margin-left: auto;
+  letter-spacing: 0.02em;
+  text-transform: none;
+}
+
+.tree {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.node {
+  display: flex;
+  gap: 10px;
+  min-width: 0;
+}
+.gutter {
+  position: relative;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 32px;
+}
+.line {
+  flex: 1;
+  width: 16px;
+  margin-top: 6px;
+  min-height: 12px;
+  cursor: pointer;
+  background:
+    linear-gradient(var(--rule-strong), var(--rule-strong)) center / 2px 100% no-repeat;
+  border-radius: 2px;
+  transition: background-size 0.15s ease;
+}
+.line:hover,
+.line:focus-visible {
+  background:
+    linear-gradient(var(--c-anime), var(--c-anime)) center / 3px 100% no-repeat;
+}
+.main {
+  flex: 1;
+  min-width: 0;
+}
+.head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  min-height: 32px;
+}
+.who {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.whoName {
+  font-size: 13.5px;
+}
+.op,
+.you {
+  padding: 0 6px;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  line-height: 16px;
+}
+.op {
+  background: var(--c-anime);
+  color: var(--ink);
+}
+.you {
+  border: 1px solid color-mix(in srgb, var(--c-anime) 55%, transparent);
+  color: var(--c-anime);
+}
+.when {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--paper-faint);
+}
+.unfold {
+  padding: 1px 8px;
+  border-radius: var(--r-pill);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--c-anime);
+  background: color-mix(in srgb, var(--c-anime) 10%, transparent);
+}
+.unfold:hover {
+  background: color-mix(in srgb, var(--c-anime) 18%, transparent);
+}
+.text {
+  font-size: 14.5px;
+}
+.acts {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin: 4px 0 0 -6px;
+}
+.act {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 8px;
+  border-radius: var(--r-pill);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--paper-faint);
+  transition: color 0.12s ease, background 0.12s ease;
+}
+.act:hover {
+  color: var(--paper);
+  background: var(--surface-hover);
+}
+.actOn {
+  color: var(--c-anime);
+}
+.like:hover,
+.likeOn {
+  color: #e2607a;
+}
+.danger:hover {
+  color: var(--danger);
+}
+.replyDesk {
+  margin: 8px 0 4px;
+}
+.children {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+/* Past five levels the tree stops stepping right: a thin rule marks the branch. */
+.deep {
+  margin-left: -42px;
+  padding-left: 10px;
+  border-left: 2px solid var(--rule);
+}
+.deep > .gutter {
+  width: 22px;
+}
+.fresh > .main {
+  animation: fresh 2.4s ease-out both;
+  border-radius: 8px;
+}
+
+.moreBtn {
+  align-self: center;
+  padding: 8px 18px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--rule);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--paper-dim);
+}
+.moreBtn:hover:not(:disabled) {
+  color: var(--paper);
+  border-color: var(--c-anime);
+}
+.bottomDesk {
+  margin-top: var(--space-2);
+  scroll-margin: 120px;
+}
+
+@media (max-width: 1100px) {
+  .back {
+    display: grid;
+  }
+}
+@media (max-width: 640px) {
+  .pane {
+    padding: var(--space-3);
+  }
+  .gutter {
+    width: 26px;
+  }
+  .opPost {
+    padding: var(--space-3);
+  }
+}
+
+@keyframes fresh {
+  from { background: color-mix(in srgb, var(--c-anime) 16%, transparent); box-shadow: 0 0 0 6px color-mix(in srgb, var(--c-anime) 16%, transparent); }
+  to { background: transparent; box-shadow: 0 0 0 6px transparent; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fresh > .main { animation: none; }
+}

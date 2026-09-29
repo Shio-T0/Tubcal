@@ -8,8 +8,6 @@ import {
   ExternalLink,
   GripVertical,
   Maximize2,
-  Minimize2,
-  PanelRight,
   Radio,
   RotateCw,
   Volume2,
@@ -22,15 +20,21 @@ import {
 import { api } from '../../api/client.js';
 import { formatWhen, timeUntil } from '../../lib/time.js';
 import { streamApi } from '../../lib/streams.js';
+import { useShared } from '../../lib/useShared.js';
 import { COMPLETE_RATIO, useAnimeSync, usePlayer, useProgress, useSettings } from '../../state.jsx';
 import { useVideoControls } from '../../lib/useVideoControls.js';
+import NotesPanel from './NotesPanel.jsx';
 import PlayerControls from './PlayerControls.jsx';
-import PlayerSidePanel from './PlayerSidePanel.jsx';
+import WatchInfo from './WatchInfo.jsx';
 import s from './player.module.css';
 
 const MARGIN = 20;
-const GAP = 12;
+const GAP = 16; // between the picture and the notes
+const DOCK_GAP = 12; // between stacked corner players
 const BAR_H = 34;
+// Height of the strip under the big screen (title + channel row), for sizing the
+// picture so the two together fit the window.
+const INFO_H = 128;
 
 // The ordered stages a stream passes through before it plays. The status readout
 // walks these top-to-bottom so a failure shows exactly how far it got.
@@ -113,7 +117,7 @@ function StreamStatus({ status, attempt, onRetry, item }) {
 // This sidesteps YouTube's embed player entirely — which had started refusing
 // every video with "Video unavailable, watch on YouTube" — and gives us exact,
 // event-driven progress via the element's own timeupdate, no postMessage hacks.
-function PlayerCard({ item, expanded, style, dragging, muted, rate, roomForPanel, showPanel, seekSignal, takeSeekTarget, onTogglePanel, onClose, onMinimize, onExpand, onEnded, onRateChange, drag }) {
+function PlayerCard({ item, expanded, style, dragging, muted, rate, notes, onChapters, next, onNext, seekSignal, takeSeekTarget, onClose, onMinimize, onExpand, onEnded, onRateChange, drag }) {
   const channelId = item.extra?.channel_id;
   const [over, setOver] = useState(false);
   const { progress, writeProgress, flushProgress } = useProgress();
@@ -127,34 +131,22 @@ function PlayerCard({ item, expanded, style, dragging, muted, rate, roomForPanel
   const [subtitles, setSubtitles] = useState([]); // [{src, lang, label}] — anime episodes
   const [quality, setQuality] = useState(0); // index into streams
   const [playErr, setPlayErr] = useState(null); // browser MediaError, if any
-  const [info, setInfo] = useState(null); // metadata for the panel + live status
   const [canPlay, setCanPlay] = useState(false); // first playable frame reached
   const [attempt, setAttempt] = useState(0); // manual-retry counter; bumping re-runs the whole pipeline
   const everPlayedRef = useRef(false); // has this source ever reached playable? (keeps controls up while re-buffering)
 
   const sapi = streamApi(item);
+  // Metadata once per video (shared with the notes panel, one request between
+  // them): the strip under the picture, chapters + "most replayed" for the seek
+  // bar, and whether this is a premiere that hasn't started (a countdown, not an
+  // error). Platforms without a metadata endpoint (anime) skip straight to playback.
+  const metaRes = useShared(sapi.meta, { maxAge: 600_000 });
+  const info = !sapi.meta ? {} : metaRes.data || (metaRes.error ? {} : null);
   const liveStatus = info?.live_status;
   const isUpcoming = liveStatus === 'is_upcoming';
   const isLive = liveStatus === 'is_live';
 
-  // Resolve metadata once per video: drives the info panel and tells us whether
-  // this is a premiere that hasn't started (so we show a countdown, not an error).
-  // Platforms without a metadata endpoint (anime) just skip straight to playback.
-  useEffect(() => {
-    let alive = true;
-    setInfo(null);
-    if (!sapi.meta) {
-      setInfo({});
-      return undefined;
-    }
-    api(sapi.meta)
-      .then((d) => alive && setInfo(d))
-      .catch(() => alive && setInfo({}));
-    return () => {
-      alive = false;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [item.id]);
+
 
   // Compute the resume point once, when this video first mounts. A finished
   // video starts over; otherwise we rewind a couple seconds for context.
@@ -408,6 +400,7 @@ function PlayerCard({ item, expanded, style, dragging, muted, rate, roomForPanel
           : undefined
       }
     >
+      {!expanded && (
       <div
         className={s.bar}
         draggable={!!drag}
@@ -443,30 +436,14 @@ function PlayerCard({ item, expanded, style, dragging, muted, rate, roomForPanel
         <span className={s.barMute} title={muted ? 'Muted (another video has the sound)' : 'Audio'}>
           {muted ? <VolumeX size={13} /> : <Volume2 size={13} />}
         </span>
-        {expanded && roomForPanel && (
-          <button
-            className={`${s.btn} ${showPanel ? s.btnActive : ''}`}
-            title={showPanel ? 'Hide info & comments' : 'Show info & comments'}
-            onClick={onTogglePanel}
-            aria-label="Toggle info panel"
-          >
-            <PanelRight size={14} />
-          </button>
-        )}
-        {!expanded && (
-          <button className={s.btn} title="Expand" onClick={onExpand} aria-label="Expand">
-            <Maximize2 size={13} />
-          </button>
-        )}
-        {expanded && (
-          <button className={s.btn} title="Minimize to corner" onClick={onMinimize} aria-label="Minimize to corner">
-            <Minimize2 size={14} />
-          </button>
-        )}
+        <button className={s.btn} title="Back to the big screen" onClick={onExpand} aria-label="Expand">
+          <Maximize2 size={13} />
+        </button>
         <button className={s.btn} title="Close" onClick={onClose} aria-label="Close">
           <X size={15} />
         </button>
       </div>
+      )}
 
       <div className={s.frameWrap}>
         {isUpcoming ? (
@@ -534,6 +511,11 @@ function PlayerCard({ item, expanded, style, dragging, muted, rate, roomForPanel
                 resumeAt={startRef.current}
                 canVolume={!muted}
                 onVolumePersist={setVolumePref}
+                heatmap={info?.heatmap}
+                chapters={info?.chapters}
+                onChapters={onChapters}
+                next={next}
+                onNext={onNext}
               />
             ) : (
               <StreamStatus status={loadStatus} attempt={attempt} onRetry={retry} item={item} />
@@ -545,17 +527,16 @@ function PlayerCard({ item, expanded, style, dragging, muted, rate, roomForPanel
       </div>
 
       {expanded && (
-        <div className={s.meta}>
-          {channelId ? (
-            <Link to={`/youtube/c/${channelId}`} className={s.metaChannel}>
-              {item.source}
-            </Link>
-          ) : (
-            <span className={s.metaChannel}>{item.source}</span>
-          )}
-          <a className={s.metaLink} href={item.url} target="_blank" rel="noopener noreferrer">
-            <ExternalLink size={13} /> Open on YouTube
-          </a>
+        <div className={s.watchSlot}>
+          <WatchInfo
+            item={item}
+            info={info}
+            isLive={isLive}
+            getTime={() => lastRef.current.position}
+            notes={notes}
+            onMinimize={onMinimize}
+            onClose={onClose}
+          />
         </div>
       )}
     </div>
@@ -563,11 +544,14 @@ function PlayerCard({ item, expanded, style, dragging, muted, rate, roomForPanel
 }
 
 export default function PlayerLayer() {
-  const { players, expandedId, order, close, minimize, undock, expandFromDock, reorder, ended, seekSignal, takeSeekTarget } = usePlayer();
+  const { players, expandedId, order, queue, close, minimize, undock, expandFromDock, reorder, ended, seekSignal, takeSeekTarget } = usePlayer();
   const { settings, updateSettings } = useSettings();
   const [vp, setVp] = useState({ w: window.innerWidth, h: window.innerHeight });
   const [dragId, setDragId] = useState(null);
-  const [showPanel, setShowPanel] = useState(true);
+  const [showPanel, setShowPanel] = useState(() => {
+    try { return localStorage.getItem('tubcal.player.notes') !== '0'; } catch { return true; }
+  });
+  const [panelTab, setPanelTab] = useState('about');
 
   const soloAudio = settings?.solo_audio !== false;
   const rate = settings?.playback_rate || 1;
@@ -579,6 +563,9 @@ export default function PlayerLayer() {
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
+
+  // A new video opens its notes on About again.
+  useEffect(() => { setPanelTab('about'); }, [expandedId]);
 
   // Lock body scroll + Esc minimizes while a video is expanded. The body marker
   // lets the global feed shortcuts (j/k) stand down so the player owns those keys.
@@ -599,37 +586,59 @@ export default function PlayerLayer() {
 
   if (players.length === 0) return null;
 
+  const setNotes = (v) => {
+    setShowPanel(v);
+    try { localStorage.setItem('tubcal.player.notes', v ? '1' : '0'); } catch { /* fine */ }
+  };
+
   const dockW = Math.min(340, vp.w - 2 * MARGIN);
   const dockCardH = BAR_H + (dockW * 9) / 16;
-  // The info/comments panel floats at the left edge; it only fits on a wide
-  // enough viewport, otherwise the toggle is hidden and the video stays centered.
-  const PANEL_W = 420; // keep in sync with .floatPanel width in player.module.css
   const expandedItem = players.find((p) => p.id === expandedId)?.item;
-  // The info/transcript panel is YouTube-only (description, comments, the Archive);
-  // anime episodes and other platforms have nothing to put in it.
-  const roomForPanel = vp.w >= 1024;
+  // The notes (description, chapters, comments, the Archive) are YouTube-only;
+  // anime episodes and other platforms have nothing to put in them.
   const canPanel = (it) => it?.platform === 'youtube';
-  const panelVisible = !!expandedId && roomForPanel && showPanel && canPanel(expandedItem);
+  const panelVisible = !!expandedId && showPanel && canPanel(expandedItem);
+  // Wide enough: the notes stand beside the picture. Narrower: they slide over it
+  // as a sheet from the right, and the picture keeps the whole stage.
+  const beside = vp.w >= 1100;
+  const PANEL_W = vp.w >= 1720 ? 480 : vp.w >= 1400 ? 440 : 400;
 
-  // Panel floats at the right edge; the video centers in the space to its left
-  // and keeps its normal size as long as that space allows — so it doesn't shrink
-  // on a wide screen just because the panel is open.
-  const regionRight = panelVisible ? vp.w - MARGIN - PANEL_W - GAP : vp.w - MARGIN;
-  const expandedW = Math.min(960, regionRight - MARGIN);
+  // The stage: everything left of the notes. The picture is as large as the stage
+  // allows with the strip under it still on screen.
+  const regionRight = panelVisible && beside ? vp.w - MARGIN - PANEL_W - GAP : vp.w - MARGIN;
+  const regionW = regionRight - MARGIN;
+  const fitH = ((vp.h - 2 * MARGIN - INFO_H) * 16) / 9;
+  const expandedW = Math.max(300, Math.min(regionW, fitH, 1920));
   const expandedCenterX = (MARGIN + regionRight) / 2;
+  const panelStyle = beside
+    ? { top: MARGIN, bottom: MARGIN, right: MARGIN, width: PANEL_W }
+    : { top: 10, bottom: 10, right: 10, width: Math.min(440, vp.w - 20) };
+
+  const next = queue[0] || null;
 
   return createPortal(
     <>
-      {expandedId && <div className={s.backdrop} onMouseDown={minimize} />}
+      {expandedId && (
+        <div className={s.theatre} onMouseDown={minimize} aria-hidden="true">
+          {expandedItem?.thumbnail && <img className={s.ambient} src={expandedItem.thumbnail} alt="" />}
+        </div>
+      )}
       {panelVisible && expandedItem && (
-        <PlayerSidePanel item={expandedItem} onClose={() => setShowPanel(false)} />
+        <NotesPanel
+          item={expandedItem}
+          tab={panelTab}
+          onTab={setPanelTab}
+          onClose={beside ? null : () => setNotes(false)}
+          className={beside ? s.notesBeside : s.notesSheet}
+          style={panelStyle}
+        />
       )}
       {players.map(({ id, item }) => {
         const isExpanded = id === expandedId;
         const dockIndex = order.indexOf(id); // 0 = bottom corner
         const style = isExpanded
           ? { left: expandedCenterX, top: '50%', transform: 'translate(-50%, -50%)', width: expandedW }
-          : { right: MARGIN, bottom: MARGIN + dockIndex * (dockCardH + GAP), width: dockW };
+          : { right: MARGIN, bottom: MARGIN + dockIndex * (dockCardH + DOCK_GAP), width: dockW };
         return (
           <PlayerCard
             key={id}
@@ -639,11 +648,12 @@ export default function PlayerLayer() {
             dragging={dragId != null}
             muted={soloAudio && id !== activeId}
             rate={rate}
-            roomForPanel={roomForPanel && canPanel(item)}
-            showPanel={showPanel}
+            notes={{ available: canPanel(item), open: panelVisible, toggle: () => setNotes(!panelVisible) }}
+            onChapters={() => { setNotes(true); setPanelTab('chapters'); }}
+            next={isExpanded ? next : null}
+            onNext={() => ended(id)}
             seekSignal={seekSignal}
             takeSeekTarget={takeSeekTarget}
-            onTogglePanel={() => setShowPanel((p) => !p)}
             onClose={() => (isExpanded ? close() : undock(id))}
             onMinimize={minimize}
             onExpand={() => expandFromDock(id)}

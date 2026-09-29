@@ -479,19 +479,39 @@ def playlist(plid):
     return payload
 
 
+def _thumb_url(value):
+    """An author thumbnail as one URL — Invidious sends a bare string on comments
+    and a list of sized thumbnails elsewhere (the largest is last)."""
+    if isinstance(value, str):
+        return value or None
+    if isinstance(value, list) and value:
+        last = value[-1]
+        return last.get("url") if isinstance(last, dict) else None
+    return None
+
+
 def _norm_comment(c, depth):
-    """One Invidious comment → the CommentThread shape. A comment that has replies
-    carries reply_count + reply_token (a continuation) so the UI can lazily expand
-    its nested thread via comment_replies()."""
+    """One Invidious comment → the CommentThread shape, plus what the player's
+    comment view draws: the author's face and channel, and the marks YouTube puts
+    on a comment (the creator's own, verified, a channel member, hearted by the
+    creator, edited). A comment with replies carries reply_count + reply_token (a
+    continuation) so the UI can lazily expand its nested thread."""
     replies = c.get("replies") or {}
+    heart = c.get("creatorHeart")
     return {
         "id": c.get("commentId") or c.get("id") or "",
         "author": c.get("author", ""),
-        "author_thumb": (c.get("authorThumbnails") or [{}])[-1].get("url"),
+        "author_id": c.get("authorId") or None,
+        "author_thumb": _thumb_url(c.get("authorThumbnail") or c.get("authorThumbnails")),
         "body_html": c.get("contentHtml") or "",
         "score": c.get("likeCount"),
         "created_at": _parse_published(c.get("published")),
         "is_pinned": bool(c.get("isPinned")),
+        "is_owner": bool(c.get("authorIsChannelOwner")),
+        "verified": bool(c.get("verified")),
+        "member": bool(c.get("isSponsor")),
+        "edited": bool(c.get("isEdited")),
+        "hearted": bool(heart),
         "depth": depth,
         "children": [],
         "reply_count": replies.get("replyCount") or 0,
@@ -499,19 +519,36 @@ def _norm_comment(c, depth):
     }
 
 
-def comments(video_id):
-    """Top-level comments for a video, normalized to the CommentThread shape.
-    Nested replies load on demand: each comment with replies carries a reply_count
-    and a reply_token the panel expands via comment_replies()."""
+COMMENT_SORTS = ("top", "new")
+
+
+def comments(video_id, sort="top", continuation=None):
+    """A page of top-level comments, normalized to the CommentThread shape:
+    `{comments, continuation, count}`. `sort` is top or new; `continuation` is the
+    previous page's token. Nested replies load on demand: each comment with replies
+    carries a reply_count and a reply_token the panel expands via comment_replies()."""
+    sort = sort if sort in COMMENT_SORTS else "top"
+
     def fetch():
-        data = _api_get(f"/comments/{video_id}?sort_by=top")
+        path = f"/comments/{video_id}?sort_by={sort}"
+        if continuation:
+            path += f"&continuation={quote(continuation, safe='')}"
+        data = _api_get(path)
         out = [_norm_comment(c, 0) for c in (data.get("comments") or [])]
         for i, c in enumerate(out):
             if not c["id"]:
                 c["id"] = f"c{i}"
-        return {"comments": out, "disabled": False}
+        return {
+            "comments": out,
+            "continuation": data.get("continuation"),
+            "count": data.get("commentCount"),
+            "disabled": False,
+        }
 
-    payload, _ = cache.cached(f"yt:inv:comments:{video_id}", config.TTL_HN_COMMENTS, fetch)
+    key = f"yt:inv:comments:v2:{video_id}:{sort}"
+    if continuation:
+        key += ":" + hashlib.sha1(continuation.encode()).hexdigest()[:16]
+    payload, _ = cache.cached(key, config.TTL_HN_COMMENTS, fetch)
     return payload
 
 

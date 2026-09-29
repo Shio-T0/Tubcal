@@ -1,0 +1,181 @@
+/* The Anime's own masthead — slimmer than the hub's, with the channel plate
+   ("CH 2 · Anime") where the room nav would be, underlined by a band in the
+   room's accent so you always know which channel you're on. */
+
+.bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin: var(--space-4) 0 var(--space-5);
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--rule);
+  box-shadow: 0 2px 0 -1px color-mix(in srgb, var(--c-anime) 55%, transparent);
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  color: inherit;
+}
+.word {
+  font-family: var(--font-display);
+  font-variation-settings: 'opsz' 144, 'SOFT' 40, 'WONK' 1;
+  font-weight: 640;
+  font-size: 34px;
+  line-height: 1;
+  color: var(--paper);
+}
+.word em {
+  font-style: italic;
+  color: var(--signal);
+}
+.channel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px 5px 5px;
+  border-radius: var(--r-pill);
+  border: 1px solid color-mix(in srgb, var(--c-anime) 45%, var(--rule));
+  background: color-mix(in srgb, var(--c-anime) 9%, var(--surface));
+}
+.chNo {
+  padding: 3px 8px;
+  border-radius: var(--r-pill);
+  background: var(--c-anime);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+.chName {
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.chName i {
+  font-style: normal;
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--paper-dim);
+  margin-left: 4px;
+}
+.brand:hover .chName {
+  color: var(--c-anime);
+}
+/* your account at a glance: sync state, inbox bell, profile chip */
+.account {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+.sync {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.sync em {
+  font-style: normal;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--paper-faint);
+}
+.profile {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 12px 3px 4px;
+  color: inherit;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--rule);
+  background: color-mix(in srgb, var(--c-anime) 7%, var(--surface));
+  transition: border-color 0.15s ease;
+}
+.profile:hover {
+  border-color: color-mix(in srgb, var(--c-anime) 55%, var(--rule));
+}
+.profileName {
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-left: 8px;
+  border-left: 1px solid var(--rule);
+}
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--rule);
+  background: var(--surface);
+  font-size: 13px;
+  color: var(--text-secondary);
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+.btn:hover {
+  color: var(--text-primary);
+  border-color: var(--rule-strong);
+}
+.keys {
+  display: inline-flex;
+  gap: 2px;
+  margin-left: 2px;
+}
+.keys kbd {
+  padding: 0 4px;
+  border-radius: 4px;
+  border: 1px solid var(--rule-strong);
+  border-bottom-width: 2px;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  line-height: 15px;
+  color: var(--paper-faint);
+}
+.icon {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid var(--rule);
+  color: var(--paper-dim);
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+.icon:hover {
+  color: var(--c-anime);
+  border-color: color-mix(in srgb, var(--c-anime) 50%, var(--rule));
+}
+
+@media (max-width: 760px) {
+  .account {
+    order: 3;
+    margin-left: 0;
+  }
+  .actions {
+    border-left: none;
+    padding-left: 0;
+  }
+}
+@media (max-width: 560px) {
+  .word {
+    font-size: 26px;
+  }
+  .profileName {
+    display: none;
+  }
+  .keys {
+    display: none;
+  }
+}

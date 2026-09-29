@@ -163,6 +163,46 @@ def cached_dynamic(key, fetcher):
     return payload
 
 
+def cached_many(keys, ttl, fetch_missing):
+    """Batch form of cached(): {key: payload} for every key that can be answered.
+
+    Fresh keys come straight from the cache; the rest go to ONE call of
+    `fetch_missing(missing_keys) -> {key: payload}`, so a caller that can fetch
+    many things per upstream request (AniList's `id_in`) pays per batch, not per
+    key. Each result is stored under its own key, so the next caller asking for an
+    overlapping set only fetches the difference.
+
+    A key the fetcher leaves out falls back to its stale payload when one exists,
+    else is omitted. A fetch that raises is survived the same way — unless it
+    leaves nothing at all to show for a missing key, in which case it re-raises,
+    so "the upstream is down" never masquerades as "there's nothing there"."""
+    now = time.time()
+    out, stale, missing = {}, {}, []
+    for k in keys:
+        entry = _load_entry(k)
+        if entry and now - entry["fetched_at"] < ttl:
+            out[k] = entry["payload"]
+        else:
+            if entry:
+                stale[k] = entry["payload"]
+            missing.append(k)
+    if not missing:
+        return out
+    try:
+        fresh = fetch_missing(missing) or {}
+    except Exception:
+        if any(k not in stale for k in missing):
+            raise
+        fresh = {}
+    for k in missing:
+        if k in fresh:
+            _store(k, fresh[k], now, ttl)
+            out[k] = fresh[k]
+        elif k in stale:
+            out[k] = stale[k]
+    return out
+
+
 def peek(key):
     """Return the cached payload for a key if it exists (even if expired), or None.
     Does NOT trigger a fetch. Useful for fuzzy fallback: check what's cached

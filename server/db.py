@@ -145,7 +145,7 @@ DEFAULT_SETTINGS = {
     "brain_enabled": True,        # master gate for the background worker
     "brain_auto_index": False,    # opt-in: index videos as you watch them
     "brain_whisper_model": "base",        # faster-whisper size (tiny→medium)
-    "brain_llm_model": "llama3.1:8b",     # Ollama chat model for summaries/ask
+    "brain_llm_model": "qwen3.5:9b",     # Ollama chat model for summaries/ask
     "brain_embed_model": "nomic-embed-text",  # Ollama embedding model
     # The Edition (No 00): the daily synthesized paper.
     "edition_enabled": True,      # master gate for the builder thread
@@ -162,7 +162,7 @@ DEFAULT_SETTINGS = {
     "editor_lsp_enabled": True,   # attach language servers when their binary exists
     "editor_relative_lines": False,  # relative line numbers (hybrid: current abs)
     # Room configuration.
-    "active_rooms": ["edition", "frontpage", "youtube", "reddit", "hackernews", "archive", "anime", "editor"],
+    "active_rooms": ["edition", "youtube", "reddit", "hackernews", "archive", "editor", "dev"],
     "max_active_rooms": 8,
 }
 
@@ -262,6 +262,14 @@ def init_db():
                 if mx and json.loads(mx["value"]) < len(rooms):
                     con.execute("UPDATE settings SET value=? WHERE key='max_active_rooms'",
                                 (json.dumps(len(rooms)),))
+            # Migration: the Front Page was retired and The Anime became its own
+            # section, so neither is a room any more. Drop any id the registry no
+            # longer knows — left in, it would count against max_active_rooms and
+            # make saving the rooms setting fail validation.
+            known = [r for r in rooms if r in config.ROOM_IDS]
+            if known != rooms:
+                con.execute("UPDATE settings SET value=? WHERE key='active_rooms'",
+                            (json.dumps(known),))
     con.close()
     _ensure_incremental_vacuum()
     try:

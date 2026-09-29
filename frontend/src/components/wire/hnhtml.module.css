@@ -1,0 +1,65 @@
+/* HN's own words: comfortable measure, quotes set back, code on the tape. */
+
+.hn {
+  font-size: 14.5px;
+  line-height: 1.62;
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+.hn p {
+  margin: 0 0 0.7em;
+}
+.hn p:last-child {
+  margin-bottom: 0;
+}
+.hn i {
+  font-style: italic;
+}
+.hn b {
+  font-weight: 650;
+  color: var(--paper);
+}
+.hn code {
+  padding: 1px 5px;
+  border-radius: 5px;
+  font-family: var(--font-code, var(--font-mono));
+  font-size: 0.88em;
+  background: color-mix(in srgb, var(--paper) 7%, transparent);
+}
+.quote {
+  padding-left: 11px;
+  border-left: 2px solid color-mix(in srgb, var(--c-hn) 45%, var(--rule));
+  color: var(--paper-faint);
+  font-style: italic;
+}
+.pre {
+  margin: 0 0 0.7em;
+  padding: 10px 12px;
+  border-radius: 9px;
+  border: 1px solid var(--rule);
+  background: color-mix(in srgb, var(--ink) 55%, transparent);
+  font-family: var(--font-code, var(--font-mono));
+  font-size: 12.5px;
+  line-height: 1.5;
+  white-space: pre;
+  overflow-x: auto;
+}
+.link {
+  color: color-mix(in srgb, var(--c-hn) 80%, var(--paper));
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--c-hn) 35%, transparent);
+  text-underline-offset: 3px;
+  word-break: break-word;
+}
+.link:hover {
+  text-decoration-color: currentColor;
+}
+.item {
+  display: inline;
+  padding: 0;
+  font: inherit;
+  color: var(--c-hn);
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}

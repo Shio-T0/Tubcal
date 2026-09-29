@@ -2,14 +2,14 @@ import { useState } from 'react';
 import { Bookmark } from 'lucide-react';
 
 import { SectionHead } from '../components/layout/Section.jsx';
-import HNCommentsPanel from '../components/modals/HNCommentsPanel.jsx';
+import { ReaderSheet } from '../components/wire/HNReader.jsx';
 import RedditPostModal from '../components/modals/RedditPostModal.jsx';
 import RepoDetailModal from '../components/modals/RepoDetailModal.jsx';
 import { EmptyState } from '../components/ui/index.jsx';
 import { SaveButton } from '../components/ui/ItemActions.jsx';
 import { timeAgo } from '../lib/time.js';
 import { usePlayer, useSaved } from '../state.jsx';
-import { VideoTile } from './ScreeningRoom.jsx';
+import { VideoTile, Wall } from '../components/screening/tiles.jsx';
 import s from './saved.module.css';
 
 const PLATFORM_LABEL = {
@@ -78,11 +78,11 @@ export default function SavedPage() {
       {youtube.length > 0 && (
         <section className={s.group}>
           <h2 className={s.groupHead}>Videos</h2>
-          <div className={s.grid}>
+          <Wall>
             {youtube.map((item) => (
               <VideoTile key={item.id} item={item} onPlay={playVideo} />
             ))}
-          </div>
+          </Wall>
         </section>
       )}
 
@@ -98,7 +98,13 @@ export default function SavedPage() {
       )}
 
       <RedditPostModal item={post} onClose={() => setPost(null)} />
-      <HNCommentsPanel item={thread} onClose={() => setThread(null)} />
+      {thread && (
+        <ReaderSheet
+          item={thread}
+          onClose={() => setThread(null)}
+          onItem={(id) => setThread({ id: `hn:${id}`, platform: 'hackernews', extra: { hn_id: id } })}
+        />
+      )}
       <RepoDetailModal item={selectedRepo} onClose={() => setSelectedRepo(null)} />
     </>
   );

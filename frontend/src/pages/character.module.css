@@ -1,0 +1,420 @@
+/* A character's page — a collectible card. The portrait sits in a foil-edged
+   frame tinted by the character's best-known show; the name is printed on a
+   plate across the foot of the card like a trading-card title bar. */
+
+.back {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: var(--space-4);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--paper-dim);
+}
+.back:hover {
+  color: var(--c-anime);
+}
+
+.page {
+  position: relative;
+}
+.backdrop {
+  position: absolute;
+  inset: -40px -24px auto;
+  height: 360px;
+  z-index: -1;
+  background: center / cover;
+  opacity: 0.22;
+  filter: blur(2px) saturate(0.8);
+  -webkit-mask-image: linear-gradient(to bottom, black, transparent);
+  mask-image: linear-gradient(to bottom, black, transparent);
+  pointer-events: none;
+}
+
+.top {
+  display: grid;
+  grid-template-columns: minmax(220px, 290px) 1fr;
+  gap: var(--space-6);
+  align-items: start;
+}
+
+/* ── the card ────────────────────────────────────────────────────────────── */
+.card {
+  padding: 10px;
+  border-radius: 20px;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--card-c) 80%, #fff) 0%, var(--card-c) 30%,
+      color-mix(in srgb, var(--card-c) 55%, var(--ink)) 60%, color-mix(in srgb, var(--card-c) 85%, #fff) 100%);
+  box-shadow: 0 22px 50px rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(255, 255, 255, 0.25);
+  transform: rotate(-1.5deg);
+  animation: dealt 0.7s var(--hand) both;
+}
+@keyframes dealt {
+  from {
+    opacity: 0;
+    transform: translateY(18px) rotate(-6deg);
+  }
+  to {
+    opacity: 1;
+    transform: rotate(-1.5deg);
+  }
+}
+.cardFrame {
+  position: relative;
+  aspect-ratio: 3 / 4.3;
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--ink-3);
+}
+.cardFrame img,
+.cardBlank {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.cardBlank {
+  display: grid;
+  place-items: center;
+  font-family: var(--font-display);
+  font-size: 64px;
+  color: var(--paper-faint);
+}
+.cardName {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 8px;
+  display: flex;
+  flex-direction: column;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--ink) 82%, transparent);
+  border: 1px solid color-mix(in srgb, var(--card-c) 60%, transparent);
+  backdrop-filter: blur(4px);
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.cardName em {
+  font-style: normal;
+  font-family: var(--font-body);
+  font-size: 11.5px;
+  font-weight: 400;
+  color: var(--paper-dim);
+}
+.cardHearts {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: var(--r-pill);
+  background: var(--accent-strong);
+  color: #fff;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* ── facts ───────────────────────────────────────────────────────────────── */
+.facts {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding-top: var(--space-3);
+}
+.kicker {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--c-anime);
+}
+.kicker a {
+  color: var(--text-secondary);
+  text-transform: none;
+  letter-spacing: 0;
+  font-family: var(--font-body);
+  font-size: 12.5px;
+  border-bottom: 1px solid var(--rule-strong);
+}
+.name {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(30px, 5vw, 46px);
+  font-weight: 600;
+  line-height: 1.05;
+  color: var(--text-primary);
+}
+.native {
+  margin: 0;
+  font-size: 17px;
+  color: var(--paper-dim);
+}
+.aliases {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.aliasLabel {
+  margin-right: 8px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--paper-faint);
+}
+.reveal {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
+  padding: 1px 8px;
+  border-radius: var(--r-pill);
+  border: 1px dashed var(--rule-strong);
+  font-size: 11.5px;
+  color: var(--paper-dim);
+}
+.spoilerNames {
+  color: var(--accent-strong);
+}
+.stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: var(--space-3) 0 0;
+}
+.stat {
+  min-width: 96px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--rule);
+  background: var(--surface);
+}
+.stat dt {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--paper-faint);
+}
+.stat dd {
+  margin: 2px 0 0;
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+.source {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--paper-dim);
+}
+.source:hover {
+  color: var(--c-anime);
+}
+
+.label {
+  margin: 0 0 var(--space-3);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--paper-faint);
+}
+
+/* ── the back of the card ────────────────────────────────────────────────── */
+.bio {
+  margin-top: var(--space-6);
+  padding: var(--space-5);
+  border-radius: var(--r-card);
+  border: 1px solid var(--rule);
+  background:
+    radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--paper) 7%, transparent) 1px, transparent 0) 0 0 / 14px 14px,
+    var(--surface);
+}
+.bioText {
+  font-size: 14.5px;
+  line-height: 1.75;
+  color: var(--text-secondary);
+  max-width: 78ch;
+}
+.bioText p {
+  margin: 0 0 0.9em;
+}
+.bioText b {
+  color: var(--text-primary);
+}
+
+/* ── appearances ─────────────────────────────────────────────────────────── */
+.apps {
+  margin-top: var(--space-6);
+}
+.appsHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.langs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.lang,
+.langOn {
+  padding: 3px 10px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--rule);
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.langOn {
+  background: var(--c-anime);
+  border-color: transparent;
+  color: var(--ink);
+  font-weight: 600;
+}
+.appGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: var(--space-5) var(--space-4);
+}
+.app {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  animation: appIn 0.4s var(--hand) calc(var(--i, 0) * 0.03s) both;
+}
+@keyframes appIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.appCover {
+  position: relative;
+  display: block;
+}
+.appCover img,
+.appCover span:first-child {
+  display: block;
+  width: 100%;
+  aspect-ratio: 2 / 3;
+  object-fit: cover;
+  border-radius: 10px;
+  background: var(--ink-3);
+  box-shadow: var(--shadow-card);
+  transition: transform 0.18s ease;
+}
+.appCover:hover img {
+  transform: translateY(-3px);
+}
+.role,
+.roleMain {
+  position: absolute;
+  left: 6px;
+  top: 6px;
+  padding: 1px 8px;
+  border-radius: var(--r-pill);
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  background: color-mix(in srgb, var(--ink) 80%, transparent);
+  color: var(--text-secondary);
+}
+.roleMain {
+  background: var(--c-anime);
+  color: var(--ink);
+  font-weight: 700;
+}
+.appTitle {
+  margin-top: 4px;
+  font-size: 13.5px;
+  font-weight: 560;
+  line-height: 1.25;
+  color: var(--text-primary);
+}
+.appMeta {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--paper-faint);
+}
+.voice {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.voice:hover {
+  color: var(--c-anime);
+}
+.voice span {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.voice em {
+  font-style: normal;
+  font-size: 10.5px;
+  color: var(--paper-faint);
+}
+.voiceAv,
+.voiceAvL {
+  width: 26px;
+  height: 26px;
+  flex: none;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.voiceAvL {
+  display: grid;
+  place-items: center;
+  background: var(--ink-3);
+  font-size: 11px;
+}
+.noVoice {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--paper-faint);
+}
+
+@media (max-width: 720px) {
+  .top {
+    grid-template-columns: 1fr;
+  }
+  .card {
+    max-width: 260px;
+    justify-self: center;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card,
+  .app {
+    animation: none;
+  }
+}

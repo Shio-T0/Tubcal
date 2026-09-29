@@ -1,0 +1,377 @@
+/* The HN reader: a sheet of teletype paper. The story sits in a header strip
+   with the article one tap away; the thread runs beneath on coloured rails you
+   can fold by clicking. New-since-last-visit comments carry a warm margin tick. */
+
+.reader {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  color: var(--paper);
+}
+.pane {
+  border-radius: var(--r-media);
+  border: 1px solid var(--rule);
+  background:
+    linear-gradient(to bottom, color-mix(in srgb, var(--c-hn) 6%, transparent), transparent 220px),
+    var(--surface);
+}
+.sheet {
+  min-height: 100%;
+  background: var(--ink-2, var(--ink));
+}
+.loading {
+  padding: 30px;
+}
+
+.head {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 18px 22px 16px;
+  border-bottom: 1px solid var(--rule);
+}
+.headTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.kind {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--c-hn);
+}
+.close {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  margin: -6px -8px -6px 0;
+  border-radius: 50%;
+  color: var(--paper-dim);
+}
+.close:hover {
+  color: var(--paper);
+  background: var(--surface-hover);
+}
+.title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(21px, 1.8vw, 27px);
+  font-weight: 580;
+  line-height: 1.2;
+}
+.title a {
+  color: inherit;
+}
+.title a:hover {
+  color: var(--c-hn);
+}
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--paper-faint);
+}
+.meta > * + *::before {
+  content: '·';
+  margin: 0 8px;
+}
+.meta b {
+  font-weight: 600;
+  color: var(--paper-dim);
+}
+.points {
+  color: var(--c-hn);
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 2px;
+}
+.primary,
+.act {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 13px;
+  border-radius: var(--r-pill);
+  font-size: 13px;
+  white-space: nowrap;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease, filter 0.15s ease;
+}
+.primary {
+  background: var(--c-hn);
+  color: var(--ink);
+  font-weight: 650;
+}
+.primary em {
+  font-style: normal;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  opacity: 0.75;
+}
+.primary:hover {
+  filter: brightness(1.08);
+}
+.act {
+  border: 1px solid var(--rule);
+  color: var(--paper-dim);
+}
+.act:hover {
+  color: var(--paper);
+  border-color: var(--rule-strong);
+  background: var(--surface-hover);
+}
+.actOn,
+.actOn:hover {
+  color: var(--c-hn);
+  border-color: color-mix(in srgb, var(--c-hn) 50%, var(--rule));
+}
+.text {
+  margin-top: 6px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--rule);
+  background: color-mix(in srgb, var(--paper) 3%, transparent);
+}
+
+.toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 22px;
+  border-bottom: 1px solid var(--rule);
+  background: color-mix(in srgb, var(--ink-2, var(--ink)) 94%, transparent);
+  backdrop-filter: blur(8px);
+}
+.count {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: auto;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--paper-dim);
+}
+.freshChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 11px;
+  border-radius: var(--r-pill);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+  background: var(--signal);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--signal) 40%, transparent);
+}
+.caught {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--paper-faint);
+}
+.tool {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--rule);
+  font-size: 12px;
+  color: var(--paper-dim);
+}
+.tool:hover {
+  color: var(--paper);
+  border-color: var(--rule-strong);
+}
+.muted {
+  margin: 0;
+  padding: 22px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--paper-faint);
+}
+
+/* ── the thread ───────────────────────────────────────────────────────────── */
+
+.thread {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 18px 22px 28px;
+}
+.comment {
+  position: relative;
+  display: grid;
+  grid-template-columns: 14px minmax(0, 1fr);
+  gap: 8px;
+  scroll-margin: 80px;
+}
+.rail {
+  position: relative;
+  width: 14px;
+  padding: 0;
+  cursor: pointer;
+}
+.rail::before {
+  content: '';
+  position: absolute;
+  top: 4px;
+  bottom: 0;
+  left: 6px;
+  width: 2px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--rail) 45%, transparent);
+  transition: background 0.15s ease, width 0.15s ease, left 0.15s ease;
+}
+.rail:hover::before {
+  left: 5px;
+  width: 4px;
+  background: var(--rail);
+}
+.fresh > .rail::before {
+  background: var(--signal);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--signal) 55%, transparent);
+}
+.cBody {
+  min-width: 0;
+}
+.cHead {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  margin-bottom: 4px;
+}
+.author {
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--paper);
+}
+.op {
+  color: var(--c-hn);
+}
+.opTag,
+.newTag {
+  padding: 0 6px;
+  border-radius: var(--r-pill);
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 700;
+  line-height: 15px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.opTag {
+  color: var(--ink);
+  background: var(--c-hn);
+}
+.newTag {
+  color: var(--ink);
+  background: var(--signal);
+}
+.cTime {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--paper-faint);
+}
+.foldNote {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--paper-faint);
+  font-style: italic;
+}
+.fold {
+  margin-left: auto;
+  padding: 0 4px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--paper-faint);
+}
+.fold:hover {
+  color: var(--paper);
+}
+.children {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 12px;
+}
+/* very deep threads stop stepping right, so the text keeps a readable measure */
+.comment[data-deep] .children {
+  margin-left: -22px;
+}
+
+/* ── the sheet ────────────────────────────────────────────────────────────── */
+
+.sheetBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  justify-content: flex-end;
+  background: color-mix(in srgb, var(--ink) 70%, transparent);
+  backdrop-filter: blur(4px);
+  animation: fade 0.2s ease both;
+}
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.sheetBox {
+  width: min(820px, 100vw);
+  height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-left: 1px solid var(--rule);
+  box-shadow: -30px 0 90px rgba(0, 0, 0, 0.5);
+  scrollbar-width: thin;
+  animation: slide 0.32s var(--hand) both;
+}
+@keyframes slide {
+  from {
+    transform: translateX(40px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sheetBox,
+  .sheetBackdrop {
+    animation: none;
+  }
+}
+@media (max-width: 640px) {
+  .head,
+  .thread {
+    padding-inline: 14px;
+  }
+  .toolbar {
+    padding-inline: 14px;
+  }
+  .comment {
+    grid-template-columns: 10px minmax(0, 1fr);
+    gap: 6px;
+  }
+  .children {
+    margin-left: -4px;
+  }
+}

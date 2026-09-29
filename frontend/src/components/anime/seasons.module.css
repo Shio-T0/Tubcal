@@ -1,0 +1,441 @@
+/* Seasons — a broadcast program guide. The season dial is a big printed masthead
+   with the season's kanji stamped beside it; program cards are landscape: poster
+   on the left with the title over its foot, the listing copy on the right. */
+
+.guide {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.muted {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  color: var(--paper-faint);
+  padding: var(--space-4) 0;
+}
+
+/* ── the dial ────────────────────────────────────────────────────────────── */
+.dial {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-3);
+  border-radius: var(--r-modal);
+  border: 1px solid var(--rule);
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--c-anime) 10%, transparent), transparent 55%),
+    var(--surface);
+}
+.arrow {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid var(--rule);
+  color: var(--paper-dim);
+  transition: color 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+.arrow:hover:not(:disabled) {
+  color: var(--c-anime);
+  border-color: color-mix(in srgb, var(--c-anime) 50%, var(--rule));
+}
+.arrow:active:not(:disabled) {
+  transform: scale(0.94);
+}
+.dialFace {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-width: 0;
+}
+.glyph {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  flex: none;
+  border-radius: 14px;
+  border: 2px solid color-mix(in srgb, var(--accent-strong) 70%, transparent);
+  color: var(--accent-strong);
+  font-size: 36px;
+  font-weight: 700;
+  line-height: 1;
+  transform: rotate(-4deg);
+  box-shadow: inset 0 0 0 3px color-mix(in srgb, var(--accent-strong) 12%, transparent);
+}
+.dialText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.dialKicker {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--c-anime);
+}
+.dialTitle {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(26px, 4vw, 38px);
+  font-weight: 600;
+  line-height: 1.1;
+  color: var(--text-primary);
+}
+.dialSub {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--paper-faint);
+}
+.nowBtn {
+  margin-left: auto;
+  padding: 5px 12px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--rule);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--paper-dim);
+}
+.nowBtn:hover {
+  color: var(--c-anime);
+  border-color: color-mix(in srgb, var(--c-anime) 50%, var(--rule));
+}
+
+/* ── controls ────────────────────────────────────────────────────────────── */
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.chip,
+.chipOn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--rule);
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+.chip span,
+.chipOn span {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--paper-faint);
+}
+.chip:hover {
+  border-color: var(--rule-strong);
+  color: var(--text-primary);
+}
+.chipOn {
+  border-color: color-mix(in srgb, var(--c-anime) 55%, var(--rule));
+  background: color-mix(in srgb, var(--c-anime) 12%, var(--surface));
+  color: var(--text-primary);
+}
+.right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.mine {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.mine input {
+  accent-color: var(--c-anime);
+}
+.select {
+  padding: 6px 10px;
+  border-radius: var(--r-input);
+  border: 1px solid var(--rule);
+  background: var(--surface-input);
+  color: var(--text-primary);
+  font-size: 12.5px;
+}
+
+/* ── groups ──────────────────────────────────────────────────────────────── */
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.groupHead {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: var(--space-3) 0 0;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--rule);
+  font-family: var(--font-display);
+  font-size: 21px;
+  font-weight: 560;
+  color: var(--text-primary);
+}
+.groupCount {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--paper-faint);
+}
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 460px), 1fr));
+  gap: var(--space-4);
+}
+
+/* ── the program card ────────────────────────────────────────────────────── */
+.card {
+  display: grid;
+  grid-template-columns: 158px 1fr;
+  height: 262px;
+  border-radius: var(--r-card);
+  overflow: hidden;
+  border: 1px solid var(--rule);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+  animation: cardIn 0.45s var(--hand) calc(var(--i, 0) * 0.03s) both;
+  transition: border-color 0.18s ease, transform 0.18s ease;
+}
+.card:hover {
+  border-color: color-mix(in srgb, var(--cover-c) 55%, var(--rule));
+  transform: translateY(-2px);
+}
+@keyframes cardIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.cover {
+  position: relative;
+  display: grid;
+  place-items: center;
+  background: var(--ink-3);
+  color: var(--paper-faint);
+  overflow: hidden;
+}
+.cover img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.4s ease;
+}
+.card:hover .cover img {
+  transform: scale(1.04);
+}
+.coverFoot {
+  position: absolute;
+  inset: auto 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 36px 10px 10px;
+  background: linear-gradient(to top, rgba(12, 8, 4, 0.94), rgba(12, 8, 4, 0.65) 55%, transparent);
+}
+.coverTitle {
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: #f4ead6;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.coverStudio {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: color-mix(in srgb, var(--cover-c) 60%, #f4ead6);
+}
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: 12px 14px 10px;
+  border-top: 3px solid color-mix(in srgb, var(--cover-c) 70%, transparent);
+}
+.bodyHead {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.airing {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+.airing strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+.airing em {
+  font-style: normal;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--paper-faint);
+}
+.facts {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--paper-faint);
+}
+.native {
+  font-size: 11.5px;
+  color: var(--paper-faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.synopsis {
+  flex: 1;
+  /* a flex item won't shrink below its content without this — a long synopsis
+     would push the footer (score, streams, Plan) out of the card */
+  min-height: 0;
+  margin: 0;
+  overflow-y: auto;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--text-secondary);
+  padding-right: 4px;
+  scrollbar-width: thin;
+}
+.genres {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.genres a {
+  padding: 1px 8px;
+  border-radius: var(--r-pill);
+  background: color-mix(in srgb, var(--cover-c) 16%, var(--surface));
+  color: var(--text-primary);
+  font-size: 10.5px;
+}
+.genres a:hover {
+  background: color-mix(in srgb, var(--cover-c) 30%, var(--surface));
+}
+.foot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-top: 6px;
+  border-top: 1px solid var(--rule);
+}
+.stats {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--paper-faint);
+  min-width: 0;
+}
+.stats b {
+  font-size: 12.5px;
+  color: var(--text-primary);
+}
+.unscored {
+  font-style: italic;
+}
+.streams {
+  display: inline-flex;
+  gap: 4px;
+  margin-left: auto;
+}
+.streams a {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: var(--st-c, var(--ink-3));
+  color: #fff;
+  transition: transform 0.15s ease;
+}
+.streams a:hover {
+  transform: translateY(-2px);
+}
+.streams img {
+  width: 14px;
+  height: 14px;
+}
+.plan,
+.onList {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: var(--r-pill);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  white-space: nowrap;
+}
+.streams + .plan,
+.streams + .onList {
+  margin-left: 0;
+}
+.plan {
+  margin-left: auto;
+  border: 1px solid var(--rule-strong);
+  color: var(--paper-dim);
+}
+.plan:hover {
+  border-color: var(--c-anime);
+  color: var(--c-anime);
+}
+.onList {
+  margin-left: auto;
+  background: color-mix(in srgb, var(--c-anime) 16%, var(--surface));
+  color: var(--text-primary);
+}
+
+@media (max-width: 560px) {
+  .card {
+    grid-template-columns: 112px 1fr;
+    height: 240px;
+  }
+  .glyph {
+    width: 48px;
+    height: 48px;
+    font-size: 26px;
+  }
+  .dial {
+    grid-template-columns: auto 1fr auto;
+    padding: var(--space-3) var(--space-2);
+  }
+  .nowBtn {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card {
+    animation: none;
+  }
+}

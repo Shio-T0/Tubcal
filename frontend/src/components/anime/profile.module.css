@@ -78,25 +78,9 @@
   padding: 0 var(--space-6);
   margin-top: -44px;
 }
-.avatar,
-.avatarFallback {
-  width: 92px;
-  height: 92px;
-  flex: none;
-  border-radius: 20px;
-  object-fit: cover;
-  border: 3px solid var(--ink-2);
-  box-shadow: var(--shadow-card);
-  background: var(--surface-input);
-}
-.avatarFallback {
-  display: grid;
-  place-items: center;
-  font-family: var(--font-display);
-  font-size: 36px;
-  font-weight: 600;
-  color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 18%, var(--ink-3));
+.studioAv {
+  --sz: 92px !important;
+  box-shadow: 0 0 0 4px var(--accent), 0 0 0 7px var(--ink-2), var(--shadow-card) !important;
 }
 .headMeta {
   flex: 1;
@@ -113,16 +97,7 @@
   margin: 0;
   color: var(--paper);
 }
-.badge {
-  padding: 2px 9px;
-  border-radius: var(--r-pill);
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--ink);
-  background: color-mix(in srgb, var(--accent) 86%, white);
-}
+
 .sub {
   display: flex;
   align-items: center;
@@ -142,41 +117,6 @@
   text-decoration: underline;
 }
 
-/* stat tiles */
-.stats {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: var(--space-3);
-  padding: var(--space-5) var(--space-6) 0;
-}
-.stat {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 3px;
-  padding: var(--space-3) var(--space-2);
-  border-radius: var(--r-card);
-  border: 1px solid var(--rule);
-  background: var(--surface);
-}
-.statIcon {
-  color: var(--accent);
-}
-.statValue {
-  font-family: var(--font-display);
-  font-size: 21px;
-  font-weight: 600;
-  color: var(--paper);
-  line-height: 1.1;
-}
-.statLabel {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--paper-faint);
-}
-
 /* sections */
 .section {
   padding: var(--space-5) var(--space-6) 0;
@@ -191,109 +131,6 @@
   text-transform: uppercase;
   color: var(--paper-faint);
   margin: 0 0 var(--space-3);
-}
-
-/* genre bars */
-.genres {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.genreRow {
-  display: grid;
-  grid-template-columns: 92px 1fr 34px;
-  align-items: center;
-  gap: var(--space-3);
-}
-.genreName {
-  font-size: 12.5px;
-  color: var(--paper-dim);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.genreTrack {
-  height: 7px;
-  border-radius: 999px;
-  background: var(--surface-input);
-  overflow: hidden;
-}
-.genreFill {
-  display: block;
-  height: 100%;
-  border-radius: 999px;
-  background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 70%, var(--ink)), var(--accent));
-  animation: growBar 0.5s ease both;
-}
-@keyframes growBar {
-  from { transform: scaleX(0.05); transform-origin: left; }
-  to { transform: scaleX(1); transform-origin: left; }
-}
-.genreCount {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--paper-faint);
-  text-align: right;
-}
-
-/* favorites strip */
-.favs {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(82px, 1fr));
-  gap: var(--space-3);
-}
-.fav {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  color: inherit;
-}
-.fav img,
-.favFallback {
-  width: 100%;
-  aspect-ratio: 2 / 3;
-  border-radius: 10px;
-  object-fit: cover;
-  border: 1px solid var(--rule);
-  background: var(--surface-input);
-  transition: border-color 0.15s ease, transform 0.15s ease;
-}
-.favFallback {
-  display: grid;
-  place-items: center;
-  color: var(--paper-faint);
-}
-.fav:hover img,
-.fav:hover .favFallback {
-  border-color: var(--accent);
-  transform: translateY(-2px);
-}
-.favTitle {
-  font-size: 11px;
-  line-height: 1.25;
-  color: var(--paper-dim);
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.about {
-  margin: 0;
-  font-size: 13px;
-  line-height: 1.65;
-  color: var(--text-secondary);
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-
-.emptyNote {
-  margin: 0;
-  padding: var(--space-4) var(--space-5) var(--space-5);
-  font-size: 12.5px;
-  line-height: 1.6;
-  color: var(--paper-faint);
-  font-style: italic;
 }
 
 /* ── Profile studio (editable settings) ──────────────────────────────────── */
@@ -508,9 +345,6 @@
 }
 
 @media (max-width: 560px) {
-  .stats {
-    grid-template-columns: repeat(2, 1fr);
-  }
   .fieldGrid {
     grid-template-columns: 1fr;
   }
@@ -518,8 +352,92 @@
 
 @media (prefers-reduced-motion: reduce) {
   .modal,
-  .genreFill,
   .spin {
     animation: none !important;
   }
+}
+
+/* ── custom lists, notifications, and the fuller settings studio ─────────── */
+
+.customLists {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.customChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px 4px 12px;
+  border-radius: var(--r-pill);
+  border: 1px dashed var(--rule-strong);
+  font-size: 12.5px;
+  color: var(--text-primary);
+}
+.customChip button {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  color: var(--paper-faint);
+}
+.customChip button:hover {
+  color: var(--danger);
+  background: var(--surface-hover);
+}
+.customAdd {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 4px 2px 12px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--rule);
+  background: var(--surface-input);
+}
+.customAdd input {
+  width: 9rem;
+  border: none;
+  outline: none;
+  background: none;
+  color: var(--text-primary);
+  font-size: 12.5px;
+}
+.customAdd button {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  color: var(--accent);
+}
+.customAdd button:disabled {
+  opacity: 0.4;
+}
+.catsInput {
+  width: 100%;
+  margin-top: 8px;
+  padding: 8px 12px;
+  border-radius: var(--r-input);
+  border: 1px solid var(--rule-strong);
+  background: var(--surface-input);
+  color: var(--text-primary);
+  font-size: 13px;
+}
+.notifGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 6px 14px;
+}
+.notifRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.notifRow input {
+  accent-color: var(--accent);
 }

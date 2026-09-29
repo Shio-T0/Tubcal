@@ -24,7 +24,7 @@ def available():
 
 
 def models():
-    """Names of locally-pulled Ollama models (e.g. ['llama3.1:8b', ...])."""
+    """Names of locally-pulled Ollama models (e.g. ['qwen3.5:9b', ...])."""
     try:
         r = requests.get(f"{config.OLLAMA_URL}/api/tags", timeout=_TIMEOUT_FAST)
         r.raise_for_status()
@@ -84,6 +84,10 @@ def chat(system, prompt, model, temperature=0.2, fmt=None):
             {"role": "user", "content": prompt},
         ],
         "stream": False,
+        # qwen3.5 and other reasoning models emit their preamble into
+        # message.thinking and leave message.content empty; The Edition and
+        # ask() stage 1 both need clean JSON, so keep thinking off.
+        "think": False,
         "options": {"temperature": temperature},
     }
     if fmt:

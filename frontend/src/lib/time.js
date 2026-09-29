@@ -41,6 +41,15 @@ export function clock(seconds) {
   return h ? `${h}:${pad(m)}:${pad(sec)}` : `${m}:${pad(sec)}`;
 }
 
+/** A moment in words either side of now: "3d ago", "just now", or — for a
+ *  scheduled premiere whose date is still ahead — "in 2d 4h". */
+export function ago(epochSeconds) {
+  if (!epochSeconds) return '';
+  if (epochSeconds > Date.now() / 1000 + 60) return timeUntil(epochSeconds);
+  const t = timeAgo(epochSeconds);
+  return t === 'now' ? 'just now' : `${t} ago`;
+}
+
 export function timeAgo(epochSeconds) {
   if (!epochSeconds) return '';
   const diff = Math.max(0, Date.now() / 1000 - epochSeconds);

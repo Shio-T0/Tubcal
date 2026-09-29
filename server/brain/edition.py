@@ -237,7 +237,7 @@ def _numpy_ok():
 
 def _chat_model():
     return (db.get_setting("edition_llm_model", "")
-            or db.get_setting("brain_llm_model", "llama3.1:8b"))
+            or db.get_setting("brain_llm_model", "qwen3.5:9b"))
 
 
 def build(force=False):

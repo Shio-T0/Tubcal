@@ -1,668 +1,910 @@
-/* Screening Room — cinematic: letterboxed hero, horizontal shelves */
+/* The Screening Room — a dark little cinema. One slim control bar, then the big
+   screen with tonight's listings beside it, then shelves of film. The channel,
+   playlist and logbook pages share the same furniture. */
 
-.hero {
-  position: relative;
-  border-radius: var(--r-media);
-  overflow: hidden;
-  cursor: pointer;
-  margin-bottom: var(--space-7);
-  border: 1px solid var(--rule);
-  animation: fadeUp 0.5s ease 0.12s both;
-  background: #000;
+.room {
+  min-width: 0;
+  animation: roomIn 0.4s ease both;
 }
-
-.heroThumb {
-  width: 100%;
-  aspect-ratio: 21 / 9;
-  object-fit: cover;
-  opacity: 0.85;
-  transition: transform 0.6s ease, opacity 0.3s ease;
+@keyframes roomIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
-
-.hero:hover .heroThumb {
-  transform: scale(1.025);
-  opacity: 1;
-}
-
-.heroScrim {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(to top, rgba(8, 6, 4, 0.92) 0%, rgba(8, 6, 4, 0.25) 45%, transparent 70%);
-}
-
-.heroText {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  padding: var(--space-5) var(--space-6);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-.heroKicker {
+.muted {
+  margin: 0;
+  padding: var(--space-5) 0;
   font-family: var(--font-mono);
-  font-size: 11px;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  color: var(--c-youtube);
-}
-
-.heroTitle {
-  font-size: clamp(22px, 3.4vw, 36px);
-  font-variation-settings: 'opsz' 110;
-  color: #f4ecdc;
-  max-width: 26ch;
-}
-
-.heroMeta {
-  font-family: var(--font-mono);
-  font-size: 12px;
-  color: rgba(237, 229, 211, 0.65);
-}
-
-.heroPlay {
-  position: absolute;
-  top: var(--space-5);
-  right: var(--space-5);
-  display: grid;
-  place-items: center;
-  width: 54px;
-  height: 54px;
-  border-radius: 50%;
-  color: #fff;
-  background: rgba(255, 66, 66, 0.9);
-  box-shadow: 0 0 34px rgba(255, 66, 66, 0.55);
-  opacity: 0;
-  transform: scale(0.85);
-  transition: opacity 0.2s ease, transform 0.2s ease;
-}
-
-.hero:hover .heroPlay {
-  opacity: 1;
-  transform: scale(1);
-}
-
-/* shelves */
-.shelf {
-  margin-bottom: var(--space-7);
-  animation: fadeUp 0.45s ease both;
-}
-
-.shelfHead {
-  display: flex;
-  align-items: baseline;
-  gap: var(--space-3);
-  padding-bottom: var(--space-2);
-  border-bottom: 1px solid var(--rule);
-  margin-bottom: var(--space-4);
-}
-
-.shelfTitle {
-  font-size: 19px;
-  font-weight: 560;
-}
-
-.shelfCount {
-  font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 12.5px;
   color: var(--paper-faint);
 }
-
-.shelfAll {
-  margin-left: auto;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--paper-faint);
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  background: none;
-  border: none;
-  padding: 0;
-  cursor: pointer;
-}
-
-/* A second .shelfAll (e.g. reshuffle next to view-all) shouldn't claim the
-   auto margin too — only the first pushes to the right. */
-.shelfAll ~ .shelfAll {
-  margin-left: var(--space-3);
-}
-
-.shelfAll:hover {
-  color: var(--shelf-c, var(--c-youtube));
-}
-
 .spin {
-  animation: shelf-spin 0.8s linear infinite;
+  animation: spin 0.9s linear infinite;
 }
-
-@keyframes shelf-spin {
+@keyframes spin {
   to {
     transform: rotate(360deg);
   }
 }
 
-.shelfRow {
+/* ── search fields ────────────────────────────────────────────────────────── */
+
+.search {
   display: flex;
-  gap: var(--space-4);
-  overflow-x: auto;
-  /* No scroll-snap on any shelf: it pulled the keyboard-focused tile back to the
-     row's left edge, defeating the centred-focus scroll (scrollIntoView center),
-     and fought the JS wheel-scroll. Centred focus now holds on every shelf. */
-  padding-bottom: var(--space-3);
+  align-items: center;
+  gap: 9px;
+  flex: 0 1 300px;
+  min-width: 0;
+  height: 36px;
+  padding: 0 12px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--rule);
+  background: var(--surface-input);
+  color: var(--paper-faint);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
-
-/* tiles */
-.tile {
-  flex: none;
-  width: 270px;
-  cursor: pointer;
-  scroll-snap-align: start;
-  transition: transform 0.2s ease;
+.search:focus-within {
+  border-color: color-mix(in srgb, var(--c-youtube) 55%, var(--rule));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--c-youtube) 13%, transparent);
+  color: var(--c-youtube);
 }
-
-.tile:hover {
-  transform: translateY(-3px);
-}
-
-/* Keyboard selection (hjkl nav) lifts further and scales up so the active tile
-   clearly stands apart from a plain hover. */
-.tile:focus-visible {
+.search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
   outline: none;
-  transform: translateY(-5px) scale(1.035);
-  z-index: 3;
+  background: none;
+  font: inherit;
+  font-size: 14px;
+  color: var(--text-primary);
+}
+.search input::placeholder {
+  color: var(--paper-faint);
+}
+.searchBig {
+  flex: 1 1 360px;
+  max-width: 560px;
+  height: 44px;
+  padding: 0 16px;
+}
+.searchBig input {
+  font-size: 15px;
+}
+.clear {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  color: var(--paper-faint);
+}
+.clear:hover {
+  color: var(--paper);
+  background: var(--surface-hover);
 }
 
-.tileThumbWrap {
+/* ── the control bar ──────────────────────────────────────────────────────── */
+
+.bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 12px;
+  margin-bottom: var(--space-5);
+}
+.views,
+.source,
+.sorts {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--rule);
+  background: var(--surface);
+}
+.view {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 14px;
+  border-radius: var(--r-pill);
+  font-size: 13.5px;
+  color: var(--paper-dim);
+  white-space: nowrap;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+.view:hover {
+  color: var(--paper);
+}
+.viewOn,
+.viewOn:hover {
+  color: var(--paper);
+  background: color-mix(in srgb, var(--c-youtube) 20%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c-youtube) 45%, transparent);
+}
+.viewOn svg {
+  color: var(--c-youtube);
+}
+.viewCount {
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: var(--r-pill);
+  font-style: normal;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--signal) 85%, var(--paper));
+}
+.viewHot {
+  background: #d63024;
+  color: #fff;
+}
+.knobs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+.source button,
+.sorts button {
+  padding: 5px 11px;
+  border-radius: var(--r-pill);
+  font-size: 12.5px;
+  color: var(--paper-dim);
+  white-space: nowrap;
+}
+.source button:hover,
+.sorts button:hover {
+  color: var(--paper);
+}
+.source .sourceOn,
+.sorts .sortOn {
+  color: var(--paper);
+  background: var(--surface-hover);
+  box-shadow: inset 0 0 0 1px var(--rule-strong);
+}
+.knob,
+.toggle,
+.ghostBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 13px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--rule);
+  font-size: 13px;
+  color: var(--paper-dim);
+  white-space: nowrap;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+.knob:hover,
+.toggle:hover,
+.ghostBtn:hover {
+  color: var(--paper);
+  border-color: var(--rule-strong);
+  background: var(--surface-hover);
+}
+.knobIcon {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid var(--rule);
+  color: var(--paper-dim);
+}
+.knobIcon:hover {
+  color: var(--paper);
+  border-color: var(--rule-strong);
+}
+
+/* ── on now: the big screen and the listings beside it ────────────────────── */
+
+.band {
+  display: grid;
+  grid-template-columns: minmax(0, 1.72fr) minmax(290px, 1fr);
+  gap: 18px;
+  margin-bottom: var(--space-7);
+}
+
+.feature {
   position: relative;
+  min-height: 0;
+  /* at least 16:9, and as tall as the listings beside it */
+  aspect-ratio: 16 / 9;
+  align-self: stretch;
   border-radius: var(--r-media);
   overflow: hidden;
+  cursor: pointer;
   background: #000;
   border: 1px solid var(--rule);
-  margin-bottom: var(--space-2);
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: 0 24px 60px rgba(10, 6, 2, 0.45);
+  animation: roomIn 0.5s ease 0.05s both;
 }
-
-.tile:hover .tileThumbWrap {
-  border-color: color-mix(in srgb, var(--c-youtube) 45%, var(--rule));
-  box-shadow: 0 14px 34px rgba(10, 6, 2, 0.5);
-}
-
-.tile:focus-visible .tileThumbWrap {
-  border-color: var(--signal);
+.feature:focus-visible {
+  outline: none;
   box-shadow:
     0 0 0 3px var(--signal),
-    0 0 0 6px color-mix(in srgb, var(--signal) 30%, transparent),
-    0 0 26px 3px color-mix(in srgb, var(--signal) 55%, transparent),
-    0 18px 40px rgba(10, 6, 2, 0.6);
-  animation: tileSelectPulse 1.8s ease-in-out infinite;
+    0 0 30px 4px color-mix(in srgb, var(--signal) 45%, transparent);
 }
-
-@keyframes tileSelectPulse {
-  0%,
-  100% {
-    box-shadow:
-      0 0 0 3px var(--signal),
-      0 0 0 6px color-mix(in srgb, var(--signal) 28%, transparent),
-      0 0 22px 2px color-mix(in srgb, var(--signal) 45%, transparent),
-      0 18px 40px rgba(10, 6, 2, 0.6);
-  }
-  50% {
-    box-shadow:
-      0 0 0 3px var(--signal),
-      0 0 0 7px color-mix(in srgb, var(--signal) 40%, transparent),
-      0 0 34px 5px color-mix(in srgb, var(--signal) 65%, transparent),
-      0 18px 40px rgba(10, 6, 2, 0.6);
-  }
-}
-
-.tileThumb {
+.featureImg {
+  position: absolute;
+  inset: 0;
   width: 100%;
-  aspect-ratio: 16 / 9;
+  height: 100%;
   object-fit: cover;
-  transition: transform 0.45s ease, opacity 0.25s ease;
-  opacity: 0.92;
+  opacity: 0.9;
+  transition: transform 0.8s ease, opacity 0.3s ease;
 }
-
-.tile:hover .tileThumb,
-.tile:focus-visible .tileThumb {
-  transform: scale(1.06);
+.feature:hover .featureImg {
+  transform: scale(1.025);
   opacity: 1;
 }
-
-/* bottom scrim so the runtime pill stays legible; deepens on hover/focus */
-.tileScrim {
+.featureScrim {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(to top, rgba(8, 6, 4, 0.94) 0%, rgba(8, 6, 4, 0.6) 34%, transparent 66%),
+    linear-gradient(to right, rgba(8, 6, 4, 0.35), transparent 55%);
+  pointer-events: none;
+}
+.featureText {
   position: absolute;
   left: 0;
   right: 0;
   bottom: 0;
-  height: 46%;
-  z-index: 1;
-  background: linear-gradient(to top, rgba(8, 6, 4, 0.62), transparent);
-  opacity: 0.7;
-  transition: opacity 0.25s ease;
-  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 22px 26px 24px;
 }
-
-.tile:hover .tileScrim,
-.tile:focus-visible .tileScrim {
-  opacity: 1;
-}
-
-/* a soft light sweep that glides across the cover on hover/focus */
-.tileSheen {
-  position: absolute;
-  inset: 0;
-  z-index: 2;
-  pointer-events: none;
-  background: linear-gradient(105deg, transparent 38%, rgba(255, 240, 214, 0.16) 50%, transparent 62%);
-  background-size: 220% 100%;
-  background-position: 150% 0;
-  opacity: 0;
-}
-
-.tile:hover .tileSheen,
-.tile:focus-visible .tileSheen {
-  opacity: 1;
-  animation: tileSheen 0.9s ease;
-}
-
-@keyframes tileSheen {
-  from { background-position: 150% 0; }
-  to { background-position: -50% 0; }
-}
-
-/* runtime pill, bottom-right of the cover */
-.tileDuration {
-  position: absolute;
-  right: 6px;
-  bottom: 6px;
-  z-index: 3;
-  padding: 1px 6px;
-  border-radius: 6px;
-  background: rgba(8, 6, 4, 0.82);
-  backdrop-filter: blur(3px);
+.featureKicker {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  min-width: 0;
   font-family: var(--font-mono);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
+  font-size: 11.5px;
+  color: rgba(237, 229, 211, 0.72);
+}
+.featureKicker > * + *::before {
+  content: '·';
+  margin: 0 7px;
+  opacity: 0.7;
+}
+.featureNew {
+  padding: 1px 7px;
+  border-radius: var(--r-pill);
+  background: var(--signal);
+  color: #1c140d;
+  font-size: 9.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.featureKicker > .featureNew + *::before {
+  content: '';
+  margin: 0 4px;
+}
+.featureChannel {
   color: #f3e7cf;
 }
-
-/* Watch-progress bar pinned to the bottom of the thumbnail. Full + green once
-   the video has been finished. */
-.tileProgress {
+.featureTitle {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  max-width: 30ch;
+  font-size: clamp(21px, 2.3vw, 31px);
+  font-variation-settings: 'opsz' 110;
+  line-height: 1.12;
+  color: #f6eedf;
+  text-shadow: 0 2px 18px rgba(0, 0, 0, 0.5);
+}
+.featureDesc {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  max-width: 62ch;
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: rgba(237, 229, 211, 0.68);
+}
+.featureActs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  cursor: default;
+}
+.playBtn,
+.playAll {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 18px;
+  border-radius: var(--r-pill);
+  background: #f3e7cf;
+  color: #1c140d;
+  font-size: 14px;
+  font-weight: 650;
+  transition: background 0.15s ease, transform 0.15s var(--hand);
+}
+.playBtn:hover,
+.playAll:hover {
+  background: #fff8ea;
+  transform: translateY(-1px);
+}
+.featureActs .featureAct {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  opacity: 1;
+}
+.featureProgress {
   position: absolute;
   left: 0;
   right: 0;
   bottom: 0;
   height: 4px;
-  background: rgba(8, 6, 4, 0.55);
-  z-index: 2;
+  background: rgba(8, 6, 4, 0.6);
 }
-
-.tileProgressFill {
+.featureProgress span {
+  display: block;
   height: 100%;
   background: var(--c-youtube);
-  box-shadow: 0 0 8px rgba(255, 66, 66, 0.6);
-  transition: width 0.3s ease;
 }
 
-.tileProgressDone {
-  background: #3fb950;
-  box-shadow: 0 0 8px rgba(63, 185, 80, 0.6);
+.guide {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  padding: 12px 10px 12px;
+  border-radius: var(--r-media);
+  border: 1px solid var(--rule);
+  background:
+    linear-gradient(to bottom, color-mix(in srgb, var(--c-youtube) 7%, transparent), transparent 140px),
+    var(--surface);
+  animation: roomIn 0.5s ease 0.12s both;
 }
-
-/* LIVE / scheduled pill, top-left of a thumbnail. */
-.statusBadge {
-  position: absolute;
-  top: 6px;
-  left: 6px;
-  z-index: 3;
-  display: inline-flex;
+.guide {
+  --row-thumb: 112px;
+}
+.guideBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.guideHead {
+  display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 2px 7px;
-  border-radius: 999px;
-  font-family: var(--font-mono);
-  font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: 0.03em;
-  color: #fff;
-  backdrop-filter: blur(4px);
+  gap: 8px;
+  margin: 0 6px 5px;
+  font-size: 16px;
+  font-weight: 560;
 }
-
-.liveBadge {
-  background: rgba(255, 40, 40, 0.92);
-  box-shadow: 0 0 14px rgba(255, 40, 40, 0.55);
+.guideLive {
+  color: #e0584a;
 }
-
-.liveBadge svg {
-  animation: livePulse 1.6s ease-in-out infinite;
-}
-
-@keyframes livePulse {
-  0%, 100% { opacity: 0.45; }
-  50% { opacity: 1; }
-}
-
-.upcomingBadge {
-  background: rgba(8, 6, 4, 0.72);
-  color: var(--c-youtube);
-  border: 1px solid color-mix(in srgb, var(--c-youtube) 50%, transparent);
-}
-
-.tilePlay {
-  position: absolute;
-  inset: 0;
-  z-index: 2;
-  display: grid;
-  place-items: center;
-  color: #fff;
-  background: rgba(8, 6, 4, 0.32);
-  opacity: 0;
-  transition: opacity 0.2s ease;
-}
-
-.tile:hover .tilePlay,
-.tile:focus-visible .tilePlay {
-  opacity: 1;
-}
-
-.tilePlay span {
-  display: grid;
-  place-items: center;
-  width: 46px;
-  height: 46px;
+.liveDot {
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
-  background: rgba(255, 66, 66, 0.92);
-  box-shadow: 0 0 26px rgba(255, 66, 66, 0.5);
-  transform: scale(0.72);
-  transition: transform 0.26s cubic-bezier(0.2, 0.8, 0.3, 1.25);
+  background: #e0443a;
+  box-shadow: 0 0 10px #e0443a;
+  animation: blink 1.6s ease-in-out infinite;
 }
-
-.tile:hover .tilePlay span,
-.tile:focus-visible .tilePlay span {
-  transform: scale(1);
+@keyframes blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
 }
-
-.tileTitle {
-  font-family: var(--font-body);
-  font-size: 13.5px;
-  font-weight: 600;
-  line-height: 1.35;
+.guideNew {
+  margin-left: auto;
+  padding: 0 7px;
+  border-radius: var(--r-pill);
+  font-style: normal;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 17px;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--signal) 85%, var(--paper));
+}
+.soon {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 11px;
+  border-radius: 11px;
+  border: 1px dashed var(--rule-strong);
+  font-size: 12.5px;
+  color: var(--paper-dim);
+}
+.soon svg {
+  flex: none;
+  color: var(--c-youtube);
+}
+.soon span {
+  flex: 1;
+  min-width: 0;
+}
+.soon b {
   color: var(--paper);
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  transition: color 0.15s ease;
+  font-weight: 600;
 }
-
-.tile:hover .tileTitle {
-  color: color-mix(in srgb, var(--paper) 78%, white);
-}
-
-.tile:focus-visible .tileTitle {
-  color: var(--signal);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .tile:hover,
-  .tile:focus-visible {
-    transform: none;
-  }
-  .tile:hover .tileThumb,
-  .tile:focus-visible .tileThumb {
-    transform: none;
-  }
-  .tileSheen {
-    display: none;
-  }
-  .tilePlay span {
-    transition: none;
-    transform: scale(1);
-  }
-  .tile:focus-visible .tileThumbWrap {
-    animation: none;
-  }
-}
-
-.tileMeta {
+.soon em {
+  font-style: normal;
   font-family: var(--font-mono);
   font-size: 11px;
   color: var(--paper-faint);
-  margin-top: 3px;
 }
-
-/* clickable channel name inside a tile's meta line */
-.metaLink {
-  color: inherit;
-  text-decoration: none;
-  transition: color 0.15s ease;
+.soon .soonBadge {
+  position: static;
+  display: inline-flex;
+  margin-left: 4px;
+  vertical-align: 1px;
 }
-
-.metaLink:hover {
-  color: var(--c-youtube);
-  text-decoration: underline;
-  text-underline-offset: 2px;
+.soon:hover {
+  border-color: var(--c-youtube);
 }
-
-/* grid (search results, channel page) */
-.grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-  gap: var(--space-5) var(--space-4);
-}
-
-.grid .tile {
-  width: auto;
-}
-
-/* channel page header */
-.channelHead {
+.guideMore {
   display: flex;
   align-items: center;
-  gap: var(--space-4);
-  margin-bottom: var(--space-6);
-  animation: fadeUp 0.4s ease both;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: auto;
+  padding: 4px 6px 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--paper-faint);
+}
+.guideMore:hover {
+  color: var(--c-youtube);
 }
 
-.channelAvatar {
-  width: 72px;
-  height: 72px;
+/* ── your channels ────────────────────────────────────────────────────────── */
+
+.groupLabel {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin: var(--space-2) 0 var(--space-5);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--rule);
+}
+.groupLabel span {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--paper-dim);
+}
+.groupLabel em {
+  font-size: 12.5px;
+  color: var(--paper-faint);
+}
+.shelfFace {
+  flex: none;
+  display: grid;
+}
+.shelfFaceImg,
+.shelfFaceLetter {
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
   object-fit: cover;
-  border: 2px solid var(--c-youtube);
-  box-shadow: 0 0 28px rgba(255, 66, 66, 0.3);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--c-youtube) 45%, transparent);
 }
-
-.channelLetter {
-  width: 72px;
-  height: 72px;
-  border-radius: 50%;
+.shelfFaceLetter {
   display: grid;
   place-items: center;
   font-family: var(--font-display);
-  font-size: 30px;
+  font-size: 15px;
+  color: var(--ink);
+  background: var(--c-youtube);
+}
+.shelfName {
+  color: inherit;
+}
+.shelfName:hover {
   color: var(--c-youtube);
-  background: color-mix(in srgb, var(--c-youtube) 14%, transparent);
-  border: 2px solid var(--c-youtube);
+}
+.shelfNew {
+  padding: 1px 8px;
+  border-radius: var(--r-pill);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--signal) 85%, var(--paper));
 }
 
-.channelName {
-  font-size: clamp(24px, 3.5vw, 34px);
+.quiet {
+  margin-bottom: var(--space-7);
 }
-
-.channelActions {
-  margin-left: auto;
+.quietHead {
+  margin: 0 0 12px;
+  font-size: 17px;
+  font-weight: 560;
+  color: var(--paper-dim);
+}
+.quietHead span {
+  margin-left: 8px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--paper-faint);
+}
+.quietRow {
   display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.quietChip {
+  display: inline-flex;
   align-items: center;
-  gap: var(--space-3);
+  gap: 8px;
+  padding: 5px 13px 5px 5px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--rule);
+  background: var(--surface);
+  font-size: 13px;
+  color: var(--paper-dim);
+  transition: border-color 0.15s ease, color 0.15s ease;
 }
-
-/* watch history tiles */
-.histTile {
-  position: relative;
+.quietChip em {
+  font-style: normal;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--paper-faint);
 }
-
-.histRemove {
-  position: absolute;
-  top: 6px;
-  right: 6px;
-  z-index: 2;
+.quietChip:hover,
+.quietChip:focus-visible {
+  outline: none;
+  color: var(--paper);
+  border-color: var(--rule-strong);
+}
+.quietChip:focus-visible {
+  box-shadow: 0 0 0 2px var(--signal);
+}
+.quietFace,
+.quietLetter {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.quietLetter {
   display: grid;
   place-items: center;
-  width: 28px;
-  height: 28px;
-  border: none;
-  border-radius: 7px;
-  color: #fff;
-  background: rgba(0, 0, 0, 0.7);
-  cursor: pointer;
-  opacity: 0;
-  transition: opacity 0.15s ease, background 0.15s ease;
-}
-
-.histTile:hover .histRemove {
-  opacity: 1;
-}
-
-.histRemove:hover {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ink);
   background: var(--c-youtube);
 }
 
-/* channel page: view/sort tabs */
-.channelTabs {
+/* ── latest ───────────────────────────────────────────────────────────────── */
+
+.filters {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: var(--space-5);
+}
+.filterRow {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scrollbar-width: thin;
+}
+.fchip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  flex: none;
+  padding: 5px 12px 5px 6px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--rule);
+  background: var(--surface);
+  font-size: 13px;
+  color: var(--paper-dim);
+  white-space: nowrap;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+.fchip:first-child {
+  padding-left: 12px;
+}
+.fchip:hover {
+  color: var(--paper);
+  border-color: var(--rule-strong);
+}
+.fchip em {
+  font-style: normal;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--paper-faint);
+}
+.fchip b {
+  min-width: 17px;
+  padding: 0 5px;
+  border-radius: var(--r-pill);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 16px;
+  text-align: center;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--signal) 85%, var(--paper));
+}
+.fchipOn,
+.fchipOn:hover {
+  color: var(--paper);
+  border-color: color-mix(in srgb, var(--c-youtube) 60%, transparent);
+  background: color-mix(in srgb, var(--c-youtube) 16%, transparent);
+}
+.fface,
+.fletter {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.fletter {
+  display: grid;
+  place-items: center;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--ink);
+  background: var(--c-youtube);
+}
+.filterKnobs {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-3);
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: var(--space-4);
+  gap: 6px;
+}
+.toggle {
+  padding: 6px 12px;
+  font-size: 12.5px;
+}
+.toggleOn,
+.toggleOn:hover {
+  color: var(--signal);
+  border-color: color-mix(in srgb, var(--signal) 55%, transparent);
 }
 
-.loadMoreWrap {
+.day {
+  margin-bottom: var(--space-6);
+}
+.dayHead {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 0 0 14px;
+}
+.dayHead span {
+  font-size: 20px;
+  font-weight: 560;
+}
+.dayHead em {
+  font-style: normal;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--paper-faint);
+}
+
+.resultsHead {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 16px;
+  font-size: 15px;
+  color: var(--paper-dim);
+}
+.resultsHead b {
+  color: var(--paper);
+  font-weight: 600;
+}
+.resultsHead em {
+  font-style: normal;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--paper-faint);
+}
+.moreWrap {
   display: flex;
   justify-content: center;
   margin: var(--space-6) 0 var(--space-2);
 }
 
-/* "Load more" end-cap tile — lives at the end of the shelf's scroller, after the
-   videos. In the two-row Projection grid it spans BOTH rows as one full-height
-   column (grid-row 1/-1) so: it never lands mid-row, it's reachable by 'l' from
-   either row via keyboard nav, and being a full-height column keeps the grid's
-   scroll geometry intact so horizontal wheel-scroll still works. */
-.loadMoreTile {
+/* ── a channel / a playlist ───────────────────────────────────────────────── */
+
+.chHead,
+.plHead {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  margin-bottom: var(--space-4);
+  padding: 20px 22px;
+  border-radius: var(--r-media);
+  border: 1px solid var(--rule);
+  background:
+    radial-gradient(120% 160% at 0% 0%, color-mix(in srgb, var(--c-youtube) 15%, transparent), transparent 58%),
+    var(--surface);
+}
+.chAvatar,
+.chLetter {
   flex: none;
-  align-self: stretch;
-  scroll-snap-align: start;
-  min-width: 148px;
-  padding: 0 var(--space-4);
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid color-mix(in srgb, var(--c-youtube) 70%, transparent);
+  box-shadow: 0 0 30px color-mix(in srgb, var(--c-youtube) 30%, transparent);
+}
+.chLetter {
+  display: grid;
+  place-items: center;
+  font-family: var(--font-display);
+  font-size: 34px;
+  color: var(--c-youtube);
+  background: color-mix(in srgb, var(--c-youtube) 14%, transparent);
+}
+.chText {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  cursor: pointer;
-  color: var(--paper-faint);
+  gap: 5px;
+  flex: 1;
+  min-width: 0;
+}
+.kicker {
   font-family: var(--font-mono);
-  font-size: 12px;
-  letter-spacing: 0.06em;
+  font-size: 10.5px;
+  letter-spacing: 0.2em;
   text-transform: uppercase;
-  background: color-mix(in oklab, var(--surface) 55%, transparent);
-  border: 1px dashed var(--rule);
-  border-radius: var(--r-card, 12px);
-  transition: color 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+  color: var(--c-youtube);
 }
-
-.shelfTall .loadMoreTile {
-  grid-row: 1 / -1;
-  justify-self: center;
+.chName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: clamp(25px, 3.2vw, 36px);
+  font-weight: 580;
+  line-height: 1.08;
 }
-
-.loadMoreTile:hover:not(:disabled) {
-  color: var(--ink-strong, var(--paper));
-  border-color: var(--shelf-c, var(--signal));
-  transform: translateY(-2px);
-}
-
-/* Keyboard focus (base.css suppresses the default outline for kbd tiles, so the
-   end-cap needs to draw its own — a solid accent border + ring). */
-.loadMoreTile:focus,
-.loadMoreTile:focus-visible {
-  outline: none;
-  color: var(--ink-strong, var(--paper));
-  border-style: solid;
-  border-color: var(--shelf-c, var(--signal));
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--shelf-c, var(--signal)) 55%, transparent);
-}
-
-.loadMoreTile:disabled {
-  cursor: default;
-  opacity: 0.6;
-}
-
-.plMeta {
-  display: block;
-  margin-top: 4px;
+.chMeta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: 11.5px;
   color: var(--paper-faint);
 }
+.chMeta > * + *::before {
+  content: '·';
+  margin: 0 8px;
+  color: var(--paper-faint);
+}
+.chMeta a {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--paper-dim);
+}
+.chMeta a:hover {
+  color: var(--c-youtube);
+}
+.chFresh {
+  color: var(--signal);
+}
+.chActs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+.chBar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  margin-bottom: var(--space-5);
+}
+.chBar .search {
+  margin-left: auto;
+}
+.tabs {
+  display: flex;
+  gap: 2px;
+}
+.tab,
+.tabOn {
+  padding: 8px 14px 9px;
+  font-size: 14.5px;
+  color: var(--paper-dim);
+  transition: color 0.15s ease, box-shadow 0.15s ease;
+}
+.tab:hover {
+  color: var(--paper);
+}
+.tabOn {
+  color: var(--paper);
+  font-weight: 620;
+  box-shadow: inset 0 -2px 0 var(--c-youtube);
+}
 
-/* playlist cards */
+.plGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: var(--space-5) var(--space-4);
+}
 .plCard {
   display: block;
-  cursor: pointer;
+  min-width: 0;
 }
-
+.plCard:focus-visible {
+  outline: none;
+}
 .plThumbWrap {
   position: relative;
   aspect-ratio: 16 / 9;
+  margin-bottom: 9px;
   border-radius: var(--r-card);
-  overflow: hidden;
-  margin-bottom: var(--space-2);
   border: 1px solid var(--rule);
-  /* stacked-paper edge to read as a "playlist" */
+  /* a stacked-paper edge, so it reads as a pile of films */
   box-shadow:
-    4px -4px 0 -1px var(--surface),
+    4px -4px 0 -1px var(--ink-2),
     4px -4px 0 0 var(--rule),
-    8px -8px 0 -1px var(--surface),
+    8px -8px 0 -1px var(--ink-2),
     8px -8px 0 0 var(--rule);
   transition: transform 0.18s ease, box-shadow 0.18s ease;
 }
-
-.plCard:hover .plThumbWrap {
+.plCard:hover .plThumbWrap,
+.plCard:focus-visible .plThumbWrap {
   transform: translateY(-3px);
   box-shadow:
-    4px -4px 0 -1px var(--surface),
+    4px -4px 0 -1px var(--ink-2),
     4px -4px 0 0 var(--c-youtube),
-    8px -8px 0 -1px var(--surface),
+    8px -8px 0 -1px var(--ink-2),
     8px -8px 0 0 var(--rule),
     0 12px 28px rgba(0, 0, 0, 0.35);
 }
-
+.plCard:focus-visible .plThumbWrap {
+  border-color: var(--signal);
+}
 .plThumb {
+  display: block;
   width: 100%;
   height: 100%;
   object-fit: cover;
-  display: block;
+  border-radius: calc(var(--r-card) - 1px);
 }
-
 .plThumbFallback {
-  width: 100%;
-  height: 100%;
   display: grid;
   place-items: center;
+  width: 100%;
+  height: 100%;
   color: var(--c-youtube);
   background: color-mix(in srgb, var(--c-youtube) 12%, transparent);
 }
-
 .plCount {
   position: absolute;
   right: 8px;
@@ -670,84 +912,183 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 4px 8px;
+  padding: 3px 8px;
   border-radius: 6px;
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: 11.5px;
   color: #fff;
   background: rgba(0, 0, 0, 0.78);
 }
-
-/* projection (discover) shelf gets a marquee treatment.
-   --shelf-c (set per-shelf in JSX) gives each marquee its own warm accent,
-   tinting both the left rule and the title; falls back to youtube red. */
-.projection {
-  border: 1px solid var(--rule);
-  border-left: 3px solid var(--shelf-c, var(--c-youtube));
-  padding: var(--space-4) var(--space-4) 0;
-  background: linear-gradient(
-    to right,
-    color-mix(in srgb, var(--shelf-c, var(--c-youtube)) 11%, var(--surface)),
-    var(--surface) 260px
-  );
-  border-radius: var(--r-card);
+.plTitle {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.35;
 }
 
-/* tint the marquee heading toward its shelf accent so each shelf reads as its
-   own colour — kept desaturated against paper so it stays comfy, not loud */
-.projection .shelfTitle {
-  color: color-mix(in srgb, var(--shelf-c, var(--c-youtube)) 70%, var(--paper));
+.plHead {
+  gap: 18px;
 }
-
-/* "Picked for you" gets two tiles' worth of height: tiles fill two rows, then
-   flow into new columns (still horizontally scrollable). As the marquee
-   feature shelf its tiles run a touch larger than the standard 270px. */
-.shelfTall .shelfRow {
+.back {
   display: grid;
-  grid-auto-flow: column;
-  grid-template-rows: repeat(2, auto);
-  grid-auto-columns: 336px;
-  align-items: start;
-  gap: var(--space-5);
+  place-items: center;
+  flex: none;
+  width: 34px;
+  height: 34px;
+  align-self: flex-start;
+  border-radius: 50%;
+  border: 1px solid var(--rule);
+  color: var(--paper-dim);
 }
-
-.shelfTall .tile {
-  width: 336px;
+.back:hover {
+  color: var(--paper);
+  border-color: var(--rule-strong);
 }
-
-/* slightly larger title on the feature shelf so its meta reads comfortably */
-.shelfTall .tileTitle {
-  font-size: 15px;
-}
-
-/* The Projection is the marquee feature shelf — give it more breathing room, a
-   wider accent rule, a soft radial wash and an inner highlight so it feels like
-   a warm, lit display rather than just another row. */
-.shelfTall.projection {
-  border-left-width: 4px;
-  padding: var(--space-5) var(--space-5) var(--space-3);
-  margin-bottom: var(--space-8);
-  background:
-    radial-gradient(
-      130% 100% at 0% 0%,
-      color-mix(in srgb, var(--shelf-c, var(--c-youtube)) 15%, transparent),
-      transparent 58%
-    ),
-    linear-gradient(
-      to right,
-      color-mix(in srgb, var(--shelf-c, var(--c-youtube)) 12%, var(--surface)),
-      var(--surface) 320px
-    );
+.plCover {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 196px;
+  aspect-ratio: 16 / 9;
+  border-radius: 12px;
+  overflow: hidden;
+  color: var(--c-youtube);
+  background: #000;
   box-shadow:
-    inset 0 1px 0 color-mix(in srgb, var(--shelf-c, var(--c-youtube)) 24%, transparent),
-    0 20px 48px rgba(10, 6, 2, 0.34);
+    5px -5px 0 -1px var(--ink-2),
+    5px -5px 0 0 var(--rule-strong),
+    0 14px 30px rgba(10, 6, 2, 0.45);
+}
+.plCover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
-.shelfTall.projection .shelfHead {
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: 1000px;
+}
+
+/* ── the logbook ──────────────────────────────────────────────────────────── */
+
+.logHead {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 12px;
   margin-bottom: var(--space-5);
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--rule);
+}
+.logIcon {
+  color: var(--c-youtube);
+}
+.logTitle {
+  font-size: 30px;
+  font-weight: 580;
+  line-height: 1;
+}
+.logCount {
+  font-style: normal;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--paper-faint);
+}
+.logKnobs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+.danger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 13px;
+  border-radius: var(--r-pill);
+  border: 1px solid color-mix(in srgb, var(--danger) 45%, transparent);
+  font-size: 13px;
+  color: var(--danger);
+}
+.danger:hover {
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+}
+.logDay {
+  margin-bottom: var(--space-6);
+}
+.rowRemove {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  color: var(--paper-faint);
+  opacity: 0;
+  transition: opacity 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+*:hover > .rowRemove,
+*:focus-within > .rowRemove {
+  opacity: 1;
+}
+.rowRemove:hover {
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
 }
 
-.shelfTall.projection .shelfTitle {
-  font-size: 23px;
-  letter-spacing: -0.01em;
+/* ── narrower screens ─────────────────────────────────────────────────────── */
+
+@media (max-width: 1180px) {
+  .band {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .feature {
+    max-height: 520px;
+  }
+}
+@media (max-width: 640px) {
+  .searchBig {
+    flex-basis: 100%;
+    max-width: none;
+  }
+  .knobs {
+    margin-left: 0;
+  }
+  .knob span {
+    display: none;
+  }
+  .featureText {
+    padding: 14px 16px 16px;
+  }
+  .featureDesc {
+    display: none;
+  }
+  .chHead,
+  .plHead {
+    flex-wrap: wrap;
+    padding: 16px;
+    gap: 14px;
+  }
+  .chAvatar,
+  .chLetter {
+    width: 60px;
+    height: 60px;
+  }
+  .chActs {
+    width: 100%;
+  }
+  .plCover {
+    width: 130px;
+  }
+  .chBar .search,
+  .logKnobs {
+    margin-left: 0;
+    flex-basis: 100%;
+  }
 }

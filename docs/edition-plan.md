@@ -374,7 +374,7 @@ Verify under all three before calling it done.
 
 **Bottom colophon:**
 - Centered mono, `--paper-faint`, boxed by hairline rules above and below:
-  `— Set in Fraunces & Schibsted Grotesk · composed by llama3.1:8b · nothing
+  `— Set in Fraunces & Schibsted Grotesk · composed by qwen3.5:9b · nothing
   left this machine —`
   Flanked by `← YESTERDAY'S PAPER` / `TOMORROW →` (disabled styling with
   `cursor: default` + 40% opacity when at either end), navigating

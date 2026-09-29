@@ -22,8 +22,8 @@ def health():
 @feeds_bp.get("/feed/hackernews")
 def feed_hackernews():
     list_name = request.args.get("list", "top")
-    if list_name not in ("top", "best", "new"):
-        return err("list must be top, best, or new")
+    if list_name not in hackernews.LISTS:
+        return err("list must be one of " + ", ".join(hackernews.LISTS))
     try:
         page = max(0, int(request.args.get("page", 0)))
     except ValueError:
@@ -40,7 +40,7 @@ def hackernews_search():
     if not q:
         return err("q required")
     try:
-        return ok(hackernews.search(q))
+        return ok(hackernews.search(q, request.args.get("sort") or "relevance", request.args.get("range")))
     except Exception as e:
         return err(f"Search failed: {e}", 502)
 
@@ -253,7 +253,7 @@ def youtube_stream_data(video_id):
         if upstream.status_code < 400 or attempt == 1:
             break
         upstream.close()
-        cache.invalidate(f"yt:info:{video_id}")
+        cache.invalidate(youtube.info_key(video_id))
         cache.invalidate(f"yt:inv:streams:{video_id}")
 
     return _relay(upstream, default_ct="video/mp4")
@@ -392,7 +392,7 @@ def youtube_hls_playlist(video_id, itag):
         except Exception as e:
             last_err = str(e)
         if attempt == 0:
-            cache.invalidate(f"yt:info:{video_id}")
+            cache.invalidate(youtube.info_key(video_id))
             cache.invalidate(f"yt:inv:streams:{video_id}")
     return err(f"HLS playlist fetch failed: {last_err or 'bad manifest'}", 502)
 
@@ -439,8 +439,12 @@ def youtube_video_info(video_id):
 
 @feeds_bp.get("/youtube/comments/<video_id>")
 def youtube_comments(video_id):
+    sort = (request.args.get("sort") or "top").strip()
+    if sort not in ("top", "new"):
+        return err("sort must be top or new")
+    continuation = (request.args.get("continuation") or "").strip() or None
     try:
-        return ok(youtube.video_comments(video_id))
+        return ok(youtube.video_comments(video_id, sort, continuation))
     except Exception as e:
         return err(f"Comments fetch failed: {e}", 502)
 

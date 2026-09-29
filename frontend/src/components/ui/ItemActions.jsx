@@ -1,6 +1,6 @@
-import { Bookmark, BookmarkCheck, Check } from 'lucide-react';
+import { Bookmark, BookmarkCheck, Check, ListChecks, ListPlus } from 'lucide-react';
 
-import { COMPLETE_RATIO, useProgress, useSaved } from '../../state.jsx';
+import { COMPLETE_RATIO, usePlayer, useProgress, useSaved } from '../../state.jsx';
 import s from './itemActions.module.css';
 
 // Save / un-save any item (video, post, story) for later.
@@ -38,6 +38,26 @@ export function WatchedButton({ item, className }) {
       }}
     >
       <Check size={15} />
+    </button>
+  );
+}
+
+// Put a video on the player's up-next queue (or take it off again). A finished
+// video rolls straight into the next one queued.
+export function QueueButton({ item, className }) {
+  const { queue, enqueue, dequeue } = usePlayer();
+  const on = queue.some((x) => x.id === item.id);
+  return (
+    <button
+      className={`${s.action} ${on ? s.actionOn : ''} ${className || ''}`}
+      title={on ? 'Take off Up next' : 'Play next — add to Up next'}
+      aria-label={on ? 'Remove from Up next' : 'Add to Up next'}
+      onClick={(e) => {
+        e.stopPropagation();
+        if (on) dequeue(item.id); else enqueue(item);
+      }}
+    >
+      {on ? <ListChecks size={15} /> : <ListPlus size={15} />}
     </button>
   );
 }

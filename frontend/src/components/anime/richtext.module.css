@@ -1,0 +1,210 @@
+/* Rendered AniList HTML (thread bodies, comments, activity, bios, previews),
+   sanitised by RichText.jsx; spoilers click to reveal; AniList title links grow
+   into little cover cards. */
+
+.rich {
+  word-break: break-word;
+}
+.rich > :first-child { margin-top: 0; }
+.rich > :last-child { margin-bottom: 0; }
+.rich p {
+  margin: 0 0 0.7em;
+}
+.rich strong,
+.rich b {
+  font-weight: 680;
+  color: var(--text-primary);
+}
+.rich em,
+.rich i {
+  font-style: italic;
+}
+.rich del,
+.rich s {
+  opacity: 0.65;
+}
+.rich a {
+  color: var(--c-anime);
+  text-decoration: none;
+  border-bottom: 1px solid color-mix(in srgb, var(--c-anime) 40%, transparent);
+}
+.rich a:hover {
+  border-bottom-color: var(--c-anime);
+}
+.rich h1,
+.rich h2,
+.rich h3,
+.rich h4 {
+  font-family: var(--font-display);
+  line-height: 1.25;
+  margin: 1em 0 0.4em;
+  color: var(--text-primary);
+}
+.rich h1 { font-size: 1.45em; }
+.rich h2 { font-size: 1.28em; }
+.rich h3 { font-size: 1.13em; }
+.rich h4 { font-size: 1em; }
+.rich ul,
+.rich ol {
+  margin: 0 0 0.7em;
+  padding-left: 1.4em;
+}
+.rich li {
+  margin: 0.2em 0;
+}
+.rich blockquote {
+  margin: 0.6em 0;
+  padding: 4px 0 4px 14px;
+  border-left: 3px solid color-mix(in srgb, var(--c-anime) 55%, var(--rule));
+  color: var(--paper-dim);
+}
+.rich code {
+  font-family: var(--font-mono);
+  font-size: 0.86em;
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: var(--surface-input);
+  border: 1px solid var(--rule);
+}
+.rich pre {
+  margin: 0.6em 0;
+  padding: var(--space-3);
+  overflow-x: auto;
+  border-radius: var(--r-card);
+  background: var(--ink-3);
+  border: 1px solid var(--rule);
+}
+.rich pre code {
+  padding: 0;
+  border: none;
+  background: none;
+}
+.rich hr {
+  border: none;
+  border-top: 1px solid var(--rule);
+  margin: 0.9em 0;
+}
+.rich center {
+  display: block;
+  text-align: center;
+}
+.rich img {
+  max-width: 100%;
+  max-height: 380px;
+  height: auto;
+  border-radius: var(--r-card);
+  margin: var(--space-2) 0;
+  border: 1px solid var(--rule);
+}
+
+/* click-to-reveal spoiler (AniList wraps spoilers in span.markdown_spoiler) */
+.rich :global(.markdown_spoiler) {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+  border-radius: 6px;
+  padding: 1px 8px;
+  background: var(--ink-3);
+  border: 1px solid var(--rule-strong);
+  color: transparent;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.18s ease;
+}
+.rich :global(.markdown_spoiler) * {
+  visibility: hidden;
+}
+.rich :global(.markdown_spoiler)::after {
+  content: 'spoiler';
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--paper-faint);
+}
+.rich :global(.markdown_spoiler:hover)::after {
+  color: var(--danger);
+}
+.rich :global(.markdown_spoiler.revealed) {
+  display: inline;
+  background: color-mix(in srgb, var(--danger) 14%, transparent);
+  border-color: transparent;
+  color: inherit;
+  cursor: auto;
+  user-select: auto;
+}
+.rich :global(.markdown_spoiler.revealed) * {
+  visibility: visible;
+}
+.rich :global(.markdown_spoiler.revealed)::after {
+  content: none;
+}
+
+
+/* ── inline AniList link preview cards ───────────────────────────────────────── */
+.linkCards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+.linkCard {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: min(280px, 100%);
+  padding: 7px 12px 7px 7px;
+  border-radius: var(--r-card);
+  border: 1px solid var(--rule);
+  background: var(--surface);
+  color: inherit;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.linkCard:hover {
+  border-color: var(--c-anime);
+  background: var(--surface-hover);
+}
+.linkCard img,
+.lcFallback {
+  flex: none;
+  width: 38px;
+  height: 52px;
+  border-radius: 6px;
+  object-fit: cover;
+  background: var(--surface-input);
+}
+.lcFallback {
+  display: grid;
+  place-items: center;
+  color: var(--paper-faint);
+}
+.lcMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.lcKicker {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--c-anime);
+}
+.lcTitle {
+  font-family: var(--font-display);
+  font-size: 13.5px;
+  font-weight: 560;
+  line-height: 1.25;
+  color: var(--text-primary);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ── activity feed ─────────────────────────────────────────────────────────── */

@@ -79,7 +79,7 @@ def _process(doc):
         db.brain_mark_ready(item_id)
 
         # Best-effort summary so the digest + side panel have something to show.
-        llm_model = db.get_setting("brain_llm_model", "llama3.1:8b")
+        llm_model = db.get_setting("brain_llm_model", "qwen3.5:9b")
         if llm.available() and llm.has_model(llm_model):
             try:
                 summarize.summary(item_id, llm_model)

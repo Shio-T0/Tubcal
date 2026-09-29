@@ -1,0 +1,516 @@
+/* Charts for the Anime room. One accent (--c-anime) does all the data work; ink
+   tokens do all the text. Marks: bars ≤ 24px with a 4px rounded data end and a
+   square baseline, 2px lines, ≥ 8px dots ringed in the surface colour, hairline
+   solid axes. Tooltips are CSS-only and read from data-tip, so they appear on
+   keyboard focus exactly as on hover. */
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.empty {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--paper-faint);
+  padding: var(--space-2) 0;
+}
+
+/* ── the shared tooltip ──────────────────────────────────────────────────────
+   Scoped to this module's classes (plus .tipped, exported for other modules to
+   opt in): a bare [data-tip] selector isn't localised by CSS Modules and would
+   leak onto the whole app. */
+:is(.barRow, .colSlot, .dbRow, .tipped)[data-tip] {
+  position: relative;
+}
+:is(.barRow, .colSlot, .dbRow, .tipped)[data-tip]:hover::after,
+:is(.barRow, .colSlot, .dbRow, .tipped)[data-tip]:focus-visible::after {
+  content: attr(data-tip);
+  position: absolute;
+  z-index: 20;
+  left: 50%;
+  bottom: calc(100% + 6px);
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: 240px;
+  padding: 6px 9px;
+  border-radius: 8px;
+  background: var(--ink-2);
+  border: 1px solid var(--rule-strong);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.35);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: pre-line;
+  text-align: left;
+  pointer-events: none;
+}
+
+/* ── stat tiles ──────────────────────────────────────────────────────────── */
+.tile {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 14px;
+  border-radius: var(--r-card);
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  min-width: 0;
+}
+.tileAccent {
+  background: color-mix(in srgb, var(--c-anime) 9%, var(--surface));
+  border-color: color-mix(in srgb, var(--c-anime) 35%, var(--rule));
+}
+.tileLabel {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.tileValue {
+  font-family: var(--font-body);
+  font-size: 26px;
+  font-weight: 650;
+  line-height: 1.15;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+}
+.tileHint {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--paper-faint);
+}
+
+/* ── ranked bars ─────────────────────────────────────────────────────────── */
+.barList {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.barRow {
+  display: grid;
+  grid-template-columns: minmax(84px, 9.5rem) 1fr auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 26px;
+  padding: 1px 6px;
+  border-radius: 7px;
+  color: inherit;
+  outline: none;
+  transition: background 0.14s ease;
+}
+.barRow:hover,
+.barRow:focus-visible {
+  background: var(--surface-hover);
+}
+.barLabel {
+  font-size: 13px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+a.barRow:hover .barLabel {
+  color: var(--text-primary);
+}
+.barTrack {
+  display: block;
+  height: 10px;
+}
+.bar {
+  display: block;
+  height: 100%;
+  border-radius: 0 4px 4px 0;
+  background: var(--c-anime);
+  transform-origin: left;
+  animation: grow 0.6s var(--hand) calc(var(--i, 0) * 0.03s) both;
+}
+.barRow:hover .bar,
+.barRow:focus-visible .bar {
+  filter: brightness(1.12);
+}
+.barValue {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+  min-width: 2.5ch;
+  text-align: right;
+}
+.more {
+  align-self: flex-start;
+  margin-top: 4px;
+  padding: 2px 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--paper-dim);
+  border-bottom: 1px dotted var(--rule-strong);
+}
+.more:hover {
+  color: var(--c-anime);
+}
+
+@keyframes grow {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+@keyframes rise {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
+/* ── columns ─────────────────────────────────────────────────────────────── */
+.columns {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.colPlot {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: var(--plot-h);
+  padding-top: 18px; /* room for the peak's cap label */
+  border-bottom: 1px solid var(--rule-strong);
+}
+.colSlot {
+  position: relative;
+  flex: 1;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  outline: none;
+  border-radius: 4px 4px 0 0;
+}
+.colSlot:hover,
+.colSlot:focus-visible {
+  background: var(--surface);
+}
+.col {
+  display: block;
+  width: min(24px, 78%);
+  border-radius: 4px 4px 0 0;
+  background: var(--c-anime);
+  transform-origin: bottom;
+  animation: rise 0.55s var(--hand) calc(var(--i, 0) * 0.025s) both;
+}
+.colSlot:hover .col,
+.colSlot:focus-visible .col {
+  filter: brightness(1.12);
+}
+.colCap {
+  position: absolute;
+  left: 50%;
+  transform: translate(-50%, -4px);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+.colAxis {
+  display: flex;
+  gap: 2px;
+}
+.colTick {
+  flex: 1;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--paper-faint);
+  white-space: nowrap;
+  overflow: visible;
+}
+
+/* ── line ────────────────────────────────────────────────────────────────── */
+.line {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.lineTitle {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+.lineWrap {
+  position: relative;
+  padding-right: 0;
+}
+.lineSvg {
+  display: block;
+  width: 100%;
+  height: 110px;
+  overflow: visible;
+  outline: none;
+  cursor: crosshair;
+}
+.lineSvg:focus-visible {
+  outline: 1px solid var(--rule-strong);
+  outline-offset: 4px;
+  border-radius: 4px;
+}
+.axis {
+  stroke: var(--rule-strong);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+.area {
+  fill: var(--c-anime);
+  opacity: 0.1;
+}
+.stroke {
+  fill: none;
+  stroke: var(--c-anime);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.cross {
+  stroke: var(--rule-strong);
+  stroke-width: 1;
+}
+.dot {
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--c-anime);
+  box-shadow: 0 0 0 2px var(--ink);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+.endLabel {
+  position: absolute;
+  right: 0;
+  transform: translateY(-50%);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-primary);
+  pointer-events: none;
+}
+.lineTip {
+  position: absolute;
+  top: -8px;
+  transform: translate(-50%, -100%);
+  padding: 4px 8px;
+  border-radius: 7px;
+  background: var(--ink-2);
+  border: 1px solid var(--rule-strong);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  pointer-events: none;
+}
+.lineTip strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+.lineAxis {
+  display: flex;
+  justify-content: space-between;
+  padding-right: 44px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--paper-faint);
+}
+
+/* ── dumbbell ────────────────────────────────────────────────────────────── */
+.dumbbell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.legend {
+  display: flex;
+  gap: 14px;
+  margin-bottom: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.keyA,
+.keyB,
+.dbA,
+.dbB {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+.keyA,
+.dbA {
+  background: var(--c-anime);
+}
+.keyB,
+.dbB {
+  background: var(--ink);
+  border: 2px solid var(--paper-dim);
+}
+.dbRow {
+  display: grid;
+  grid-template-columns: minmax(120px, 15rem) 1fr auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 34px;
+  padding: 3px 6px;
+  border-radius: 8px;
+  color: inherit;
+  outline: none;
+}
+.dbRow:hover,
+.dbRow:focus-visible {
+  background: var(--surface-hover);
+}
+.dbLabel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.dbLabel img {
+  width: 22px;
+  height: 30px;
+  flex: none;
+  object-fit: cover;
+  border-radius: 4px;
+}
+.dbLabel span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dbTrack {
+  position: relative;
+  height: 12px;
+  border-radius: 6px;
+  background: linear-gradient(var(--rule), var(--rule)) center / 100% 1px no-repeat;
+}
+.dbGap {
+  position: absolute;
+  top: 50%;
+  height: 2px;
+  transform: translateY(-50%);
+  background: var(--paper-faint);
+}
+.dbA,
+.dbB {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 0 2px var(--ink);
+}
+.dbA {
+  z-index: 1;
+}
+.dbValue {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.dbValue strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+.dbValue em {
+  font-style: normal;
+  min-width: 4ch;
+  text-align: right;
+}
+.dbUp,
+.dbDown {
+  color: var(--text-secondary);
+}
+
+/* ── the table twin ──────────────────────────────────────────────────────── */
+.tableWrap {
+  margin-top: 8px;
+}
+.tableToggle {
+  cursor: pointer;
+  width: fit-content;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  color: var(--paper-faint);
+  list-style: none;
+}
+.tableToggle::-webkit-details-marker {
+  display: none;
+}
+.tableToggle:hover {
+  color: var(--paper-dim);
+}
+.table {
+  margin-top: 8px;
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+.table th,
+.table td {
+  text-align: left;
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--rule);
+  font-variant-numeric: tabular-nums;
+}
+.table th {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--paper-faint);
+}
+.table td {
+  color: var(--text-secondary);
+}
+
+@media (max-width: 640px) {
+  .dbRow {
+    grid-template-columns: 1fr auto;
+    grid-template-areas: 'label value' 'track track';
+    row-gap: 4px;
+  }
+  .dbLabel {
+    grid-area: label;
+  }
+  .dbTrack {
+    grid-area: track;
+  }
+  .dbValue {
+    grid-area: value;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bar,
+  .col {
+    animation: none;
+  }
+}

@@ -1,0 +1,351 @@
+/* The activity timeline: a rail down the left joining every face, days pinned to
+   it, posts as letters (cards), list updates as light slips with the poster. */
+
+.feed {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.muted {
+  margin: 0;
+  padding: var(--space-3) 0;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  color: var(--paper-faint);
+}
+.statusDesk {
+  margin-bottom: var(--space-2);
+}
+
+.kinds {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--rule);
+}
+.kind,
+.kindOn {
+  padding: 5px 12px;
+  border-radius: var(--r-pill);
+  font-size: 12.5px;
+  color: var(--paper-dim);
+  transition: color 0.15s ease, background 0.15s ease;
+}
+.kind:hover {
+  color: var(--paper);
+  background: var(--surface-hover);
+}
+.kindOn {
+  color: var(--paper);
+  font-weight: 620;
+  background: color-mix(in srgb, var(--c-anime) 14%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c-anime) 40%, transparent);
+}
+
+/* ── the rail ─────────────────────────────────────────────────────────────── */
+
+.timeline {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+.timeline::before {
+  content: '';
+  position: absolute;
+  left: 20px;
+  top: 8px;
+  bottom: 8px;
+  width: 2px;
+  transform: translateX(-1px);
+  background: linear-gradient(to bottom, var(--rule-strong), var(--rule) 85%, transparent);
+}
+.slot {
+  position: relative;
+}
+.single::before {
+  display: none;
+}
+.day {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin: var(--space-4) 0 var(--space-2);
+  padding-left: 40px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--paper-faint);
+}
+.day::before {
+  content: '';
+  position: absolute;
+  left: 15px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--ink);
+  box-shadow: inset 0 0 0 2px var(--c-anime);
+}
+.day span {
+  padding: 1px 8px;
+  border-radius: var(--r-pill);
+  background: var(--ink);
+}
+.slot:first-child .day {
+  margin-top: var(--space-2);
+}
+
+/* ── an entry ─────────────────────────────────────────────────────────────── */
+
+.entry {
+  position: relative;
+  display: flex;
+  gap: 12px;
+  padding: 7px 0;
+  min-width: 0;
+  animation: in 0.3s var(--hand) both;
+}
+.gutter {
+  position: relative;
+  z-index: 1;
+  flex: none;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  width: 40px;
+  padding-top: 2px;
+}
+.card {
+  flex: 1;
+  min-width: 0;
+}
+.letter .card {
+  padding: 10px 14px 6px;
+  border-radius: var(--r-card);
+  border: 1px solid var(--rule);
+  background: var(--surface);
+  transition: border-color 0.15s ease;
+}
+.letter .card:hover {
+  border-color: var(--rule-strong);
+}
+.slip .card {
+  padding: 2px 4px 0 2px;
+}
+.slip {
+  padding: 4px 0;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  min-height: 24px;
+}
+.name {
+  font-size: 13.5px;
+}
+.to {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--paper-faint);
+}
+.private {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 0 6px;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--paper-faint);
+  border: 1px solid var(--rule);
+}
+.author {
+  padding: 0 6px;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  line-height: 16px;
+  color: var(--c-anime);
+  border: 1px solid color-mix(in srgb, var(--c-anime) 50%, transparent);
+}
+.when {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--paper-faint);
+}
+.when:hover {
+  color: var(--paper);
+}
+.text {
+  margin-top: 3px;
+  font-size: 14.5px;
+}
+
+/* a list update: the verb, the title, the poster */
+.update {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-top: 2px;
+}
+.slip .updateLine {
+  padding-top: 5px;
+}
+.updateLine {
+  flex: 1;
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--paper-dim);
+}
+.verb {
+  color: var(--paper-faint);
+}
+.whenInline {
+  margin-left: 8px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--paper-faint);
+  white-space: nowrap;
+}
+.whenInline:hover {
+  color: var(--paper);
+}
+.slip .acts {
+  margin-top: 0;
+}
+.mediaLink {
+  color: var(--paper);
+  font-weight: 620;
+}
+.mediaLink:hover {
+  color: var(--c-anime);
+}
+.poster {
+  flex: none;
+  display: block;
+  width: 38px;
+  height: 54px;
+  overflow: hidden;
+  border-radius: 5px;
+  box-shadow: 0 0 0 1px var(--rule), 0 4px 10px -6px rgba(0, 0, 0, 0.6);
+  transform: rotate(1.5deg);
+  transition: transform 0.2s var(--hand);
+}
+.poster:hover {
+  transform: rotate(0) scale(1.06);
+}
+.poster img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.acts {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin: 4px 0 2px -6px;
+}
+.act {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 8px;
+  border-radius: var(--r-pill);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--paper-faint);
+  transition: color 0.12s ease, background 0.12s ease;
+}
+.act:hover {
+  color: var(--paper);
+  background: var(--surface-hover);
+}
+.actOn {
+  color: var(--c-anime);
+}
+.danger:hover {
+  color: var(--danger);
+}
+.ext {
+  margin-left: auto;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.entry:hover .ext,
+.ext:focus-visible {
+  opacity: 1;
+}
+
+/* ── replies, in place ────────────────────────────────────────────────────── */
+
+.replies {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 6px 0 8px;
+  padding: 10px 0 2px 12px;
+  border-left: 2px solid color-mix(in srgb, var(--c-anime) 35%, var(--rule));
+  animation: in 0.25s var(--hand) both;
+}
+.reply {
+  display: flex;
+  gap: 10px;
+  min-width: 0;
+}
+.replyMain {
+  flex: 1;
+  min-width: 0;
+}
+.replyDesk {
+  margin-top: 2px;
+}
+.fresh .card,
+.reply.fresh .replyMain {
+  animation: fresh 2.4s ease-out both;
+  border-radius: 8px;
+}
+
+@media (max-width: 640px) {
+  .timeline::before {
+    left: 16px;
+  }
+  .gutter {
+    width: 32px;
+  }
+  .day {
+    padding-left: 32px;
+  }
+  .day::before {
+    left: 11px;
+  }
+  .ext {
+    opacity: 1;
+  }
+}
+
+@keyframes in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes fresh {
+  /* only a start: it settles into whatever background the element already has */
+  from { background: color-mix(in srgb, var(--c-anime) 14%, transparent); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .entry, .replies, .fresh .card, .reply.fresh .replyMain { animation: none; }
+}

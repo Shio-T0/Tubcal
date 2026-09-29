@@ -471,19 +471,70 @@ def _ytdlp_info(video_id):
     # legitimately has none yet, so don't treat that as an error.
     if not streams and live_status != "is_upcoming":
         raise RuntimeError("no playable muxed stream")
+    return {**video_meta(data, video_id), "streams": streams, "audio": audio}
+
+
+def _published_at(data):
+    """Epoch seconds a video went up: yt-dlp's `timestamp` when it has one, else
+    midnight UTC of `upload_date` (YYYYMMDD), else None."""
+    ts = data.get("timestamp") or data.get("release_timestamp")
+    if isinstance(ts, (int, float)) and ts > 0:
+        return int(ts)
+    day = str(data.get("upload_date") or "")
+    if len(day) == 8 and day.isdigit():
+        return calendar.timegm((int(day[:4]), int(day[4:6]), int(day[6:]), 0, 0, 0))
+    return None
+
+
+def _heatmap(data):
+    """"Most replayed" as a plain list of 0–1 values, one per equal slice of the
+    video (yt-dlp's segments are evenly spaced). [] when YouTube has none."""
+    segs = data.get("heatmap") or []
+    vals = [s.get("value") for s in segs if isinstance(s, dict)]
+    if len(vals) < 10 or not all(isinstance(v, (int, float)) for v in vals):
+        return []
+    top = max(vals) or 1
+    return [round(max(0.0, v / top), 3) for v in vals]
+
+
+def _chapters(data):
+    """Chapters as [{start, end, title}], sorted, with a sane end on every one."""
+    out = []
+    raw = [c for c in (data.get("chapters") or []) if isinstance(c, dict)]
+    raw.sort(key=lambda c: c.get("start_time") or 0)
+    for i, c in enumerate(raw):
+        start = float(c.get("start_time") or 0)
+        end = c.get("end_time")
+        if end is None:
+            end = raw[i + 1].get("start_time") if i + 1 < len(raw) else data.get("duration")
+        title = (c.get("title") or "").strip() or f"Chapter {i + 1}"
+        out.append({"start": start, "end": float(end or start), "title": title})
+    return out
+
+
+def video_meta(data, video_id=None):
+    """Everything the player shows about a video, from one yt-dlp info dict —
+    kept separate from the stream resolution so it's testable without yt-dlp."""
     return {
-        "video_id": video_id,
+        "video_id": video_id or data.get("id"),
         "title": data.get("title", ""),
         "description": data.get("description") or "",
         "author": data.get("uploader") or data.get("channel") or "",
         "channel_id": data.get("channel_id"),
+        "channel_handle": data.get("uploader_id") if str(data.get("uploader_id") or "").startswith("@") else None,
+        "channel_followers": data.get("channel_follower_count"),
+        "channel_verified": bool(data.get("channel_is_verified")),
         "duration": data.get("duration"),
         "view_count": data.get("view_count") or data.get("concurrent_view_count"),
         "like_count": data.get("like_count"),
-        "live_status": live_status,
+        "comment_count": data.get("comment_count"),
+        "published_at": _published_at(data),
+        "live_status": data.get("live_status"),
         "scheduled_at": data.get("release_timestamp"),
-        "streams": streams,
-        "audio": audio,
+        "chapters": _chapters(data),
+        "heatmap": _heatmap(data),
+        "tags": [t for t in (data.get("tags") or []) if isinstance(t, str)][:16],
+        "category": (data.get("categories") or [None])[0],
     }
 
 
@@ -523,12 +574,21 @@ def video_info(video_id):
                 "like_count": None,
                 "live_status": None,
                 "scheduled_at": None,
+                "chapters": [],
+                "heatmap": [],
+                "tags": [],
                 "streams": inv.get("streams") or [],
                 "audio": [],
                 "degraded": True,
             }, 90
 
-    return cache.cached_dynamic(f"yt:info:{video_id}", fetch)
+    return cache.cached_dynamic(info_key(video_id), fetch)
+
+
+def info_key(video_id):
+    """Cache key of a video's info (v2: the payload grew chapters, the heatmap and
+    the channel/stat fields). The stream proxy invalidates it to force a re-resolve."""
+    return f"yt:info:v2:{video_id}"
 
 
 def video_streams(video_id):
@@ -543,14 +603,15 @@ def video_streams(video_id):
     }
 
 
-def video_comments(video_id):
-    """Top-level comments for a video (Invidious). Best-effort: empty on failure."""
+def video_comments(video_id, sort="top", continuation=None):
+    """A page of top-level comments for a video (Invidious), `top` or `new` first.
+    Best-effort: empty on failure."""
     from . import invidious
 
     try:
-        return invidious.comments(video_id)
+        return invidious.comments(video_id, sort, continuation)
     except Exception:
-        return {"comments": [], "disabled": False}
+        return {"comments": [], "continuation": None, "count": None, "disabled": False}
 
 
 def video_comment_replies(video_id, continuation, depth=1):

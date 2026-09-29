@@ -1,0 +1,519 @@
+/* Reviews — a letters page. Cards open on the reviewed show's art like a
+   postcard's picture side; the summary is a pull-quote in the display face; the
+   score sits in a round seal whose ring fills to the score. */
+
+/* ── the seal ────────────────────────────────────────────────────────────── */
+.seal {
+  --size: 44px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: var(--size);
+  height: var(--size);
+  border-radius: 50%;
+  background:
+    radial-gradient(closest-side, var(--ink-2) calc(100% - 4px), transparent calc(100% - 3px)),
+    conic-gradient(var(--c-anime) var(--pct), var(--rule-strong) 0);
+}
+.seal span {
+  font-family: var(--font-body);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+.sealLg {
+  --size: 64px;
+}
+.sealLg span {
+  font-size: 21px;
+}
+
+/* ── the card ────────────────────────────────────────────────────────────── */
+.card {
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--r-card);
+  overflow: hidden;
+  border: 1px solid var(--rule);
+  background: var(--surface);
+  cursor: pointer;
+  break-inside: avoid;
+  margin-bottom: var(--space-4);
+  animation: letterIn 0.45s var(--hand) calc(var(--i, 0) * 0.04s) both;
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+  outline: none;
+}
+.card:hover,
+.card:focus-visible {
+  transform: translateY(-2px) rotate(-0.25deg);
+  border-color: color-mix(in srgb, var(--cover-c) 50%, var(--rule));
+  box-shadow: var(--shadow-card);
+}
+@keyframes letterIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.cardArt {
+  position: relative;
+  height: 92px;
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--ink-3) center / cover;
+}
+.cardArt::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(12, 8, 4, 0.92), rgba(12, 8, 4, 0.3));
+}
+.cardArt img {
+  position: relative;
+  width: 44px;
+  height: 62px;
+  margin-bottom: -26px;
+  object-fit: cover;
+  border-radius: 6px;
+  box-shadow: 0 0 0 2px var(--ink-2), 0 6px 16px rgba(0, 0, 0, 0.45);
+}
+.cardMedia {
+  position: relative;
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: #f4ead6;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.cardBody {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+}
+.cardBody .seal {
+  align-self: flex-end;
+  margin-top: -36px;
+  position: relative;
+}
+/* no art strip above (a title's own review list): the seal sits in the card */
+.cardBodyPlain {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+.cardBodyPlain .seal {
+  order: 2;
+  margin: 0 0 0 auto;
+}
+.cardBodyPlain .quote {
+  flex: 1;
+  min-width: 0;
+}
+.cardBodyPlain .byline {
+  order: 3;
+  width: 100%;
+}
+.quote {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-style: italic;
+  line-height: 1.4;
+  color: var(--text-primary);
+}
+.quote::before {
+  content: '“';
+  color: var(--c-anime);
+  margin-right: 2px;
+}
+.quote::after {
+  content: '”';
+  color: var(--c-anime);
+  margin-left: 2px;
+}
+.byline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--paper-faint);
+}
+.when {
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+.helpful {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+}
+
+/* ── modals ──────────────────────────────────────────────────────────────── */
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: start center;
+  padding: var(--space-6) var(--space-4);
+  overflow-y: auto;
+  background: var(--backdrop);
+  backdrop-filter: blur(3px);
+}
+.modal {
+  position: relative;
+  width: min(760px, 100%);
+  padding: 0 0 var(--space-5);
+  border-radius: var(--r-modal);
+  border: 1px solid var(--rule-strong);
+  background: var(--ink-2);
+  box-shadow: var(--shadow-modal);
+  overflow: hidden;
+  animation: modalIn 0.22s ease both;
+}
+@keyframes modalIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.close {
+  position: absolute;
+  z-index: 2;
+  top: var(--space-3);
+  right: var(--space-3);
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--r-pill);
+  background: color-mix(in srgb, var(--ink) 60%, transparent);
+  color: var(--paper-dim);
+}
+.close:hover {
+  color: var(--text-primary);
+  background: var(--surface-hover);
+}
+.err {
+  padding: var(--space-5);
+  color: var(--danger);
+}
+.head {
+  position: relative;
+  min-height: 150px;
+  display: flex;
+  align-items: flex-end;
+  background: var(--ink-3);
+}
+.headArt {
+  position: absolute;
+  inset: 0;
+  background: center / cover;
+  -webkit-mask-image: linear-gradient(to bottom, black 30%, transparent);
+  mask-image: linear-gradient(to bottom, black 30%, transparent);
+  opacity: 0.7;
+}
+.headInner {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-4);
+  width: 100%;
+  padding: var(--space-5) var(--space-5) 0;
+}
+.headMedia {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  color: var(--text-primary);
+  min-width: 0;
+}
+.headMedia img {
+  width: 70px;
+  height: 100px;
+  object-fit: cover;
+  border-radius: 8px;
+  box-shadow: 0 0 0 2px var(--ink-2), var(--shadow-card);
+}
+.headMedia span {
+  display: flex;
+  flex-direction: column;
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.15;
+}
+.headMedia em {
+  font-style: normal;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 400;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--c-anime);
+}
+.summary {
+  margin: var(--space-4) var(--space-5) var(--space-2);
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-style: italic;
+  line-height: 1.4;
+  color: var(--text-primary);
+}
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 0 var(--space-5) var(--space-4);
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--rule);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--paper-faint);
+}
+.meta span,
+.meta a {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.meta a:hover {
+  color: var(--c-anime);
+}
+.body {
+  margin: 0 var(--space-5);
+  font-size: 15px;
+  line-height: 1.75;
+  color: var(--text-secondary);
+}
+.votes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: var(--space-5) var(--space-5) 0;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--rule);
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.votes em {
+  font-style: normal;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--paper-faint);
+}
+.vote,
+.voteOn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--rule-strong);
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+.vote:hover {
+  color: var(--text-primary);
+}
+.voteOn {
+  background: var(--c-anime);
+  border-color: transparent;
+  color: var(--ink);
+  font-weight: 600;
+}
+
+/* ── the composer ────────────────────────────────────────────────────────── */
+.composer {
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.compTitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding-right: 40px;
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.compTitle em {
+  font-style: normal;
+  color: var(--c-anime);
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.fieldHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--paper-faint);
+}
+.field > input {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: var(--r-input);
+  border: 1px solid var(--rule-strong);
+  background: var(--surface-input);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: 14px;
+  line-height: 1.6;
+  resize: vertical;
+}
+.field > input:focus {
+  outline: none;
+  border-color: var(--c-anime);
+}
+.count,
+.countOk {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.count {
+  color: var(--paper-faint);
+}
+.countOk {
+  color: var(--success);
+}
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+.scoreField {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 260px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.scoreField input {
+  flex: 1;
+  accent-color: var(--c-anime);
+}
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.check input {
+  accent-color: var(--c-anime);
+}
+.actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--rule);
+}
+.rule {
+  flex: 1;
+  font-size: 12px;
+  color: var(--paper-faint);
+}
+.publish,
+.delete {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 16px;
+  border-radius: var(--r-input);
+  font-size: 13px;
+  font-weight: 600;
+}
+.publish {
+  background: var(--c-anime);
+  color: var(--ink);
+}
+.publish:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.delete {
+  border: 1px solid color-mix(in srgb, var(--danger) 45%, var(--rule));
+  color: var(--danger);
+}
+.spin {
+  animation: spinR 0.85s linear infinite;
+}
+@keyframes spinR {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card,
+  .modal {
+    animation: none;
+  }
+}
+
+/* the form on its own (the modal wraps it; the curtain call sets it inline) */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+.existing {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: var(--r-input);
+  background: color-mix(in srgb, var(--c-anime) 10%, transparent);
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+.cancel {
+  padding: 9px 14px;
+  border-radius: var(--r-input);
+  font-size: 13px;
+  color: var(--paper-dim);
+}
+.cancel:hover {
+  color: var(--paper);
+  background: var(--surface-hover);
+}

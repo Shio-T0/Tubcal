@@ -1,0 +1,464 @@
+/* The Hub's console: a wood-cabinet side panel with a column of channel-preset
+   keys. The room you're in is the key that's pressed in and lit with the room's
+   own dye; its index hangs off it on a thin guide rail. */
+
+.frame {
+  --console-w: 236px;
+  --console-gap: 28px;
+  display: grid;
+  grid-template-columns: var(--console-w) minmax(0, 1fr);
+  gap: var(--console-gap);
+  align-items: start;
+  padding-top: var(--space-5);
+}
+.frameRail {
+  --console-w: 60px;
+}
+/* Wide screens: hang the console in the shell's empty left margin, so the page
+   keeps the shell's full width. */
+@media (min-width: 1780px) {
+  .frame {
+    margin-left: calc(-1 * (var(--console-w) + var(--console-gap)));
+  }
+}
+.main {
+  min-width: 0;
+}
+
+/* ── the panel ────────────────────────────────────────────────────────────── */
+
+.console {
+  position: sticky;
+  top: 14px;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: calc(100vh - 28px);
+  padding: 11px 10px 10px;
+  border-radius: var(--r-modal);
+  border: 1px solid var(--rule);
+  background:
+    linear-gradient(to bottom, color-mix(in srgb, var(--signal) 6%, transparent), transparent 170px),
+    var(--surface);
+  box-shadow: var(--shadow-card), inset 0 1px 0 color-mix(in srgb, var(--paper) 5%, transparent);
+  animation: consoleIn 0.4s var(--hand) both;
+}
+@keyframes consoleIn {
+  from {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 4px 8px;
+  border-bottom: 1px solid var(--rule);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--paper-faint);
+}
+.onair {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--signal);
+}
+.led {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--signal);
+  box-shadow: 0 0 9px var(--signal);
+  animation: led 3.6s ease-in-out infinite;
+}
+@keyframes led {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+.brandRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 0 2px 0 4px;
+}
+.wordmark {
+  font-family: var(--font-display);
+  font-variation-settings: 'opsz' 144, 'SOFT' 40, 'WONK' 1;
+  font-weight: 640;
+  font-size: 32px;
+  line-height: 1;
+  letter-spacing: -0.015em;
+  color: var(--paper);
+  user-select: none;
+}
+.wordmark em {
+  font-style: italic;
+  color: var(--signal);
+}
+.fold {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  color: var(--paper-faint);
+  transition: color 0.15s ease, background 0.15s ease;
+}
+.fold:hover {
+  color: var(--paper);
+  background: var(--surface-hover);
+}
+
+/* channel 1 / channel 2 */
+.channels {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3px;
+  padding: 3px;
+  border-radius: 11px;
+  border: 1px solid var(--rule);
+  background: color-mix(in srgb, var(--ink) 55%, transparent);
+}
+.ch {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-width: 0;
+  padding: 5px 8px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  color: var(--paper-faint);
+  transition: color 0.15s ease, background 0.15s ease;
+}
+.ch b {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 600;
+}
+.ch:hover {
+  color: var(--paper);
+}
+.chOn {
+  color: var(--paper);
+  background: var(--surface-hover);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--paper) 6%, transparent);
+}
+.chOn b {
+  color: var(--signal);
+}
+
+.search {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--rule);
+  background: var(--surface-input);
+  font-size: 13px;
+  color: var(--paper-faint);
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+.search:hover {
+  color: var(--paper-dim);
+  border-color: var(--rule-strong);
+}
+.search span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.search svg {
+  flex: none;
+}
+.search kbd {
+  flex: none;
+  white-space: nowrap;
+  margin-left: auto;
+  padding: 1px 5px;
+  border-radius: 5px;
+  border: 1px solid var(--rule);
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  color: var(--paper-faint);
+}
+
+/* ── rooms ────────────────────────────────────────────────────────────────── */
+
+.rooms {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  margin: 0 -4px;
+  padding: 0 4px 2px;
+  scrollbar-width: thin;
+}
+.label {
+  padding: 4px 6px 3px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--paper-faint);
+}
+.room {
+  min-width: 0;
+}
+.roomLink {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 9px 5px 5px;
+  border-radius: 11px;
+  color: var(--text-secondary);
+  transition: color 0.15s ease, background 0.15s ease;
+}
+.roomLink:hover {
+  color: var(--paper);
+  background: var(--surface-hover);
+}
+/* the preset key */
+.plate {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 26px;
+  border-radius: 7px;
+  border: 1px solid var(--rule);
+  background: color-mix(in srgb, var(--paper) 5%, transparent);
+  box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.22);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--paper-faint);
+  transition: background 0.18s ease, color 0.18s ease, box-shadow 0.18s ease;
+}
+.roomLink:hover .plate {
+  color: var(--paper-dim);
+  border-color: var(--rule-strong);
+}
+.roomName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 540;
+}
+.roomIcon {
+  color: var(--paper-faint);
+  opacity: 0.55;
+  transition: color 0.15s ease, opacity 0.15s ease;
+}
+.roomLink:hover .roomIcon {
+  opacity: 0.9;
+}
+.roomOn,
+.roomOn:hover {
+  color: var(--paper);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--room-c) 17%, transparent), transparent 92%);
+}
+/* pressed in and lit */
+.roomOn .plate {
+  border-color: transparent;
+  background: var(--room-c);
+  color: var(--ink);
+  font-weight: 700;
+  box-shadow:
+    0 0 14px color-mix(in srgb, var(--room-c) 55%, transparent),
+    inset 0 2px 0 rgba(0, 0, 0, 0.18);
+}
+.roomOn .roomIcon {
+  color: var(--room-c);
+  opacity: 1;
+}
+/* the room's own index, on a guide rail in its dye */
+.places {
+  margin: 4px 0 10px 19px;
+  padding-left: 11px;
+  border-left: 1px solid color-mix(in srgb, var(--room-c) 38%, var(--rule));
+  animation: placesIn 0.3s var(--hand) both;
+}
+@keyframes placesIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.foot {
+  display: flex;
+  gap: 3px;
+  padding-top: 8px;
+  border-top: 1px solid var(--rule);
+}
+.footBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 34px;
+  padding: 7px 6px;
+  border-radius: 9px;
+  font-size: 12.5px;
+  color: var(--paper-dim);
+  transition: color 0.15s ease, background 0.15s ease;
+}
+.footBtn:hover {
+  color: var(--paper);
+  background: var(--surface-hover);
+}
+.foot .footBtn:last-child {
+  flex: none;
+  width: 34px;
+}
+.footOn,
+.footOn:hover {
+  color: var(--signal);
+}
+
+/* ── folded to a rail ─────────────────────────────────────────────────────── */
+
+.frameRail .console {
+  align-items: stretch;
+  padding: 10px 6px 8px;
+}
+.frameRail .brandRow {
+  flex-direction: column;
+  padding: 0;
+}
+.frameRail .wordmark {
+  font-size: 26px;
+}
+.frameRail .channels {
+  grid-template-columns: 1fr;
+}
+.frameRail .ch {
+  padding: 4px 0;
+}
+.frameRail .search {
+  justify-content: center;
+  padding: 8px 0;
+}
+.frameRail .roomLink {
+  grid-template-columns: 1fr;
+  justify-items: center;
+  padding: 3px 0;
+}
+.frameRail .plate {
+  width: 38px;
+  height: 34px;
+  border-radius: 9px;
+}
+.frameRail .foot {
+  flex-direction: column;
+}
+.frameRail .foot .footBtn:last-child {
+  width: auto;
+}
+
+/* ── phones: a bar across the top ─────────────────────────────────────────── */
+
+.phone {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 12px 0 12px;
+  margin-bottom: var(--space-3);
+  border-bottom: 1px solid var(--rule);
+  min-width: 0;
+}
+.phoneTop {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.phone .wordmark {
+  font-size: 26px;
+}
+.phone .channels {
+  flex: none;
+  width: 72px;
+}
+.phone .ch {
+  padding: 3px 0;
+}
+.phoneKnobs {
+  display: flex;
+  gap: 2px;
+  margin-left: auto;
+}
+.phoneKnobs .footBtn {
+  flex: none;
+  width: 34px;
+  padding: 7px 0;
+}
+.phoneRooms {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  margin: 0 -16px;
+  padding: 0 16px;
+}
+.phoneRoom {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  flex: none;
+  padding: 4px 11px 4px 4px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--rule);
+  font-size: 13px;
+  color: var(--paper-dim);
+  white-space: nowrap;
+}
+.phoneRoom .plate {
+  width: 26px;
+  height: 22px;
+  border-radius: var(--r-pill);
+  font-size: 10px;
+}
+.phoneRoom.roomOn {
+  border-color: color-mix(in srgb, var(--room-c) 60%, transparent);
+}
+
+@media (max-width: 900px) {
+  .frame {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+    padding-top: 0;
+  }
+}

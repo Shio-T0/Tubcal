@@ -2,8 +2,8 @@
    Each [data-theme] block re-skins the whole app by (1) overriding the design
    tokens from tokens.css and (2) restyling the global hooks: base.css classes
    (.app-shell, .glass, .kicker, .search-input), element/selection rules, and the
-   structural hooks added in JSX (.tc-masthead, .tc-topline, .tc-wordmark,
-   .tc-nav, .tc-navitem(/-on), .tc-sectionhead). Component CSS Modules inherit the
+   structural hooks added in JSX (the hub console: .tc-console, .tc-topline,
+   .tc-wordmark, .tc-nav, .tc-navitem(/-on), .tc-navno; and .tc-sectionhead). Component CSS Modules inherit the
    palette/fonts/radii for free through var(--token); the hooks carry the layout
    personality the tokens can't express. Backdrop atmospheres live in backdrop.css. */
 
@@ -107,48 +107,6 @@
     opacity: 0;
   }
 }
-
-/* nav becomes a function-key bar: [F1] FRONT  [F2] SCREENING ... */
-[data-theme='terminal'] .tc-nav {
-  counter-reset: fkey;
-  border: 1px solid var(--rule-strong);
-  border-radius: 0;
-  background: var(--ink-2);
-  padding: 0;
-  gap: 0;
-  box-shadow: none;
-}
-[data-theme='terminal'] .tc-navitem {
-  counter-increment: fkey;
-  flex-direction: row;
-  align-items: baseline;
-  gap: 6px;
-  border-right: 1px solid var(--rule);
-  padding: 8px 14px 9px;
-}
-/* hide the "No 0x" index span and stamp an Fn key in its place */
-[data-theme='terminal'] .tc-navitem > span:first-child {
-  font-size: 0;
-}
-[data-theme='terminal'] .tc-navitem > span:first-child::before {
-  content: '[F' counter(fkey) ']';
-  font-family: var(--font-mono);
-  font-size: 11px;
-  letter-spacing: 0;
-  color: var(--accent-strong);
-}
-[data-theme='terminal'] .tc-navitem-on {
-  background: #36ff6a;
-  color: #05080a;
-  text-shadow: none;
-}
-[data-theme='terminal'] .tc-navitem-on > span:first-child::before {
-  color: #05080a;
-}
-[data-theme='terminal'] .tc-navitem-on::after {
-  display: none; /* drop the soft underline glow; selection is an inverted block */
-}
-
 /* section heads get a prompt caret */
 [data-theme='terminal'] .tc-sectionhead .kicker::before {
   content: '> ';
@@ -250,40 +208,6 @@
   font-weight: 900;
   text-transform: uppercase;
   letter-spacing: -0.035em;
-}
-
-/* nav as a row of primary color blocks */
-[data-theme='bauhaus'] .tc-nav {
-  border: 2px solid #111111;
-  border-radius: 0;
-  gap: 0;
-  padding: 0;
-  background: #ffffff;
-  box-shadow: none;
-}
-[data-theme='bauhaus'] .tc-navitem {
-  border-right: 2px solid #111111;
-  padding: 12px 16px 14px;
-  color: #111111;
-}
-[data-theme='bauhaus'] .tc-navitem:nth-child(1) { background: #e2231a; color: #fff; }
-[data-theme='bauhaus'] .tc-navitem:nth-child(2) { background: #0b4ee2; color: #fff; }
-[data-theme='bauhaus'] .tc-navitem:nth-child(3) { background: #ffd400; color: #111; }
-[data-theme='bauhaus'] .tc-navitem:nth-child(4) { background: #111111; color: #fff; }
-[data-theme='bauhaus'] .tc-navitem:nth-child(5) { background: #f4f1e9; color: #111; }
-[data-theme='bauhaus'] .tc-navitem > span:first-child {
-  color: inherit;
-  opacity: 0.85;
-}
-[data-theme='bauhaus'] .tc-navitem:hover {
-  filter: brightness(1.08);
-}
-[data-theme='bauhaus'] .tc-navitem-on {
-  outline: 4px solid #111111;
-  outline-offset: -4px;
-}
-[data-theme='bauhaus'] .tc-navitem-on::after {
-  display: none;
 }
 
 /* ===================================================================== *
@@ -397,24 +321,6 @@
   letter-spacing: 0.1em;
 }
 
-/* nav reads like a drawing's titleblock */
-[data-theme='blueprint'] .tc-nav {
-  border: 1px solid var(--rule-strong);
-  border-radius: 2px;
-  background: rgba(11, 37, 69, 0.5);
-  padding: 0;
-  gap: 0;
-  box-shadow: none;
-}
-[data-theme='blueprint'] .tc-navitem {
-  border-right: 1px solid var(--rule);
-  padding: 9px 14px 10px;
-}
-[data-theme='blueprint'] .tc-navitem-on::after {
-  background: var(--accent-strong);
-  box-shadow: none;
-}
-
 /* ===================================================================== *
  * AQUA Y2K — a glossy turn-of-the-century desktop.
  * ===================================================================== */
@@ -520,40 +426,6 @@
   text-shadow: 0 1px 0 rgba(255, 255, 255, 0.8);
 }
 
-/* nav as a glossy capsule tab strip with a candy active lozenge */
-[data-theme='aqua'] .tc-nav {
-  border: 1px solid var(--rule-strong);
-  border-radius: var(--r-pill);
-  background: linear-gradient(#f4f8fe, #dde8f6);
-  padding: 4px;
-  gap: 4px;
-  box-shadow: inset 0 1px 0 #ffffff;
-  overflow: visible;
-}
-[data-theme='aqua'] .tc-navitem {
-  border: none;
-  border-radius: var(--r-pill);
-  padding: 8px 18px;
-}
-[data-theme='aqua'] .tc-navitem:first-child {
-  border-left: none;
-}
-[data-theme='aqua'] .tc-navitem:hover {
-  background: rgba(255, 255, 255, 0.6);
-}
-[data-theme='aqua'] .tc-navitem-on,
-[data-theme='aqua'] .tc-navitem-on:hover {
-  background: linear-gradient(#5ea8ff, #1a73e8);
-  color: #ffffff;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55), 0 2px 7px rgba(26, 115, 232, 0.45);
-}
-[data-theme='aqua'] .tc-navitem-on > span:first-child {
-  color: rgba(255, 255, 255, 0.85);
-}
-[data-theme='aqua'] .tc-navitem-on::after {
-  display: none;
-}
-
 /* ===================================================================== *
  * DEEP SPACE — glass panels adrift over a nebula.
  * ===================================================================== */
@@ -652,27 +524,167 @@
   -webkit-text-fill-color: #22d3ee;
 }
 
-/* nav as a floating glass pill */
-[data-theme='space'] .tc-nav {
-  border: 1px solid var(--rule);
+/* ===================================================================== *
+ * THE HUB CONSOLE, per skin.
+ * The console (components/layout/HubConsole.jsx) is a column: .tc-console is the
+ * panel, .tc-nav the room list (on a phone, a row of chips), .tc-navitem a room,
+ * .tc-navitem-on the one you're in, .tc-navno its number key (an icon when the
+ * console is folded to a rail).
+ * ===================================================================== */
+
+/* PHOSPHOR TERMINAL — a function-key column: F1 EDITION, F2 SCREENING… */
+[data-theme='terminal'] .tc-console {
+  border-radius: 0;
+  border-color: var(--rule-strong);
+  background: var(--ink-2);
+  box-shadow: none;
+}
+[data-theme='terminal'] .tc-console .tc-wordmark {
+  font-size: 21px;
+}
+[data-theme='terminal'] .tc-nav {
+  counter-reset: fkey;
+}
+[data-theme='terminal'] .tc-navitem {
+  counter-increment: fkey;
+  border-radius: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+[data-theme='terminal'] .tc-navno {
+  border-radius: 0;
+  font-size: 0;
+  box-shadow: none;
+}
+[data-theme='terminal'] .tc-navno:not(:has(svg))::before {
+  content: 'F' counter(fkey);
+  font-size: 11px;
+  color: var(--accent-strong);
+}
+[data-theme='terminal'] .tc-navitem-on,
+[data-theme='terminal'] .tc-navitem-on:hover {
+  background: #36ff6a;
+  color: #05080a;
+  text-shadow: none;
+}
+[data-theme='terminal'] .tc-navitem-on .tc-navno {
+  background: #05080a;
+  color: #36ff6a;
+  box-shadow: none;
+}
+[data-theme='terminal'] .tc-navitem-on .tc-navno::before,
+[data-theme='terminal'] .tc-navitem-on .tc-navno svg {
+  color: #36ff6a;
+}
+[data-theme='terminal'] .tc-navitem-on > svg:last-child {
+  color: #05080a;
+}
+
+/* BAUHAUS PRINT — the number keys are primary blocks; the room you're in is
+   framed in black. */
+[data-theme='bauhaus'] .tc-console {
+  border: 2px solid #111111;
+  border-radius: 0;
+  background: #ffffff;
+  box-shadow: 6px 6px 0 #111111;
+}
+[data-theme='bauhaus'] .tc-navitem,
+[data-theme='bauhaus'] .tc-navno {
+  border-radius: 0;
+}
+[data-theme='bauhaus'] .tc-navno {
+  border: 2px solid #111111;
+  box-shadow: none;
+  color: #111111;
+  font-weight: 700;
+}
+[data-theme='bauhaus'] .tc-nav > :nth-of-type(5n + 1) .tc-navno { background: #e2231a; color: #fff; }
+[data-theme='bauhaus'] .tc-nav > :nth-of-type(5n + 2) .tc-navno { background: #0b4ee2; color: #fff; }
+[data-theme='bauhaus'] .tc-nav > :nth-of-type(5n + 3) .tc-navno { background: #ffd400; color: #111; }
+[data-theme='bauhaus'] .tc-nav > :nth-of-type(5n + 4) .tc-navno { background: #111111; color: #fff; }
+[data-theme='bauhaus'] .tc-nav > :nth-of-type(5n + 5) .tc-navno { background: #f4f1e9; color: #111; }
+[data-theme='bauhaus'] .tc-navitem-on,
+[data-theme='bauhaus'] .tc-navitem-on:hover {
+  background: #f4f1e9;
+  outline: 3px solid #111111;
+  outline-offset: -3px;
+}
+
+/* BLUEPRINT — a drawing's titleblock: square corners, hairlines, a red-pencil
+   mark on the current sheet. */
+[data-theme='blueprint'] .tc-console {
+  border-radius: 2px;
+  border-color: var(--rule-strong);
+  background: rgba(11, 37, 69, 0.55);
+  box-shadow: none;
+}
+[data-theme='blueprint'] .tc-navitem,
+[data-theme='blueprint'] .tc-navno {
+  border-radius: 2px;
+}
+[data-theme='blueprint'] .tc-navno {
+  box-shadow: none;
+}
+[data-theme='blueprint'] .tc-navitem-on,
+[data-theme='blueprint'] .tc-navitem-on:hover {
+  background: rgba(11, 37, 69, 0.8);
+  box-shadow: inset 2px 0 0 var(--accent-strong);
+}
+[data-theme='blueprint'] .tc-navitem-on .tc-navno {
+  background: var(--accent-strong);
+  box-shadow: none;
+}
+
+/* AQUA Y2K — a glossy sidebar window: title-bar dots, candy lozenge. */
+[data-theme='aqua'] .tc-console {
+  border-color: var(--rule-strong);
+  background: linear-gradient(#f4f8fe, #dde8f6);
+  box-shadow: inset 0 1px 0 #ffffff, 0 10px 28px rgba(26, 60, 120, 0.18);
+}
+[data-theme='aqua'] .tc-console .tc-topline {
+  padding: 6px 10px 6px 58px;
+  border-radius: 8px;
+  letter-spacing: 0.05em;
+}
+[data-theme='aqua'] .tc-console .tc-topline::before {
+  left: 12px;
+  width: 10px;
+  height: 10px;
+  box-shadow: 15px 0 0 #febc2e, 30px 0 0 #28c840;
+}
+[data-theme='aqua'] .tc-navitem {
   border-radius: var(--r-pill);
-  background: rgba(18, 22, 44, 0.4);
+}
+[data-theme='aqua'] .tc-navno {
+  border-radius: var(--r-pill);
+  background: linear-gradient(#ffffff, #e6eef9);
+  box-shadow: inset 0 1px 0 #ffffff;
+}
+[data-theme='aqua'] .tc-navitem-on,
+[data-theme='aqua'] .tc-navitem-on:hover {
+  background: linear-gradient(#5ea8ff, #1a73e8);
+  color: #ffffff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55), 0 2px 7px rgba(26, 115, 232, 0.45);
+}
+[data-theme='aqua'] .tc-navitem-on .tc-navno {
+  background: rgba(255, 255, 255, 0.92);
+  color: #1a73e8;
+}
+[data-theme='aqua'] .tc-navitem-on > svg:last-child {
+  color: #ffffff;
+}
+
+/* DEEP SPACE — a glass panel adrift; the current room glows in the nebula
+   gradient. */
+[data-theme='space'] .tc-console {
+  border-radius: 22px;
+  background: rgba(18, 22, 44, 0.42);
   backdrop-filter: blur(12px);
-  padding: 5px;
-  gap: 4px;
-  overflow: visible;
   box-shadow: 0 12px 34px rgba(0, 0, 0, 0.42);
 }
-[data-theme='space'] .tc-navitem {
-  border: none;
+[data-theme='space'] .tc-navitem,
+[data-theme='space'] .tc-navno {
   border-radius: var(--r-pill);
-  padding: 8px 18px;
-}
-[data-theme='space'] .tc-navitem:first-child {
-  border-left: none;
-}
-[data-theme='space'] .tc-navitem:hover {
-  background: rgba(140, 160, 255, 0.1);
 }
 [data-theme='space'] .tc-navitem-on,
 [data-theme='space'] .tc-navitem-on:hover {
@@ -680,9 +692,11 @@
   color: #ffffff;
   box-shadow: 0 0 20px rgba(124, 92, 255, 0.5);
 }
-[data-theme='space'] .tc-navitem-on > span:first-child {
-  color: rgba(255, 255, 255, 0.85);
+[data-theme='space'] .tc-navitem-on .tc-navno {
+  background: rgba(255, 255, 255, 0.9);
+  color: #3b2a8f;
+  box-shadow: none;
 }
-[data-theme='space'] .tc-navitem-on::after {
-  display: none;
+[data-theme='space'] .tc-navitem-on > svg:last-child {
+  color: #ffffff;
 }

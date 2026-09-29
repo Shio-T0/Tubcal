@@ -1,0 +1,633 @@
+/* The Screening Room's film: tiles, rows and shelves. Tiles are lit screens in the
+   dark room — the cover glows up on hover, a slow sheen crosses it, and the
+   keyboard's selection gets a pulsing amber ring you can find from the couch. */
+
+/* ── tile ─────────────────────────────────────────────────────────────────── */
+
+.tile {
+  position: relative;
+  flex: none;
+  width: 264px;
+  min-width: 0;
+  cursor: pointer;
+  transition: transform 0.22s var(--hand);
+}
+.tile:hover {
+  transform: translateY(-3px);
+}
+/* Keyboard selection (hjkl) lifts further so it stands apart from a hover. */
+.tile:focus-visible {
+  outline: none;
+  transform: translateY(-5px) scale(1.03);
+  z-index: 3;
+}
+
+.thumbWrap {
+  position: relative;
+  border-radius: var(--r-media);
+  overflow: hidden;
+  background: #000;
+  border: 1px solid var(--rule);
+  margin-bottom: 9px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.tile:hover .thumbWrap {
+  border-color: color-mix(in srgb, var(--c-youtube) 45%, var(--rule));
+  box-shadow: 0 14px 34px rgba(10, 6, 2, 0.5);
+}
+.tile:focus-visible .thumbWrap {
+  border-color: var(--signal);
+  box-shadow:
+    0 0 0 3px var(--signal),
+    0 0 0 6px color-mix(in srgb, var(--signal) 30%, transparent),
+    0 0 26px 3px color-mix(in srgb, var(--signal) 55%, transparent),
+    0 18px 40px rgba(10, 6, 2, 0.6);
+  animation: selectPulse 1.8s ease-in-out infinite;
+}
+@keyframes selectPulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 3px var(--signal),
+      0 0 0 6px color-mix(in srgb, var(--signal) 28%, transparent),
+      0 0 22px 2px color-mix(in srgb, var(--signal) 45%, transparent),
+      0 18px 40px rgba(10, 6, 2, 0.6);
+  }
+  50% {
+    box-shadow:
+      0 0 0 3px var(--signal),
+      0 0 0 7px color-mix(in srgb, var(--signal) 40%, transparent),
+      0 0 34px 5px color-mix(in srgb, var(--signal) 65%, transparent),
+      0 18px 40px rgba(10, 6, 2, 0.6);
+  }
+}
+
+.thumb {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  opacity: 0.9;
+  transition: transform 0.45s ease, opacity 0.25s ease;
+}
+.tile:hover .thumb,
+.tile:focus-visible .thumb {
+  transform: scale(1.05);
+  opacity: 1;
+}
+/* A finished video dims a little — still there, clearly already seen. */
+.tileDone .thumb,
+.tileDone .rowThumb img {
+  opacity: 0.55;
+  filter: saturate(0.7);
+}
+.tileDone .title,
+.tileDone .rowTitle {
+  color: var(--paper-dim);
+}
+
+.scrim {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 46%;
+  z-index: 1;
+  background: linear-gradient(to top, rgba(8, 6, 4, 0.62), transparent);
+  opacity: 0.7;
+  transition: opacity 0.25s ease;
+  pointer-events: none;
+}
+.tile:hover .scrim,
+.tile:focus-visible .scrim {
+  opacity: 1;
+}
+
+.sheen {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background: linear-gradient(105deg, transparent 38%, rgba(255, 240, 214, 0.16) 50%, transparent 62%);
+  background-size: 220% 100%;
+  background-position: 150% 0;
+  opacity: 0;
+}
+.tile:hover .sheen,
+.tile:focus-visible .sheen {
+  opacity: 1;
+  animation: sheen 0.9s ease;
+}
+@keyframes sheen {
+  from {
+    background-position: 150% 0;
+  }
+  to {
+    background-position: -50% 0;
+  }
+}
+
+.play {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: rgba(8, 6, 4, 0.28);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+.tile:hover .play,
+.tile:focus-visible .play {
+  opacity: 1;
+}
+.play span {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--c-youtube) 92%, transparent);
+  box-shadow: 0 0 26px color-mix(in srgb, var(--c-youtube) 55%, transparent);
+  transform: scale(0.72);
+  transition: transform 0.26s cubic-bezier(0.2, 0.8, 0.3, 1.25);
+}
+.tile:hover .play span,
+.tile:focus-visible .play span {
+  transform: scale(1);
+}
+
+/* watched / up next / save — out of the way until you're on the tile */
+.actions {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 3;
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transform: translateY(-3px);
+  transition: opacity 0.16s ease, transform 0.16s var(--hand);
+}
+.tile:hover .actions,
+.tile:focus-within .actions {
+  opacity: 1;
+  transform: none;
+}
+
+.duration {
+  position: absolute;
+  right: 6px;
+  bottom: 7px;
+  z-index: 3;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: rgba(8, 6, 4, 0.82);
+  backdrop-filter: blur(3px);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #f3e7cf;
+}
+
+.progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+  height: 4px;
+  background: rgba(8, 6, 4, 0.55);
+}
+.progressFill {
+  height: 100%;
+  background: var(--c-youtube);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--c-youtube) 60%, transparent);
+  transition: width 0.3s ease;
+}
+.progressDone {
+  background: var(--success, #3fb950);
+  box-shadow: none;
+}
+
+/* LIVE / scheduled / new, top-left of a cover */
+.badge {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  border-radius: var(--r-pill);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: #fff;
+  backdrop-filter: blur(4px);
+}
+.live {
+  background: rgba(214, 48, 36, 0.94);
+  box-shadow: 0 0 14px rgba(214, 48, 36, 0.55);
+}
+.live svg {
+  animation: livePulse 1.6s ease-in-out infinite;
+}
+@keyframes livePulse {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+.upcoming {
+  background: rgba(8, 6, 4, 0.74);
+  color: color-mix(in srgb, var(--c-youtube) 70%, #fff);
+  border: 1px solid color-mix(in srgb, var(--c-youtube) 50%, transparent);
+}
+.fresh {
+  background: color-mix(in srgb, var(--signal) 88%, black);
+  color: var(--ink);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 9.5px;
+  box-shadow: 0 0 12px color-mix(in srgb, var(--signal) 45%, transparent);
+}
+
+.title {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.36;
+  color: var(--paper);
+  transition: color 0.15s ease;
+}
+.tile:focus-visible .title {
+  color: var(--signal);
+}
+
+/* face · channel · 3d · 12K views — the dots are drawn, not typed */
+.meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  column-gap: 0;
+  row-gap: 2px;
+  min-width: 0;
+  margin-top: 5px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--paper-faint);
+}
+.meta > * + *::before {
+  content: '·';
+  margin: 0 6px;
+  color: var(--paper-faint);
+  opacity: 0.7;
+}
+.channel {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+  color: var(--paper-dim);
+}
+.channelName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.channelLink:hover {
+  color: var(--c-youtube);
+}
+.channelLink:hover .channelName {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.face,
+.faceLetter {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.faceLetter {
+  display: grid;
+  place-items: center;
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--ink);
+  background: var(--c-youtube);
+}
+
+/* ── row ──────────────────────────────────────────────────────────────────── */
+
+.row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 7px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.row:hover,
+.row:focus-visible {
+  outline: none;
+  background: var(--surface-hover);
+}
+.row:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--signal);
+}
+.rowIndex {
+  flex: none;
+  width: 22px;
+  text-align: right;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--paper-faint);
+}
+.rowThumb {
+  position: relative;
+  flex: none;
+  width: var(--row-thumb, 136px);
+  aspect-ratio: 16 / 9;
+  border-radius: 9px;
+  overflow: hidden;
+  background: #000;
+  border: 1px solid var(--rule);
+}
+.rowThumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.rowThumb .duration {
+  right: 4px;
+  bottom: 5px;
+  font-size: 10px;
+  padding: 0 5px;
+}
+.rowBadge {
+  top: 4px;
+  left: 4px;
+  font-size: 9.5px;
+  padding: 1px 6px;
+}
+.rowText {
+  flex: 1;
+  min-width: 0;
+}
+.rowTitle {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--paper);
+}
+.freshDot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin: 0 7px 1px 0;
+  border-radius: 50%;
+  background: var(--signal);
+  box-shadow: 0 0 8px var(--signal);
+  vertical-align: middle;
+}
+.row .meta {
+  flex-wrap: nowrap;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.row .meta > * {
+  flex: none;
+}
+.row .meta > .channel {
+  flex: 0 1 auto;
+}
+.rowActions {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transform: translateY(-50%);
+  transition: opacity 0.15s ease;
+  pointer-events: none;
+}
+.row:hover .rowActions,
+.row:focus-within .rowActions {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* ── shelf ────────────────────────────────────────────────────────────────── */
+
+.shelf {
+  margin-bottom: var(--space-7);
+  animation: fadeUp 0.45s ease both;
+}
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.shelfHead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  margin-bottom: 14px;
+}
+.lamp {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--shelf-c, var(--c-youtube));
+  box-shadow: 0 0 10px var(--shelf-c, var(--c-youtube));
+}
+.shelfTitle {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 20px;
+  font-weight: 560;
+  letter-spacing: -0.005em;
+}
+.shelfNote {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--paper-faint);
+}
+.shelfActs {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-left: auto;
+  flex: none;
+}
+.shelfAct {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--paper-faint);
+  transition: color 0.15s ease;
+}
+.shelfAct:hover {
+  color: var(--shelf-c, var(--c-youtube));
+}
+.spin {
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* No scroll-snap: it pulled the keyboard-focused tile back to the row's left
+   edge, defeating the centred-focus scroll, and fought the wheel-scroll. */
+.shelfRow {
+  display: flex;
+  gap: var(--space-4);
+  overflow-x: auto;
+  padding: 4px 2px var(--space-3);
+  margin: -4px -2px 0;
+  scrollbar-width: thin;
+}
+
+/* The tall shelf: two rows of larger tiles, flowing into new columns. */
+.shelfTall .shelfRow {
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-rows: repeat(2, auto);
+  grid-auto-columns: 312px;
+  align-items: start;
+  gap: var(--space-5) var(--space-4);
+}
+.shelfTall .tile {
+  width: 312px;
+}
+.shelfTall .title {
+  font-size: 15px;
+}
+.shelfTall .shelfTitle {
+  font-size: 23px;
+}
+
+/* the "load more" end cap — in the tall shelf it spans both rows, so hjkl can
+   reach it from either one and it never lands mid-row */
+.moreTile {
+  flex: none;
+  align-self: stretch;
+  min-width: 140px;
+  padding: 0 var(--space-4);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--paper-faint);
+  background: color-mix(in oklab, var(--surface) 55%, transparent);
+  border: 1px dashed var(--rule);
+  border-radius: var(--r-card);
+  transition: color 0.18s ease, border-color 0.18s ease;
+}
+.shelfTall .moreTile {
+  grid-row: 1 / -1;
+  justify-self: center;
+}
+.moreTile:hover:not(:disabled),
+.moreTile:focus-visible {
+  outline: none;
+  color: var(--paper);
+  border-style: solid;
+  border-color: var(--shelf-c, var(--signal));
+}
+.moreTile:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+/* walls of tiles (search, a channel, a day of uploads) */
+.wall {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(236px, 1fr));
+  gap: var(--space-5) var(--space-4);
+}
+.wall .tile {
+  width: auto;
+}
+
+@media (max-width: 640px) {
+  .tile {
+    width: 228px;
+  }
+  .shelfTall .shelfRow {
+    grid-auto-columns: 250px;
+  }
+  .shelfTall .tile {
+    width: 250px;
+  }
+  .rowThumb {
+    width: 112px;
+  }
+  .rowActions {
+    display: none;
+  }
+  .wall {
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: var(--space-4) var(--space-3);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tile:hover,
+  .tile:focus-visible,
+  .tile:hover .thumb,
+  .tile:focus-visible .thumb {
+    transform: none;
+  }
+  .sheen {
+    display: none;
+  }
+  .tile:focus-visible .thumbWrap {
+    animation: none;
+  }
+}

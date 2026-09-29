@@ -1,0 +1,83 @@
+/* Live words: timestamps are little amber tape-counter chips, links to other
+   videos carry a play mark, hashtags and mentions read as quiet in-app links. */
+
+.rich {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 14px;
+  line-height: 1.62;
+  color: var(--text-secondary);
+}
+.rich b {
+  color: var(--paper);
+  font-weight: 650;
+}
+
+.stamp,
+.video,
+.tag,
+.mention {
+  display: inline;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+}
+
+.stamp {
+  padding: 0 5px;
+  margin: 0 1px;
+  border-radius: 5px;
+  font-family: var(--font-mono);
+  font-size: 0.88em;
+  font-variant-numeric: tabular-nums;
+  color: var(--signal);
+  background: color-mix(in srgb, var(--signal) 13%, transparent);
+  transition: background 0.14s ease, color 0.14s ease;
+}
+.stamp:hover {
+  color: var(--ink);
+  background: var(--signal);
+}
+
+.video {
+  color: var(--c-youtube);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--c-youtube) 40%, transparent);
+  text-underline-offset: 3px;
+}
+.video svg {
+  vertical-align: 0;
+}
+.video:hover {
+  text-decoration-color: currentColor;
+}
+
+.tag,
+.mention {
+  color: color-mix(in srgb, var(--signal) 70%, var(--paper));
+}
+.tag:hover,
+.mention:hover {
+  color: var(--signal);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.out {
+  color: color-mix(in srgb, var(--paper) 88%, var(--signal));
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--paper) 25%, transparent);
+  text-underline-offset: 3px;
+}
+.outIcon {
+  display: inline-block;
+  margin-left: 3px;
+  opacity: 0.6;
+  vertical-align: -1px;
+}
+.out:hover {
+  color: var(--paper);
+  text-decoration-color: currentColor;
+}

@@ -1,0 +1,323 @@
+/* The writing desk: a paper pad on the left, the post-to-be on the right — or
+   stacked, when the box is narrow (a container query, so an inline reply deep in a
+   thread and a full-width status box each get the right shape). */
+
+.composer {
+  container-type: inline-size;
+  min-width: 0;
+}
+.grid {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.desk {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-card);
+  background: var(--surface-input, var(--surface));
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.desk:focus-within {
+  border-color: color-mix(in srgb, var(--c-anime) 60%, var(--rule));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--c-anime) 14%, transparent);
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1px;
+  padding: 4px 6px;
+  border-bottom: 1px dashed var(--rule);
+}
+.tool {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  min-width: 26px;
+  justify-content: center;
+  padding: 0 5px;
+  border-radius: 6px;
+  color: var(--paper-faint);
+  transition: color 0.12s ease, background 0.12s ease;
+}
+.tool:hover {
+  color: var(--paper);
+  background: var(--surface-hover);
+}
+.toolOn {
+  color: var(--c-anime);
+  background: color-mix(in srgb, var(--c-anime) 12%, transparent);
+}
+.previewToggle span {
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+.sep {
+  width: 1px;
+  height: 16px;
+  margin: 0 4px;
+  background: var(--rule);
+}
+.grow {
+  flex: 1;
+}
+
+.cheats {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 4px 14px;
+  margin: 0;
+  padding: 10px 12px;
+  border-bottom: 1px dashed var(--rule);
+  background: color-mix(in srgb, var(--c-anime) 4%, transparent);
+  animation: drop 0.2s var(--hand) both;
+}
+.cheats div {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+.cheats dt code {
+  font-family: var(--font-code, var(--font-mono));
+  font-size: 11.5px;
+  color: var(--paper);
+}
+.cheats dd {
+  margin: 0;
+  font-size: 11.5px;
+  color: var(--paper-faint);
+}
+
+.textarea {
+  width: 100%;
+  min-height: 64px;
+  resize: vertical;
+  border: 0;
+  outline: none;
+  padding: 11px 13px;
+  background: transparent;
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: 14.5px;
+  line-height: 1.6;
+}
+.compact .textarea {
+  min-height: 44px;
+  font-size: 14px;
+  padding: 9px 11px;
+}
+.textarea::placeholder {
+  color: var(--paper-faint);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 6px 8px 8px 12px;
+}
+.hint {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--paper-faint);
+}
+.hint kbd {
+  padding: 0 4px;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 10px;
+}
+.compact .hint {
+  display: none;
+}
+.cancel {
+  padding: 6px 10px;
+  border-radius: var(--r-pill);
+  font-size: 13px;
+  color: var(--paper-dim);
+}
+.cancel:hover {
+  color: var(--paper);
+  background: var(--surface-hover);
+}
+.submit {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 15px;
+  border-radius: var(--r-pill);
+  background: var(--c-anime);
+  color: var(--ink);
+  font-weight: 650;
+  font-size: 13px;
+  transition: transform 0.15s var(--hand), filter 0.15s ease, opacity 0.15s ease;
+}
+.submit:hover:not(:disabled) {
+  transform: translateY(-1px);
+  filter: brightness(1.08);
+}
+.submit:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* ── the preview: the post as it will stand ─────────────────────────────────── */
+
+.preview {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--r-card);
+  border: 1px dashed color-mix(in srgb, var(--c-anime) 40%, var(--rule));
+  background:
+    repeating-linear-gradient(135deg, transparent 0 11px, color-mix(in srgb, var(--c-anime) 3%, transparent) 11px 12px),
+    var(--surface);
+  animation: drop 0.25s var(--hand) both;
+}
+.previewHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px 0 12px;
+}
+.previewLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--paper-faint);
+}
+.fidelity {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  padding: 1px 7px;
+  border-radius: var(--r-pill);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--paper-faint);
+  border: 1px solid var(--rule);
+}
+.fidelityExact {
+  color: var(--success, var(--c-anime));
+  border-color: color-mix(in srgb, var(--success, var(--c-anime)) 45%, transparent);
+}
+.hide {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  color: var(--paper-faint);
+}
+.hide:hover {
+  color: var(--paper);
+  background: var(--surface-hover);
+}
+
+.post {
+  display: flex;
+  gap: 11px;
+  padding: 10px 14px 14px 12px;
+  min-width: 0;
+}
+.postMain {
+  flex: 1;
+  min-width: 0;
+}
+.postHead {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 3px;
+}
+.postName {
+  font-size: 13.5px;
+  font-weight: 650;
+  color: var(--paper);
+}
+.postTime {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--paper-faint);
+}
+.postTitle {
+  margin: 2px 0 6px;
+  font-family: var(--font-display);
+  font-size: 21px;
+  font-weight: 620;
+  line-height: 1.2;
+  color: var(--paper);
+}
+.postTitle i {
+  color: var(--paper-faint);
+  font-weight: 500;
+}
+.postBody {
+  max-height: 420px;
+  overflow: auto;
+}
+.compact .postBody {
+  max-height: 260px;
+}
+.postEmpty {
+  margin: 4px 0 0;
+  font-size: 13px;
+  font-style: italic;
+  color: var(--paper-faint);
+}
+
+.spin {
+  animation: spin 0.9s linear infinite;
+}
+
+/* Stacked, an empty preview is just a box in the way; beside the desk it's a
+   promise of where the words will go. */
+@container (max-width: 759px) {
+  .previewEmpty {
+    display: none;
+  }
+}
+
+/* Side by side when there's room for both to breathe. */
+@container (min-width: 760px) {
+  .withPreview:not(.compact) .grid {
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+    align-items: start;
+  }
+  .withPreview:not(.compact) .preview {
+    position: sticky;
+    top: var(--space-4);
+  }
+  /* the preview is right there — the toggle can be just its eye */
+  .withPreview:not(.compact) .previewToggle span {
+    display: none;
+  }
+  .withPreview:not(.compact) .tool {
+    min-width: 25px;
+    padding: 0 4px;
+  }
+}
+
+@keyframes drop {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cheats, .preview, .spin { animation: none; }
+}

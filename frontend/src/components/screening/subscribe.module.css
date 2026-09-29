@@ -1,0 +1,41 @@
+.subscribe,
+.subbed {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  padding: 9px 18px;
+  border-radius: var(--r-pill);
+  font-size: 14px;
+  white-space: nowrap;
+  transition: filter 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.subscribe {
+  background: var(--c-youtube);
+  color: #fff;
+  font-weight: 650;
+}
+.subscribe:hover {
+  filter: brightness(1.08);
+}
+.subbed {
+  padding: 8px 16px;
+  border: 1px solid var(--rule-strong);
+  font-size: 13.5px;
+  color: var(--paper-dim);
+}
+.subbed:hover {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 55%, transparent);
+}
+.small {
+  padding: 6px 13px;
+  font-size: 13px;
+}
+.subbed.small {
+  padding: 5px 12px;
+}
+.subscribe:disabled,
+.subbed:disabled {
+  opacity: 0.6;
+}

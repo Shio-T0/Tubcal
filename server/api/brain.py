@@ -13,7 +13,7 @@ brain_bp = Blueprint("brain", __name__, url_prefix="/api/brain")
 def status():
     """What's available right now — drives graceful degradation in the UI."""
     embed_model = db.get_setting("brain_embed_model", "nomic-embed-text")
-    llm_model = db.get_setting("brain_llm_model", "llama3.1:8b")
+    llm_model = db.get_setting("brain_llm_model", "qwen3.5:9b")
     ollama_up = llm.available()
     installed = llm.models() if ollama_up else []
     return ok({
@@ -61,7 +61,7 @@ def remove(item_id):
 
 @brain_bp.post("/summarize/<path:item_id>")
 def summarize_doc(item_id):
-    llm_model = db.get_setting("brain_llm_model", "llama3.1:8b")
+    llm_model = db.get_setting("brain_llm_model", "qwen3.5:9b")
     if not (llm.available() and llm.has_model(llm_model)):
         return err("local LLM unavailable", 503)
     try:
@@ -98,7 +98,7 @@ def ask():
     if not question:
         return err("question required")
     embed_model = db.get_setting("brain_embed_model", "nomic-embed-text")
-    llm_model = db.get_setting("brain_llm_model", "llama3.1:8b")
+    llm_model = db.get_setting("brain_llm_model", "qwen3.5:9b")
     if not (llm.available() and llm.has_model(embed_model) and llm.has_model(llm_model)):
         return err("local models unavailable", 503)
     try:
@@ -109,7 +109,7 @@ def ask():
 
 @brain_bp.get("/digest")
 def digest():
-    llm_model = db.get_setting("brain_llm_model", "llama3.1:8b")
+    llm_model = db.get_setting("brain_llm_model", "qwen3.5:9b")
     if not (llm.available() and llm.has_model(llm_model)):
         return err("local LLM unavailable", 503)
     try:

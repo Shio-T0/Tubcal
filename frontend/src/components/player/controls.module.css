@@ -636,3 +636,94 @@
   .deck { transition: opacity 0.2s ease; }
   @keyframes hudFade { 0% { opacity: 0; } 25% { opacity: 1; } 100% { opacity: 0; } }
 }
+
+/* ── "most replayed" + chapters ──────────────────────────────────────────────*/
+/* the ridge sits just above the filament and brightens while you're on the bar */
+.heat {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(50% + 3px);
+  width: 100%;
+  height: 26px;
+  pointer-events: none;
+  opacity: 0.32;
+  transition: opacity 0.2s ease, height 0.2s ease;
+}
+.heat path {
+  fill: color-mix(in srgb, var(--paper) 55%, transparent);
+}
+.scrub[data-active] .heat {
+  opacity: 0.75;
+  height: 34px;
+}
+.scrub[data-active] .heat path {
+  fill: color-mix(in srgb, var(--signal) 55%, transparent);
+}
+/* a chapter break: a cut in the filament, in the deck's own dark */
+.notch {
+  position: absolute;
+  top: -1px;
+  bottom: -1px;
+  width: 3px;
+  margin-left: -1.5px;
+  background: var(--ink);
+  pointer-events: none;
+}
+.chip b {
+  display: block;
+  max-width: 260px;
+  margin-bottom: 1px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--paper);
+}
+.chip {
+  text-align: center;
+}
+
+/* the chapter you're in, beside the tape counter */
+.chapter {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  max-width: 280px;
+  margin-left: 2px;
+  padding: 4px 6px 4px 10px;
+  border-radius: var(--r-pill);
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  border-left: 1px solid var(--rule);
+  border-radius: 0 var(--r-pill) var(--r-pill) 0;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+.chapter span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.chapter:hover {
+  color: var(--paper);
+  background: color-mix(in srgb, var(--signal) 12%, transparent);
+}
+.hudChapter {
+  max-width: 80%;
+  font-family: var(--font-body);
+  font-size: 15px;
+  text-align: center;
+}
+.hudWide {
+  width: auto;
+  height: auto;
+  min-width: 92px;
+  max-width: 70%;
+  padding: 14px 22px;
+  border-radius: 18px;
+}
+.hudChapter {
+  max-width: none;
+}
