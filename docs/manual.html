@@ -1,0 +1,519 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>The Manual · Tubcal</title>
+  <meta name="description" content="The Tubcal service manual: install, configuration, keyboard, connecting accounts, how it works, and every API route the Flask server answers." />
+  <meta name="theme-color" content="#1c140d" />
+  <link rel="icon" type="image/svg+xml" href="assets/icon.svg" />
+  <script>
+    (function () {
+      var ok = ['dark', 'light', 'terminal', 'aqua', 'bauhaus', 'blueprint', 'space'];
+      try {
+        var t = localStorage.getItem('tubcal.docs.theme');
+        if (ok.indexOf(t) < 0) t = window.matchMedia && matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-theme', t);
+      } catch (e) {}
+    })();
+  </script>
+  <link rel="preload" href="assets/fonts/fraunces.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="preload" href="assets/fonts/schibsted-grotesk.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="stylesheet" href="assets/css/site.css" />
+  <link rel="stylesheet" href="assets/css/manual.css" />
+</head>
+<body data-page="manual">
+  <a class="skip" href="#main">Skip to the manual</a>
+  <div class="backdrop" id="backdrop" aria-hidden="true"></div>
+
+  <div class="frame" id="frame">
+    <!-- ══ the console ══════════════════════════════════════════════════ -->
+    <aside class="tc-console man-console" id="console" aria-label="Manual contents">
+      <div class="con-top">
+        <span>ch 2 · manual</span>
+        <span class="onair"><span class="led"></span> on air</span>
+      </div>
+      <div class="brand-row">
+        <a class="tc-wordmark con-mark" href="./" aria-label="Tubcal — back to the tour">Tubcal<em>.</em></a>
+        <button class="iconbtn con-menu" id="con-menu" aria-expanded="false" aria-controls="man-nav" aria-label="Contents">
+          <svg class="ico ico-lg" viewBox="0 0 24 24" aria-hidden="true"><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/></svg>
+        </button>
+      </div>
+      <nav class="chswitch" aria-label="Channels">
+        <a href="./"><b>1</b> Tour</a>
+        <a href="manual.html" aria-current="page"><b>2</b> Manual</a>
+      </nav>
+      <button class="searchbtn" data-open-palette><span data-icon="search"></span><span>Search the manual</span><kbd>/</kbd></button>
+      <span class="con-label">Contents</span>
+      <nav class="tc-nav man-nav" id="man-nav" aria-label="Sections"></nav>
+      <div class="con-foot">
+        <button class="skinbtn" data-cycle-skin title="Next skin (t)"><span data-skin-dots></span><span data-skin-label>Shōwa Night</span></button>
+        <button class="iconbtn" data-open-keys aria-label="Keyboard shortcuts (?)" data-icon="keyboard"></button>
+        <a class="iconbtn" href="https://github.com/Shio-T0/Tubcal" aria-label="Tubcal on GitHub" data-icon="github"></a>
+      </div>
+    </aside>
+
+    <main class="man-main" id="main">
+      <header class="man-hero">
+        <span class="kicker">Channel 2 · the service manual</span>
+        <h1>The Manual <i lang="ja">説明書</i></h1>
+        <p class="man-dek">Everything about running Tubcal on your own machine — installing it, the rooms, the keys, the settings, how the pieces fit, and every route the server answers.</p>
+        <div class="spec">
+          <span><b>Python</b> ≥ 3.12</span><span><b>React</b> 19 + Vite</span><span><b>Flask</b> one port</span><span><b>SQLite</b> one file</span><span><b>binds</b> 127.0.0.1</span><span><b>license</b> MIT</span>
+        </div>
+      </header>
+
+      <!-- ══ 01 Quick start ════════════════════════════════════════════ -->
+      <section class="msec" id="quick-start" data-section>
+        <header class="tc-sectionhead" style="--sec-c: var(--signal)">
+          <span class="plate">01</span><span class="kicker">Install</span><h2>Quick start</h2>
+          <p class="dek">You need <b>Python ≥ 3.12</b>, <b>Node</b>, and <b><code>yt-dlp</code> on your PATH</b>. Everything else is optional.</p>
+        </header>
+        <div class="prose">
+          <div class="codeblock">
+            <div class="cb-head"><span>install &amp; run</span><button class="copy"></button></div>
+<pre><span class="k">uv sync</span>                                               <span class="c"># backend</span>
+<span class="k">cd frontend &amp;&amp; npm install &amp;&amp; npm run build &amp;&amp; cd ..</span>  <span class="c"># frontend</span>
+<span class="k">uv run python main.py</span>                                 <span class="c"># → http://127.0.0.1:5000</span></pre>
+          </div>
+          <p>That's the whole install. Open the page, pick a channel, add a few YouTube channels and subreddits in <b>Settings</b>, and the rooms fill in.</p>
+
+          <h3>Optional extras</h3>
+          <p>The heavier features are each opt-in:</p>
+          <div class="codeblock">
+            <div class="cb-head"><span>extras</span><button class="copy"></button></div>
+<pre><span class="k">uv sync --extra brain</span>     <span class="c"># The Archive: faster-whisper + numpy (local transcription)</span>
+<span class="k">uv sync --extra editor</span>    <span class="c"># The Composing Room: flask-sock (PTY terminal + LSP bridge)</span></pre>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Also nice to have</th><th>Unlocks</th></tr></thead>
+              <tbody>
+                <tr><td>A running <a href="https://ollama.com">Ollama</a> server</td><td>The Archive's answers and summaries, and the <em>written</em> (rather than “wire”) Edition</td></tr>
+                <tr><td><code>rg</code> (ripgrep)</td><td>Fast project grep in the editor — falls back to <code>os.walk</code></td></tr>
+                <tr><td><code>notify-send</code></td><td>A desktop ping ~10 min before a subscribed stream goes live</td></tr>
+                <tr><td>A language server (<code>rust-analyzer</code>, <code>pyright</code>, …)</td><td>Completion and diagnostics in the editor</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p>Every one of these degrades quietly. Miss them all and the app still boots — the feature just reports itself unavailable.</p>
+        </div>
+
+        <div class="machine-check glass">
+          <div class="mc-head">
+            <div><span class="kicker">What do you have?</span><h3>Tick what's on your machine.</h3></div>
+            <p class="dim">The readout shows what each room will do with exactly that — nothing here is required except the three basics above.</p>
+          </div>
+          <div class="mc-grid">
+            <fieldset class="mc-have" id="mc-have"><legend class="sr-only">Installed and connected</legend></fieldset>
+            <div class="mc-out" id="mc-out" aria-live="polite"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ══ 02 Channels & rooms ══════════════════════════════════════ -->
+      <section class="msec" id="channels" data-section>
+        <header class="tc-sectionhead" style="--sec-c: var(--c-foryou)">
+          <span class="plate">02</span><span class="kicker">The set</span><h2>Channels &amp; rooms</h2>
+          <p class="dek">The set has two channels, chosen at <code>/</code> — a TV-style chooser. Press <kbd>1</kbd> or <kbd>2</kbd>.</p>
+        </header>
+        <div class="prose">
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th></th><th>Channel</th><th>What's on</th></tr></thead>
+              <tbody>
+                <tr><td class="nowrap"><b>1</b></td><td class="nowrap"><b>The Hub</b></td><td>Today's paper, your videos, the wire, the archive and the workshop — a set of numbered rooms beside a console.</td></tr>
+                <tr><td class="nowrap"><b>2</b></td><td class="nowrap"><b>The Anime</b></td><td>All of AniList — the season, the week's schedule, your list and its ledger, the community — as a section of its own.</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p>From anywhere, <kbd>Space</kbd><kbd>g</kbd><kbd>h</kbd> goes to the Hub and <kbd>Space</kbd><kbd>g</kbd><kbd>a</kbd> to the Anime.</p>
+
+          <h3>The console</h3>
+          <p>There's no masthead. A slim console runs down the left — the wordmark, the channel switch, a search-everything button, your rooms as numbered preset keys, and Saved / Settings / skin — so every room starts at the top of the screen. The room you're in opens its own index under it (the Screening Room lists its views, your channels with their new counts, and what's queued). It folds to an icon rail, becomes a top bar on a phone, and on very wide screens (≥ 1780 px) hangs in the page's empty left margin. This manual's contents panel is the same console.</p>
+
+          <h3>The rooms</h3>
+          <p>The numbers aren't hardcoded — they're each room's position in your own running order, so switching one off in <b>Settings → Rooms</b> renumbers the rest. The default set:</p>
+          <div class="table-wrap">
+            <table id="rooms-table">
+              <thead><tr><th>No</th><th>Room</th><th>Route</th><th>What it is</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <p>A room's view state — its tab, filters, search — lives in the URL's query string rather than in component state, so opening a detail page and pressing Back restores exactly what you were looking at.</p>
+        </div>
+      </section>
+
+      <!-- ══ 03 The player ════════════════════════════════════════════ -->
+      <section class="msec" id="player" data-section>
+        <header class="tc-sectionhead" style="--sec-c: var(--c-youtube)">
+          <span class="plate">03</span><span class="kicker">One global player</span><h2>The player</h2>
+          <p class="dek">Every video — from any room — plays in one global player, straight from YouTube's own streams: real 1080p, no account, no embed, no third party.</p>
+        </header>
+        <div class="prose">
+          <ul class="feature-list">
+            <li><b>A theatre, not a pop-up.</b> The room goes dark, the picture's colours glow softly around it, and it's sized to the largest 16:9 that fits. Underneath: the title, the channel's face and subscriber count, Subscribe, Save, and a link that starts at this very second.</li>
+            <li><b>A seek bar that knows the video</b> — YouTube's <em>most replayed</em> as a ridge above it, cut at every chapter, with the chapter's name on hover and beside the clock.</li>
+            <li><b>Programme notes beside it.</b> The description with every timestamp seeking, every link to another video opening in the player and every hashtag searching the room; chapters; comments with faces, creator / verified / member / pinned / hearted marks, replies in place, Top or Newest, loading as you scroll; and The Archive's transcript (it follows the playhead) and summary.</li>
+            <li><b>Keeps playing when you leave.</b> <kbd>Esc</kbd> tucks it into a corner dock that stacks and reorders; an up-next queue rolls into the next video when one ends. One <code>&lt;video&gt;</code> element per open video only changes its styling between expanded and docked, so playback never restarts.</li>
+          </ul>
+          <p>How the 1080p works without an account or ffmpeg is in <a href="#how-it-works">How it works → Streams</a>. The player's keys are in <a href="#keyboard">Keyboard</a>. <a href="./#player">Try the player demo on the tour.</a></p>
+        </div>
+      </section>
+
+      <!-- ══ 04 The Anime ═════════════════════════════════════════════ -->
+      <section class="msec" id="anime" data-section>
+        <header class="tc-sectionhead" style="--sec-c: var(--accent-strong)">
+          <span class="plate">04</span><span class="kicker">Channel 2</span><h2>The Anime</h2>
+          <p class="dek">A whole section built on AniList — its own top bar, and a file-tree index down the left where every view (and every useful place inside one) is one click away.</p>
+        </header>
+        <div class="prose">
+          <div class="callout callout-warn"><strong>AniList account required.</strong> AniList now refuses unauthenticated queries, so your list, progress sync and the social side all need a connected account — see <a href="#accounts">Connecting accounts</a>.</div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>View</th><th>What's there</th></tr></thead>
+              <tbody>
+                <tr><td class="nowrap"><b>Browse</b></td><td>Trending, popular, top-rated and more, plus a genre/tag finder with every AniList filter — infinite scroll.</td></tr>
+                <tr><td class="nowrap"><b>Seasons · Schedule</b></td><td>Any season's line-up; the week ahead as an airing grid with countdowns.</td></tr>
+                <tr><td class="nowrap"><b>My List</b></td><td>Your shelves with fast editing, bulk tools, custom lists, export (JSON, CSV, MyAnimeList XML) and the sequel radar — what comes next after everything you've finished. Synced to AniList as you tap.</td></tr>
+                <tr><td class="nowrap"><b>Ledger</b></td><td>Your statistics computed from the list itself: genres, formats, scores, time spent, hot takes.</td></tr>
+                <tr><td class="nowrap"><b>Community</b></td><td>Reviews, people's recommendation pairings (vote on them), today's birthdays and the hall of fame.</td></tr>
+                <tr><td class="nowrap"><b>Channel</b></td><td>Trailers related to what you've watched, played like a station.</td></tr>
+                <tr><td class="nowrap"><b>Social</b></td><td>The forum (threads beside the list), the activity stream, your inbox and people — profile pages, follow, message — with a live preview of every post as others will see it.</td></tr>
+                <tr><td class="nowrap"><b>Title pages</b></td><td>The full dossier: cast with every dub's voice actors, characters, staff, studios, rankings, trends, a franchise watch-order guide, reviews and discussion.</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <h3>Watching</h3>
+          <p>Episodes play in-app through two independent scrapers — <code>anipy-api</code> (allanime / animekai) first, and <code>weeb-cli</code>'s aniworld provider as the fallback — because two unrelated sites rarely break on the same day. Both return the same <code>{sources, subtitles, headers}</code> shape, so nothing downstream special-cases either. On startup Tubcal upgrades <code>anipy-api</code> from PyPI (the scraper's fixes ship as releases); <code>TUBCAL_AUTO_UPDATE=0</code> turns that off.</p>
+          <p>Finishing an episode advances your AniList progress on its own: once playback passes <code>TUBCAL_ANIME_WATCHED_PERCENT</code> (default 80 %) the episode is marked watched — advance-only, once per episode.</p>
+
+          <h3>The Reckoner</h3>
+          <p>A watch-time calculator docked in the page's margin. Hover any title and tap <kbd>C</kbd>: it tallies the next <em>unwatched</em> episode — capped at what has actually aired — and each further <kbd>C</kbd> extends the run. It sums AniList's per-episode durations (24 min, flagged “estimated”, when AniList has none) into a total and a live “start now, finish at…” clock, and remembers the plan. The <kbd>C</kbd> key stands down for modifiers, text fields, an expanded player or editor, and for one second after <kbd>g</kbd> so the <kbd>g</kbd><kbd>c</kbd> room jump still wins.</p>
+
+          <h3>The curtain call</h3>
+          <p>When you finish a season, velvet drapes part on the title: score it in your own AniList scale, join the finale's episode discussion (or start it), write the review while it's fresh, and put the next sequels on Planning or Watching — or read <span lang="ja">終</span>, series finished. It appears once per title, only for a season that has finished airing, and waits while the player is expanded.</p>
+
+          <h3>AniList on a budget</h3>
+          <p>AniList currently allows 30 requests a minute. Every read is cached, relation walks (sequels, watch order) are cached per title, the fan-out walkers check the remaining budget and stop early, and list edits apply locally at once and sync on a short debounce — a flurry of taps is one mutation. On a 429 a cooldown starts during which calls fail fast, so the stale cache is served at once.</p>
+        </div>
+      </section>
+
+      <!-- ══ 05 Keyboard ══════════════════════════════════════════════ -->
+      <section class="msec" id="keyboard" data-section>
+        <header class="tc-sectionhead" style="--sec-c: var(--c-hn)">
+          <span class="plate">05</span><span class="kicker">Hands on the keys</span><h2>Keyboard</h2>
+          <p class="dek">The global bindings stand down while you're typing, while a video is on the big screen, and while the Composing Room has focus — those own their own keys.</p>
+        </header>
+        <div class="keyfinder glass">
+          <label for="kf-in"><span class="kicker">Key finder</span></label>
+          <input id="kf-in" class="kf-in" type="text" placeholder="Press a key, or type what you want to do…" autocomplete="off" spellcheck="false" />
+          <span class="kf-count" id="kf-count" aria-live="polite"></span>
+          <div class="kf-scopes" id="kf-scopes" role="group" aria-label="Filter by context"></div>
+        </div>
+        <div class="keytables" id="keytables"></div>
+      </section>
+
+      <!-- ══ 06 Configuration ═════════════════════════════════════════ -->
+      <section class="msec" id="configuration" data-section>
+        <header class="tc-sectionhead" style="--sec-c: var(--c-editor)">
+          <span class="plate">06</span><span class="kicker">.env and Settings</span><h2>Configuration</h2>
+          <p class="dek">Nothing is required. Copy <code>.env.example</code> to <code>.env</code> only to override a default; anything you'd want to change while the app is running lives in <b>Settings</b> instead.</p>
+        </header>
+        <div class="envbuilder">
+          <div class="eb-form glass" id="eb-form"></div>
+          <div class="eb-out">
+            <div class="codeblock">
+              <div class="cb-head"><span>.env</span><span class="eb-actions"><button class="copy" id="eb-copy"></button><button class="copy" id="eb-dl"></button></span></div>
+              <pre id="eb-pre"></pre>
+            </div>
+            <p class="dim eb-note">Only the values you change are written — a default doesn't need saying. The file stays next to <code>main.py</code> and is git-ignored.</p>
+          </div>
+        </div>
+
+        <div class="prose">
+          <h3>Settings (changed in the app, stored in SQLite)</h3>
+          <p>These live in the <code>settings</code> table of <code>data/tubcal.db</code> and are edited in <b>Settings</b>; the defaults are:</p>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Setting</th><th>Default</th><th>What it does</th></tr></thead>
+              <tbody>
+                <tr><td><code>active_rooms</code></td><td>7 rooms (GitHub off)</td><td>The hub's running order — the room numbers come from it.</td></tr>
+                <tr><td><code>theme</code></td><td><code>dark</code></td><td>The skin (Shōwa Night); injected server-side so the first paint is right.</td></tr>
+                <tr><td><code>brain_auto_index</code></td><td><code>false</code></td><td>Opt-in: transcribe videos into The Archive as you watch them.</td></tr>
+                <tr><td><code>brain_whisper_model</code></td><td><code>base</code></td><td>faster-whisper size (tiny → medium).</td></tr>
+                <tr><td><code>brain_llm_model</code></td><td><code>qwen3.5:9b</code></td><td>Ollama chat model for summaries and answers.</td></tr>
+                <tr><td><code>brain_embed_model</code></td><td><code>nomic-embed-text</code></td><td>Ollama embedding model (Archive search, Edition clustering).</td></tr>
+                <tr><td><code>edition_hour</code></td><td><code>6</code></td><td>Local hour after which today's paper is composed.</td></tr>
+                <tr><td><code>edition_llm_model</code></td><td><em>(blank)</em></td><td>Chat model override for the Edition; blank uses <code>brain_llm_model</code>.</td></tr>
+                <tr><td><code>anime_autosync</code></td><td><code>true</code></td><td>Finishing an episode bumps AniList progress.</td></tr>
+                <tr><td><code>anime_sub_pref</code></td><td><code>sub</code></td><td><code>sub</code> or <code>dub</code>.</td></tr>
+                <tr><td><code>editor_leader</code></td><td><kbd>Space</kbd></td><td>The vim <code>&lt;leader&gt;</code> key in the Composing Room.</td></tr>
+                <tr><td><code>editor_autosave</code></td><td><code>false</code></td><td>Write buffers on blur/idle instead of only on <code>:w</code>.</td></tr>
+                <tr><td><code>notify_live</code></td><td><code>true</code></td><td>Desktop ping 10 min before a subscribed stream goes live.</td></tr>
+                <tr><td><code>solo_audio</code></td><td><code>true</code></td><td>Only the focused video plays sound; others auto-mute.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ══ 07 Connecting accounts ═══════════════════════════════════ -->
+      <section class="msec" id="accounts" data-section>
+        <header class="tc-sectionhead" style="--sec-c: var(--c-reddit)">
+          <span class="plate">07</span><span class="kicker">All optional</span><h2>Connecting accounts</h2>
+          <p class="dek">Everything works logged out. <b>Settings → Connections</b> shows the redirect URIs to register if you want more. Credentials are pasted into Settings and stored only in the local database; the flows use plain HTTP requests, no provider SDKs.</p>
+        </header>
+        <div class="acct-port">
+          <label for="acct-port">Your <code>TUBCAL_PORT</code></label>
+          <input id="acct-port" type="number" min="1" max="65535" value="5000" inputmode="numeric" />
+          <span class="dim">— the redirect URIs below follow it.</span>
+        </div>
+        <div class="accts" id="accts"></div>
+      </section>
+
+      <!-- ══ 08 Privacy ═══════════════════════════════════════════════ -->
+      <section class="msec" id="privacy" data-section>
+        <header class="tc-sectionhead" style="--sec-c: var(--c-dev)">
+          <span class="plate">08</span><span class="kicker">What leaves the machine</span><h2>Privacy</h2>
+          <p class="dek">Binds to <code>127.0.0.1</code> and nothing else. Self-hosted fonts, no trackers, no analytics.</p>
+        </header>
+        <div class="prose">
+          <ul class="feature-list">
+            <li><b>One file holds everything.</b> Subscriptions, settings, watch history, playback progress, saved items, OAuth tokens and every byte of Archive data live in one git-ignored SQLite file, <code>data/tubcal.db</code> (with <code>.bak-*</code> snapshots beside it).</li>
+            <li><b>Anonymous YouTube.</b> Every YouTube read goes through an anonymous session whose policy neither stores nor sends cookies, so there's no stable id linking your searches, feeds and playback. The consent cookie is sent as an explicit header; the one deliberate exception is importing your own subscriptions, which carries your OAuth token. A test (<code>tests/test_httpc_anon.py</code>) sweeps <code>youtube.py</code>'s syntax tree and fails if any call site is neither anonymous nor authenticated.</li>
+            <li><b>Local models.</b> The Archive and The Edition talk to Ollama on <code>127.0.0.1:11434</code> over plain HTTP; transcripts and vectors never leave the box.</li>
+            <li><b>Who it talks to.</b> The platforms themselves (YouTube, Reddit, Hacker News + Algolia, GitHub, AniList), public Invidious instances for trending, comments and fallback search, the anime scrapers while you watch, and PyPI for the <code>anipy-api</code> self-update.</li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- ══ 09 How it works ══════════════════════════════════════════ -->
+      <section class="msec" id="how-it-works" data-section>
+        <header class="tc-sectionhead" style="--sec-c: var(--c-github)">
+          <span class="plate">09</span><span class="kicker">Under the cabinet</span><h2>How it works</h2>
+          <p class="dek">One Flask backend, one React SPA, one SQLite file. The interesting parts are the decisions that keep a single-person app fast and unbreakable.</p>
+        </header>
+
+        <h3 class="sub" id="flow">The request path</h3>
+        <div class="flow" aria-label="Request flow">
+          <div class="fl-node"><span class="kicker">frontend/src/api/client.js</span><b>React</b><span><code>api()</code> / <code>useApi()</code> unwrap <code>data</code>, or throw on <code>ok === false</code></span></div>
+          <div class="fl-arrow" aria-hidden="true"></div>
+          <div class="fl-node"><span class="kicker">server/api/*</span><b>Flask blueprints</b><span>every response is <code>ok(data)</code> or <code>err(msg)</code>; <code>/api/*</code> is <code>no-store</code></span></div>
+          <div class="fl-arrow" aria-hidden="true"></div>
+          <div class="fl-node lit"><span class="kicker">server/cache.py</span><b>Two-layer cache</b><span>memory over SQLite; stale rows kept for when upstream fails</span></div>
+          <div class="fl-arrow" aria-hidden="true"></div>
+          <div class="fl-node"><span class="kicker">server/sources/*</span><b>Source adapters</b><span>one module per platform's quirks</span></div>
+          <div class="fl-arrow" aria-hidden="true"></div>
+          <div class="fl-node"><span class="kicker">server/httpc.py</span><b>Shared sessions</b><span>per-host spacing, anonymous reads, a large pool for HLS fan-out</span></div>
+          <div class="fl-arrow" aria-hidden="true"></div>
+          <div class="fl-node ext"><span class="kicker">the internet</span><b>The platforms</b><span>YouTube · Reddit · HN · GitHub · AniList</span></div>
+        </div>
+
+        <h3 class="sub" id="boot">Boot sequence</h3>
+        <p class="dim">What <code>main.py</code> does, in order. Step through it:</p>
+        <div class="boot glass">
+          <ol class="boot-steps" id="boot-steps"></ol>
+          <div class="boot-side">
+            <div class="boot-term" id="boot-term" aria-live="polite"></div>
+            <div class="boot-btns"><button class="btn btn-sm btn-lit" id="boot-next">Power on</button><button class="btn btn-sm" id="boot-reset">Reset</button></div>
+          </div>
+        </div>
+
+        <h3 class="sub" id="caching">Caching is the load-bearing wall</h3>
+        <p>Two layers — an in-memory dict over a <code>cache</code> table in SQLite — so caches survive restarts. Expired rows are kept <em>on purpose</em>: if an upstream fetch fails, the stale payload is served instead of an error. That single decision is why Reddit's rate limiting can't take the app down. Play with it — this is <code>cache.cached()</code> with a 10-minute TTL (the YouTube RSS one):</p>
+        <div class="cachesim glass" id="cachesim">
+          <div class="cs-ctl">
+            <button class="btn btn-sm btn-lit" data-cs="req">Request the feed</button>
+            <button class="btn btn-sm" data-cs="tick">Wait 4 minutes</button>
+            <button class="btn btn-sm" data-cs="restart">Restart the server</button>
+            <label class="switch cs-up"><input type="checkbox" id="cs-up" checked /><span class="track"></span><span>Upstream reachable</span></label>
+            <label class="switch cs-swr"><input type="checkbox" id="cs-swr" /><span class="track"></span><span><code>cached_swr()</code></span></label>
+          </div>
+          <div class="cs-board">
+            <div class="cs-clock"><span class="kicker">clock</span><b id="cs-clock">0:00</b></div>
+            <div class="cs-layer" id="cs-mem"></div>
+            <div class="cs-layer" id="cs-db"></div>
+            <div class="cs-resp" id="cs-resp"></div>
+          </div>
+          <ol class="cs-log" id="cs-log" aria-live="polite"></ol>
+        </div>
+
+        <h3 class="sub" id="rates">Rate limits, respected</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Upstream</th><th>How Tubcal stays under it</th></tr></thead>
+            <tbody>
+              <tr><td class="nowrap">Reddit</td><td>One request every 3 s per host (<code>HOST_INTERVALS</code>); listings cached 5 min; stale served on 429.</td></tr>
+              <tr><td class="nowrap">Invidious</td><td>1 s spacing per public instance, so a channel page's burst becomes a gentle stream.</td></tr>
+              <tr><td class="nowrap">AniList</td><td>30 req/min budget tracked from <code>X-RateLimit-Remaining</code>; fan-outs stop early; a 429 starts a fail-fast cooldown.</td></tr>
+              <tr><td class="nowrap">GitHub</td><td>60 req/hr/IP unauthenticated, so everything is cached hard; a classic PAT raises it to 5,000.</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 class="sub" id="streams">Streams: real 1080p without an account or ffmpeg</h3>
+        <p>YouTube's open player clients now expose exactly one muxed rendition — 360p. Everything above ships as adaptive DASH, video and audio apart. Tubcal keeps 360p as an instant floor and, for each higher rendition, parses the stream's <code>sidx</code> index into byte-range segments and synthesizes an HLS playlist around them; <code>hls.js</code> muxes the two in the browser, fetching straight from googlevideo through a segment proxy.</p>
+        <div class="ladder-diag" aria-label="Quality ladder">
+          <div class="ld-row"><span class="ld-tag">360p</span><div class="ld-box muxed">one muxed stream (itag 18) — plays instantly</div></div>
+          <div class="ld-row"><span class="ld-tag">480p–1080p</span>
+            <div class="ld-chain">
+              <div class="ld-box">DASH video-only (avc1) + original-language AAC</div>
+              <div class="ld-box">fmp4.py reads each <code>sidx</code> → byte ranges</div>
+              <div class="ld-box">feeds.py serves a master + <code>#EXT-X-BYTERANGE</code> playlists</div>
+              <div class="ld-box lit">hls.js muxes in the browser, native seeking</div>
+            </div>
+          </div>
+          <div class="ld-row"><span class="ld-tag">live</span><div class="ld-box">no DASH — stays on YouTube's own muxed HLS</div></div>
+        </div>
+        <p class="dim">Dubbed and DRC audio tracks are dropped; only the creator's original track is kept. A resolve that only yields the 360p floor is cached briefly, so it heals itself on the next open.</p>
+
+        <h3 class="sub" id="edition-how">The Edition never computes on the request path</h3>
+        <p>A background thread builds one JSON payload per day into the <code>editions</code> table; <code>GET /api/edition/latest</code> is a single row read. Clustering (<code>brain/cluster.py</code>) is pure functions — canonical-URL hard-links, then greedy centroid clustering over unit vectors at a strict cosine threshold (0.80) — and has the deepest test coverage in the repo. Model synthesis is capped at six calls per build, time-boxed, and gated by a citation validator with a template fallback, so unvalidated model output can't reach a page. The lede alone gets a transcript block: if its top video is already in The Archive, the copy desk reads what was actually said.</p>
+        <div class="rungs-m">
+          <div><span class="kicker">nothing installed</span><b>Wire edition</b><span>hard-link clusters, template prose, every story shows its numbers</span></div>
+          <div><span class="kicker">+ numpy + embed model</span><b>Semantic clusters</b><span>the same story found across rooms</span></div>
+          <div><span class="kicker">+ chat model</span><b>Edited</b><span>grounded synthesis with citations</span></div>
+        </div>
+
+        <h3 class="sub" id="archive-how">The Archive answers in two passes</h3>
+        <p>A retrieved chunk is a ~45-second keyhole, and the sentence that answers the question is often just past its edge. So <code>summarize.ask()</code> runs two local LLM calls:</p>
+        <ol class="steps">
+          <li><b>Retrieve.</b> Embed the question; brute-force cosine over every chunk vector in SQLite; keep the top 12.</li>
+          <li><b>Zoom.</b> The model sees the numbered excerpts and names (JSON only, temperature 0) the ≤ 3 worth a closer read (<code>TUBCAL_BRAIN_ASK_EXPAND</code>).</li>
+          <li><b>Re-read.</b> Those come back with two chunks either side (~± 90 s), deduped so no passage is sent twice, each with its provenance — title, channel, timestamps, position in the video, watch date, rewatch count.</li>
+          <li><b>Answer.</b> The model writes the answer with citations; the deep-read ones are ringed in the UI. Anything malformed from the zoom pass falls back to the top-scoring excerpts — validate model output, never trust it.</li>
+        </ol>
+
+        <h3 class="sub" id="safety">Untrusted HTML, the editor sandbox, lazy imports</h3>
+        <p><b>Untrusted HTML is never injected.</b> Comments and descriptions from YouTube, HN and AniList are walked with an allow-list into React elements — which is also what lets a timestamp seek, or a link to another video open in the player.</p>
+        <p><b>The editor is sandboxed.</b> Every client-supplied path resolves against <code>EDITOR_ROOT</code> and is rejected if it escapes — traversal, absolute paths, symlinks out. Writes are atomic (temp file + <code>os.replace</code>) behind an mtime precondition, so a stale buffer gets a conflict instead of clobbering your file; <code>:w!</code> forces. Try the rule:</p>
+        <div class="pathtest glass">
+          <div class="pt-row">
+            <label for="pt-root">EDITOR_ROOT</label><input id="pt-root" type="text" value="/home/you/Projects" spellcheck="false" />
+          </div>
+          <div class="pt-row">
+            <label for="pt-in">client path</label><input id="pt-in" type="text" value="lantern/src/main.rs" spellcheck="false" />
+          </div>
+          <div class="pt-try" id="pt-try"></div>
+          <div class="pt-out" id="pt-out" aria-live="polite"></div>
+          <p class="pt-foot dim">A symlink inside the root that points outside it is caught the same way: <code>resolve()</code> follows it first. That part needs a real filesystem, so it isn't simulated here.</p>
+        </div>
+        <p><b>Heavy dependencies are lazy.</b> anipy, weeb-cli, numpy, faster-whisper, rapidfuzz and flask-sock are imported inside the function that needs them and guarded — which is what lets minimal runtimes, down to the Android/Chaquopy build, boot at all.</p>
+      </section>
+
+      <!-- ══ 10 API reference ═════════════════════════════════════════ -->
+      <section class="msec" id="api" data-section>
+        <header class="tc-sectionhead" style="--sec-c: var(--c-hn)">
+          <span class="plate">10</span><span class="kicker">server/api/*</span><h2>API reference</h2>
+          <p class="dek">Every route the Flask app registers, read straight out of the blueprints. The API is for the app's own UI — it binds to <code>127.0.0.1</code> and has no auth of its own — but it's plain JSON, so it's easy to script against locally.</p>
+        </header>
+        <div class="prose">
+          <div class="envelope">
+            <div class="codeblock"><div class="cb-head"><span>success</span></div><pre>{ <span class="k">"ok"</span>: true,  <span class="k">"data"</span>: { … } }</pre></div>
+            <div class="codeblock"><div class="cb-head"><span>failure</span></div><pre>{ <span class="k">"ok"</span>: false, <span class="k">"error"</span>: <span class="s">"message"</span> }</pre></div>
+          </div>
+          <p class="dim">Paths use Flask's converters — <code>&lt;int:id&gt;</code>, <code>&lt;path:item_id&gt;</code>. <b>query</b> lists the parameters a handler reads from <code>request.args</code>; <b>body</b> the JSON keys a write reads. The list is generated by <code>docs/tools/extract_routes.py</code>.</p>
+        </div>
+        <div class="api-ctl glass">
+          <div class="api-search"><span data-icon="search"></span><input id="api-q" type="search" placeholder="Filter by path, handler or description…" autocomplete="off" spellcheck="false" aria-label="Filter routes" /></div>
+          <div class="api-chips" id="api-methods" role="group" aria-label="Methods"></div>
+          <div class="api-chips" id="api-bps" role="group" aria-label="Blueprints"></div>
+          <span class="api-count" id="api-count" aria-live="polite"></span>
+        </div>
+        <div class="api-list" id="api-list"></div>
+      </section>
+
+      <!-- ══ 11 Project layout ════════════════════════════════════════ -->
+      <section class="msec" id="layout" data-section>
+        <header class="tc-sectionhead" style="--sec-c: var(--c-editor)">
+          <span class="plate">11</span><span class="kicker">Where everything lives</span><h2>Project layout</h2>
+          <p class="dek">Open a folder, pick a file — the note on the right says what it's for, with a link to the source.</p>
+        </header>
+        <div class="tree-wrap">
+          <div class="ftree glass" id="ftree" role="tree" aria-label="Repository"></div>
+          <div class="fnote glass" id="fnote" aria-live="polite"></div>
+        </div>
+        <div class="prose">
+          <h3>Adding a room</h3>
+          <p>Three edits kept in sync: an entry in <code>frontend/src/lib/rooms.js</code>, a component in <code>pages/</code>, and a route in <code>App.jsx</code> — plus the id in <code>config.ROOM_IDS</code> so the backend agrees.</p>
+          <h3>Adding a source</h3>
+          <p><code>server/sources/hackernews.py</code> is the reference pattern: <code>normalize(item)</code>, <code>get_feed()</code>, <code>search()</code>, <code>get_item()</code>, each wrapped in <code>cache.cached()</code>. New external fetches go through <code>httpc.py</code>, with a TTL constant added to <code>config.py</code>.</p>
+        </div>
+      </section>
+
+      <!-- ══ 12 Develop ═══════════════════════════════════════════════ -->
+      <section class="msec" id="develop" data-section>
+        <header class="tc-sectionhead" style="--sec-c: var(--c-dev)">
+          <span class="plate">12</span><span class="kicker">Hacking on it</span><h2>Develop</h2>
+          <p class="dek">Two servers in dev; one port in production mode, where Flask serves <code>frontend/dist</code>.</p>
+        </header>
+        <div class="prose">
+          <div class="codeblock">
+            <div class="cb-head"><span>dev mode</span><button class="copy"></button></div>
+<pre><span class="k">uv run python main.py</span>        <span class="c"># API on :5000</span>
+<span class="k">cd frontend &amp;&amp; npm run dev</span>   <span class="c"># UI on :5173, /api proxied</span>
+
+<span class="k">uv run pytest</span>                <span class="c"># backend tests</span>
+<span class="k">uv run pytest tests/test_api.py::test_name -q</span>   <span class="c"># a single test</span></pre>
+          </div>
+          <p>In production mode a UI change needs <code>npm run build</code> and a hard refresh, and a backend change needs a restart. There is no linter or formatter configured, and no frontend tests. The deepest test coverage sits where a bug would be silent: edition clustering, editor path containment, the fMP4 index parser, anonymous YouTube reads, and the pure AniList helpers. Tests point the app at a throwaway database through the <code>client</code> fixture — they never touch <code>data/tubcal.db</code>.</p>
+          <h3>Conventions</h3>
+          <ul class="feature-list compact">
+            <li>API endpoints return <code>ok(data)</code> / <code>err(msg, status)</code> — never a bare <code>jsonify</code>.</li>
+            <li>New external fetches go through <code>server/httpc.py</code> and are wrapped in <code>server/cache.py</code> with a TTL constant in <code>server/config.py</code>.</li>
+            <li>Anonymous reads use <code>anonymous=True</code>; every YouTube call site is either anonymous or authenticated.</li>
+            <li>Configuration is env-driven through <code>config.py</code>; runtime settings live in the DB and are read with <code>db.get_setting()</code>. All DB access goes through <code>db.py</code> — there is no ORM.</li>
+            <li>Heavy or native dependencies are imported lazily inside the function that needs them, never at module top level.</li>
+            <li>A room's view state belongs in the query string (<code>useParamState</code> in <code>lib/urlState.js</code>), not in <code>useState</code>.</li>
+            <li>Component CSS reads the design tokens through <code>var(--token)</code> — that's how every skin restyles it for free, down to the editor buffer.</li>
+          </ul>
+          <h3>These docs</h3>
+          <p>This site is plain HTML, CSS and JavaScript in <code>docs/</code> — no build step, no dependencies, fonts self-hosted. GitHub Pages serves it from the <code>/docs</code> folder of <code>main</code>. When the API changes, regenerate the reference with <code>python docs/tools/extract_routes.py</code>.</p>
+        </div>
+      </section>
+
+      <!-- ══ 13 Troubleshooting ═══════════════════════════════════════ -->
+      <section class="msec" id="troubleshooting" data-section>
+        <header class="tc-sectionhead" style="--sec-c: var(--danger)">
+          <span class="plate">13</span><span class="kicker">When a room goes quiet</span><h2>Troubleshooting</h2>
+          <p class="dek">Most “broken” rooms are a missing optional piece reporting itself unavailable, by design.</p>
+        </header>
+        <div class="faq">
+          <details><summary>A UI change doesn't show up.</summary><p>In production mode Flask serves the built <code>frontend/dist</code>. Run <code>cd frontend &amp;&amp; npm run build</code> and hard-refresh. Backend changes need a server restart. In dev, run the Vite server on :5173 instead.</p></details>
+          <details><summary>The Anime channel says to connect AniList.</summary><p>AniList refuses unauthenticated queries, so the whole channel needs a connected account. Register an API client on AniList with the redirect URI shown in <b>Settings → Connections</b> (see <a href="#accounts">Connecting accounts</a>). AniList tokens last about a year and have no refresh flow — when one expires, reconnect.</p></details>
+          <details><summary>An episode won't play.</summary><p>The scrapers break when their sites change; the fix usually ships as an <code>anipy-api</code> release, which Tubcal installs on startup — restart the app. If you set <code>TUBCAL_AUTO_UPDATE=0</code>, update it yourself. If the first scraper can't resolve, the second one is tried automatically; you can prefer one with <code>TUBCAL_ANIME_PROVIDER</code>.</p></details>
+          <details><summary>The Dispatch has no scores and flat comments.</summary><p>That's Reddit logged out: it only serves RSS to anonymous clients. Create an OAuth <em>web app</em> at reddit.com/prefs/apps and connect it in Settings for full data.</p></details>
+          <details><summary>Videos only play at 360p.</summary><p>360p is the instant floor; higher renditions come from YouTube's DASH streams. A resolve that only produced the floor is cached briefly and heals on the next open. Make sure <code>yt-dlp</code> is on your PATH and reasonably current.</p></details>
+          <details><summary>The Archive or the written Edition says models are unavailable.</summary><p>Install the extra (<code>uv sync --extra brain</code>), start Ollama, and pull the models named in Settings (by default <code>nomic-embed-text</code> and <code>qwen3.5:9b</code>). Without them the Edition still prints a wire edition. If ML wheels fail to install, use Python 3.12 rather than a newer system Python.</p></details>
+          <details><summary>The Composing Room has no terminal or completion.</summary><p>The terminal and the LSP bridge need <code>uv sync --extra editor</code>; completion needs a language server on your PATH. Without them it's still a full editor. It can only reach <code>TUBCAL_EDITOR_ROOT</code> (default <code>~/Projects</code>).</p></details>
+          <details><summary>The GitHub room stops loading.</summary><p>Unauthenticated GitHub allows 60 requests an hour per IP. Paste a classic personal access token into Settings, or set <code>TUBCAL_GITHUB_TOKEN</code>, for 5,000.</p></details>
+          <details><summary>Search says every Invidious instance failed.</summary><p>Search goes to YouTube's own InnerTube endpoint first; Invidious is only the fallback. If you need the fallback to work, point <code>TUBCAL_INVIDIOUS</code> at instances you trust.</p></details>
+        </div>
+      </section>
+
+      <!-- ══ 14 License ═══════════════════════════════════════════════ -->
+      <section class="msec" id="license" data-section>
+        <header class="tc-sectionhead" style="--sec-c: var(--paper-faint)">
+          <span class="plate">14</span><span class="kicker">The fine print</span><h2>License</h2>
+        </header>
+        <div class="prose">
+          <p>Tubcal is MIT licensed — see <a href="https://github.com/Shio-T0/Tubcal/blob/main/LICENSE">LICENSE</a>. The fonts on this site (Fraunces, Schibsted Grotesk, IBM Plex Mono, VT323, Archivo, Space Grotesk, Inter) are under the SIL Open Font License and are served from this repository.</p>
+        </div>
+      </section>
+
+      <footer class="sitefoot man-foot">
+        <div class="tc-wordmark">Tubcal<em>.</em></div>
+        <p><em>Runs on localhost, for one person, on purpose.</em></p>
+        <p><a href="./">The tour</a> · <a href="https://github.com/Shio-T0/Tubcal">github.com/Shio-T0/Tubcal</a></p>
+      </footer>
+    </main>
+  </div>
+
+  <script src="assets/js/data.js"></script>
+  <script src="assets/js/routes.js"></script>
+  <script src="assets/js/site.js"></script>
+  <script src="assets/js/manual.js"></script>
+</body>
+</html>

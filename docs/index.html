@@ -1,0 +1,436 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Tubcal — a private broadcast station for one person</title>
+  <meta name="description" content="Tubcal: YouTube, Reddit, Hacker News, GitHub and AniList in one Flask app bound to 127.0.0.1 — a daily paper written on your own machine, a second brain over what you've watched, and a vim-handed code editor." />
+  <meta name="theme-color" content="#1c140d" />
+  <meta property="og:title" content="Tubcal — a private broadcast station for one person" />
+  <meta property="og:description" content="YouTube · Reddit · Hacker News · GitHub · AniList, on localhost, for one person, on purpose." />
+  <meta property="og:type" content="website" />
+  <link rel="icon" type="image/svg+xml" href="assets/icon.svg" />
+  <script>
+    /* Paint the saved skin before first paint — the app does the same server-side. */
+    (function () {
+      var ok = ['dark', 'light', 'terminal', 'aqua', 'bauhaus', 'blueprint', 'space'];
+      try {
+        var t = localStorage.getItem('tubcal.docs.theme');
+        if (ok.indexOf(t) < 0) t = window.matchMedia && matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-theme', t);
+      } catch (e) {}
+    })();
+  </script>
+  <link rel="preload" href="assets/fonts/fraunces.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="preload" href="assets/fonts/schibsted-grotesk.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="stylesheet" href="assets/css/site.css" />
+  <link rel="stylesheet" href="assets/css/tour.css" />
+</head>
+<body data-page="tour">
+  <a class="skip" href="#hub">Skip to the tour</a>
+  <div class="backdrop" id="backdrop" aria-hidden="true"></div>
+
+  <!-- the slim bar that drops in once you've left the chooser -->
+  <header class="bar" id="bar">
+    <div class="bar-in">
+      <a class="tc-wordmark bar-mark" href="#top" aria-label="Tubcal — back to the chooser">Tubcal<em>.</em></a>
+      <nav class="chswitch" aria-label="Channels">
+        <a href="./" aria-current="page"><b>1</b> Tour</a>
+        <a href="manual.html"><b>2</b> Manual</a>
+      </nav>
+      <nav class="bar-stops" aria-label="Tour stops" id="bar-stops"></nav>
+      <div class="bar-tools">
+        <button class="searchbtn" data-open-palette aria-label="Search the docs"><span data-icon="search"></span><span class="bar-search-l">Search</span><kbd>Ctrl K</kbd></button>
+        <button class="skinbtn" data-cycle-skin aria-label="Next skin"><span data-skin-dots></span><span class="bar-skin-l" data-skin-label>Shōwa Night</span></button>
+        <a class="iconbtn" href="https://github.com/Shio-T0/Tubcal" aria-label="Tubcal on GitHub" data-icon="github"></a>
+      </div>
+    </div>
+  </header>
+
+  <main class="page" id="main">
+
+    <!-- ══ "/" — the chooser ═════════════════════════════════════════════ -->
+    <section id="top" class="chooser shell" data-section>
+      <div class="tc-topline chooser-top">
+        <span data-today>Today</span>
+        <button class="skinlink" data-cycle-skin title="Change the skin (t)"><span data-skin-label>Shōwa Night</span></button>
+        <span class="onair"><span class="led"></span> select a channel</span>
+      </div>
+
+      <h1 class="tc-wordmark hero-mark">Tubcal<em>.</em></h1>
+      <p class="hero-tag">A private broadcast station for one person.</p>
+      <p class="hero-sub">
+        YouTube · Reddit · Hacker News · GitHub · AniList — a daily paper written on your own machine,
+        a second brain over what you've watched, and a vim-handed code editor. One Flask app, bound to <code>127.0.0.1</code>.
+      </p>
+
+      <div class="sets">
+        <!-- Channel 1 -->
+        <article class="set set-tour" aria-labelledby="ch-tour">
+          <div class="screen">
+            <span class="scan" aria-hidden="true"></span>
+            <a class="head" href="#hub" id="ch-tour">
+              <span class="dial">1</span>
+              <span class="headText">
+                <span class="kicker">Channel 1 · the programme</span>
+                <span class="title">The Tour</span>
+                <span class="note">Walk the set — the Hub's rooms, the paper, the player, the Anime, the seven skins. Every stop is playable right here.</span>
+              </span>
+              <span class="arrow" data-icon="arrow" data-icon-class="ico-lg"></span>
+            </a>
+            <nav class="guide" aria-label="Tour stops" id="guide"></nav>
+            <footer class="foot">
+              <span>seven stops · all interactive</span>
+              <span class="keys"><kbd>1</kbd></span>
+            </footer>
+          </div>
+        </article>
+
+        <!-- Channel 2 -->
+        <article class="set set-manual" aria-labelledby="ch-manual">
+          <div class="screen">
+            <div class="routewall" aria-hidden="true" id="routewall"></div>
+            <span class="scan" aria-hidden="true"></span>
+            <a class="head" href="manual.html" id="ch-manual">
+              <span class="dial">2</span>
+              <span class="headText">
+                <span class="kicker">Channel 2 · the service manual</span>
+                <span class="title">The Manual <i lang="ja">説明書</i></span>
+                <span class="note">Install it, configure it, learn its keys, read how it works — down to every route the server answers.</span>
+              </span>
+              <span class="arrow" data-icon="arrow" data-icon-class="ico-lg"></span>
+            </a>
+            <nav class="doors" aria-label="Manual sections">
+              <a class="door" href="manual.html#quick-start">Quick start</a>
+              <a class="door" href="manual.html#configuration">Configuration</a>
+              <a class="door" href="manual.html#keyboard">Keyboard</a>
+              <a class="door" href="manual.html#how-it-works">How it works</a>
+              <a class="door" href="manual.html#api">API reference</a>
+              <a class="door" href="manual.html#layout">Project layout</a>
+            </nav>
+            <footer class="foot">
+              <span id="route-count">every route documented</span>
+              <span class="keys"><kbd>2</kbd></span>
+            </footer>
+          </div>
+        </article>
+      </div>
+
+      <p class="hint">
+        <kbd>1</kbd> <kbd>2</kbd> switch channels · <kbd>Ctrl</kbd><kbd>K</kbd> searches everything ·
+        <kbd>t</kbd> changes the skin · <kbd>?</kbd> for the rest
+      </p>
+
+      <div class="ticker" aria-label="No accounts required, no cloud, no telemetry">
+        <div class="ticker-track" aria-hidden="true">
+          <span>No accounts required</span><span>no cloud</span><span>no telemetry</span><span>the only outbound traffic is the platforms themselves</span><span>one SQLite file</span><span>binds to 127.0.0.1 and nothing else</span>
+          <span>No accounts required</span><span>no cloud</span><span>no telemetry</span><span>the only outbound traffic is the platforms themselves</span><span>one SQLite file</span><span>binds to 127.0.0.1 and nothing else</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══ 01 · The Hub ═════════════════════════════════════════════════ -->
+    <section id="hub" class="tour-sec" data-section>
+      <div class="shell">
+        <header class="tc-sectionhead reveal" style="--sec-c: var(--signal)">
+          <span class="plate">01</span>
+          <span class="kicker">Channel 1 · the broadsheet</span>
+          <h2>The Hub</h2>
+          <p class="dek">
+            There's no masthead. A slim console runs down the left — the wordmark, the channel switch, a search-everything
+            button and your rooms as numbered preset keys — so every room starts at the top of the screen.
+            <strong>Press a key.</strong>
+          </p>
+        </header>
+
+        <div class="hubdemo reveal">
+          <aside class="tc-console demo-console" aria-label="The hub console (demo)">
+            <div class="con-top">
+              <span>ch 1 · hub</span>
+              <span class="onair"><span class="led"></span> on air</span>
+            </div>
+            <div class="tc-wordmark con-mark">Tubcal<em>.</em></div>
+            <div class="chswitch con-ch" aria-hidden="true"><a aria-current="page"><b>1</b> Hub</a><a href="#anime"><b>2</b> Anime</a></div>
+            <div class="con-search" aria-hidden="true"><span data-icon="search"></span><span>Search everything</span><kbd>/</kbd></div>
+            <span class="con-label">Rooms</span>
+            <div class="tc-nav" id="con-nav" role="tablist" aria-label="Rooms" aria-orientation="vertical"></div>
+            <div class="con-foot" aria-hidden="true"><span>Saved</span><span>Settings</span><span data-skin-dots></span></div>
+          </aside>
+
+          <div class="roomscreen" id="roomscreen" role="tabpanel" aria-live="polite"></div>
+        </div>
+
+        <div class="settings-rooms glass reveal">
+          <div class="sr-head">
+            <div>
+              <span class="kicker">Settings → Rooms</span>
+              <h3>The numbers aren't hardcoded.</h3>
+            </div>
+            <p class="dim">They're each room's position in your own running order — switch one off and the rest renumber. GitHub ships off by default.</p>
+          </div>
+          <div class="sr-grid" id="sr-grid"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══ 02 · The Edition ════════════════════════════════════════════ -->
+    <section id="edition" class="tour-sec" data-section>
+      <div class="shell">
+        <header class="tc-sectionhead reveal" style="--sec-c: var(--c-foryou)">
+          <span class="plate">02</span>
+          <span class="kicker">The daily paper</span>
+          <h2>The Edition</h2>
+          <p class="dek">
+            A front page composed on this machine. It degrades like a real press: every rung of the ladder prints a usable paper.
+            Flip what's installed and watch the same morning's news re-set itself.
+          </p>
+        </header>
+
+        <div class="ladder reveal">
+          <div class="ladder-ctl glass">
+            <span class="kicker">What's installed</span>
+            <label class="switch"><input type="checkbox" id="lad-embed" /><span class="track"></span><span><b>numpy + an embed model</b><small>semantic clustering across platforms</small></span></label>
+            <label class="switch"><input type="checkbox" id="lad-chat" /><span class="track"></span><span><b>an Ollama chat model</b><small>grounded, citation-checked prose</small></span></label>
+            <ol class="rungs" id="rungs">
+              <li data-rung="0"><span>Wire</span>URL hard-links cluster; headlines + numbers</li>
+              <li data-rung="1"><span>Semantic</span>the same story, found across rooms</li>
+              <li data-rung="2"><span>Edited</span>written up by the copy desk</li>
+            </ol>
+            <p class="ladder-note" id="ladder-note"></p>
+          </div>
+          <div class="paper" id="paper" aria-live="polite"></div>
+        </div>
+
+        <ol class="presses reveal">
+          <li><span class="kicker">Background thread</span><b>Built once a day</b><span>Clustering, ranking and writing all happen off the request path.</span></li>
+          <li><span class="kicker">editions table</span><b>One JSON payload</b><span>Every paper is a single row, so back issues are free.</span></li>
+          <li><span class="kicker">GET /api/edition/latest</span><b>One SQLite read</b><span>Opening the page never waits on a model.</span></li>
+          <li><span class="kicker">The copy desk</span><b>≤ 6 model calls</b><span>Time-boxed, gated by a citation validator, with a template fallback — the paper cannot invent a story.</span></li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- ══ 03 · The player ═════════════════════════════════════════════ -->
+    <section id="player" class="tour-sec" data-section>
+      <div class="shell">
+        <header class="tc-sectionhead reveal" style="--sec-c: var(--c-youtube)">
+          <span class="plate">03</span>
+          <span class="kicker">One global player</span>
+          <h2>A theatre, not a pop-up.</h2>
+          <p class="dek">
+            Every video — from any room — plays in one player, straight from YouTube's own streams: real 1080p, no account,
+            no embed. The room goes dark, the picture's colours glow around it, and the seek bar knows the video.
+            <strong>Click the screen, then use the keys.</strong>
+          </p>
+        </header>
+
+        <div class="theatre reveal" id="theatre" tabindex="0" data-owns-keys aria-label="Player demo. Focus it and use Space, J, L, the arrows, 0 to 9, Control-arrows for chapters, and Escape.">
+          <div class="th-stage" id="th-stage">
+            <div class="th-card" id="th-card">
+              <div class="th-glow" id="th-glow" aria-hidden="true"></div>
+              <div class="th-picture" id="th-picture">
+                <div class="th-scene" id="th-scene"></div>
+                <span class="th-beam" aria-hidden="true"></span>
+                <span class="scan" aria-hidden="true"></span>
+                <div class="th-osd" id="th-osd" aria-hidden="true"></div>
+                <button class="th-bigplay" id="th-bigplay" aria-label="Play">▶</button>
+              </div>
+              <div class="th-controls">
+                <button class="iconbtn th-play" id="th-play" aria-label="Play"></button>
+                <span class="th-time" id="th-time">0:00 / 18:40</span>
+                <span class="th-chap" id="th-chap"></span>
+                <div class="th-seek" id="th-seek" role="slider" tabindex="-1" aria-label="Seek" aria-valuemin="0" aria-valuemax="1120" aria-valuenow="0">
+                  <svg class="th-ridge" id="th-ridge" viewBox="0 0 1000 40" preserveAspectRatio="none" aria-hidden="true"></svg>
+                  <div class="th-bar" id="th-bar"></div>
+                  <div class="th-tip" id="th-tip" aria-hidden="true"></div>
+                </div>
+                <button class="iconbtn th-dockbtn" id="th-dockbtn" aria-label="Keep playing in the corner (Esc)" title="Keep playing in the corner (Esc)">⤡</button>
+              </div>
+              <div class="th-info">
+                <div class="th-title">How a picture tube paints a picture</div>
+                <div class="th-meta">
+                  <span class="th-face" aria-hidden="true">PL</span>
+                  <span><b>The Phosphor Lab</b><small>182K subscribers</small></span>
+                  <button class="btn btn-sm th-sub" id="th-sub">Subscribe</button>
+                  <button class="btn btn-sm" id="th-save">Save</button>
+                  <button class="btn btn-sm" id="th-link">Copy link at <span id="th-at">0:00</span></button>
+                </div>
+              </div>
+            </div>
+            <div class="th-dockhint" id="th-dockhint">Still playing in the corner — <kbd>Esc</kbd> or click it to come back.</div>
+          </div>
+
+          <aside class="th-notes">
+            <div class="th-tabs" role="tablist" aria-label="Programme notes">
+              <button role="tab" aria-selected="true" data-tab="chapters">Chapters</button>
+              <button role="tab" aria-selected="false" data-tab="transcript">Transcript</button>
+              <button role="tab" aria-selected="false" data-tab="keys">Keys</button>
+            </div>
+            <div class="th-pane" id="th-pane-chapters"></div>
+            <div class="th-pane" id="th-pane-transcript" hidden></div>
+            <div class="th-pane" id="th-pane-keys" hidden></div>
+          </aside>
+        </div>
+        <p class="th-caption dim reveal">
+          The ridge over the seek bar is YouTube's <em>most replayed</em>, cut at every chapter. The transcript comes from The Archive
+          and follows the playhead. <kbd>Esc</kbd> tucks the player into a corner dock that keeps playing while you browse.
+        </p>
+      </div>
+    </section>
+
+    <!-- ══ 04 · The Anime ══════════════════════════════════════════════ -->
+    <section id="anime" class="tour-sec" data-section>
+      <div class="shell">
+        <header class="tc-sectionhead reveal" style="--sec-c: var(--accent-strong)">
+          <span class="plate">04</span>
+          <span class="kicker">Channel 2 · the picture scroll</span>
+          <h2>The Anime <i lang="ja" class="jp">アニメ</i></h2>
+          <p class="dek">
+            All of AniList as a section of its own — its own top bar, and a file-tree index down the left where every view,
+            and every useful place inside one, is one click away.
+          </p>
+        </header>
+
+        <div class="animedemo reveal">
+          <nav class="atree glass" id="atree" aria-label="The Anime index (demo)"></nav>
+          <div class="aview glass" id="aview" aria-live="polite"></div>
+        </div>
+
+        <div class="reckoner-wrap reveal">
+          <div class="rk-intro">
+            <span class="kicker">The Reckoner</span>
+            <h3>Hover a title, tap <kbd>C</kbd>.</h3>
+            <p class="dim">It tallies how long the next unwatched episodes take — capped at what has actually aired — and when you'd finish if you started now. On a phone, use the <b>+ 1 ep</b> buttons.</p>
+          </div>
+          <div class="rk" id="rk" data-owns-keys tabindex="-1">
+            <div class="rk-shelf" id="rk-shelf"></div>
+            <aside class="rk-dock glass" id="rk-dock" aria-live="polite"></aside>
+          </div>
+        </div>
+
+        <div class="curtain-cta reveal">
+          <div>
+            <span class="kicker">The curtain call</span>
+            <h3>Finish a season, and the drapes part.</h3>
+            <p class="dim">Score it in your own AniList scale, join the finale's discussion, write the review while it's fresh, and put the sequel on Planning — or read <span lang="ja">終</span>, series finished.</p>
+          </div>
+          <button class="btn btn-lit" id="curtain-open">Finish the season</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══ 05 · The look ═══════════════════════════════════════════════ -->
+    <section id="look" class="tour-sec" data-section>
+      <div class="shell">
+        <header class="tc-sectionhead reveal" style="--sec-c: var(--rail-3)">
+          <span class="plate">05</span>
+          <span class="kicker">Seven skins</span>
+          <h2>The look</h2>
+          <p class="dek">
+            Each skin is one <code>[data-theme]</code> block overriding design tokens — so every component restyles for free,
+            down to the editor buffer and the terminal's ANSI palette. Each card below is wearing its own skin. Pick one; this whole page follows.
+          </p>
+        </header>
+        <div class="skins reveal" id="skins"></div>
+        <p class="skins-foot dim reveal">In the app your choice is injected server-side into <code>index.html</code>, so there's no flash of the wrong theme on first paint. This page does the same with a two-line script in its <code>&lt;head&gt;</code>.</p>
+      </div>
+    </section>
+
+    <!-- ══ 06 · Privacy ═════════════════════════════════════════════════ -->
+    <section id="privacy" class="tour-sec" data-section>
+      <div class="shell">
+        <header class="tc-sectionhead reveal" style="--sec-c: var(--c-dev)">
+          <span class="plate">06</span>
+          <span class="kicker">Runs on localhost</span>
+          <h2>Privacy, by wiring.</h2>
+          <p class="dek">
+            Binds to <code>127.0.0.1</code> and nothing else. Self-hosted fonts, no trackers, no analytics. Every YouTube read is anonymous —
+            no cookies stored or sent, so there's no stable id linking your searches, feeds and playback.
+          </p>
+        </header>
+
+        <div class="wiring reveal">
+          <div class="machine glass">
+            <span class="kicker">your machine</span>
+            <div class="machine-addr">127.0.0.1<span>:5000</span></div>
+            <ul>
+              <li><b>Flask</b> serves the API and the built UI on one port</li>
+              <li><b><code>data/tubcal.db</code></b> — one git-ignored SQLite file: subscriptions, settings, watch history, playback progress, saved items, OAuth tokens and every byte of Archive data</li>
+              <li><b>Ollama</b> (optional) on <code>127.0.0.1:11434</code> — the models never leave the box</li>
+            </ul>
+          </div>
+          <ol class="lines" id="lines">
+            <li style="--l: var(--c-youtube)"><b>YouTube</b><span>RSS feeds, InnerTube search, googlevideo streams — anonymous, cookie-less</span></li>
+            <li style="--l: var(--c-reddit)"><b>Reddit</b><span>RSS logged out; full data if you connect an OAuth app</span></li>
+            <li style="--l: var(--c-hn)"><b>Hacker News</b><span>the Firebase API, and Algolia for search</span></li>
+            <li style="--l: var(--c-github)"><b>GitHub</b><span>the public REST API; your PAT only if you paste one</span></li>
+            <li style="--l: var(--accent-strong)"><b>AniList</b><span>GraphQL with your own OAuth token</span></li>
+            <li style="--l: var(--paper-faint)"><b>Helpers</b><span>Invidious for trending and fallback search, the anime scrapers while you watch, PyPI for the anipy-api self-update (<code>TUBCAL_AUTO_UPDATE=0</code> stops it)</span></li>
+            <li class="cut"><b>Nothing else</b><span>no analytics, no trackers, no CDN fonts, no cloud relay</span></li>
+          </ol>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══ 07 · Tune in ═════════════════════════════════════════════════ -->
+    <section id="tune-in" class="tour-sec tune" data-section>
+      <div class="shell">
+        <header class="tc-sectionhead reveal" style="--sec-c: var(--signal)">
+          <span class="plate">07</span>
+          <span class="kicker">Three commands</span>
+          <h2>Tune in.</h2>
+          <p class="dek">You need <b>Python ≥ 3.12</b>, <b>Node</b>, and <b><code>yt-dlp</code> on your PATH</b>. Everything else is optional and degrades quietly.</p>
+        </header>
+        <div class="tune-grid reveal">
+          <div class="codeblock">
+            <div class="cb-head"><span>install &amp; run</span><button class="copy"></button></div>
+<pre><span class="k">uv sync</span>                                               <span class="c"># backend</span>
+<span class="k">cd frontend &amp;&amp; npm install &amp;&amp; npm run build &amp;&amp; cd ..</span>  <span class="c"># frontend</span>
+<span class="k">uv run python main.py</span>                                 <span class="c"># → http://127.0.0.1:5000</span></pre>
+          </div>
+          <div class="tune-cta">
+            <p>Open the page, pick a channel, add a few YouTube channels and subreddits in <b>Settings</b>, and the rooms fill in.</p>
+            <div class="tune-btns">
+              <a class="btn btn-lit" href="manual.html#quick-start"><span data-icon="book"></span>Read the manual</a>
+              <a class="btn" href="https://github.com/Shio-T0/Tubcal"><span data-icon="github"></span>View on GitHub</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="sitefoot">
+    <div class="tc-wordmark">Tubcal<em>.</em></div>
+    <p><em>Runs on localhost, for one person, on purpose.</em></p>
+    <p>MIT licensed · <a href="https://github.com/Shio-T0/Tubcal">github.com/Shio-T0/Tubcal</a> · <a href="manual.html">The manual</a></p>
+  </footer>
+
+  <!-- the curtain call (demo) -->
+  <div class="curtain" id="curtain" role="dialog" aria-modal="true" aria-labelledby="cc-title" hidden>
+    <div class="drape drape-l" aria-hidden="true"></div>
+    <div class="drape drape-r" aria-hidden="true"></div>
+    <div class="cc-stage">
+      <button class="iconbtn cc-x" id="curtain-x" aria-label="Close"></button>
+      <span class="kicker">Curtain call · season finished</span>
+      <h3 id="cc-title">Lanterns of the Low Tide</h3>
+      <p class="cc-sub dim">12 episodes · 4 h 48 m with it</p>
+      <div class="cc-rate" id="cc-rate" role="radiogroup" aria-label="Your score"></div>
+      <p class="cc-word" id="cc-word">How was it?</p>
+      <div class="cc-next">
+        <div class="cc-seq">
+          <span class="cc-cover" aria-hidden="true">灯</span>
+          <span><small>Sequel · Season 2</small><b>Lanterns of the Low Tide II</b></span>
+          <span class="cc-seqbtns"><button class="chip" data-plan="Planning">Planning</button><button class="chip" data-plan="Watching">Watching</button></span>
+        </div>
+        <p class="cc-end dim">…or, when there is no sequel: <span class="cc-owari" lang="ja">終</span> series finished.</p>
+      </div>
+    </div>
+  </div>
+
+  <script src="assets/js/data.js"></script>
+  <script src="assets/js/routes.js"></script>
+  <script src="assets/js/site.js"></script>
+  <script src="assets/js/tour.js"></script>
+</body>
+</html>
