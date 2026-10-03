@@ -1,6 +1,5 @@
-// Build-time only (Node), never imported by the app. It lives under src/ so the
-// phone build gets it along with the rest of the desktop sources
-// (Tubcal-Android/tools/sync-from-pc.sh copies frontend/src/ to phone/src/pc/).
+// Build-time only (Node), never imported by the app. Both builds use it: the
+// desktop's (frontend/vite.config.js) and the phone's (android/phone/vite.config.js).
 //
 // legal({ files }) is a Vite plugin that, on `vite build`, writes into the output:
 //
