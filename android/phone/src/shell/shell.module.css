@@ -1,0 +1,687 @@
+/* The phone shell. The app bar is translucent wood over the page; the tab bar a
+   row of preset keys at the bottom with a lit amber pill under the current one;
+   sheets rise from the bottom edge. Everything respects the system-bar insets the
+   Android shell passes in (--sa-top / --sa-bottom). */
+
+/* ── app bar ──────────────────────────────────────────────────────────────── */
+
+.bar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  padding-top: var(--sa-top);
+  background: color-mix(in srgb, var(--ink) 86%, transparent);
+  backdrop-filter: blur(14px) saturate(1.2);
+  -webkit-backdrop-filter: blur(14px) saturate(1.2);
+  border-bottom: 1px solid color-mix(in srgb, var(--rule) 70%, transparent);
+  transition: background-color 0.3s ease, box-shadow 0.35s ease, border-color 0.3s ease;
+}
+/* once the page moves under it, the bar lifts: denser glass and a soft shadow */
+:global(html[data-scrolled='1']) .bar:not(.overlayBar) {
+  background: color-mix(in srgb, var(--ink) 94%, transparent);
+  box-shadow: 0 10px 28px -14px rgba(0, 0, 0, 0.55);
+}
+.barRow {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 56px;
+  padding: 0 8px 0 4px;
+}
+.back {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  color: var(--paper);
+}
+.back:active {
+  background: var(--surface-hover);
+}
+.titles {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  padding-left: 4px;
+}
+.titlesRoot {
+  padding-left: 12px;
+}
+.title {
+  animation: titleIn 0.5s var(--e-out) both;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-display);
+  font-size: 21px;
+  font-weight: 600;
+  line-height: 1.15;
+  color: var(--paper);
+}
+.sub {
+  animation: titleIn 0.5s var(--e-out) 0.06s both;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--tone, var(--paper-faint));
+}
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: none;
+  animation: titleIn 0.5s var(--e-out) 0.1s both;
+}
+@keyframes titleIn {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 6px, 0);
+  }
+}
+.barExtra {
+  padding: 0 0 10px;
+}
+
+.iconBtn {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  color: var(--paper-dim);
+  transition: background 0.15s ease, color 0.15s ease, scale 0.42s var(--e-spring);
+  --press: 0.84;
+}
+.iconBtn:active {
+  background: var(--surface-hover);
+  color: var(--paper);
+}
+.iconBtnOn {
+  color: var(--signal);
+}
+
+/* ── tab bar ──────────────────────────────────────────────────────────────── */
+
+.tabs {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 40;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  padding: 4px max(6px, var(--sa-left)) calc(4px + var(--sa-bottom)) max(6px, var(--sa-right));
+  background: color-mix(in srgb, var(--ink-2, var(--ink)) 94%, transparent);
+  backdrop-filter: blur(16px) saturate(1.2);
+  -webkit-backdrop-filter: blur(16px) saturate(1.2);
+  border-top: 1px solid var(--rule);
+  transition: transform 0.25s var(--hand);
+}
+.tabsHidden {
+  transform: translateY(110%);
+}
+.tab {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  min-height: 54px;
+  padding: 5px 0 3px;
+  color: var(--paper-faint);
+  -webkit-tap-highlight-color: transparent;
+  transition: color 0.25s ease, scale 0.42s var(--e-spring);
+  --press: 0.9;
+}
+.tabIcon {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 30px;
+  border-radius: var(--r-pill);
+  transition: color 0.25s ease;
+}
+.tabLabel {
+  font-size: 11.5px;
+  font-weight: 560;
+  letter-spacing: 0.01em;
+  transition: color 0.25s ease, transform 0.35s var(--e-spring);
+}
+.tabOn {
+  color: var(--paper);
+}
+.tabOn .tabIcon {
+  color: var(--signal);
+}
+.tabOn .tabLabel {
+  transform: translateY(-1px);
+}
+/* the pill behind the current tab: it glides between tabs and stretches as it goes */
+.track {
+  position: absolute;
+  top: 9px;
+  left: max(6px, var(--sa-left));
+  right: max(6px, var(--sa-right));
+  height: 30px;
+  pointer-events: none;
+}
+.pill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  display: grid;
+  place-items: center;
+  width: 20%;
+  transform: translate3d(calc(var(--ti) * 100%), 0, 0);
+  transition: transform 0.55s var(--e-spring), opacity 0.25s ease;
+}
+.pill i {
+  width: 56px;
+  height: 30px;
+  border-radius: var(--r-pill);
+  background: color-mix(in srgb, var(--signal) 20%, transparent);
+  box-shadow: 0 0 18px -4px color-mix(in srgb, var(--signal) 45%, transparent);
+  animation: squish 0.55s var(--e-out);
+}
+@keyframes squish {
+  30% {
+    transform: scaleX(1.5) scaleY(0.82);
+  }
+}
+.iconOn,
+.iconOff {
+  display: grid;
+}
+.iconOn {
+  animation: iconPop 0.5s var(--e-out) both;
+}
+@keyframes iconPop {
+  0% {
+    transform: scale(0.7) rotate(-8deg);
+  }
+  45% {
+    transform: scale(1.22) rotate(4deg);
+  }
+  100% {
+    transform: none;
+  }
+}
+.badge {
+  position: absolute;
+  top: -3px;
+  right: 6px;
+  min-width: 17px;
+  padding: 0 4px;
+  border-radius: var(--r-pill);
+  border: 2px solid var(--ink-2, var(--ink));
+  font-style: normal;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 700;
+  line-height: 13px;
+  text-align: center;
+  color: var(--ink);
+  background: var(--signal);
+  animation: badgeIn 0.5s var(--e-spring) both;
+}
+@keyframes badgeIn {
+  from {
+    transform: scale(0);
+  }
+}
+
+/* ── sheets ───────────────────────────────────────────────────────────────── */
+
+.sheetBack {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: flex-end;
+}
+.sheetBackClosing {
+  pointer-events: none;
+}
+/* the dim is its own layer, so a drag can lighten it without fading the sheet
+   (no backdrop blur: re-blurring the screen every frame is what a phone can't
+   afford mid-gesture) */
+.sheetDim {
+  position: absolute;
+  inset: 0;
+  background: rgba(8, 5, 2, 0.58);
+  animation: fade 0.28s ease;
+  will-change: opacity;
+}
+.sheetDimOut {
+  animation: fadeOut 0.26s ease forwards;
+}
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes fadeOut {
+  to {
+    opacity: 0;
+  }
+}
+.sheet {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-height: calc(88vh - var(--sa-top));
+  padding-bottom: max(10px, var(--sa-bottom), var(--kb, 0px));
+  border-radius: 22px 22px 0 0;
+  border-top: 1px solid var(--rule-strong);
+  background: var(--ink-2, var(--ink));
+  box-shadow: 0 -20px 60px rgba(0, 0, 0, 0.45);
+  will-change: transform;
+  /* backwards, not both: once it has risen, the drag's own transform must win
+     (a filling animation would pin the sheet in place under your finger) */
+  animation: rise 0.46s var(--e-out) backwards;
+}
+@keyframes rise {
+  from {
+    transform: translate3d(0, 100%, 0);
+  }
+}
+.sheetOut {
+  animation: sink 0.26s cubic-bezier(0.4, 0, 0.7, 0.2) forwards;
+}
+@keyframes sink {
+  to {
+    transform: translate3d(0, 105%, 0);
+  }
+}
+.sheetFull {
+  height: calc(94vh - var(--sa-top));
+  max-height: none;
+}
+.grab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px 6px;
+  touch-action: none;
+}
+/* a pull at the top of a short sheet is the browser's to ignore: we move it */
+.sheet {
+  touch-action: pan-y;
+}
+.handle {
+  width: 40px;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--rule-strong);
+  animation: handleIn 0.6s var(--e-spring) 0.12s both;
+}
+@keyframes handleIn {
+  from {
+    transform: scaleX(0.3);
+    opacity: 0;
+  }
+}
+.sheetTitle {
+  align-self: stretch;
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 600;
+}
+.sheetBody {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: none;
+  padding: 4px 16px 8px;
+}
+.sheetFoot {
+  padding: 10px 16px 0;
+  border-top: 1px solid var(--rule);
+}
+.actionList {
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 6px;
+}
+.action {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-height: 52px;
+  padding: 0 6px;
+  border-radius: 12px;
+  font-size: 15.5px;
+  text-align: left;
+  color: var(--paper);
+}
+.action svg {
+  flex: none;
+  color: var(--paper-dim);
+}
+.action span {
+  flex: 1;
+}
+.action em {
+  font-style: normal;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--paper-faint);
+}
+.action {
+  --press: 0.98;
+}
+.action:active {
+  background: var(--surface-hover);
+}
+.actionDanger,
+.actionDanger svg {
+  color: var(--danger);
+}
+
+/* ── chips ────────────────────────────────────────────────────────────────── */
+
+.chips {
+  position: relative;
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 0 16px;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.chips::-webkit-scrollbar {
+  display: none;
+}
+.chip {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--rule);
+  background: color-mix(in srgb, var(--surface) 55%, transparent);
+  font-size: 14px;
+  color: var(--paper-dim);
+  white-space: nowrap;
+  transition: color 0.3s ease, border-color 0.3s ease, scale 0.42s var(--e-spring);
+  --press: 0.92;
+}
+/* the lit pill under the chosen chip — it slides and stretches to the next */
+.chipPill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 0;
+  border-radius: var(--r-pill);
+  background: var(--paper);
+  box-shadow: 0 6px 16px -8px color-mix(in srgb, var(--paper) 60%, transparent);
+  pointer-events: none;
+}
+.chipPill[data-ready] {
+  transition: transform 0.5s var(--e-spring), width 0.5s var(--e-spring), height 0.3s ease, opacity 0.2s ease;
+}
+.chip em {
+  animation: badgeIn 0.45s var(--e-spring) both;
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: var(--r-pill);
+  font-style: normal;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+  color: var(--ink);
+  background: var(--signal);
+}
+.chipOn {
+  color: var(--ink);
+  border-color: transparent;
+  background: transparent;
+}
+.chipOn em {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+/* ── pull to refresh ──────────────────────────────────────────────────────── */
+
+.pull {
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  transition: height 0.5s var(--e-spring);
+}
+.pullDot {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  color: var(--signal);
+  background: var(--surface);
+  border: 1px solid var(--rule);
+}
+.pullSpin {
+  animation: pullGlow 1.2s ease-in-out infinite;
+}
+.pullSpin svg {
+  animation: spin 0.8s linear infinite;
+}
+@keyframes pullGlow {
+  50% {
+    box-shadow: 0 0 0 6px color-mix(in srgb, var(--signal) 18%, transparent);
+  }
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ── small states ─────────────────────────────────────────────────────────── */
+
+.loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 48px 16px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--paper-faint);
+}
+.loadingBar {
+  width: 120px;
+  height: 3px;
+  border-radius: 3px;
+  background: linear-gradient(90deg, transparent, var(--signal), transparent);
+  background-size: 200% 100%;
+  animation: sweep 1.2s linear infinite;
+}
+@keyframes sweep {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 48px 28px;
+  text-align: center;
+  color: var(--paper-faint);
+  animation: emptyIn 0.6s var(--e-out) both;
+}
+.empty > svg {
+  animation: bob 3.4s ease-in-out 0.6s infinite;
+}
+@keyframes emptyIn {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 14px, 0) scale(0.97);
+  }
+}
+@keyframes bob {
+  50% {
+    transform: translateY(-6px) rotate(-4deg);
+  }
+}
+.empty h3 {
+  margin: 4px 0 0;
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--paper);
+}
+.empty p {
+  margin: 0;
+  max-width: 34ch;
+  font-size: 14.5px;
+  line-height: 1.55;
+  color: var(--paper-dim);
+}
+.error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 12px 16px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--danger) 45%, transparent);
+  font-size: 13.5px;
+  color: var(--paper-dim);
+  animation: errIn 0.55s ease both;
+}
+@keyframes errIn {
+  0% {
+    opacity: 0;
+    transform: translateX(0);
+  }
+  20% {
+    opacity: 1;
+    transform: translateX(-6px);
+  }
+  40% {
+    transform: translateX(5px);
+  }
+  60% {
+    transform: translateX(-3px);
+  }
+  80% {
+    transform: translateX(2px);
+  }
+  100% {
+    transform: none;
+  }
+}
+.error button {
+  flex: none;
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--rule-strong);
+  color: var(--paper);
+}
+.section {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 20px 16px 10px;
+}
+.section h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 600;
+}
+.section button {
+  min-height: 36px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--signal);
+}
+
+/* ── overlay pages ─────────────────────────────────────────────────────────── */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 55; /* over the tabs and the mini player, under the open player and sheets */
+  display: flex;
+  flex-direction: column;
+  background: var(--ink);
+  box-shadow: -24px 0 70px rgba(0, 0, 0, 0.55);
+  animation: slideIn 0.46s var(--e-swift) backwards;
+  transition: transform 0.3s var(--e-out);
+}
+@keyframes slideIn {
+  from {
+    transform: translate3d(100%, 0, 0);
+  }
+}
+.overlay {
+  will-change: transform;
+  touch-action: pan-y;
+}
+.overlayOut {
+  animation: slideOut 0.27s cubic-bezier(0.4, 0, 0.7, 0.2) forwards;
+}
+@keyframes slideOut {
+  to {
+    transform: translate3d(100%, 0, 0);
+  }
+}
+.overlayBody > * {
+  animation: bodyIn 0.5s var(--e-out) 0.12s both;
+}
+@keyframes bodyIn {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 10px, 0);
+  }
+}
+.overlayBar {
+  position: relative;
+  flex: none;
+}
+.overlayBody {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-bottom: calc(var(--sa-bottom) + var(--kb) + 24px);
+}
+
+/* the keyboard is up (the Android shell sets data-kb): the tabs step aside */
+:global(html[data-kb='1']) .tabs {
+  display: none;
+}

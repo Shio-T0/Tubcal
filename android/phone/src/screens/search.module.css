@@ -1,0 +1,128 @@
+.screen {
+  min-height: 100vh;
+}
+.box {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  height: 44px;
+  padding: 0 4px 0 14px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--rule);
+  background: var(--surface-input);
+  color: var(--paper-faint);
+}
+.box input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: none;
+  color: var(--text-primary);
+}
+.box button {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  color: var(--paper-dim);
+}
+
+.recent {
+  padding: 0 4px;
+}
+.recentRow {
+  display: flex;
+  align-items: center;
+}
+.recentRow > button:first-child {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex: 1;
+  min-width: 0;
+  min-height: 50px;
+  padding: 0 12px;
+  font-size: 15px;
+  text-align: left;
+}
+.recentRow svg {
+  flex: none;
+  color: var(--paper-faint);
+}
+.forget {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  color: var(--paper-faint);
+}
+
+.hit {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  padding: 12px 16px 12px 18px;
+  border-bottom: 1px solid color-mix(in srgb, var(--rule) 70%, transparent);
+  border-left: 3px solid var(--c);
+  text-align: left;
+}
+.hit:active {
+  background: var(--surface-hover);
+}
+.hit b {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+.desc {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 13px;
+  color: var(--paper-dim);
+}
+.meta {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--paper-faint);
+}
+.wall {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px 10px;
+  padding: 12px;
+}
+.strip {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 108px;
+  gap: 10px;
+  overflow-x: auto;
+  padding: 0 16px 6px;
+  scrollbar-width: none;
+}
+
+.hit {
+  --press: 0.985;
+}
+.box {
+  animation: boxIn 0.5s var(--e-out) both;
+}
+@keyframes boxIn {
+  from {
+    opacity: 0;
+    transform: scaleX(0.92);
+  }
+}
+.box:focus-within {
+  border-color: var(--signal);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--signal) 18%, transparent);
+}
+.box {
+  transition: border-color 0.25s ease, box-shadow 0.3s ease;
+}

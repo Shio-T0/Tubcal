@@ -1,0 +1,14 @@
+anipy-api 3.8.21
+Copyright (C) sdaqo and the anipy-cli contributors
+https://github.com/sdaqo/anipy-cli  (PyPI: anipy-api)
+
+Licensed under the GNU General Public License v3.0; the full text is in LICENSE
+next to this file. This directory is the anipy_api package of the anipy-api 3.8.21
+release, unmodified. It is vendored here because pip can't install the release on
+Android: some of its declared dependencies have no Android build, and none of them
+are imported by the parts Tubcal uses. The package's source is the release itself,
+at the link above.
+
+Tubcal for Android shadows one of its imports, `Levenshtein`, with its own small
+module (app/src/main/python/Levenshtein.py). That module contains no code from
+anipy-api or from the Levenshtein package.

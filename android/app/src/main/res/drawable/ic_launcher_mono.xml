@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 13+ themed icon: the same mark in one colour (the launcher tints it). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:pathData="M24,54 a30,30 0 1,0 60,0 a30,30 0 1,0 -60,0"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="2.8"
+        android:fillColor="#00000000" />
+    <path
+        android:pathData="M36.4,36.4 h35.2 v8.8 h-13.2 v35.2 h-8.8 v-35.2 h-13.2 z"
+        android:fillColor="#FFFFFFFF" />
+</vector>

@@ -25,6 +25,24 @@ saved `active_rooms`. Global chords `Space g h` (Hub → /edition) and `Space g 
 Anime) live in `components/layout/KeyboardShortcuts.jsx`; Space stays native in text
 fields, the editor, the expanded player, media, and keyboard-focused controls.
 
+**The Android app lives in `android/`**: a Gradle project with Chaquopy and Kotlin
+(`app/`), a separate phone UI (`phone/`, Vite + React) and tools (`tools/`).
+- Nothing desktop is copied there. Gradle's `syncDesktopPython` packs the root
+  `server/` and `main.py` (as `desktop_main.py`) into the build.
+- `phone/` imports `frontend/src` in place as `@pc`. Its `resolve.dedupe` keeps
+  every npm package coming from `android/phone/node_modules`.
+- Gradle's `buildPhoneUi` builds it into the APK's assets.
+- So a change to `server/` or `frontend/src` reaches the phone on its next build.
+  A desktop markup change can break the `pc_<dir>_<file>__<class>` overrides in
+  `android/phone/src/styles/phone.css`.
+- Server code must also run on the phone's Python 3.11.
+- Heavy optional imports stay lazy (Chaquopy has no wheels for many).
+- `android/app/src/main/python/` holds only the Android shims and the vendored
+  anipy_api/weeb_cli, with their LICENSE and NOTICE.
+- Build: `cd android && ANDROID_HOME=~/Android/Sdk ./gradlew :app:assembleDebug`.
+- `android/tools/sync-data.sh` moves user data between the desktop and phone
+  databases.
+
 ## Commands
 
 ```bash

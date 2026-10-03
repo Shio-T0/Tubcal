@@ -319,6 +319,7 @@ frontend/src/
   components/anime/       every view of the Anime channel
   state.jsx               shared state as a stack of context providers
   styles/                 design tokens + one block per skin
+android/                  the phone app: Gradle project, phone UI (phone/), vendored scrapers
 data/tubcal.db            everything local (git-ignored)
 ```
 
@@ -339,6 +340,14 @@ change there needs `npm run build` and a hard refresh, and a backend change need
 restart. The deepest test coverage sits where a bug would be silent: edition clustering,
 editor path containment, the fMP4 index parser, anonymous YouTube reads, and the pure
 AniList helpers.
+
+## 📱 On a phone
+
+`android/` builds the same Tubcal as an Android app. It runs the whole stack on the
+phone: the Flask backend runs inside the APK and a phone-made UI sits on top. It
+builds from the desktop code in this repo, nothing is copied. See
+[android/README.md](android/README.md). The desktop app doesn't need it, and
+ignores it.
 
 ## License
 

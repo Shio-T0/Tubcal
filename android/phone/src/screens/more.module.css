@@ -1,0 +1,243 @@
+.screen {
+  min-height: 100vh;
+  padding-bottom: 12px;
+}
+.word {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+.word i {
+  color: var(--signal);
+}
+.search {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 14px 16px 6px;
+  min-height: 50px;
+  padding: 0 18px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--rule);
+  background: var(--surface-input);
+  color: var(--paper-faint);
+  font-size: 15px;
+}
+.rooms {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  padding: 10px 16px;
+}
+.room {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 120px;
+  padding: 14px;
+  border-radius: 18px;
+  border: 1px solid color-mix(in srgb, var(--c) 30%, var(--rule));
+  background: linear-gradient(160deg, color-mix(in srgb, var(--c) 14%, transparent), transparent 70%), var(--surface);
+}
+.room:first-child:nth-last-child(odd) {
+  grid-column: 1 / -1;
+}
+.roomIcon {
+  transition: transform 0.5s var(--e-spring);
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  margin-bottom: 6px;
+  border-radius: 12px;
+  color: var(--c);
+  background: color-mix(in srgb, var(--c) 16%, transparent);
+}
+.room b {
+  font-size: 15px;
+  font-weight: 650;
+}
+.room span:last-child {
+  font-size: 12.5px;
+  line-height: 1.35;
+  color: var(--paper-faint);
+}
+.list {
+  margin: 8px 16px;
+  border-radius: 16px;
+  border: 1px solid var(--rule);
+  background: var(--surface);
+  overflow: hidden;
+}
+.list a {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 56px;
+  padding: 0 14px 0 16px;
+  font-size: 15px;
+}
+.list a + a {
+  border-top: 1px solid var(--rule);
+}
+.list a:active {
+  background: var(--surface-hover);
+}
+.list svg:first-child {
+  color: var(--paper-dim);
+}
+.list em {
+  padding: 0 7px;
+  border-radius: 8px;
+  font-style: normal;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: #1c140d;
+  background: var(--signal);
+}
+.list svg:last-child {
+  margin-left: auto;
+  color: var(--paper-faint);
+}
+
+.queue {
+  padding: 0 4px;
+}
+.qRow {
+  display: flex;
+  align-items: center;
+}
+.qRow > button:first-child {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+  padding: 8px 12px;
+  text-align: left;
+}
+.qRow img {
+  flex: none;
+  width: 96px;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: 8px;
+}
+.qRow span {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.qRow b {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 13.5px;
+  font-weight: 600;
+}
+.qRow em {
+  font-style: normal;
+  font-size: 12px;
+  color: var(--paper-faint);
+}
+.qX {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  color: var(--paper-faint);
+}
+
+.skins {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  padding: 0 16px;
+}
+.skin,
+.skinOn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 52px;
+  padding: 0 12px;
+  border-radius: 14px;
+  border: 1px solid var(--rule);
+  font-size: 13.5px;
+  text-align: left;
+}
+.skinOn {
+  border-color: var(--signal);
+  box-shadow: inset 0 0 0 1px var(--signal);
+}
+.swatch {
+  display: flex;
+  flex: none;
+}
+.swatch i {
+  width: 14px;
+  height: 14px;
+  margin-left: -4px;
+  border-radius: 50%;
+  border: 2px solid var(--surface);
+}
+.swatch i:first-child {
+  margin-left: 0;
+}
+.foot {
+  margin: 22px 24px 8px;
+  font-size: 12px;
+  line-height: 1.5;
+  text-align: center;
+  color: var(--paper-faint);
+}
+
+.room {
+  --press: 0.96;
+  transition: scale 0.42s var(--e-spring), border-color 0.3s ease;
+}
+.room:active .roomIcon {
+  transform: rotate(-10deg) scale(1.12);
+}
+.roomIcon svg {
+  animation: iconFloat 4s ease-in-out 1s infinite;
+}
+@keyframes iconFloat {
+  50% {
+    transform: translateY(-2px) rotate(4deg);
+  }
+}
+.skin,
+.skinOn {
+  transition: border-color 0.3s ease, box-shadow 0.3s ease, scale 0.42s var(--e-spring);
+}
+.skinOn .swatch i {
+  animation: swatch 0.6s var(--e-spring) both;
+}
+.skinOn .swatch i:nth-child(2) {
+  animation-delay: 60ms;
+}
+.skinOn .swatch i:nth-child(3) {
+  animation-delay: 120ms;
+}
+@keyframes swatch {
+  40% {
+    transform: translateY(-4px) scale(1.25);
+  }
+}
+.word i {
+  display: inline-block;
+  animation: wordIn 0.8s var(--e-spring) 0.15s both;
+}
+@keyframes wordIn {
+  from {
+    opacity: 0;
+    transform: translate3d(8px, 0, 0) rotate(8deg);
+  }
+}
+.list a {
+  --press: 0.985;
+}

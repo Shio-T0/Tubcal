@@ -1,0 +1,605 @@
+/* The Anime tab: watch rows with big ▶/+1 buttons, poster walls three across,
+   the finder sheet's tri-state chips. Everything in the anime accent. */
+
+.screen {
+  --c: var(--c-anime);
+  min-height: 100vh;
+}
+.bell {
+  position: relative;
+}
+.bell em {
+  position: absolute;
+  top: 5px;
+  right: 3px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  border-radius: 9px;
+  font-style: normal;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 17px;
+  text-align: center;
+  color: #1c140d;
+  background: var(--c-anime);
+}
+.muted {
+  margin: 8px 0;
+  color: var(--paper-faint);
+  font-size: 13.5px;
+}
+.flip {
+  transform: rotate(180deg);
+}
+
+.shelves {
+  padding-top: 12px;
+}
+.subChips {
+  padding-top: 8px;
+}
+.subChips button {
+  min-height: 32px !important;
+  font-size: 12.5px !important;
+}
+.tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px 2px;
+}
+.tool {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 38px;
+  padding: 0 14px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--rule);
+  font-size: 13.5px;
+  color: var(--paper-dim);
+}
+.tool:last-child {
+  margin-left: auto;
+  padding: 0 10px;
+}
+.find {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  height: 44px;
+  padding: 0 4px 0 14px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--rule);
+  background: var(--surface-input);
+  color: var(--paper-faint);
+}
+.find input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: none;
+  color: var(--text-primary);
+}
+.find button {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  color: var(--paper-dim);
+}
+
+.catchUp {
+  margin: 12px 16px 4px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--paper-dim);
+  background: color-mix(in srgb, var(--c-anime) 9%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--c-anime) 25%, transparent);
+}
+.catchUp b {
+  color: var(--paper);
+}
+.catchUp span {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--paper-faint);
+}
+
+.dust {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: calc(100% - 32px);
+  margin: 8px 16px 0;
+  min-height: 52px;
+  padding: 0 12px 0 14px;
+  border-radius: 14px;
+  border: 1px solid var(--rule);
+  font-size: 13.5px;
+  text-align: left;
+  color: var(--paper-dim);
+}
+.dust b {
+  color: var(--paper);
+}
+.dust span {
+  flex: 1;
+  min-width: 0;
+}
+.dust svg {
+  flex: none;
+  color: var(--paper-faint);
+}
+
+/* watch rows */
+.rows {
+  padding-top: 6px;
+}
+.row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px 10px 16px;
+  border-bottom: 1px solid color-mix(in srgb, var(--rule) 70%, transparent);
+}
+.rowPicked {
+  background: color-mix(in srgb, var(--c-anime) 10%, transparent);
+}
+.pick,
+.pickDot {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  border: 2px solid var(--rule-strong);
+  color: #1c140d;
+}
+.pick[aria-pressed='true'],
+.rowPicked .pickDot {
+  border-color: var(--c-anime);
+  background: var(--c-anime);
+}
+.rowCover {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 58px;
+  aspect-ratio: 2 / 3;
+  overflow: hidden;
+  border-radius: 8px;
+  background: var(--surface-hover);
+  color: var(--c-anime);
+}
+.rowCover {
+  --press: 0.9;
+}
+.rowCover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.rowMain {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  flex: 1;
+  min-width: 0;
+}
+.rowTitle {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+.rowMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 10px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--paper-faint);
+}
+.behind {
+  font-style: normal;
+  color: var(--c-anime);
+  font-weight: 600;
+}
+.track {
+  position: relative;
+  display: block;
+  height: 4px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--rule);
+}
+.track i {
+  position: absolute;
+  inset: 0 auto 0 0;
+  z-index: 1;
+  background: var(--c-anime);
+  transition: width 0.6s var(--e-spring);
+  animation: trackIn 1s var(--e-out) 0.15s both;
+  transform-origin: left;
+}
+@keyframes trackIn {
+  from {
+    transform: scaleX(0);
+  }
+}
+.track .trackAired {
+  z-index: 0;
+  background: color-mix(in srgb, var(--c-anime) 30%, transparent);
+}
+.rowActs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+.playBtn {
+  --ring: var(--c-anime);
+  animation: ph-ring 2.6s ease-out 1s infinite;
+  --press: 0.86;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  color: #1c140d;
+  background: var(--c-anime);
+}
+.playBtn span {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+}
+.plusBtn {
+  position: relative;
+  --press: 0.82;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid var(--rule-strong);
+  color: var(--paper);
+}
+/* the "+1" that floats off the button when an episode is marked */
+.burst {
+  position: absolute;
+  left: 50%;
+  top: -4px;
+  font-style: normal;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--c-anime);
+  pointer-events: none;
+  animation: burst 0.9s var(--e-out) forwards;
+}
+@keyframes burst {
+  0% {
+    opacity: 0;
+    transform: translate3d(-50%, 8px, 0) scale(0.6);
+  }
+  25% {
+    opacity: 1;
+    transform: translate3d(-50%, -10px, 0) scale(1.15);
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(-50%, -46px, 0) scale(1);
+  }
+}
+@keyframes ph-ring {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--ring) 50%, transparent);
+  }
+  60%,
+  100% {
+    box-shadow: 0 0 0 10px color-mix(in srgb, var(--ring) 0%, transparent);
+  }
+}
+
+/* poster walls */
+.wall {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px 10px;
+  padding: 12px 12px 8px;
+}
+.posterCell {
+  position: relative;
+  border-radius: 10px;
+}
+.pickDot {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  z-index: 2;
+  background: rgba(0, 0, 0, 0.5);
+  border-color: #fff;
+}
+
+.bulk {
+  position: fixed;
+  left: 8px;
+  right: 8px;
+  bottom: calc(var(--tab-h) + var(--sa-bottom) + var(--mini-h) + 8px);
+  z-index: 42;
+  padding: 0 !important;
+}
+.bulk > div {
+  flex-wrap: wrap;
+  border-radius: 16px !important;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+}
+
+.sortList button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 52px;
+  border-bottom: 1px solid var(--rule);
+  font-size: 15px;
+  text-align: left;
+}
+.sortOn {
+  color: var(--c-anime);
+  font-weight: 650;
+}
+
+.cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 46px;
+  padding: 0 20px;
+  border-radius: var(--r-pill);
+  font-weight: 650;
+  color: #1c140d;
+  background: var(--c-anime);
+}
+
+/* browse */
+.browseBar {
+  display: flex;
+  gap: 8px;
+  padding: 12px 16px 4px;
+}
+.filterBtn {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid var(--rule);
+  color: var(--paper-dim);
+}
+.filterOn {
+  color: #1c140d;
+  background: var(--c-anime);
+  border-color: transparent;
+}
+.filterBtn em {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 9px;
+  font-style: normal;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 18px;
+  color: #fff;
+  background: var(--danger, #c4553f);
+}
+.pills {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 10px 16px 2px;
+  scrollbar-width: none;
+}
+.pill,
+.pillX,
+.pillClear {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: none;
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: var(--r-pill);
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+.pill {
+  color: #1c140d;
+  background: var(--c-anime);
+}
+.pillX {
+  color: var(--danger, #c4553f);
+  border: 1px solid color-mix(in srgb, var(--danger, #c4553f) 50%, transparent);
+}
+.pillClear {
+  color: var(--paper-dim);
+  border: 1px dashed var(--rule-strong);
+}
+
+/* the finder sheet */
+.finderHead {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 18px 0 10px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--paper-faint);
+}
+.finderHead:first-child {
+  margin-top: 4px;
+}
+.finderHead em {
+  font-style: normal;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.finderChips {
+  margin: 0 -16px;
+}
+.triWrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  padding: 8px 0;
+}
+.tri {
+  transition: background-color 0.25s ease, color 0.25s ease, border-color 0.25s ease, scale 0.42s var(--e-spring);
+  --press: 0.9;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 36px;
+  padding: 0 13px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--rule);
+  font-size: 13.5px;
+  color: var(--paper-dim);
+}
+.triOn {
+  color: #1c140d;
+  background: var(--c-anime);
+  border-color: transparent;
+  font-weight: 600;
+  animation: triIn 0.45s var(--e-spring);
+}
+.triNo {
+  animation: triIn 0.45s var(--e-spring);
+  color: var(--danger, #c4553f);
+  border-color: color-mix(in srgb, var(--danger, #c4553f) 55%, transparent);
+  text-decoration: line-through;
+}
+.cat {
+  border-bottom: 1px solid var(--rule);
+}
+.catHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 50px;
+  font-size: 14.5px;
+  font-weight: 600;
+  text-align: left;
+}
+.catHead em {
+  font-style: normal;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--paper-faint);
+}
+.catHead b {
+  padding: 0 7px;
+  border-radius: 8px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: #1c140d;
+  background: var(--c-anime);
+}
+.catHead svg {
+  margin-left: auto;
+  color: var(--paper-faint);
+}
+.finderFoot {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 10px;
+}
+.primary,
+.ghost {
+  min-height: 48px;
+  border-radius: var(--r-pill);
+  font-weight: 650;
+}
+.primary {
+  color: #1c140d;
+  background: var(--c-anime);
+}
+.ghost {
+  border: 1px solid var(--rule-strong);
+}
+.ghost:disabled {
+  opacity: 0.4;
+}
+
+@keyframes triIn {
+  40% {
+    transform: scale(1.12);
+  }
+}
+.cat .triWrap {
+  animation: catOpen 0.4s var(--e-out) both;
+}
+@keyframes catOpen {
+  from {
+    opacity: 0;
+    transform: translate3d(0, -6px, 0);
+  }
+}
+.catHead svg {
+  transition: transform 0.35s var(--e-spring);
+}
+.pill,
+.pillX {
+  animation: pillIn 0.42s var(--e-spring) both;
+}
+@keyframes pillIn {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+}
+.bulk {
+  animation: bulkUp 0.45s var(--e-out) both;
+}
+@keyframes bulkUp {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 30px, 0);
+  }
+}
+.filterOn {
+  animation: triIn 0.45s var(--e-spring);
+}
+.filterBtn em {
+  animation: pillIn 0.42s var(--e-spring) both;
+}
+.bell em {
+  animation: pillIn 0.42s var(--e-spring) both;
+}

@@ -1,0 +1,244 @@
+/* Phone-wide styles: the insets, the room the tab bar and mini player take, touch
+   defaults — and, at the end, how the desktop screens the phone reuses are
+   adapted for a phone (their classes come out of the build as stable
+   `pc_<dir>_<file>__<class>` names; see vite.config.js). */
+
+:root {
+  /* System-bar insets — the Android shell overwrites these with the real values. */
+  --sa-top: env(safe-area-inset-top, 0px);
+  --sa-bottom: env(safe-area-inset-bottom, 0px);
+  --sa-left: env(safe-area-inset-left, 0px);
+  --sa-right: env(safe-area-inset-right, 0px);
+  --kb: 0px;
+  --tab-h: 62px;
+  --mini-h: 0px;
+}
+html[data-player='mini'] {
+  --mini-h: 71px;
+}
+
+html,
+body {
+  overscroll-behavior-y: none; /* our own pull-to-refresh, no rubber band */
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+}
+body {
+  min-height: 100vh;
+  font-size: 15.5px;
+  padding-bottom: calc(var(--tab-h) + var(--sa-bottom) + var(--mini-h) + var(--kb));
+  touch-action: manipulation; /* no 300ms tap delay, no double-tap zoom */
+}
+html[data-kb='1'] body {
+  padding-bottom: calc(var(--kb) + 12px);
+}
+.ph-app {
+  min-height: 100vh;
+  padding-left: var(--sa-left);
+  padding-right: var(--sa-right);
+}
+button {
+  -webkit-tap-highlight-color: transparent;
+}
+img {
+  -webkit-user-drag: none;
+}
+/* UI chrome isn't text to select; content stays selectable */
+nav,
+header,
+button {
+  user-select: none;
+  -webkit-user-select: none;
+}
+input,
+textarea,
+select {
+  font-size: 16px; /* under 16px some keyboards zoom the page */
+}
+
+/* The toasts sit above the tab bar, full width. */
+.pc_ui_ui__toastStack {
+  left: 12px !important;
+  right: 12px !important;
+  bottom: calc(var(--tab-h) + var(--sa-bottom) + var(--mini-h) + 12px) !important;
+  align-items: stretch;
+}
+.pc_ui_ui__toast {
+  max-width: none !important;
+  padding: 13px 16px !important;
+  font-size: 14px !important;
+}
+
+/* Desktop modals (the desktop's own add-channel dialog, a Reddit post) become
+   full-width sheets from the bottom. */
+.pc_modals_Modal__backdrop {
+  align-items: flex-end !important;
+  padding: 0 !important;
+}
+.pc_modals_Modal__panel {
+  width: 100% !important;
+  max-width: none !important;
+  max-height: calc(92vh - var(--sa-top)) !important;
+  border-radius: 22px 22px 0 0 !important;
+  padding-bottom: var(--sa-bottom) !important;
+}
+
+/* ── reused desktop screens ───────────────────────────────────────────────── */
+
+.ph-reuse {
+  padding: 12px 14px 24px;
+}
+/* the desktop's room heads: no blurb on a phone, a compact title */
+.ph-reuse .pc_layout_Section__note {
+  display: none;
+}
+.ph-reuse .pc_layout_Section__head {
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.ph-reuse .pc_layout_Section__title {
+  font-size: 24px;
+}
+.ph-reuse .kicker {
+  display: none;
+}
+.ph-reuse .pc_layout_Section__searchWrap {
+  max-width: none;
+}
+.ph-reuse .search-input {
+  font-size: 16px;
+  min-height: 44px;
+}
+/* bigger hit targets for the desktop's small buttons */
+.ph-reuse .pc_ui_ui__iconBtn {
+  width: 42px;
+  height: 42px;
+}
+.ph-reuse .pc_ui_ui__btn {
+  min-height: 42px;
+}
+.ph-reuse .pc_ui_ui__segment {
+  min-height: 38px;
+}
+
+/* anime pages reused as-is get the phone gutter and stacked layouts */
+.ph-reuse .pc_pages_user__hero,
+.ph-reuse .pc_pages_voiceactor__hero,
+.ph-reuse .pc_pages_character__hero,
+.ph-reuse .pc_pages_studio__hero {
+  margin-left: -14px;
+  margin-right: -14px;
+  border-radius: 0;
+}
+
+/* the curtain call (reused) — already stacks under 900px; give it the insets */
+.pc_anime_curtain__backdrop {
+  padding: var(--sa-top) 0 0 !important;
+}
+.pc_anime_curtain__sheet {
+  max-height: calc(100vh - var(--sa-top)) !important;
+  border-radius: 20px 20px 0 0 !important;
+}
+.pc_anime_curtain__foot {
+  padding-bottom: calc(12px + var(--sa-bottom)) !important;
+}
+
+/* the HN reader, reused as a page / sheet */
+.pc_wire_reader__sheetBox {
+  width: 100vw !important;
+  padding-top: var(--sa-top);
+  padding-bottom: var(--sa-bottom);
+}
+
+/* desktop modals sit over overlay pages and the player, under our own sheets */
+.pc_modals_Modal__backdrop {
+  z-index: 75 !important;
+}
+
+/* The app bar already names the page, so a reused desktop page's own head keeps
+   only its controls (and disappears when it has none). */
+.ph-reuse-page .pc_layout_Section__headText {
+  display: none;
+}
+.ph-reuse-page .pc_layout_Section__head:not(:has(.pc_layout_Section__controls > *)) {
+  display: none;
+}
+
+/* The Composing Room isn't part of the phone app: its settings section and its
+   room switch stay on the desktop. */
+.ph-page-settings section:has(> h2 > .lucide-code-xml),
+.ph-page-settings .pc_pages_settings__subRow:has(> [style*='--c-editor']) {
+  display: none;
+}
+
+/* ── the anime player's shared pieces (desktop components), sized for a phone ── */
+/* the skip cue goes top-right: a portrait picture is short, and at the foot it
+   would sit on the subtitles */
+.ph-player .pc_anime_anime__cue {
+  top: 48px;
+  right: 10px;
+  bottom: auto;
+}
+.ph-player .pc_anime_anime__cueBtn {
+  padding: 9px 14px;
+  font-size: 13.5px;
+}
+/* the next-episode card fills the picture's foot */
+.ph-player .pc_anime_anime__nextUp {
+  place-items: end stretch;
+  padding: 10px;
+}
+.ph-player .pc_anime_anime__nextCard {
+  width: 100%;
+  padding: 12px;
+  gap: 12px;
+}
+.ph-player .pc_anime_anime__nextThumb {
+  display: none;
+}
+.ph-player .pc_anime_anime__nextText b {
+  font-size: 18px;
+}
+.ph-player .pc_anime_anime__nextPlay,
+.ph-player .pc_anime_anime__nextCancel {
+  min-height: 40px;
+  padding: 0 16px;
+}
+/* the episode list inside the watch page: bigger rows for a thumb */
+.ph-episodes .pc_anime_anime__railItem {
+  gap: 14px;
+  padding: 8px 4px;
+  border-radius: 12px;
+}
+.ph-episodes .pc_anime_anime__railThumb {
+  width: 128px;
+}
+.ph-episodes .pc_anime_anime__railText b {
+  font-size: 15px;
+}
+.ph-episodes .pc_anime_anime__railText em {
+  font-size: 13.5px;
+}
+/* the subtitle style editor in a sheet: label above control, bigger targets */
+.ph-sub-editor .pc_player_subtitles__field {
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+.ph-sub-editor .pc_player_subtitles__choice,
+.ph-sub-editor .pc_player_subtitles__choiceOn {
+  min-height: 40px;
+  padding: 0 16px;
+  font-size: 14px;
+}
+.ph-sub-editor .pc_player_subtitles__swatch,
+.ph-sub-editor .pc_player_subtitles__swatchOn {
+  width: 36px;
+  height: 36px;
+}
+.ph-sub-editor .pc_player_subtitles__slider input {
+  height: 32px;
+}
+.ph-sub-editor .pc_player_subtitles__select {
+  min-height: 42px;
+  font-size: 14.5px;
+}
