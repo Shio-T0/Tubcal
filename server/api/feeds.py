@@ -3,11 +3,13 @@ import hashlib
 import logging
 import re
 import threading
-from urllib.parse import urljoin, urlparse
+import time
+from urllib.parse import parse_qs, urljoin, urlparse
 
-from flask import Blueprint, Response, current_app, request, stream_with_context
+from flask import Blueprint, Response, current_app, request
 
 from . import err, ok
+from .relay import relay
 from .. import cache, config, db, httpc
 from ..sources import anilist, fmp4, github, hackernews, invidious, mixer, reddit, youtube
 
@@ -181,10 +183,6 @@ def youtube_stream(video_id):
     return ok({k: v for k, v in data.items() if k != "audio"})
 
 
-# Headers worth relaying from the upstream CDN response to the browser.
-_STREAM_PASS_HEADERS = ("Content-Type", "Content-Length", "Content-Range", "Accept-Ranges")
-
-
 def _fwd_headers():
     h = {"User-Agent": config.BROWSER_UA}
     if request.headers.get("Range"):
@@ -192,25 +190,77 @@ def _fwd_headers():
     return h
 
 
-def _relay(upstream, default_ct="application/octet-stream"):
-    """Stream an already-opened upstream response back to the browser, relaying
-    the headers a media element / hls.js cares about."""
-    def generate():
-        try:
-            for chunk in upstream.iter_content(chunk_size=65536):
-                if chunk:
-                    yield chunk
-        finally:
-            upstream.close()
+# ── keeping a playing video's googlevideo URLs alive ──────────────────────────
+#
+# A playlist is built once when a video opens, and every segment in it addresses
+# one googlevideo URL. That URL can stop working mid-video: it expires, and it is
+# minted for this machine's public IP — a phone moving between Wi-Fi and mobile
+# data, or IPv6 rotating its temporary address, gets every later segment refused.
+# When that happens the segment proxy re-resolves the video, finds the same
+# rendition (same itag = same file, so byte ranges still line up) and carries on
+# from the fresh URL; the swap is remembered so the rest of the video's segments
+# go straight there.
 
-    headers = {k: upstream.headers[k] for k in _STREAM_PASS_HEADERS if k in upstream.headers}
-    headers.setdefault("Accept-Ranges", "bytes")
-    return Response(
-        stream_with_context(generate()),
-        status=upstream.status_code,
-        headers=headers,
-        content_type=upstream.headers.get("Content-Type", default_ct),
-    )
+_FRESH = {}  # stale googlevideo URL -> a working URL for the same file
+_FRESH_MAX = 256
+_refresh_locks = {}
+_refreshed_at = {}
+_refresh_registry = threading.Lock()
+
+
+def _itag_of(url):
+    return (parse_qs(urlparse(url).query).get("itag") or [None])[0]
+
+
+def _current_url(url):
+    """The newest known-good URL standing in for `url` (follows chained swaps)."""
+    seen = 0
+    while url in _FRESH and seen < 8:
+        url = _FRESH[url]
+        seen += 1
+    return url
+
+
+def _fresh_url(video_id, stale):
+    """A re-resolved googlevideo URL for the same rendition as `stale`, or None.
+    One re-resolve per video per ~20 s however many segments ask at once."""
+    itag = _itag_of(stale)
+    if not video_id or not itag:
+        return None
+    with _refresh_registry:
+        lock = _refresh_locks.setdefault(video_id, threading.Lock())
+    with lock:
+        if time.time() - _refreshed_at.get(video_id, 0) > 20:
+            cache.invalidate(youtube.info_key(video_id))
+            cache.invalidate(f"yt:inv:streams:{video_id}")
+            _refreshed_at[video_id] = time.time()
+        try:
+            data = youtube.video_streams(video_id)
+        except Exception:
+            return None
+    for s in (data.get("streams") or []) + (data.get("audio") or []):
+        u = s.get("url")
+        if u and u != stale and _itag_of(u) == itag:
+            if len(_FRESH) >= _FRESH_MAX:
+                _FRESH.pop(next(iter(_FRESH)))
+            _FRESH[stale] = u
+            return u
+    return None
+
+
+def _open_media(url, video_id, headers):
+    """Open googlevideo bytes for the player: retries transient failures, swaps in
+    a re-resolved URL when the old one is refused, and returns (upstream, reopen)
+    — `reopen(range)` resumes the body if the connection breaks mid-way."""
+    refresh = (lambda stale: _fresh_url(video_id, stale)) if video_id else None
+    upstream = httpc.stream_get(_current_url(url), headers=headers, anonymous=True, refresh=refresh)
+
+    def reopen(rng):
+        return httpc.stream_get(
+            _current_url(url), headers={**headers, "Range": rng}, anonymous=True, refresh=refresh,
+        )
+
+    return upstream, reopen
 
 
 def _find_stream(video_id, itag, kind=None):
@@ -234,34 +284,27 @@ def youtube_stream_data(video_id):
     are forwarded so seeking works.
     """
     itag = request.args.get("itag")
-
-    # A cached stream URL can rot before its TTL (googlevideo 4xx's expired/
-    # consumed URLs); on any client/server error drop the cache and re-resolve a
-    # fresh one once — otherwise the browser sees a non-media error body and
-    # reports it as an unsupported source.
-    upstream = None
-    for attempt in range(2):
-        try:
-            target = _find_stream(video_id, itag)
-        except Exception as e:
-            return err(f"Stream resolve failed: {e}", 502)
-        if not target:
-            return err("No playable stream", 502)
-        upstream = httpc.anon_session.get(
-            target["url"], headers=_fwd_headers(), stream=True, timeout=20, allow_redirects=True,
-        )
-        if upstream.status_code < 400 or attempt == 1:
-            break
-        upstream.close()
-        cache.invalidate(youtube.info_key(video_id))
-        cache.invalidate(f"yt:inv:streams:{video_id}")
-
-    return _relay(upstream, default_ct="video/mp4")
+    try:
+        target = _find_stream(video_id, itag)
+    except Exception as e:
+        return err(f"Stream resolve failed: {e}", 502)
+    if not target:
+        return err("No playable stream", 502)
+    # A cached stream URL can rot before its TTL (googlevideo 4xx's expired or
+    # other-IP URLs); _open_media swaps in a re-resolved one rather than handing the
+    # browser a non-media error body it would report as an unsupported source.
+    try:
+        upstream, reopen = _open_media(target["url"], video_id, _fwd_headers())
+    except Exception as e:
+        return err(f"Stream fetch failed: {e}", 502)
+    return relay(upstream, reopen=reopen, default_ct="video/mp4")
 
 
-def _seg_proxy_url(abs_url):
+def _seg_proxy_url(abs_url, video_id=None):
+    """The same-origin proxy URL for one googlevideo resource. With `video_id`, the
+    proxy can re-resolve the video if this URL stops working mid-playback."""
     token = base64.urlsafe_b64encode(abs_url.encode()).decode()
-    return f"/api/youtube/hls/seg?u={token}"
+    return f"/api/youtube/hls/seg?u={token}" + (f"&v={video_id}" if video_id else "")
 
 
 _URI_ATTR_RE = re.compile(r'URI="([^"]+)"')
@@ -301,7 +344,7 @@ def _index_fmp4(url):
         resp = httpc.get(
             url, headers={"Range": "bytes=0-262143"}, timeout=20, allow_redirects=True,
             anonymous=True,
-        )
+        )  # raises on a refused (expired / other-IP) URL
         init_end, segs = fmp4.parse_sidx(resp.content)
         return init_end, segs
 
@@ -343,8 +386,16 @@ def _adaptive_media(video_id, itag, track):
     try:
         init_end, segments = _index_fmp4(url)
     except Exception as e:
-        return err(f"Segment index failed: {e}", 502)
-    return _hls_response(fmp4.media_playlist(_seg_proxy_url(url), init_end, segments))
+        # the cached URL may already be dead (expired, or for an old IP): re-resolve once
+        fresh = _fresh_url(video_id, url)
+        if not fresh:
+            return err(f"Segment index failed: {e}", 502)
+        url = fresh
+        try:
+            init_end, segments = _index_fmp4(url)
+        except Exception as e2:
+            return err(f"Segment index failed: {e2}", 502)
+    return _hls_response(fmp4.media_playlist(_seg_proxy_url(url, video_id), init_end, segments))
 
 
 @feeds_bp.get("/youtube/hls/<video_id>/<itag>/v.m3u8")
@@ -409,10 +460,14 @@ def youtube_hls_segment():
         return err("bad token")
     if "googlevideo.com" not in (urlparse(url).hostname or ""):  # only proxy YouTube CDN
         return err("forbidden host", 403)
-    upstream = httpc.anon_session.get(
-        url, headers=_fwd_headers(), stream=True, timeout=20, allow_redirects=True,
-    )
-    return _relay(upstream, default_ct="video/mp2t")
+    video_id = request.args.get("v")
+    if video_id and not re.fullmatch(r"[\w-]{6,20}", video_id):
+        return err("bad video id")
+    try:
+        upstream, reopen = _open_media(url, video_id, _fwd_headers())
+    except Exception as e:
+        return err(f"Segment fetch failed: {e}", 502)
+    return relay(upstream, reopen=reopen, default_ct="video/mp2t")
 
 
 @feeds_bp.get("/youtube/playlist/<playlist_id>")

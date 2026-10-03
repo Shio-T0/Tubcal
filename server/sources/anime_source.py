@@ -1,28 +1,35 @@
 """Episode-source adapter.
 
-Resolves an anime's episode list and playable streams directly with
-``anipy_api`` — the same scraper Shou uses — so nothing external needs to run
-(no Consumet/meta aggregator). anipy searches a provider (allanime / animekai)
-by *title*, so we map the AniList id to its title via ``anilist.media`` first,
-then pick the best-matching entry.
+Resolves an anime's episode list and playable streams for the player. Sources, in
+the order they're tried:
+
+1. ``hianime`` (hianime.at + its ZokoAnime embed) — the source ani-cli 5.1 moved
+   to. Episodes are addressed by MyAnimeList id + number, which AniList carries,
+   so most titles need no title search at all. See ``hianime.py``.
+2. ``anipy_api`` (allanime / animekai) — what Tubcal used before. allanime now
+   answers ``AA_CRYPTO_STALE`` and anipy 3.10 dropped it from its registry, so
+   this only helps if a later anipy release brings it back; kept as a fallback.
+3. ``weeb_fallback`` (weeb-cli's aniworld) — a second, independent site.
 
 The two public functions keep the exact shapes the player + proxy expect:
 
     info(anilist_id) -> {"episodes": [{key, number, title, image}], "total": int}
     watch(key)       -> {"sources":   [{url, quality, isM3U8}],
-                         "subtitles": [{url, lang}],
-                         "headers":   {"Referer": ...}}
+                         "subtitles": [{url, lang, label?, default?}],
+                         "headers":   {"Referer": ...},
+                         "skip"?: {intro?: {start, end}, outro?: {...}},
+                         "audio"?: "sub"|"dub", "audio_options"?: [...]}
 
-The stream URLs anipy returns are still proxied through Tubcal's own endpoints,
-so the browser only ever talks to localhost. Pluggable by design: swap these two
-functions for a local-files or torrent adapter later without touching the player.
+Stream URLs are still proxied through Tubcal's own endpoints, so the browser only
+ever talks to localhost. Swap these two functions for a local-files or torrent
+adapter later without touching the player.
 """
 
 import base64
 import json
 
 from .. import cache, config, db
-from . import anilist
+from . import anilist, hianime
 
 # anipy's real providers. A leftover Consumet provider name in settings (e.g.
 # "gogoanime") isn't one of these, so we ignore it and fall back to the defaults.
@@ -109,6 +116,8 @@ def _resolve_episodes(titles, anilist_id=None):
             prov = get_provider(provider)
         except Exception:
             continue
+        if prov is None:  # anipy 3.10 no longer registers allanime/animekai
+            continue
         results = None
         for title in titles:
             try:
@@ -142,47 +151,127 @@ def _resolve_episodes(titles, anilist_id=None):
     raise RuntimeError("no playable episodes found for this title on any source")
 
 
+def _aired(m):
+    """How many episodes have aired, from AniList — None when it can't say (an
+    airing show with no schedule, e.g. a streaming drop)."""
+    if m.get("next_episode"):
+        return m["next_episode"] - 1
+    if m.get("status") == "NOT_YET_RELEASED":
+        return 0
+    if m.get("status") in ("FINISHED", "CANCELLED") and m.get("episodes"):
+        return m["episodes"]
+    return None
+
+
+def _lang_pref():
+    return "dub" if (db.get_setting("anime_sub_pref") or "sub") == "dub" else "sub"
+
+
+def _hianime_episodes(anilist_id):
+    """The episode list for hianime: numbers from AniList when it knows the MAL id
+    and the aired count (after one probe, so ▶ only appears when the source really
+    carries the show), else hianime's own list, found by title."""
+    m = anilist.media(anilist_id) or {}
+    lang = _lang_pref()
+    mal, aired = m.get("id_mal"), _aired(m)
+    numbers = ident = None
+    if mal and aired:
+        for audio in ("sub", "dub"):
+            try:
+                hianime.embed_config(hianime.embed_url(mal, 1, audio))
+                numbers, ident = list(range(1, aired + 1)), f"mal:{mal}"
+                break
+            except Exception:  # noqa: BLE001 — try the other language, then the site
+                continue
+    if numbers is None:
+        slug = hianime.find_show(_titles(anilist_id))
+        if not slug:
+            raise LookupError("hianime has no show matching this title")
+        listed = hianime.episode_list(slug)
+        numbers, ident = sorted(listed), f"slug:{slug}"
+    if not numbers:
+        raise LookupError("hianime lists no episodes yet")
+    episodes = [
+        {"key": _encode_key("hianime", ident, n, lang, anilist_id), "number": n,
+         "title": f"Episode {n}", "image": None}
+        for n in numbers
+    ]
+    return {"episodes": episodes, "total": len(episodes), "provider": "hianime"}
+
+
 def info(anilist_id):
-    """Episode list for an AniList id, resolved through anipy and cached."""
-    titles = _titles(anilist_id)
-    if not titles:
-        raise RuntimeError("could not resolve a title for this anime")
-    data, _ = cache.cached(
-        f"anime:info:{anilist_id}", config.TTL_ANIME_EPISODES,
-        lambda: _resolve_episodes(titles, anilist_id),
-    )
+    """Episode list for an AniList id — hianime first, anipy if that fails."""
+    def resolve():
+        errors = []
+        try:
+            return _hianime_episodes(anilist_id)
+        except Exception as e:  # noqa: BLE001 — fall through to the next source
+            errors.append(f"hianime: {e}")
+        titles = _titles(anilist_id)
+        if titles:
+            try:
+                return _resolve_episodes(titles, anilist_id)
+            except Exception as e:  # noqa: BLE001
+                errors.append(f"anipy: {e}")
+        raise RuntimeError("no playable episodes found — " + "; ".join(errors))
+
+    data, _ = cache.cached(f"anime:info:{anilist_id}", config.TTL_ANIME_EPISODES, resolve)
     return data
+
+
+def with_audio(key, audio):
+    """The same episode's key, asking for the other language."""
+    provider, identifier, episode, _, anilist_id = _decode_key(key)
+    return _encode_key(provider, identifier, episode, audio, anilist_id)
 
 
 def watch(key):
     """Resolve playable sources + subtitles for one episode key.
 
-    Returns {sources:[{url,quality,isM3U8}], subtitles:[{url,lang}],
-    headers:{Referer}} — the aggregator shape the proxy already forwards.
-
-    Tries the primary scraper (anipy) first; if it can't produce a stream — e.g.
-    allanime rotated its crypto and no anipy release handles it yet — falls back
-    to weeb_fallback (desktop-only). Raises only when both come up empty.
+    hianime first — for its own keys, and for keys minted by the older anipy path
+    too (re-addressed through the AniList id's MAL id) — then anipy, then
+    weeb_fallback. Raises only when every source comes up empty, naming why each
+    failed so the player can say more than "no stream".
     """
     provider, identifier, episode, lang, anilist_id = _decode_key(key)
     want_dub = lang == "dub"
+    errors = []
 
-    streams = None
+    mal = slug = None
+    if provider == "hianime" and isinstance(identifier, str):
+        kind, _, val = identifier.partition(":")
+        mal, slug = (val, None) if kind == "mal" else (None, val if kind == "slug" else None)
+    elif anilist_id:
+        mal = (anilist.media(anilist_id) or {}).get("id_mal")
     try:
-        get_provider, LanguageTypeEnum = _anipy()
-        prov = get_provider(provider)
-        lang_enum = LanguageTypeEnum.DUB if want_dub else LanguageTypeEnum.SUB
-        streams = prov.get_video(identifier, episode, lang_enum)
-    except Exception:
-        streams = None
-    if streams:
-        return _format_anipy(streams)
+        return hianime.resolve(
+            episode, mal_id=mal, slug=slug,
+            titles=_titles(anilist_id) if anilist_id and not slug else (),
+            want_dub=want_dub,
+        )
+    except Exception as e:  # noqa: BLE001 — the next source may have it
+        errors.append(f"hianime: {e}")
+
+    if provider in _VALID_PROVIDERS:
+        try:
+            get_provider, LanguageTypeEnum = _anipy()
+            prov = get_provider(provider)
+            if prov is None:
+                raise LookupError(f"anipy no longer ships {provider}")
+            lang_enum = LanguageTypeEnum.DUB if want_dub else LanguageTypeEnum.SUB
+            streams = prov.get_video(identifier, episode, lang_enum)
+            if streams:
+                return _format_anipy(streams)
+            errors.append("anipy: no streams")
+        except Exception as e:  # noqa: BLE001
+            errors.append(f"anipy: {e}")
 
     fallback = _fallback_watch(anilist_id, episode, want_dub)
     if fallback and fallback.get("sources"):
         return fallback
+    errors.append("aniworld: nothing")
 
-    raise RuntimeError("no playable source for this episode")
+    raise RuntimeError("no playable source for this episode — " + "; ".join(errors))
 
 
 def _format_anipy(streams):

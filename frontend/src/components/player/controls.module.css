@@ -345,6 +345,14 @@
   border-radius: 999px;
   background: color-mix(in srgb, var(--paper) 22%, transparent);
 }
+/* an anime episode's opening/ending, under the played filament */
+.span {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--signal) 34%, transparent);
+}
 .played {
   position: absolute;
   left: 0;

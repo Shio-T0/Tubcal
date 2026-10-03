@@ -1,0 +1,616 @@
+/* Episodes — a desk that says what to watch next, over a contact sheet of the run.
+   Stills where AniList has them; otherwise slates: the number set large in the
+   display face on the show's own colour, faint scanlines over it like the room's
+   CRT. Watched episodes recede, the next one is ringed. */
+
+.section {
+  --tile-r: 10px;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-3);
+}
+.head h3 {
+  margin: 0;
+}
+.headTools {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+.ranges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.range,
+.rangeOn {
+  padding: 4px 10px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--rule);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+.range:hover {
+  color: var(--text-primary);
+  border-color: var(--rule-strong);
+}
+.rangeOn {
+  color: var(--text-primary);
+  border-color: color-mix(in srgb, var(--c-anime) 55%, var(--rule));
+  background: color-mix(in srgb, var(--c-anime) 12%, transparent);
+}
+.rangeSelect {
+  padding: 5px 10px;
+  border-radius: var(--r-input);
+  border: 1px solid var(--rule);
+  background: var(--surface-input);
+  color: var(--text-primary);
+  font-size: 12.5px;
+}
+.guard,
+.guardOn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 11px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--rule);
+  font-size: 12px;
+  color: var(--paper-faint);
+}
+.guard:hover {
+  color: var(--text-primary);
+}
+.guardOn {
+  color: var(--text-primary);
+  border-color: color-mix(in srgb, var(--cover-c) 50%, var(--rule));
+}
+
+/* ── the desk ─────────────────────────────────────────────────────────────── */
+.desk {
+  display: grid;
+  grid-template-columns: minmax(0, 360px) 1fr;
+  gap: var(--space-5);
+  align-items: stretch;
+  margin-bottom: var(--space-5);
+  padding: var(--space-4);
+  border-radius: var(--r-card);
+  border: 1px solid var(--rule);
+  background: var(--surface);
+}
+.desk[data-mode='next'],
+.desk[data-mode='resume'],
+.desk[data-mode='start'] {
+  border-color: color-mix(in srgb, var(--cover-c) 40%, var(--rule));
+}
+.deskArt {
+  position: relative;
+  display: block;
+  align-self: start;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--tile-r);
+  overflow: hidden;
+  border: 1px solid var(--rule);
+  background: var(--ink-3);
+}
+.deskArt img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.deskArt:disabled {
+  cursor: default;
+}
+.deskPlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  margin: -29px 0 0 -29px;
+  border-radius: 50%;
+  background: rgba(10, 7, 4, 0.55);
+  color: #f6ecd8;
+  backdrop-filter: blur(4px);
+  opacity: 0;
+  transform: scale(0.9);
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+.deskArt:hover .deskPlay {
+  opacity: 1;
+  transform: none;
+}
+.deskArt:disabled .deskPlay {
+  display: none;
+}
+.deskDone {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: var(--success);
+  color: var(--ink);
+}
+.deskBody {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+}
+.kicker {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--c-anime);
+}
+.deskTitle {
+  margin: 2px 0 0;
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 600;
+  line-height: 1.15;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+.deskSub {
+  margin: 4px 0 0;
+  font-size: 14.5px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.deskNote {
+  margin: 6px 0 0;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--paper-faint);
+}
+
+/* the reel: the whole run, one cell per episode */
+.reel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: var(--space-4);
+}
+.cells {
+  display: flex;
+  gap: 2px;
+  max-width: 560px;
+}
+.cells i {
+  flex: 1 1 0;
+  min-width: 2px;
+  max-width: 22px;
+  height: 9px;
+  border-radius: 2px;
+}
+.cells i[data-s='seen'] {
+  background: var(--c-anime);
+}
+.cells i[data-s='next'] {
+  background: var(--paper);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--c-anime) calc(70% * var(--glow-strength, 1)), transparent);
+}
+.cells i[data-s='aired'] {
+  background: var(--rule-strong);
+}
+.cells i[data-s='later'] {
+  box-shadow: inset 0 0 0 1px var(--rule-strong);
+}
+.reelBar {
+  position: relative;
+  display: block;
+  max-width: 560px;
+  height: 9px;
+  border-radius: 5px;
+  box-shadow: inset 0 0 0 1px var(--rule-strong);
+  overflow: hidden;
+}
+.reelBar i {
+  position: absolute;
+  inset: 0 auto 0 0;
+}
+.reelAired {
+  background: var(--rule-strong);
+}
+.reelSeen {
+  background: var(--c-anime);
+}
+.reelText {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--paper-faint);
+}
+.reelText b {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.deskActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px var(--space-4);
+  margin-top: var(--space-5);
+}
+.primary,
+.secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border-radius: var(--r-pill);
+  font-size: 13.5px;
+  font-weight: 600;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+.primary {
+  background: var(--c-anime);
+  color: var(--ink);
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--c-anime) calc(30% * var(--glow-strength, 1)), transparent);
+}
+.primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--c-anime) calc(42% * var(--glow-strength, 1)), transparent);
+}
+.secondary {
+  border: 1px solid var(--rule-strong);
+  color: var(--text-primary);
+}
+.secondary:hover {
+  border-color: var(--c-anime);
+}
+.primary:active,
+.secondary:active {
+  transform: scale(0.97);
+}
+.sites {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--paper-faint);
+}
+.site {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: var(--r-pill);
+  border: 1px solid color-mix(in srgb, var(--ext-c, var(--rule-strong)) 60%, var(--rule));
+  font-size: 12px;
+  color: var(--text-primary);
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.site:hover {
+  background: var(--surface-hover);
+  border-color: var(--ext-c, var(--c-anime));
+}
+.site img {
+  width: 13px;
+  height: 13px;
+  border-radius: 3px;
+}
+
+/* ── slates: the number, set large on the show's colour ───────────────────── */
+.slate {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  padding: 6px 12px;
+  background:
+    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.06) 0 1px, transparent 1px 3px),
+    radial-gradient(120% 90% at 85% 0%, color-mix(in srgb, var(--cover-c) 30%, transparent), transparent 70%),
+    color-mix(in srgb, var(--cover-c) 16%, var(--ink-3));
+  transition: opacity 0.2s ease;
+}
+.slate b {
+  font-family: var(--font-display);
+  font-size: 46px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  font-variant-numeric: lining-nums tabular-nums;
+  color: color-mix(in srgb, var(--cover-c) 28%, var(--paper));
+}
+.slateBig {
+  padding: 10px 20px;
+}
+.slateBig b {
+  font-size: 108px;
+}
+.slateWait {
+  align-items: center;
+  justify-content: center;
+  background: var(--surface);
+  color: var(--paper-faint);
+}
+.slateWait b {
+  color: var(--paper-faint);
+}
+
+/* ── the contact sheet ────────────────────────────────────────────────────── */
+.sheet {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(178px, 1fr));
+  gap: var(--space-4) 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.tile {
+  position: relative;
+  min-width: 0;
+  animation: tileIn 0.4s var(--hand) calc(var(--deal, 0.95s) + var(--i, 0) * 0.035s) both;
+}
+@keyframes tileIn {
+  from {
+    opacity: 0;
+    transform: translateY(7px);
+  }
+}
+.tileMain {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+}
+.tileMain:disabled {
+  cursor: default;
+}
+.frame {
+  position: relative;
+  display: block;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--tile-r);
+  overflow: hidden;
+  border: 1px solid var(--rule);
+  background: var(--ink-3);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.frame img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.35s ease, opacity 0.2s ease;
+}
+.tileMain:not(:disabled):hover .frame {
+  border-color: color-mix(in srgb, var(--cover-c) 55%, var(--rule-strong));
+}
+.tileMain:not(:disabled):hover .frame img {
+  transform: scale(1.04);
+}
+.veiled {
+  filter: blur(9px) saturate(0.5);
+  transform: scale(1.12);
+}
+.tileMain:not(:disabled):hover .frame img.veiled {
+  transform: scale(1.12);
+}
+.frameNum {
+  position: absolute;
+  left: 8px;
+  bottom: 6px;
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1;
+  color: #f6ecd8;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.7);
+}
+.tilePlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  margin: -21px 0 0 -21px;
+  border-radius: 50%;
+  background: rgba(10, 7, 4, 0.58);
+  color: #f6ecd8;
+  opacity: 0;
+  transform: scale(0.9);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+.tileMain:not(:disabled):hover .tilePlay,
+.tileMain:focus-visible .tilePlay {
+  opacity: 1;
+  transform: none;
+}
+.seenMark {
+  position: absolute;
+  right: 7px;
+  bottom: 9px;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--success);
+  color: var(--ink);
+}
+.nextMark {
+  position: absolute;
+  top: 7px;
+  left: 7px;
+  padding: 2px 9px;
+  border-radius: var(--r-pill);
+  background: var(--c-anime);
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 600;
+}
+.time {
+  position: absolute;
+  right: 6px;
+  bottom: 9px;
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: rgba(8, 6, 4, 0.82);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  color: #f3e7cf;
+}
+.bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 4px;
+  background: rgba(8, 6, 4, 0.55);
+}
+.bar i {
+  display: block;
+  height: 100%;
+  background: var(--c-anime);
+}
+.bar i[data-done] {
+  background: var(--success);
+}
+
+.cap {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  padding: 0 2px;
+}
+.capNum {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.capTitle {
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--text-secondary);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.hidden {
+  font-style: italic;
+  color: var(--paper-faint);
+}
+
+/* watched episodes recede; the next one is ringed */
+.tile[data-state='seen'] .slate,
+.tile[data-state='seen'] .frame img {
+  opacity: 0.45;
+}
+.tile[data-state='seen'] .capNum {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+.tile[data-state='next'] .frame {
+  border-color: var(--c-anime);
+  box-shadow: 0 0 0 1px var(--c-anime), 0 6px 20px color-mix(in srgb, var(--c-anime) calc(22% * var(--glow-strength, 1)), transparent);
+}
+
+/* the official site, as the second way in (shown on hover; always on touch) */
+.ext {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: rgba(10, 7, 4, 0.66);
+  color: #f3e7cf;
+  opacity: 0;
+  transition: opacity 0.15s ease, background 0.15s ease;
+}
+.tile:hover .ext,
+.ext:focus-visible {
+  opacity: 1;
+}
+.ext:hover {
+  background: rgba(10, 7, 4, 0.86);
+}
+@media (hover: none) {
+  .ext {
+    opacity: 1;
+  }
+}
+
+/* the next episode, still to air */
+.tileWait .frame {
+  border-style: dashed;
+  border-color: var(--rule-strong);
+  background: none;
+}
+.tileWait .slate {
+  background: none;
+}
+.tileWait .slate b {
+  color: var(--paper-faint);
+}
+.tileWait .capTitle {
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+@media (max-width: 760px) {
+  .desk {
+    grid-template-columns: 1fr;
+    gap: var(--space-3);
+  }
+  .deskTitle {
+    font-size: 24px;
+  }
+  .slateBig b {
+    font-size: 84px;
+  }
+}
+@media (max-width: 560px) {
+  .sheet {
+    grid-template-columns: repeat(auto-fill, minmax(138px, 1fr));
+    gap: var(--space-3) 10px;
+  }
+  .slate b {
+    font-size: 36px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tile {
+    animation: none;
+  }
+  .frame img,
+  .tilePlay,
+  .deskPlay {
+    transition: none;
+  }
+}

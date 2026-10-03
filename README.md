@@ -13,7 +13,7 @@ One Flask app, bound to `127.0.0.1`.
 ![Flask](https://img.shields.io/badge/flask-backend-3b2a1a?style=flat-square&logo=flask&logoColor=e6ab5e)
 ![SQLite](https://img.shields.io/badge/sqlite-one%20file-3b2a1a?style=flat-square&logo=sqlite&logoColor=e6ab5e)
 ![Localhost only](https://img.shields.io/badge/binds-127.0.0.1%20only-3b2a1a?style=flat-square)
-![License MIT](https://img.shields.io/badge/license-MIT-3b2a1a?style=flat-square)
+![License GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-3b2a1a?style=flat-square)
 
 *No accounts required · no cloud · no telemetry — the only outbound traffic is the platforms themselves.*
 
@@ -342,7 +342,20 @@ AniList helpers.
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+Copyright (C) 2026 shio-t0
+
+Tubcal is free software: you can redistribute it and/or modify it under the terms of
+the GNU General Public License as published by the Free Software Foundation, either
+version 3 of the License, or (at your option) any later version.
+
+Tubcal is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
+PURPOSE. See the GNU General Public License for more details. A copy is in
+[LICENSE](LICENSE); Settings → About shows it in the app too.
+
+Anime playback builds on other GPL-3.0 projects: ani-cli's method, anipy-api and
+weeb-cli. [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) credits them. A build
+also lists every library bundled into the web app in `legal/third-party-licenses.txt`.
 
 ---
 

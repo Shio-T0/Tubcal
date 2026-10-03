@@ -145,3 +145,56 @@ def post(url, *, ua=config.BROWSER_UA, headers=None, timeout=15, anonymous=False
     resp = sess.post(url, headers=hdrs, timeout=timeout, **kwargs)
     resp.raise_for_status()
     return resp
+
+
+# ── media bytes ───────────────────────────────────────────────────────────────
+
+# The CDN's own hiccups: worth another try at the same URL.
+_RETRY_STATUS = {408, 429, 500, 502, 503, 504}
+# The CDN refusing the URL itself — expired, or (googlevideo) minted for an IP
+# this machine no longer has. Retrying the same URL won't help; a fresh one will.
+_STALE_STATUS = {401, 403, 404, 410}
+
+
+def stream_get(url, *, headers=None, anonymous=False, timeout=(6, 25), attempts=4, refresh=None):
+    """Open a streaming GET for media bytes, riding out what usually goes wrong
+    mid-video instead of handing the first failure to the player.
+
+    Connection errors, timeouts and the CDN's 5xx/429 are retried with a short
+    backoff. When the server refuses the URL itself (403/404/410), `refresh(url)`
+    may supply a replacement — a freshly resolved URL for the *same file*, so a
+    byte range carries over unchanged — and that is tried instead (once).
+
+    Returns the last response (the caller relays its status, error or not), or
+    raises the last connection error if no attempt got a response at all."""
+    sess = anon_session if anonymous else session
+    hdrs = dict(headers or {})
+    hdrs.setdefault("User-Agent", config.BROWSER_UA)
+    resp = None
+    last_exc = None
+    refreshed = False
+    for i in range(attempts):
+        if resp is not None:
+            resp.close()
+            resp = None
+        try:
+            resp = sess.get(url, headers=hdrs, stream=True, timeout=timeout, allow_redirects=True)
+        except requests.RequestException as e:
+            last_exc = e
+            if i < attempts - 1:
+                time.sleep(min(2.0, 0.3 * 2 ** i))
+            continue
+        if resp.status_code in _STALE_STATUS and refresh and not refreshed:
+            refreshed = True
+            fresh = refresh(url)
+            if fresh and fresh != url:
+                url = fresh
+                continue
+            return resp
+        if resp.status_code in _RETRY_STATUS and i < attempts - 1:
+            time.sleep(min(2.0, 0.3 * 2 ** i))
+            continue
+        return resp
+    if resp is not None:
+        return resp
+    raise last_exc or requests.ConnectionError(f"no response from {urlparse(url).hostname}")
