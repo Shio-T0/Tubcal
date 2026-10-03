@@ -156,6 +156,17 @@ DEFAULT_SETTINGS = {
     "anime_sub_pref": "sub",      # 'sub' | 'dub'
     "anime_source_url": "",       # aggregator base URL (blank → config/env default)
     "anime_provider": "",         # adapter-specific provider hint (optional)
+    "anime_theme_audio": True,    # play a title's opening when its page opens
+    "anime_theme_volume": 0.35,   # 0..1, the opening's volume
+    "anime_theme_seconds": 30,    # how long it plays (0 = the whole song)
+    "anime_auto_skip": False,     # the player jumps an episode's opening by itself
+    # How subtitles look in every player (frontend/src/lib/subtitleStyle.js has the
+    # same shape). `updated_at` lets the phone⇄desktop data sync keep the newer one.
+    "subtitle_style": {
+        "size": 1, "font": "sans", "weight": 600, "color": "#ffffff", "edge": "outline",
+        "bg": 0, "bg_color": "#000000", "position": 6, "lang": "", "show": True,
+        "updated_at": 0,
+    },
     # The Composing Room (code editor): vim-driven CodeMirror over EDITOR_ROOT.
     "editor_autosave": False,     # write buffers on blur/idle instead of only :w
     "editor_leader": " ",         # vim <leader> key (space, like modern nvim rigs)

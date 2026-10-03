@@ -11,3 +11,12 @@ frontend/dist/
 scraper.py
 main_scrap.py
 anime_aggregator.py
+
+# The Android app (android/): build output, caches and machine-specific config
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/.idea/
+android/phone/node_modules/
+*.iml

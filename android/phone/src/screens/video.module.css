@@ -1,0 +1,340 @@
+/* Phone video cards and rows. Full-bleed pictures, the title in the reading face
+   under them, and a ⋮ big enough to hit. */
+
+.thumb {
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 16 / 9;
+  background: #000;
+}
+.thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+/* while the picture loads, a sheen passes over the empty frame */
+.thumb::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, 0.06) 50%, transparent 70%) #000;
+  background-size: 220% 100%;
+  animation: sheen 1.6s linear infinite;
+}
+.thumb img {
+  position: relative;
+}
+@keyframes sheen {
+  from {
+    background-position: 160% 0;
+  }
+  to {
+    background-position: -60% 0;
+  }
+}
+.noPic {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: var(--surface-hover);
+}
+.done img {
+  opacity: 0.55;
+  filter: saturate(0.7);
+}
+.len {
+  position: absolute;
+  right: 6px;
+  bottom: 7px;
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: rgba(0, 0, 0, 0.8);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #fff;
+}
+.prog {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.25);
+}
+.prog i {
+  display: block;
+  height: 100%;
+  background: var(--c-youtube);
+  transform-origin: left;
+  animation: grow 0.9s var(--e-out) 0.25s both;
+}
+@keyframes grow {
+  from {
+    transform: scaleX(0);
+  }
+}
+.progDone {
+  background: var(--success, #6fae9f) !important;
+}
+.badge {
+  animation: badgeIn 0.5s var(--e-spring) 0.2s both;
+  position: absolute;
+  top: 7px;
+  left: 7px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: var(--r-pill);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #fff;
+}
+.live {
+  background: #d63024;
+}
+.liveDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #fff;
+  animation: breathe 1.2s ease-in-out infinite;
+}
+@keyframes breathe {
+  50% {
+    opacity: 0.35;
+    transform: scale(0.7);
+  }
+}
+@keyframes badgeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+}
+.soon {
+  background: rgba(0, 0, 0, 0.75);
+}
+.fresh {
+  overflow: hidden;
+  background: var(--signal);
+  color: #1c140d;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 9.5px;
+}
+/* "new" catches the light now and then */
+.fresh::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 20%, rgba(255, 255, 255, 0.7) 50%, transparent 80%);
+  transform: translateX(-120%);
+  animation: glint 3.6s ease-in-out 1s infinite;
+}
+@keyframes glint {
+  0%,
+  70% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(160%);
+  }
+}
+
+/* full card */
+.card {
+  min-width: 0;
+}
+.full + .full {
+  margin-top: 6px;
+}
+.cardHit {
+  display: block;
+  width: 100%;
+  --press: 0.975;
+}
+.full .thumb {
+  border-radius: 0;
+}
+.cardText {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  padding: 10px 4px 14px 14px;
+}
+.face,
+.faceLetter {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  margin-top: 2px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.faceLetter {
+  display: grid;
+  place-items: center;
+  font-family: var(--font-display);
+  font-size: 16px;
+  color: #1c140d;
+  background: var(--c-youtube);
+}
+.cardWords {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+}
+.cardWords b,
+.rowWords b {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--paper);
+}
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--paper-faint);
+}
+.meta > * + *::before {
+  content: '·';
+  margin: 0 6px;
+}
+.more {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  color: var(--paper-faint);
+  --press: 0.8;
+}
+.more:active {
+  background: var(--surface-hover);
+}
+
+/* strip cards (the row is .rail; .strip is the card's size variant) */
+.rail {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding: 0 16px 4px;
+  scroll-snap-type: x mandatory;
+  scroll-padding: 0 16px;
+  scrollbar-width: none;
+}
+.rail::-webkit-scrollbar {
+  display: none;
+}
+.rail .card {
+  flex: none;
+  width: 72vw;
+  max-width: 340px;
+  scroll-snap-align: start;
+}
+.rail .thumb {
+  border-radius: 12px;
+}
+.rail .cardText {
+  padding: 8px 0 4px 2px;
+}
+.rail .cardWords b {
+  font-size: 14px;
+}
+
+/* rows */
+.row {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 6px 4px 6px 14px;
+}
+.index {
+  flex: none;
+  width: 22px;
+  padding-top: 18px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--paper-faint);
+}
+.rowHit {
+  --press: 0.975;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+}
+.rowThumb {
+  flex: none;
+  width: 42%;
+  max-width: 190px;
+  border-radius: 10px;
+}
+.rowWords {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding-top: 2px;
+}
+.rowWords b {
+  font-size: 14px;
+}
+
+/* the sheet's head */
+.menuHead {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 2px 0 12px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--rule);
+}
+.menuHead img {
+  flex: none;
+  width: 96px;
+  aspect-ratio: 16 / 9;
+  border-radius: 8px;
+  object-fit: cover;
+}
+.menuHead span {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.menuHead b {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 600;
+}
+.menuHead em {
+  font-style: normal;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--paper-faint);
+}
+
+.strip {
+  min-width: 0;
+}
+.thumb:has(img[data-loaded])::before {
+  animation: none;
+}

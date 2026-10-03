@@ -5,19 +5,25 @@
 // grouped the way a broadcast guide is — the TV lineup, shorts, films, the odd
 // OVA/ONA/special, and last season's leftovers still on air. Planning a show is a
 // single tap on its card.
+//
+// A card reads the way a listing in a TV guide does: its time slot first (the
+// weekday stamped in kanji, the local time, a live countdown), then the title, one
+// line of facts, as much synopsis as the card has room for — "Read more" grows the
+// card in place rather than scrolling a box — and the trailer and services last.
 
-import { useMemo } from 'react';
+import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Check, ChevronLeft, ChevronRight, Clock, ExternalLink, Plus, Tv } from 'lucide-react';
+import { Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, ExternalLink, Play, Plus, Tv, Users } from 'lucide-react';
 
 import { useApi } from '../../api/client.js';
 import { ErrorBox, Receiving } from '../layout/Section.jsx';
-import { applyOverlay, useAnimeSync, useToast } from '../../state.jsx';
+import { applyOverlay, useAnimeSync, usePlayer, useToast } from '../../state.jsx';
 import {
-  SOURCE_LABEL, STATUS_LABEL, airingDateLabel, fmtCountdown, formatLabel, stripHtml,
-  titleCase, useCountdownTick, useParamState,
+  CoverRatings, MONTH_SHORT, SOURCE_LABEL, STATUS_META, fmtCountdown, formatLabel,
+  titleCase, trailerItem, useCountdownTick, useParamState,
 } from './shared.jsx';
 import { useAnimeCalc } from './WatchCalculator.jsx';
+import s from '../../pages/anime.module.css';
 import g from './seasons.module.css';
 
 const SEASONS = ['WINTER', 'SPRING', 'SUMMER', 'FALL'];
@@ -59,34 +65,178 @@ function step(season, year, dir) {
   return [SEASONS[i], y];
 }
 
-function AiringLine({ m }) {
-  const atMs = m.next_airing_at ? m.next_airing_at * 1000 : 0;
-  useCountdownTick(atMs);
-  if (atMs && atMs > Date.now()) {
-    const premiere = m.next_episode === 1;
-    return (
-      <span className={g.airing}>
-        <Clock size={12} />
-        {premiere ? 'Premieres' : `Ep ${m.next_episode}`} in <strong>{fmtCountdown(atMs - Date.now())}</strong>
-        <em>{airingDateLabel(m.next_airing_at)}</em>
-      </span>
-    );
-  }
-  if (m.status === 'FINISHED') {
-    return <span className={g.airing}>{m.episodes ? `All ${m.episodes} episodes out` : 'Finished airing'}</span>;
-  }
-  if (m.start_date && m.status === 'NOT_YET_RELEASED') {
-    return <span className={g.airing}><Clock size={12} /> Starts {m.start_date}</span>;
-  }
-  return <span className={g.airing}>{m.status === 'RELEASING' ? 'Airing' : 'Date to be announced'}</span>;
+const WEEKDAY_KANJI = ['日', '月', '火', '水', '木', '金', '土'];
+const DAY_MS = 86_400_000;
+const compact = new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 });
+
+const sameDay = (a, b) => a.toDateString() === b.toDateString();
+
+/** "2026-10-20" → a local Date (not UTC midnight, which is the day before out west). */
+function localDate(iso) {
+  const [y, mo, d] = iso.split('-').map(Number);
+  return new Date(y, mo - 1, d);
 }
 
-function ProgramCard({ m, index }) {
+/** The listing's time slot, as a TV guide prints it: a stamp (the weekday in kanji
+ *  for a weekly show, a calendar leaf for a dated one-off), a headline time, and a
+ *  line under it. `tone` colours it: soon = within a day, quiet = nothing to wait for. */
+function slotOf(m, now) {
+  const at = m.next_airing_at ? m.next_airing_at * 1000 : 0;
+  const film = m.format === 'MOVIE';
+  if (at > now) {
+    const d = new Date(at);
+    const day = sameDay(d, new Date(now)) ? 'Today'
+      : sameDay(d, new Date(now + DAY_MS)) ? 'Tomorrow'
+        : d.toLocaleDateString([], { weekday: 'short' });
+    const what = film ? 'Opens' : m.next_episode === 1 ? 'Premiere'
+      : `Ep ${m.next_episode}${m.episodes ? ` of ${m.episodes}` : ''}`;
+    // A film opens on a date, not in a slot — its "time" is just AniList's midnight JST.
+    return {
+      stamp: film ? null : WEEKDAY_KANJI[d.getDay()],
+      leaf: film ? d : null,
+      head: film
+        ? d.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })
+        : `${day} ${d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`,
+      date: film ? null : d.toLocaleDateString([], { month: 'short', day: 'numeric' }),
+      what,
+      countdown: fmtCountdown(at - now),
+      tone: at - now < DAY_MS ? 'soon' : '',
+    };
+  }
+  if (m.status === 'FINISHED') {
+    const out = film && m.start_date
+      ? `Released ${localDate(m.start_date).toLocaleDateString([], { month: 'short', day: 'numeric' })}`
+      : m.episodes > 1 ? `All ${m.episodes} episodes out` : null;
+    return { stamp: '完', head: 'Finished', what: out, tone: 'quiet' };
+  }
+  if (m.status === 'RELEASING') {
+    return { stamp: '配', head: 'Streaming now', what: 'No weekly slot', tone: 'quiet' };
+  }
+  // a payload cached before these flags existed: trust the date, as the guide used to
+  if (m.start_date && (m.start_exact ?? true)) {
+    const d = localDate(m.start_date);
+    return {
+      leaf: d,
+      head: `Starts ${d.toLocaleDateString([], { month: 'short', day: 'numeric' })}`,
+      what: 'Time not announced',
+    };
+  }
+  if (m.start_date && (m.start_month ?? true)) {
+    const d = localDate(m.start_date);
+    return {
+      stamp: '未',
+      head: `Coming ${d.toLocaleDateString([], { month: 'long' })}`,
+      what: 'Day not announced',
+      tone: 'quiet',
+    };
+  }
+  return { stamp: '未', head: 'Date not announced', tone: 'quiet' };
+}
+
+function Slot({ m }) {
+  const atMs = m.next_airing_at ? m.next_airing_at * 1000 : 0;
+  useCountdownTick(atMs);
+  const t = slotOf(m, Date.now());
+  return (
+    <div className={g.slot} data-tone={t.tone || undefined}>
+      <span className={g.stamp} aria-hidden="true">
+        {t.leaf ? (
+          <span className={g.leaf}><b>{t.leaf.getDate()}</b>{MONTH_SHORT[t.leaf.getMonth()]}</span>
+        ) : (
+          <span lang="ja">{t.stamp}</span>
+        )}
+      </span>
+      <span className={g.slotText}>
+        <span className={g.when}>
+          {t.head}
+          {t.date && <em>{t.date}</em>}
+        </span>
+        {(t.what || t.countdown) && (
+          <span className={g.until}>
+            {t.what}
+            {t.countdown && <> in <strong>{t.countdown}</strong></>}
+          </span>
+        )}
+      </span>
+    </div>
+  );
+}
+
+/** AniList descriptions → paragraphs, minus the "(Source: Crunchyroll)" credit
+ *  lines that eat a short card's last line. */
+function synopsisOf(html) {
+  if (!html) return [];
+  return html
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<[^>]*>/g, '')
+    .replace(/\((?:Source|Written by)[^)]*\)|\[Written by[^\]]*\]/gi, '')
+    .split(/\n\s*\n/)
+    .map((p) => p.replace(/\s+/g, ' ').trim())
+    .filter(Boolean);
+}
+
+/** Clamp the synopsis to exactly the lines its box has room for — a card's free
+ *  height depends on whether the title took one line or two. When it doesn't all
+ *  fit, one line is given up to the "Read more" row. Imperative on purpose: the
+ *  clamp is pure layout and shouldn't cost a render per card per resize. */
+function useFitLines(open, content) {
+  const boxRef = useRef(null);
+  const textRef = useRef(null);
+  const [clipped, setClipped] = useState(false);
+  useLayoutEffect(() => {
+    const box = boxRef.current;
+    const text = textRef.current;
+    if (!box || !text) return undefined;
+    if (open) {
+      text.style.webkitLineClamp = 'none';
+      return undefined;
+    }
+    const measure = () => {
+      const lh = parseFloat(getComputedStyle(text).lineHeight) || 21;
+      text.style.webkitLineClamp = 'none';
+      const fits = text.scrollHeight <= box.clientHeight + 1;
+      const room = fits ? box.clientHeight : box.clientHeight - lh;
+      text.style.webkitLineClamp = String(Math.max(1, Math.floor(room / lh)));
+      setClipped(!fits);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(box);
+    return () => ro.disconnect();
+  }, [open, content]);
+  return { boxRef, textRef, clipped };
+}
+
+function ListMark({ m, entry }) {
+  const [, label, Icon] = STATUS_META.find(([k]) => k === entry.status) || [null, 'On your list', Check];
+  const counting = ['CURRENT', 'REPEATING', 'PAUSED'].includes(entry.status) && entry.progress > 0;
+  return (
+    <Link to={`/anime/${m.id}`} className={g.onList} title="On your list — open to edit">
+      <Icon size={13} />
+      <span className={g.actLabel}>{label}</span>
+      {counting && <span className={g.progress}>{entry.progress}{m.episodes ? `/${m.episodes}` : ''}</span>}
+    </Link>
+  );
+}
+
+function ProgramCard({ m }) {
   const { overlay, queueListEdit } = useAnimeSync();
   const { hoverProps } = useAnimeCalc();
+  const { open: play } = usePlayer();
   const toast = useToast();
+  const [open, setOpen] = useState(false);
+  const paras = useMemo(() => synopsisOf(m.description), [m.description]);
+  const { boxRef, textRef, clipped } = useFitLines(open, m.description);
   const entry = applyOverlay(m.id, m.list_entry, overlay);
-  const synopsis = stripHtml(m.description);
+  const trailer = trailerItem(m);
+  const studio = m.studio_refs?.[0];
+  const streams = m.streams || [];
+  const facts = [
+    formatLabel(m.format),
+    m.episodes > 1 && `${m.episodes} eps`,
+    m.duration && `${m.duration} min`,
+    SOURCE_LABEL[m.source] && (m.source === 'ORIGINAL' ? 'Original story' : `From ${SOURCE_LABEL[m.source].toLowerCase()}`),
+  ].filter(Boolean);
   const plan = () => {
     queueListEdit(m, { status: 'PLANNING' });
     toast(`“${m.title}” → Planning`, 'success');
@@ -94,59 +244,100 @@ function ProgramCard({ m, index }) {
   return (
     <article
       className={g.card}
-      style={{ '--cover-c': m.color || 'var(--c-anime)', '--i': Math.min(index, 12) }}
+      data-open={open || undefined}
+      style={{ '--cover-c': m.color || 'var(--c-anime)' }}
       {...hoverProps(m)}
     >
-      <Link to={`/anime/${m.id}`} className={g.cover}>
+      <Link to={`/anime/${m.id}`} className={g.cover} tabIndex={-1} aria-hidden="true">
         {m.cover_xl || m.cover ? <img src={m.cover_xl || m.cover} alt="" loading="lazy" /> : <Tv size={28} />}
-        <span className={g.coverFoot}>
-          <span className={g.coverTitle}>{m.title}</span>
-          {m.studios?.[0] && <span className={g.coverStudio}>{m.studios[0]}</span>}
-        </span>
+        <CoverRatings media={m} className={s.ratingsTR} />
       </Link>
       <div className={g.body}>
-        <div className={g.bodyHead}>
-          <AiringLine m={m} />
-          <span className={g.facts}>
-            {[formatLabel(m.format), m.episodes && `${m.episodes} eps`, m.duration && `${m.duration}m`,
-              SOURCE_LABEL[m.source]].filter(Boolean).join(' · ')}
-          </span>
+        <div className={g.slotRow}>
+          <Slot m={m} />
+          {entry?.status ? (
+            <ListMark m={m} entry={entry} />
+          ) : (
+            <button type="button" className={g.plan} onClick={plan} aria-label="Add to Planning">
+              <Plus size={13} /><span className={g.actLabel}>Plan</span>
+            </button>
+          )}
         </div>
-        {m.title_native && <span className={g.native} lang="ja">{m.title_native}</span>}
-        <p className={g.synopsis}>{synopsis || 'No synopsis yet.'}</p>
-        {m.genres?.length > 0 && (
-          <div className={g.genres}>
-            {m.genres.slice(0, 4).map((x) => (
-              <Link key={x} to={`/anime?tab=browse&g=${encodeURIComponent(x)}`}>{x}</Link>
-            ))}
-          </div>
-        )}
+
+        <h4 className={g.title}>
+          <Link to={`/anime/${m.id}`} title={m.title_romaji && m.title_romaji !== m.title ? m.title_romaji : undefined}>
+            {m.title}
+          </Link>
+        </h4>
+        {m.title_native && <p className={g.native} lang="ja">{m.title_native}</p>}
+        <p className={g.facts}>
+          {studio ? <Link to={`/anime/studio/${studio.id}`}>{studio.name}</Link> : m.studios?.[0] && <span>{m.studios[0]}</span>}
+          {facts.map((x) => <span key={x}>{x}</span>)}
+        </p>
+
+        <div className={g.syn} ref={boxRef}>
+          {open ? (
+            <div className={g.synFull} ref={textRef}>
+              {paras.map((p, i) => <p key={i}>{p}</p>)}
+            </div>
+          ) : (
+            <p
+              className={paras.length ? g.synText : `${g.synText} ${g.synNone}`}
+              ref={textRef}
+              onClick={clipped ? () => setOpen(true) : undefined}
+            >
+              {paras.join(' ') || 'No synopsis yet.'}
+            </p>
+          )}
+          {(clipped || open) && (
+            <button type="button" className={g.more} onClick={() => setOpen((v) => !v)} aria-expanded={open}>
+              {open ? <>Show less <ChevronUp size={13} /></> : <>Read more <ChevronDown size={13} /></>}
+            </button>
+          )}
+        </div>
+
         <footer className={g.foot}>
-          <span className={g.stats}>
-            {m.score ? <b>{m.score}%</b> : <span className={g.unscored}>no score yet</span>}
-            {m.popularity > 0 && <span>{m.popularity.toLocaleString()} watching</span>}
-          </span>
-          {m.streams?.length > 0 && (
-            <span className={g.streams}>
-              {m.streams.slice(0, 5).map((st) => (
-                <a
-                  key={st.url}
-                  href={st.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  title={`${st.site}${st.language ? ` (${st.language})` : ''}`}
-                  style={st.color ? { '--st-c': st.color } : undefined}
-                >
-                  {st.icon ? <img src={st.icon} alt={st.site} /> : <ExternalLink size={12} />}
-                </a>
+          {m.genres?.length > 0 && (
+            <span className={g.genres}>
+              {m.genres.slice(0, 3).map((x) => (
+                <Link key={x} to={`/anime?tab=browse&g=${encodeURIComponent(x)}`}>{x}</Link>
               ))}
             </span>
           )}
-          {entry?.status ? (
-            <span className={g.onList}><Check size={12} /> {STATUS_LABEL[entry.status] || 'On your list'}</span>
-          ) : (
-            <button type="button" className={g.plan} onClick={plan}><Plus size={12} /> Plan</button>
-          )}
+          <span className={g.tools}>
+            {m.popularity > 0 && (
+              <span className={g.pop} title={`${m.popularity.toLocaleString()} people have it on their AniList`}>
+                <Users size={12} /> {compact.format(m.popularity)}
+              </span>
+            )}
+            {trailer && (
+              <button type="button" className={g.trailer} onClick={() => play(trailer)}>
+                <Play size={11} fill="currentColor" /> Trailer
+              </button>
+            )}
+            {streams.slice(0, 3).map((st) => (
+              <a
+                key={st.url}
+                className={g.stream}
+                href={st.url}
+                target="_blank"
+                rel="noreferrer"
+                title={`Watch on ${st.site}${st.language ? ` (${st.language})` : ''}`}
+                style={st.color ? { '--st-c': st.color } : undefined}
+              >
+                {st.icon ? <img src={st.icon} alt={st.site} /> : <ExternalLink size={12} />}
+              </a>
+            ))}
+            {streams.length > 3 && (
+              <Link
+                to={`/anime/${m.id}`}
+                className={g.streamMore}
+                title={streams.slice(3).map((st) => st.site).join(', ')}
+              >
+                +{streams.length - 3}
+              </Link>
+            )}
+          </span>
         </footer>
       </div>
     </article>
@@ -261,7 +452,7 @@ export default function Seasons() {
             <span className={g.groupCount}>{list.length}</span>
           </h3>
           <div className={g.cards}>
-            {list.map((m, i) => <ProgramCard key={m.id} m={m} index={i} />)}
+            {list.map((m) => <ProgramCard key={m.id} m={m} />)}
           </div>
         </section>
       ))}

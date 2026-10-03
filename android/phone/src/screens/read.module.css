@@ -1,0 +1,523 @@
+/* Read: the Wire's teletype lines, the Dispatch's letters, GitHub's repo lines —
+   each a full-width tap target with its secondary door on the right. */
+
+.screen {
+  min-height: 100vh;
+}
+
+/* the room switch under the bar title */
+.rooms {
+  position: relative;
+  display: flex;
+  gap: 4px;
+  margin: 0 16px;
+  padding: 3px;
+  border-radius: 12px;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+}
+.rooms button {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  min-height: 36px;
+  border-radius: 9px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--paper-dim);
+  transition: color 0.3s ease, scale 0.42s var(--e-spring);
+}
+.rooms .roomOn {
+  color: #1c140d;
+}
+/* the lit segment glides to the room you pick, taking on its colour */
+.roomPill {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 3px;
+  width: calc((100% - 6px - (var(--rn) - 1) * 4px) / var(--rn));
+  border-radius: 9px;
+  background: var(--pc);
+  box-shadow: 0 6px 18px -8px var(--pc);
+  transform: translate3d(calc(var(--ri) * (100% + 4px)), 0, 0);
+  transition: transform 0.5s var(--e-spring), background-color 0.4s ease, box-shadow 0.4s ease;
+}
+
+.search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  height: 44px;
+  padding: 0 4px 0 14px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--rule);
+  background: var(--surface-input);
+  color: var(--paper-faint);
+}
+.search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: none;
+  color: var(--text-primary);
+}
+.search button {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  color: var(--paper-dim);
+}
+
+.chips {
+  padding: 10px 0 4px;
+}
+.filters {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 0 6px;
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 10px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--paper-faint);
+}
+.domain {
+  color: var(--c);
+  max-width: 55vw;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.excerpt {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: var(--paper-dim);
+}
+
+/* ── the wire ── */
+.wire {
+  display: flex;
+  align-items: stretch;
+  border-bottom: 1px solid color-mix(in srgb, var(--rule) 70%, transparent);
+}
+.wireHit {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+  padding: 13px 4px 12px 12px;
+  text-align: left;
+}
+.wireHit:active,
+.cmts:active,
+.letterHit:active,
+.repo:active {
+  background: var(--surface-hover);
+}
+.rank {
+  flex: none;
+  width: 22px;
+  padding-top: 3px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-align: right;
+  color: var(--paper-faint);
+}
+.wireText {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+.wireText b {
+  font-size: 15.5px;
+  font-weight: 600;
+  line-height: 1.32;
+  color: var(--paper);
+}
+.kind {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 0 6px;
+  border-radius: 4px;
+  font-style: normal;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  vertical-align: 2px;
+  color: #1c140d;
+  background: var(--c-hn);
+}
+.points {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--paper-dim);
+}
+.points svg {
+  color: #e36a32;
+}
+.gauge {
+  display: block;
+  width: 64px;
+  height: 2px;
+  overflow: hidden;
+  border-radius: 1px;
+  background: var(--rule);
+}
+.gauge i {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--c-hn), #e36a32);
+  transform-origin: left;
+  animation: gaugeIn 1s var(--e-out) 0.2s both;
+}
+@keyframes gaugeIn {
+  from {
+    transform: scaleX(0);
+  }
+}
+.points svg {
+  animation: flicker 1.8s ease-in-out infinite;
+}
+@keyframes flicker {
+  0%,
+  100% {
+    transform: scale(1) rotate(0);
+  }
+  30% {
+    transform: scale(1.18) rotate(-6deg);
+  }
+  60% {
+    transform: scale(0.94) rotate(4deg);
+  }
+}
+.cmts {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  flex: none;
+  width: 64px;
+  border-left: 1px solid color-mix(in srgb, var(--rule) 60%, transparent);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--paper-dim);
+}
+.cmts em {
+  animation: freshIn 0.5s var(--e-spring) 0.3s both;
+  padding: 0 5px;
+  border-radius: 4px;
+  font-style: normal;
+  font-size: 10.5px;
+  color: #1c140d;
+  background: var(--signal);
+}
+.isRead .wireText b {
+  color: var(--paper-faint);
+  font-weight: 500;
+}
+
+/* ── the dispatch ── */
+.faces {
+  display: flex;
+  gap: 14px;
+  overflow-x: auto;
+  padding: 12px 16px 4px;
+  scrollbar-width: none;
+}
+.faces::-webkit-scrollbar {
+  display: none;
+}
+.face {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  flex: none;
+  width: 62px;
+}
+.face span:last-child {
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 11px;
+  color: var(--paper-dim);
+}
+.faceImg,
+.faceLetter {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid color-mix(in srgb, var(--c) 40%, transparent);
+}
+.faceLetter {
+  display: grid;
+  place-items: center;
+  font-family: var(--font-display);
+  font-size: 20px;
+  color: var(--c);
+  background: color-mix(in srgb, var(--c) 12%, transparent);
+}
+.faceAdd {
+  border-style: dashed;
+  color: var(--paper-dim);
+  background: none;
+}
+.faceOn .faceImg,
+.faceOn .faceLetter {
+  border-color: var(--c);
+}
+
+.letter {
+  border-bottom: 1px solid var(--rule);
+}
+.letterHit {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  padding: 14px 16px 6px;
+  text-align: left;
+}
+.letterTop {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--paper-faint);
+}
+.sub {
+  color: var(--c-reddit);
+  font-weight: 600;
+}
+.letterMain {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.letterWords {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+.letterWords strong {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--paper);
+}
+.letterPic {
+  flex: none;
+  width: 92px;
+  height: 92px;
+  border-radius: 10px;
+  object-fit: cover;
+  background: var(--surface-hover);
+}
+.linkOut {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--c-reddit);
+}
+.letterFoot {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 8px 8px 16px;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  color: var(--paper-dim);
+}
+.letterFoot > span,
+.letterFoot > button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 10px 0 0;
+}
+.letterFoot > button {
+  padding: 0 12px;
+  border-radius: var(--r-pill);
+}
+.letterFoot > button:active {
+  background: var(--surface-hover);
+}
+.letterMore {
+  margin-left: auto;
+  font-size: 18px;
+  letter-spacing: 1px;
+}
+
+/* ── github ── */
+.repo {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  width: 100%;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--rule);
+  text-align: left;
+}
+.repoIcon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  color: var(--c-github);
+  background: color-mix(in srgb, var(--c-github) 12%, transparent);
+}
+.repoText {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  flex: 1;
+  min-width: 0;
+}
+.repoText b {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+.repoOut {
+  flex: none;
+  margin-top: 6px;
+  color: var(--paper-faint);
+}
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--paper-dim);
+}
+.tags:empty {
+  display: none;
+}
+.tags span {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.tags em {
+  padding: 1px 7px;
+  border-radius: 5px;
+  font-style: normal;
+  color: var(--c-github);
+  background: color-mix(in srgb, var(--c-github) 12%, transparent);
+}
+.tags .pre {
+  color: var(--signal);
+  background: color-mix(in srgb, var(--signal) 12%, transparent);
+}
+.topic {
+  color: var(--paper-faint);
+}
+.manage {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 16px 8px;
+  min-height: 42px;
+  padding: 0 14px;
+  border-radius: 12px;
+  border: 1px solid var(--rule);
+  color: var(--paper-dim);
+  font-size: 14px;
+}
+.manageList > div {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 58px;
+  border-bottom: 1px solid var(--rule);
+}
+.manageList > div span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.manageList .faceImg,
+.manageList .faceLetter {
+  width: 38px;
+  height: 38px;
+  font-size: 16px;
+}
+.manageList button {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  color: var(--danger, #c4553f);
+}
+
+.cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 46px;
+  padding: 0 20px;
+  border-radius: var(--r-pill);
+  font-weight: 650;
+  color: #1c140d;
+  background: var(--c);
+}
+
+@keyframes freshIn {
+  from {
+    opacity: 0;
+    transform: scale(0.3) translateY(4px);
+  }
+}
+.wireHit,
+.letterHit,
+.repo {
+  --press: 0.985;
+}
+.cmts {
+  --press: 0.88;
+}
+.faceImg,
+.faceLetter {
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+.faceOn .faceImg,
+.faceOn .faceLetter {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--c) 30%, transparent);
+}
+.letterPic {
+  transition: opacity 0.5s var(--e-out), transform 0.6s var(--e-out);
+}

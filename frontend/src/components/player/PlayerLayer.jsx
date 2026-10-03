@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import {
@@ -24,8 +24,15 @@ import { useShared } from '../../lib/useShared.js';
 import { COMPLETE_RATIO, useAnimeSync, usePlayer, useProgress, useSettings } from '../../state.jsx';
 import { useVideoControls } from '../../lib/useVideoControls.js';
 import NotesPanel from './NotesPanel.jsx';
+import { SubtitleOverlay, SubtitleStyleEditor, useSubtitleStyle } from './Subtitles.jsx';
+import { pickTrack } from '../../lib/subtitleStyle.js';
 import PlayerControls from './PlayerControls.jsx';
 import WatchInfo from './WatchInfo.jsx';
+import AnimeStrip from './anime/AnimeStrip.jsx';
+import EpisodeRail from './anime/EpisodeRail.jsx';
+import { NextUp, SkipCue } from './anime/Cues.jsx';
+import { rememberAudio, showAccent, skipChapters, skipSpans, useAnimeShow } from './anime/useAnimeShow.js';
+import { attachHls } from '../../lib/hlsPlayback.js';
 import s from './player.module.css';
 
 const MARGIN = 20;
@@ -48,10 +55,14 @@ const LOAD_STEPS = [
 // stepper while it loads, and — if a stage stalls — the reason plus a "Try again"
 // button that replays the whole pipeline. Replaces the old one-line placeholders
 // so the user can always see what it's doing and where it stopped.
+// An episode's stages read as what they are: the source is looked up per episode.
+const ANIME_STEP = { resolve: 'Finding the episode', buffer: 'Loading the picture', play: 'Playing' };
+
 function StreamStatus({ status, attempt, onRetry, item }) {
   const failed = status.state === 'error';
   const curIdx = LOAD_STEPS.findIndex((st) => st.key === status.step);
-  const srcLabel = item.platform === 'youtube' ? 'Watch on YouTube' : 'Open source page';
+  const anime = item.platform === 'anime';
+  const srcLabel = item.platform === 'youtube' ? 'Watch on YouTube' : anime ? 'Open on AniList' : 'Open source page';
 
   return (
     <div className={s.frameMsg}>
@@ -80,7 +91,7 @@ function StreamStatus({ status, attempt, onRetry, item }) {
                   {state === 'error' && <X size={12} strokeWidth={3} />}
                   {state === 'pending' && <span className={s.stepPip} />}
                 </span>
-                <span className={s.stepLabel}>{st.label}</span>
+                <span className={s.stepLabel}>{anime ? ANIME_STEP[st.key] : st.label}</span>
               </li>
             );
           })}
@@ -117,7 +128,7 @@ function StreamStatus({ status, attempt, onRetry, item }) {
 // This sidesteps YouTube's embed player entirely — which had started refusing
 // every video with "Video unavailable, watch on YouTube" — and gives us exact,
 // event-driven progress via the element's own timeupdate, no postMessage hacks.
-function PlayerCard({ item, expanded, style, dragging, muted, rate, notes, onChapters, next, onNext, seekSignal, takeSeekTarget, onClose, onMinimize, onExpand, onEnded, onRateChange, drag }) {
+function PlayerCard({ item, expanded, style, dragging, muted, rate, notes, onChapters, next, onNext, onSwitch, seekSignal, takeSeekTarget, onClose, onMinimize, onExpand, onEnded, onRateChange, drag }) {
   const channelId = item.extra?.channel_id;
   const [over, setOver] = useState(false);
   const { progress, writeProgress, flushProgress } = useProgress();
@@ -131,11 +142,29 @@ function PlayerCard({ item, expanded, style, dragging, muted, rate, notes, onCha
   const [subtitles, setSubtitles] = useState([]); // [{src, lang, label}] — anime episodes
   const [quality, setQuality] = useState(0); // index into streams
   const [playErr, setPlayErr] = useState(null); // browser MediaError, if any
+  const [healing, setHealing] = useState(false); // riding out a network hiccup mid-video
   const [canPlay, setCanPlay] = useState(false); // first playable frame reached
   const [attempt, setAttempt] = useState(0); // manual-retry counter; bumping re-runs the whole pipeline
   const everPlayedRef = useRef(false); // has this source ever reached playable? (keeps controls up while re-buffering)
+  const [resolveErr, setResolveErr] = useState(null); // why resolution failed, from the server
+  // Subtitles: which track (-1 = off), chosen from the saved style when the tracks
+  // arrive, and whether the style editor is open over the picture.
+  const [subStyle] = useSubtitleStyle();
+  const [ccIndex, setCc] = useState(-1);
+  const [styleOpen, setStyleOpen] = useState(false);
 
-  const sapi = streamApi(item);
+  // Anime: the show around this episode, the source's own extras (opening/ending
+  // timings, which audio came back, the key for the other one), whether AniList
+  // has been told, and the next-episode countdown.
+  const isAnime = item.platform === 'anime';
+  const show = useAnimeShow(isAnime ? item : null);
+  const [audioKey, setAudioKey] = useState(null); // the other language's key, once switched
+  const [animeInfo, setAnimeInfo] = useState(null); // {skip, audio, audioKeys}
+  const [synced, setSynced] = useState(false);
+  const [nextUp, setNextUp] = useState(false);
+  const effItem = audioKey ? { ...item, extra: { ...item.extra, stream_key: audioKey } } : item;
+
+  const sapi = streamApi(effItem);
   // Metadata once per video (shared with the notes panel, one request between
   // them): the strip under the picture, chapters + "most replayed" for the seek
   // bar, and whether this is a premiere that hasn't started (a countdown, not an
@@ -181,20 +210,42 @@ function PlayerCard({ item, expanded, style, dragging, muted, rate, notes, onCha
     let alive = true;
     setStreams(null);
     setPlayErr(null);
+    setResolveErr(null);
     setSubtitles([]);
     api(sapi.resolve)
       .then((d) => {
         if (!alive) return;
         setStreams(d.streams || []);
         setSubtitles(d.subtitles || []);
+        if (isAnime) {
+          setAnimeInfo({
+            skip: d.skip || {},
+            audio: d.audio,
+            audioKeys: d.audio_keys || {},
+            audioOptions: d.audio_options || Object.keys(d.audio_keys || {}),
+          });
+        }
       })
-      .catch(() => alive && setStreams([]));
+      .catch((e) => {
+        if (!alive) return;
+        setStreams([]);
+        setResolveErr(e?.message || null);
+      });
     return () => {
       alive = false;
     };
-    // `attempt` re-runs resolution when the user hits "Try again".
+    // `attempt` re-runs resolution when the user hits "Try again"; `audioKey` when
+    // the episode switches between Sub and Dub.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [item.id, attempt]);
+  }, [item.id, attempt, audioKey]);
+
+  // A fresh set of tracks (a new episode, the other audio): start on the one the
+  // saved style prefers, or with subtitles off if that's how you like it.
+  useEffect(() => {
+    setCc(pickTrack(subtitles, subStyle));
+    // only when the tracks change — not every time the style is edited
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [subtitles]);
 
   // "Try again": re-run the entire pipeline from scratch — re-resolve the stream
   // list, re-mount the <video>, and replay the stepped status so the user can see
@@ -242,6 +293,7 @@ function PlayerCard({ item, expanded, style, dragging, muted, rate, notes, onCha
       v.currentTime / v.duration >= COMPLETE_RATIO
     ) {
       syncedRef.current = true;
+      setSynced(true);
       // Route through the shared sync queue so it coalesces with any list edits
       // and the overlay reflects the bumped progress everywhere at once.
       queueListEdit({ id: item.extra.anilist_id }, { progress: item.extra.episode });
@@ -268,7 +320,8 @@ function PlayerCard({ item, expanded, style, dragging, muted, rate, notes, onCha
   // raw googlevideo URLs. Progressive mp4 is a native <video src>; HLS renditions
   // (up to 1080p) are fed to hls.js, which fetches the (proxied) playlist+segments.
   const isHls = active?.kind === 'hls';
-  const playKey = active ? `${active.kind}:${active.itag}` : null;
+  // An audio switch keeps kind+itag, so the key carries it too — a fresh element.
+  const playKey = active ? `${active.kind}:${active.itag}${audioKey ? `:${audioKey}` : ''}` : null;
   const ctl = useVideoControls(videoRef, playKey, cardRef);
 
   // Attach the chosen source to the element. Re-runs when the selection changes
@@ -282,38 +335,20 @@ function PlayerCard({ item, expanded, style, dragging, muted, rate, notes, onCha
     setCanPlay(false); // re-enter "buffering" until this source yields a frame
     if (isHls) {
       const url = sapi.hls(active.itag);
-      let hls = null;
+      let destroy = null;
       let cancelled = false;
-      // Dynamic import → hls.js is a separate chunk fetched only now.
+      // Dynamic import → hls.js is a separate chunk fetched only now. The
+      // attach (lib/hlsPlayback.js) retries, recovers and watches for stalls,
+      // and only reports a failure it couldn't get past.
       import('hls.js').then(({ default: Hls }) => {
         if (cancelled || !videoRef.current) return;
         if (Hls.isSupported()) {
-          // backBufferLength frees already-played segments so long videos don't
-          // grow memory unbounded; the buffer caps keep ahead-of-playhead modest.
-          hls = new Hls({
-            maxBufferLength: 30,
-            maxMaxBufferLength: 60,
-            backBufferLength: 30,
-          });
-          // A single fatal HLS error is often transient (an expired segment, a
-          // dropped connection). hls.js can recover network errors by reloading
-          // and media errors by flushing the decoder, so try a bounded number of
-          // recoveries before surfacing an error — this is what otherwise showed
-          // up as an intermittent "unsupported format".
-          let recoveries = 0;
-          hls.loadSource(url);
-          hls.attachMedia(v);
-          hls.on(Hls.Events.MANIFEST_PARSED, () => v.play().catch(() => {}));
-          hls.on(Hls.Events.ERROR, (_, d) => {
-            if (!d.fatal) return;
-            if (recoveries < 3) {
-              recoveries += 1;
-              if (d.type === Hls.ErrorTypes.NETWORK_ERROR) hls.startLoad();
-              else if (d.type === Hls.ErrorTypes.MEDIA_ERROR) hls.recoverMediaError();
-              else hls.destroy();
-              return;
-            }
-            setPlayErr(`HLS ${d.type}${d.details ? ` — ${d.details}` : ''}`);
+          destroy = attachHls(Hls, v, url, {
+            profile: 'desktop',
+            onHealth: (h) => setHealing(h === 'healing'),
+            // rebuilt mid-video: resume here, not at the original resume point
+            onReload: (at) => { startRef.current = at; },
+            onGiveUp: (why) => setPlayErr(why),
           });
         } else if (v.canPlayType('application/vnd.apple.mpegurl')) {
           v.src = url; // Safari plays HLS natively
@@ -324,7 +359,7 @@ function PlayerCard({ item, expanded, style, dragging, muted, rate, notes, onCha
       }).catch(() => {
         if (!cancelled) setPlayErr('failed to load HLS player');
       });
-      return () => { cancelled = true; if (hls) hls.destroy(); };
+      return () => { cancelled = true; destroy?.(); setHealing(false); };
     }
     v.src = sapi.mp4(active.itag);
     v.play().catch(() => {});
@@ -341,8 +376,10 @@ function PlayerCard({ item, expanded, style, dragging, muted, rate, notes, onCha
     // error here is usually a transient network/decode blip. Reload the element
     // a couple of times (cache-busted) before giving up — this avoids a flash of
     // "unsupported format" on a stream that's actually fine on the next try.
-    if (!isHls && active && retryRef.current < 2) {
+    if (!isHls && active && retryRef.current < 3) {
       retryRef.current += 1;
+      // reloading the element starts it over: resume where it broke, not at 0
+      if (v.currentTime > 0) startRef.current = v.currentTime;
       const base = sapi.mp4(active.itag);
       v.src = `${base}${base.includes('?') ? '&' : '?'}r=${retryRef.current}`;
       v.load();
@@ -358,19 +395,30 @@ function PlayerCard({ item, expanded, style, dragging, muted, rate, notes, onCha
     everPlayedRef.current = true;
     setCanPlay(true);
   };
+  // Playing again after a hiccup: whatever error was showing no longer applies,
+  // and the progressive path's reload budget refills.
+  const onPlaying = () => {
+    retryRef.current = 0;
+    setPlayErr(null);
+    setHealing(false);
+  };
 
   // Single source of truth for the load pipeline, driving the stepped status
-  // readout: which stage we're at and whether it stalled there.
-  const isAnime = item.platform === 'anime';
+  // readout: which stage we're at and whether it stalled there. A failed lookup
+  // says what the server said — for an episode, which sources it tried and why
+  // each came up empty.
   let loadStatus;
   if (streams === null) {
     loadStatus = { step: 'resolve', state: 'active' };
   } else if (streams.length === 0) {
+    const why = (resolveErr || '')
+      .replace(/^source resolve failed:\s*/i, '')
+      .replace(/^no playable source for this episode\s*—\s*/i, 'Tried ');
     loadStatus = {
       step: 'resolve',
       state: 'error',
       detail: isAnime
-        ? 'No playable stream was found for this episode.'
+        ? `No playable stream was found for this episode.${why ? ` ${why}` : ''}`
         : 'No playable stream was found for this video.',
     };
   } else if (playErr) {
@@ -383,11 +431,40 @@ function PlayerCard({ item, expanded, style, dragging, muted, rate, notes, onCha
   // Controls take over once we're playing; otherwise the status readout is shown.
   const showControls = loadStatus.step === 'play';
 
+  // ── anime ──
+  // Sub ⇄ Dub: re-resolve the same episode in the other language, from here.
+  const switchAudio = (lang) => {
+    const k = animeInfo?.audioKeys?.[lang];
+    if (!k) return;
+    startRef.current = Math.max(0, Math.floor(lastRef.current.position));
+    everPlayedRef.current = false;
+    setCanPlay(false);
+    setAudioKey(k);
+    rememberAudio(item.extra?.anilist_id, lang);
+  };
+  // Another episode of the show, in the language you're listening in.
+  const playEpisode = useCallback((e) => onSwitch?.(show.itemFor(e)), [onSwitch, show]);
+  const goNext = useCallback(() => show.next && playEpisode(show.next), [show.next, playEpisode]);
+  // The source's opening/ending timings as chapters: notches on the seek bar,
+  // names under the pointer, and Ctrl ←/→ to step between the parts.
+  const dur = ctl.duration;
+  const skip = animeInfo?.skip;
+  const animeChapters = useMemo(() => (isAnime ? skipChapters(skip, dur) : null), [isAnime, dur, skip]);
+  const animeSpans = skipSpans(skip);
+  const nextItem = isAnime && show.next ? show.itemFor(show.next) : null;
+  // The show's colour carries the anime player: scrubber, cues, strip.
+  const accent = isAnime ? showAccent(show.media?.color || item.extra?.color) : null;
+  const cardStyle = accent ? { ...style, '--signal': accent, '--accent-strong': accent } : style;
+  const veilNext = (() => {
+    try { if (localStorage.getItem('tubcal.anime.spoilerGuard') === '0') return false; } catch { /* default on */ }
+    return !!show.entry && (show.next?.number || 0) > Math.max(show.entry.progress || 0, item.extra?.episode || 0);
+  })();
+
   return (
     <div
       ref={cardRef}
       className={`${s.card} ${expanded ? s.cardExpanded : s.cardDocked} ${over ? s.cardOver : ''}`}
-      style={style}
+      style={cardStyle}
       onDragOver={drag ? (e) => { e.preventDefault(); setOver(true); } : undefined}
       onDragLeave={drag ? () => setOver(false) : undefined}
       onDrop={
@@ -474,22 +551,39 @@ function PlayerCard({ item, expanded, style, dragging, muted, rate, notes, onCha
               onLoadedMetadata={onLoadedMeta}
               onLoadedData={onReady}
               onCanPlay={onReady}
+              onPlaying={onPlaying}
               onPause={onPauseFlush}
-              onEnded={() => onEnded?.()}
+              onEnded={() => (isAnime && expanded && show.next ? setNextUp(true) : onEnded?.())}
               onRateChange={onRateEvt}
               onError={onVideoError}
             >
-              {subtitles.map((sub, i) => (
+              {/* no `default`: the overlay below draws the cues, not the browser */}
+              {subtitles.map((sub) => (
                 <track
                   key={sub.src}
                   kind="subtitles"
                   src={sub.src}
                   srcLang={sub.lang || 'en'}
                   label={sub.label || sub.lang || 'Subtitles'}
-                  default={i === 0}
                 />
               ))}
             </video>
+            {subtitles.length > 0 && <SubtitleOverlay videoRef={videoRef} track={ccIndex} playKey={playKey} />}
+            {styleOpen && expanded && (
+              <div className={s.subPanel} onMouseDown={(e) => e.stopPropagation()}>
+                <div className={s.subPanelHead}>
+                  <b>Subtitle style</b>
+                  <span>Saved for every player</span>
+                  <button type="button" onClick={() => setStyleOpen(false)} aria-label="Close"><X size={15} /></button>
+                </div>
+                <SubtitleStyleEditor />
+              </div>
+            )}
+            {healing && showControls && (
+              <span className={s.healing} role="status">
+                <span className={s.healingDot} aria-hidden="true" /> Reconnecting…
+              </span>
+            )}
             {showControls ? (
               <PlayerControls
                 expanded={expanded}
@@ -506,19 +600,42 @@ function PlayerCard({ item, expanded, style, dragging, muted, rate, notes, onCha
                   setQuality(i);
                 }}
                 subtitles={subtitles}
+                ccIndex={ccIndex}
+                onCc={setCc}
+                onSubtitleStyle={() => setStyleOpen((v) => !v)}
                 rate={rate}
                 onRate={(r) => onRateChange?.(r)}
                 resumeAt={startRef.current}
                 canVolume={!muted}
                 onVolumePersist={setVolumePref}
                 heatmap={info?.heatmap}
-                chapters={info?.chapters}
-                onChapters={onChapters}
-                next={next}
-                onNext={onNext}
+                chapters={isAnime ? animeChapters : info?.chapters}
+                spans={isAnime ? animeSpans : null}
+                onChapters={isAnime ? notes?.toggle : onChapters}
+                next={isAnime ? nextItem : next}
+                onNext={isAnime ? goNext : onNext}
               />
             ) : (
               <StreamStatus status={loadStatus} attempt={attempt} onRetry={retry} item={item} />
+            )}
+            {isAnime && expanded && showControls && !nextUp && (
+              <SkipCue
+                key={playKey}
+                current={ctl.current}
+                skip={skip}
+                next={show.next}
+                onSeek={ctl.seek}
+                onNext={goNext}
+                autoSkip={settings?.anime_auto_skip === true}
+              />
+            )}
+            {isAnime && nextUp && show.next && (
+              <NextUp
+                ep={veilNext ? { ...show.next, title: null, still: null } : show.next}
+                show={show.media?.title || item.extra?.show}
+                onPlay={goNext}
+                onCancel={() => setNextUp(false)}
+              />
             )}
           </>
         ) : (
@@ -526,7 +643,23 @@ function PlayerCard({ item, expanded, style, dragging, muted, rate, notes, onCha
         )}
       </div>
 
-      {expanded && (
+      {expanded && isAnime && (
+        <div className={s.watchSlot}>
+          <AnimeStrip
+            item={item}
+            show={show}
+            audio={animeInfo?.audio}
+            audioOptions={animeInfo?.audioOptions}
+            onAudio={switchAudio}
+            synced={synced}
+            onEpisode={playEpisode}
+            rail={notes}
+            onMinimize={onMinimize}
+            onClose={onClose}
+          />
+        </div>
+      )}
+      {expanded && !isAnime && (
         <div className={s.watchSlot}>
           <WatchInfo
             item={item}
@@ -543,8 +676,17 @@ function PlayerCard({ item, expanded, style, dragging, muted, rate, notes, onCha
   );
 }
 
+/** The episode rail for the expanded episode — its own component so the show hook
+ *  runs only while an episode is on the big screen. */
+function AnimeRailHost({ item, onEpisode, ...rest }) {
+  const show = useAnimeShow(item);
+  return (
+    <EpisodeRail item={item} show={show} onEpisode={(e) => onEpisode(show.itemFor(e))} {...rest} />
+  );
+}
+
 export default function PlayerLayer() {
-  const { players, expandedId, order, queue, close, minimize, undock, expandFromDock, reorder, ended, seekSignal, takeSeekTarget } = usePlayer();
+  const { players, expandedId, order, queue, open, close, minimize, undock, expandFromDock, reorder, ended, seekSignal, takeSeekTarget } = usePlayer();
   const { settings, updateSettings } = useSettings();
   const [vp, setVp] = useState({ w: window.innerWidth, h: window.innerHeight });
   const [dragId, setDragId] = useState(null);
@@ -594,9 +736,16 @@ export default function PlayerLayer() {
   const dockW = Math.min(340, vp.w - 2 * MARGIN);
   const dockCardH = BAR_H + (dockW * 9) / 16;
   const expandedItem = players.find((p) => p.id === expandedId)?.item;
-  // The notes (description, chapters, comments, the Archive) are YouTube-only;
-  // anime episodes and other platforms have nothing to put in them.
-  const canPanel = (it) => it?.platform === 'youtube';
+  // Beside the picture: the notes (description, chapters, comments, the Archive)
+  // for YouTube, the episode rail for anime.
+  const canPanel = (it) => it?.platform === 'youtube' || it?.platform === 'anime';
+  // Another episode takes the big screen; the one playing closes (its progress is
+  // flushed on the way out).
+  const switchTo = (it) => {
+    if (!it) return;
+    close();
+    open(it);
+  };
   const panelVisible = !!expandedId && showPanel && canPanel(expandedItem);
   // Wide enough: the notes stand beside the picture. Narrower: they slide over it
   // as a sheet from the right, and the picture keeps the whole stage.
@@ -620,10 +769,25 @@ export default function PlayerLayer() {
     <>
       {expandedId && (
         <div className={s.theatre} onMouseDown={minimize} aria-hidden="true">
-          {expandedItem?.thumbnail && <img className={s.ambient} src={expandedItem.thumbnail} alt="" />}
+          {(() => {
+            // an episode glows with its show's key art, not the episode still
+            const art = expandedItem?.platform === 'anime'
+              ? expandedItem.extra?.banner || expandedItem.extra?.cover || expandedItem.thumbnail
+              : expandedItem?.thumbnail;
+            return art ? <img className={s.ambient} src={art} alt="" /> : null;
+          })()}
         </div>
       )}
-      {panelVisible && expandedItem && (
+      {panelVisible && expandedItem?.platform === 'anime' && (
+        <AnimeRailHost
+          key={expandedItem.extra?.anilist_id}
+          item={expandedItem}
+          onEpisode={switchTo}
+          onClose={beside ? null : () => setNotes(false)}
+          style={panelStyle}
+        />
+      )}
+      {panelVisible && expandedItem && expandedItem.platform !== 'anime' && (
         <NotesPanel
           item={expandedItem}
           tab={panelTab}
@@ -652,6 +816,7 @@ export default function PlayerLayer() {
             onChapters={() => { setNotes(true); setPanelTab('chapters'); }}
             next={isExpanded ? next : null}
             onNext={() => ended(id)}
+            onSwitch={switchTo}
             seekSignal={seekSignal}
             takeSeekTarget={takeSeekTarget}
             onClose={() => (isExpanded ? close() : undock(id))}

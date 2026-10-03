@@ -25,6 +25,24 @@ saved `active_rooms`. Global chords `Space g h` (Hub → /edition) and `Space g 
 Anime) live in `components/layout/KeyboardShortcuts.jsx`; Space stays native in text
 fields, the editor, the expanded player, media, and keyboard-focused controls.
 
+**The Android app lives in `android/`**: a Gradle project with Chaquopy and Kotlin
+(`app/`), a separate phone UI (`phone/`, Vite + React) and tools (`tools/`).
+- Nothing desktop is copied there. Gradle's `syncDesktopPython` packs the root
+  `server/` and `main.py` (as `desktop_main.py`) into the build.
+- `phone/` imports `frontend/src` in place as `@pc`. Its `resolve.dedupe` keeps
+  every npm package coming from `android/phone/node_modules`.
+- Gradle's `buildPhoneUi` builds it into the APK's assets.
+- So a change to `server/` or `frontend/src` reaches the phone on its next build.
+  A desktop markup change can break the `pc_<dir>_<file>__<class>` overrides in
+  `android/phone/src/styles/phone.css`.
+- Server code must also run on the phone's Python 3.11.
+- Heavy optional imports stay lazy (Chaquopy has no wheels for many).
+- `android/app/src/main/python/` holds only the Android shims and the vendored
+  anipy_api/weeb_cli, with their LICENSE and NOTICE.
+- Build: `cd android && ANDROID_HOME=~/Android/Sdk ./gradlew :app:assembleDebug`.
+- `android/tools/sync-data.sh` moves user data between the desktop and phone
+  databases.
+
 ## Commands
 
 ```bash
@@ -122,6 +140,24 @@ no ORM.
   keeps only the creator's original track (dubs/DRC dropped). A resolve that
   yields only the 360p floor is cached briefly (self-heals on the next open).
   Live broadcasts have no DASH, so they stay on YouTube's own muxed HLS.
+  **Playback resilience.** A googlevideo URL is IP-bound and expires, and the
+  playlist freezes it in at open time. So:
+  - Adaptive segment proxy URLs carry `&v=<video_id>`. When googlevideo refuses
+    one (403/404/410), `feeds._fresh_url` re-resolves the video, at most once per
+    ~20s, and takes the same itag (same file, so the byte range still lines up).
+    `_FRESH` remembers the swap for later segments.
+  - `httpc.stream_get` retries drops, timeouts and 5xx/429.
+  - `server/api/relay.py` resumes a body that breaks mid-way from the exact byte
+    it reached, so the player never sees a truncated segment. The anime proxy uses
+    the same retries and resume.
+  - On the client, `lib/hlsPlayback.js` (shared with the phone app):
+    - patient load policies and a deeper buffer;
+    - a fatal-error recovery budget per minute rather than per video;
+    - a stall watchdog that restarts a stopped loader;
+    - a position-preserving rebuild.
+    It reports `onGiveUp` only after rebuilds fail. A "Reconnecting…" hint shows
+    only while playback is actually stuck, and `onPlaying` clears any stale
+    error. Tests: `tests/test_media_relay.py`.
 - `reddit.py` — anonymous access is RSS-only (Reddit blocks anonymous JSON), so
   logged-out data is degraded; OAuth upgrades it. Threaded comments.
 - `hackernews.py` — Firebase API + Algolia search. It is the reference pattern for
@@ -166,16 +202,38 @@ no ORM.
   links, schedule) are a *second* request (`media_extras`) to stay under AniList's
   query-complexity limit. Field names were verified against a live introspection
   dump; re-introspect rather than guess when adding a query. Tests: `tests/test_anilist.py`.
-- `anime_source.py` — resolves the episode list + playable streams with `anipy_api`
-  (the allanime/animekai scraper Shou uses); no external aggregator needed. It maps
-  the AniList id to a title via `anilist.media`, searches the provider, and returns
-  the same `{sources,subtitles,headers}` shape the player/proxy forward. The old
-  `TUBCAL_ANIME_SOURCE` / `anime_source_url` setting is now inert.
+- `anime_source.py` — resolves the episode list + playable streams. Its sources,
+  in order: **`hianime.py`** (hianime.at + its ZokoAnime embed — what ani-cli 5.1
+  moved to), then `anipy_api` (allanime/animekai — allanime answers
+  `AA_CRYPTO_STALE` and anipy 3.10 dropped it from its registry, so this only
+  helps if a later release revives it), then `weeb_fallback`. hianime's embed is
+  addressed by **MAL id + episode** (`zokoanime.video/stream/mal/<mal>/<ep>/<sub|dub>`),
+  which AniList carries, so the episode list is numbered from AniList's aired count
+  after one probe, and playback needs no title search; titles without a MAL id walk
+  hianime the way ani-cli does (search → episode list → servers → the ZokoAnime
+  `data-hash`). The embed's `window.__P` is base64 JSON XOR-ed with
+  `otaku-embed-v1`; it holds the HLS master, every subtitle track and intro/outro
+  timings (→ `skip`). Segments are plain MPEG-TS; the subtitle host wants the
+  embed origin as Referer (`/api/anime/sub?r=`). `watch()` returns
+  `{sources,subtitles,headers,skip,audio,audio_options}`; old allanime-era keys are
+  re-addressed through the AniList id's MAL id. Every source's failure is
+  collected into the error, which the player shows. The old `TUBCAL_ANIME_SOURCE` /
+  `anime_source_url` setting is inert. Tests: `tests/test_hianime.py`.
   Auto-watched: the anime player reports progress under item ids
   `anime:<anilist_id>:<episode>`, so `feeds.post_progress` piggybacks on those
   POSTs and, once past `ANIME_WATCHED_PERCENT` (default 80), advances AniList
   progress via `anilist.mark_episode_watched` (advance-only, in a background
   thread, once per episode per run) — no extra client call.
+- `animethemes.py` — a title's openings/endings from AnimeThemes, looked up by
+  AniList id (one filtered request, no key), served at `/api/anime/themes/<id>`
+  and cached a day (an empty answer 6h: an airing show's OP often lands days late).
+  The title page's `components/anime/ThemePlayer.jsx` plays the opening covering
+  your next episode straight from AnimeThemes' audio CDN. Spans overlap in their
+  data (OP1 "1-" after OP2 took over at 14), so the latest-starting cover wins.
+  Settings `anime_theme_audio` / `_volume` / `_seconds` gate the autoplay; it
+  fades out when a video opens or comes to the front, the tab hides, or the page
+  unmounts. The chip stays as a manual player either way.
+  Tests: `tests/test_animethemes.py`.
 - `weeb_fallback.py` — second anime scraper (weeb-cli's `aniworld` provider,
   EngSub/EngDub HLS). `anime_source.watch()` falls back to it when anipy/allanime
   can't resolve, and it returns the identical `{sources,subtitles,headers}` shape
@@ -322,6 +380,36 @@ and the creator/verified/member/hearted/edited marks. Keys while expanded: Space
 J/L, arrows, 0–9, M/F/C, `<`/`>` speed, Ctrl+←/→ chapters, Shift+N next, `?` help,
 Esc to the corner.
 
+**Subtitles** are drawn by Tubcal, not the browser:
+- `components/player/Subtitles.jsx` has `SubtitleOverlay`. It sets the chosen
+  `<track>` to `hidden`, so the browser still parses the WebVTT and updates
+  `activeCues`, then draws the active cues over the picture.
+- The look is one `subtitle_style` setting: `lib/subtitleStyle.js` holds the shape
+  and limits; `server/api/settings.py`'s `subtitle_style()` validates, clamps and
+  stamps `updated_at`.
+- `useSubtitleStyle` shares an edit in progress with every player and editor, and
+  saves after a pause.
+- `pickTrack` chooses the first track from the preferred language and on/off choice.
+- `SubtitleStyleEditor` appears in the player's Subtitles menu and in Settings, and
+  the phone app uses the same pieces.
+- Never put `default` on a `<track>`; the overlay owns the tracks' modes.
+
+An **anime episode** gets its own player, built from `components/player/anime/`:
+- Accent: the card's `--signal` is set to the show's colour (`showAccent`), so the
+  scrubber and cues retheme with no forked CSS.
+- `AnimeStrip` replaces `WatchInfo`. It shows the show, the episode number and
+  title, a Sub/Dub switch (`audio_keys` from `/anime/stream`), AniList sync state,
+  and previous/next episode.
+- `EpisodeRail` replaces the notes panel.
+- `SkipCue` gives "Skip opening" / "Next episode" from the source's timings, with
+  auto-skip as setting `anime_auto_skip`; those timings also become chapters.
+- `NextUp` is an 8s countdown into the next episode when one ends.
+- `useAnimeShow` reads the same `/anime/media` + `/anime/episodes` the title page
+  does, through `useShared`, and `components/anime/episodeList.js` builds the list
+  and player items for both.
+- Switching episodes is `close()` + `open()`. A Sub/Dub choice sticks per show for
+  the session (`rememberAudio`; the key's `l` field is rewritten by `keyWithAudio`).
+
 The Screening Room (`pages/ScreeningRoom.jsx`, `/youtube`) opens on a control bar
 (search all of YouTube — `?q=` —, the views, add channel, refresh) with no title or
 blurb. Views are `?v=`: the programme (the newest upload on a big screen beside a "just
@@ -377,7 +465,25 @@ view the URL names; card/badge/URL-state helpers they all share are in
 `components/anime/shared.jsx` (not in `pages/Anime.jsx`), charts in
 `components/anime/charts.jsx` (single-series in `--c-anime`, CSS tooltips via
 `data-tip`, a table twin for each). Heavy detail-page sections (the franchise guide)
-load on `useInView` to save AniList budget.
+load on `useInView` to save AniList budget. My List's titles are `components/anime/WatchList.jsx`, in poster or register
+(`?view=rows`) form:
+- `watchState` is the pure "where you are": watched / aired / total, what's left
+  and how long, the next episode, a half-watched episode to resume, and the next
+  airing.
+- `usePlayEpisode` plays an episode from the list through `/anime/episodes`
+  (warmed on hover), with the same `episodeItem` as the title page.
+- What a title offers follows its shelf: next episode and +1 while watching,
+  Start for Planning, the score for Completed, and a countdown when you've caught
+  up on something airing.
+- The register has column headings, and "Gathering dust" is folded to one line
+  there (`collapsible`).
+
+The title page's episode section is
+`components/anime/Episodes.jsx`. A desk works out where you are from AniList
+progress *and* local resume points, and shows a per-episode reel. Below it is a
+contact sheet of tiles: AniList stills, or a numeral "slate" when an image is shared
+by several episodes (that's series art, not a still). Long-runners page in fifties
+(`?eps=`), opening on your stretch.
 
 Social (`?tab=discuss`, `components/anime/SocialDesk.jsx`) is a desk bar (you, your
 counts, the faces you follow, Inbox / Post / New thread) over one of: the forum
@@ -436,6 +542,14 @@ itself in the margin when it fits (≥ `PANEL_W` of side space past the 1280px s
 floats/rails otherwise.
 
 ## Conventions
+
+- **Licensing.** Tubcal is GPL-3.0-or-later (`LICENSE`). Anime playback builds on
+  GPL-3.0 projects (ani-cli's method, anipy-api, weeb-cli), credited in
+  `THIRD_PARTY_NOTICES.md`. Add a runtime dependency or a borrowed method there too.
+  `frontend/src/build/legal.mjs` is a Vite plugin that writes `dist/legal/`: the
+  licence, the notices, and every bundled npm package's licence text. Settings → About
+  shows them, as GPL §5d asks of an interactive program. It sits under `src/` so the
+  Android build gets it through its `pc/` copy, which sets its own `__TUBCAL_APP__`.
 
 - Backend API endpoints return `ok(data)` / `err(msg, status)` — never bare `jsonify`.
 - New external fetches go through `server/httpc.py` and are wrapped in `server/cache.py`

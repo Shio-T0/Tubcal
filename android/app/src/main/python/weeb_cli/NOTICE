@@ -1,0 +1,16 @@
+weeb-cli 3.0.0
+Copyright (C) ewgsta and the weeb-cli contributors
+https://github.com/ewgsta/weeb-cli  (PyPI: weeb-cli)
+
+Licensed under the GNU General Public License v3.0 only; the full text is in
+LICENSE next to this file.
+
+Modified 2026-10-03 by Tubcal for Android: this directory holds a subset of the
+weeb_cli package from the weeb-cli 3.0.0 release. The files present are unchanged.
+These parts of the release were left out because the app only uses one stream
+provider: commands/, locales/, templates/, ui/, utils/, constants.py, i18n.py,
+__main__.py, main.py, and services/ aniskip, _base, cache, dependency_manager,
+details, discord_rpc, download/, downloader, error_handler, headless_downloader,
+local_library, notifier, player, progress, scraper, search, shortcuts,
+stream_validator, _tracker_base, tracker, updater, watch. The complete source is
+the 3.0.0 release, at the link above.

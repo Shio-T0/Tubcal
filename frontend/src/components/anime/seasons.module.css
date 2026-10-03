@@ -1,6 +1,7 @@
 /* Seasons — a broadcast program guide. The season dial is a big printed masthead
-   with the season's kanji stamped beside it; program cards are landscape: poster
-   on the left with the title over its foot, the listing copy on the right. */
+   with the season's kanji stamped beside it; program cards are landscape listings:
+   clean poster on the left, and a body that reads like a TV-guide entry — the slot
+   (the weekday stamped in kanji), the title, the facts, the synopsis. */
 
 .guide {
   display: flex;
@@ -194,42 +195,39 @@
 }
 .cards {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 460px), 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 500px), 1fr));
   gap: var(--space-4);
+  /* collapsed cards share one fixed height, so rows line up on their own; a card
+     opened to its full synopsis grows alone instead of stretching its neighbour */
+  align-items: start;
 }
 
 /* ── the program card ────────────────────────────────────────────────────── */
+/* A listing, not a poster: the art stays clean on the left, and the body reads
+   top-down like a guide entry — slot, title, facts, synopsis, where to watch. */
 .card {
   display: grid;
-  grid-template-columns: 158px 1fr;
-  height: 262px;
+  grid-template-columns: 184px 1fr;
+  height: 304px;
   border-radius: var(--r-card);
   overflow: hidden;
   border: 1px solid var(--rule);
   background: var(--surface);
   box-shadow: var(--shadow-card);
-  animation: cardIn 0.45s var(--hand) calc(var(--i, 0) * 0.03s) both;
-  transition: border-color 0.18s ease, transform 0.18s ease;
+  transition: border-color 0.18s ease;
 }
 .card:hover {
-  border-color: color-mix(in srgb, var(--cover-c) 55%, var(--rule));
-  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--cover-c) 45%, var(--rule));
 }
-@keyframes cardIn {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
+.card[data-open] {
+  height: auto;
+  min-height: 304px;
 }
 .cover {
   position: relative;
   display: grid;
   place-items: center;
-  background: var(--ink-3);
+  background: color-mix(in srgb, var(--cover-c) 22%, var(--ink-3));
   color: var(--paper-faint);
   overflow: hidden;
 }
@@ -239,186 +237,408 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: transform 0.4s ease;
-}
-.card:hover .cover img {
-  transform: scale(1.04);
-}
-.coverFoot {
-  position: absolute;
-  inset: auto 0 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 36px 10px 10px;
-  background: linear-gradient(to top, rgba(12, 8, 4, 0.94), rgba(12, 8, 4, 0.65) 55%, transparent);
-}
-.coverTitle {
-  font-family: var(--font-display);
-  font-size: 14px;
-  font-weight: 600;
-  line-height: 1.2;
-  color: #f4ead6;
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-.coverStudio {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  color: color-mix(in srgb, var(--cover-c) 60%, #f4ead6);
 }
 .body {
   display: flex;
   flex-direction: column;
-  gap: 6px;
   min-width: 0;
-  padding: 12px 14px 10px;
-  border-top: 3px solid color-mix(in srgb, var(--cover-c) 70%, transparent);
+  padding: 14px 16px 12px 18px;
 }
-.bodyHead {
+
+/* the slot: stamp + time + countdown, with the list action across from it */
+.slotRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: 12px;
+}
+.slot {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
+}
+.stamp {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  border: 1.5px solid color-mix(in srgb, var(--cover-c) 60%, var(--rule-strong));
+  background: color-mix(in srgb, var(--cover-c) 12%, transparent);
+  color: var(--text-primary);
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1;
+}
+.leaf {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-}
-.airing {
-  display: inline-flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 5px;
-  font-size: 12.5px;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 400;
   color: var(--text-secondary);
 }
-.airing strong {
-  color: var(--text-primary);
+.leaf b {
+  font-family: var(--font-display);
+  font-size: 17px;
   font-weight: 600;
+  line-height: 1;
+  color: var(--text-primary);
 }
-.airing em {
+.slot[data-tone='soon'] .stamp {
+  border-color: var(--signal);
+  background: var(--signal);
+  color: var(--ink);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--signal) calc(40% * var(--glow-strength, 1)), transparent);
+}
+.slot[data-tone='soon'] .leaf,
+.slot[data-tone='soon'] .leaf b {
+  color: var(--ink);
+}
+.slot[data-tone='quiet'] .stamp {
+  border-style: dashed;
+  border-color: var(--rule-strong);
+  background: none;
+  color: var(--paper-faint);
+}
+.slotText {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  overflow: hidden;
+}
+.when {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.when em {
+  margin-left: 7px;
+  font-family: var(--font-mono);
+  font-size: 11px;
   font-style: normal;
-  font-family: var(--font-mono);
-  font-size: 10.5px;
+  font-weight: 400;
   color: var(--paper-faint);
 }
-.facts {
+.until {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.until strong {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+.slot[data-tone='soon'] .until strong {
+  color: var(--signal);
+}
+.slot[data-tone='quiet'] .when {
+  color: var(--text-secondary);
+}
+
+.plan,
+.onList {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: auto;
+  padding: 6px 13px;
+  border-radius: var(--r-pill);
+  font-size: 12.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.plan {
+  border: 1px solid color-mix(in srgb, var(--c-anime) 45%, var(--rule-strong));
+  color: var(--text-primary);
+}
+.plan:hover {
+  border-color: var(--c-anime);
+  background: color-mix(in srgb, var(--c-anime) 16%, transparent);
+}
+.plan:active {
+  transform: scale(0.96);
+}
+.onList {
+  border: 1px solid transparent;
+  background: color-mix(in srgb, var(--c-anime) 16%, var(--surface));
+  color: var(--text-primary);
+}
+.onList svg {
+  color: var(--c-anime);
+}
+.onList .progress {
   font-family: var(--font-mono);
-  font-size: 10.5px;
-  color: var(--paper-faint);
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+.onList:hover {
+  border-color: color-mix(in srgb, var(--c-anime) 45%, var(--rule));
+}
+
+/* title block */
+.title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 600;
+  line-height: 1.22;
+  color: var(--text-primary);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  /* not balance: balancing a clamped title shortens line one and truncates line two */
+  text-wrap: pretty;
+}
+.title a:hover {
+  color: var(--c-anime);
 }
 .native {
-  font-size: 11.5px;
+  margin: 3px 0 0;
+  font-size: 12px;
   color: var(--paper-faint);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.synopsis {
-  flex: 1;
-  /* a flex item won't shrink below its content without this — a long synopsis
-     would push the footer (score, streams, Plan) out of the card */
-  min-height: 0;
-  margin: 0;
-  overflow-y: auto;
-  font-size: 12.5px;
-  line-height: 1.55;
-  color: var(--text-secondary);
-  padding-right: 4px;
-  scrollbar-width: thin;
-}
-.genres {
+.facts {
   display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
+  margin: 7px 0 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
 }
-.genres a {
-  padding: 1px 8px;
-  border-radius: var(--r-pill);
-  background: color-mix(in srgb, var(--cover-c) 16%, var(--surface));
+.facts > * {
+  flex: none;
+}
+.facts > :last-child {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.facts > * + *::before {
+  content: '·';
+  margin: 0 7px;
+  color: var(--paper-faint);
+}
+.facts a {
   color: var(--text-primary);
-  font-size: 10.5px;
+  text-decoration: underline;
+  text-decoration-color: var(--rule-strong);
+  text-underline-offset: 3px;
 }
-.genres a:hover {
-  background: color-mix(in srgb, var(--cover-c) 30%, var(--surface));
+.facts a:hover {
+  color: var(--c-anime);
+  text-decoration-color: currentColor;
 }
+
+/* synopsis: exactly the lines that fit (see useFitLines), never a scroll box */
+.syn {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  margin-top: 11px;
+  overflow: hidden;
+}
+.synText {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 21px;
+  color: var(--text-secondary);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.synText:has(+ .more) {
+  cursor: pointer;
+}
+.synNone {
+  font-style: italic;
+  color: var(--paper-faint);
+}
+.card[data-open] .syn {
+  flex: none;
+  overflow: visible;
+}
+.synFull {
+  font-size: 13.5px;
+  line-height: 21px;
+  color: var(--text-secondary);
+  animation: synIn 0.22s ease both;
+}
+.synFull p {
+  margin: 0 0 8px;
+  max-width: 68ch;
+}
+@keyframes synIn {
+  from {
+    opacity: 0;
+  }
+}
+.more {
+  align-self: flex-end;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 21px;
+  padding: 0 2px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--c-anime);
+}
+.more:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* footer: what it is on the left, where to see it on the right */
 .foot {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding-top: 6px;
+  gap: var(--space-3);
+  margin-top: 10px;
+  padding-top: 10px;
   border-top: 1px solid var(--rule);
 }
-.stats {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 8px;
-  font-family: var(--font-mono);
-  font-size: 10.5px;
-  color: var(--paper-faint);
+.genres {
+  display: flex;
+  gap: 4px;
   min-width: 0;
+  overflow: hidden;
 }
-.stats b {
-  font-size: 12.5px;
+.genres a {
+  flex: none;
+  padding: 2px 9px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--rule);
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+.genres a:hover {
+  border-color: color-mix(in srgb, var(--cover-c) 55%, var(--rule));
   color: var(--text-primary);
 }
-.unscored {
-  font-style: italic;
-}
-.streams {
-  display: inline-flex;
-  gap: 4px;
+.tools {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
   margin-left: auto;
 }
-.streams a {
+.pop {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-right: 4px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--paper-faint);
+}
+.trailer {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--rule-strong);
+  font-size: 12px;
+  color: var(--text-primary);
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+.trailer:hover {
+  border-color: var(--c-anime);
+  color: var(--c-anime);
+}
+.stream,
+.streamMore {
   display: grid;
   place-items: center;
-  width: 22px;
-  height: 22px;
-  border-radius: 6px;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+}
+.stream {
   background: var(--st-c, var(--ink-3));
   color: #fff;
   transition: transform 0.15s ease;
 }
-.streams a:hover {
+.stream:hover {
   transform: translateY(-2px);
 }
-.streams img {
-  width: 14px;
-  height: 14px;
+.stream img {
+  width: 15px;
+  height: 15px;
 }
-.plan,
-.onList {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 3px 10px;
-  border-radius: var(--r-pill);
+.streamMore {
+  border: 1px solid var(--rule);
   font-family: var(--font-mono);
   font-size: 10.5px;
-  white-space: nowrap;
+  color: var(--text-secondary);
 }
-.streams + .plan,
-.streams + .onList {
-  margin-left: 0;
-}
-.plan {
-  margin-left: auto;
-  border: 1px solid var(--rule-strong);
-  color: var(--paper-dim);
-}
-.plan:hover {
-  border-color: var(--c-anime);
-  color: var(--c-anime);
-}
-.onList {
-  margin-left: auto;
-  background: color-mix(in srgb, var(--c-anime) 16%, var(--surface));
+.streamMore:hover {
   color: var(--text-primary);
+  border-color: var(--rule-strong);
 }
 
 @media (max-width: 560px) {
   .card {
-    grid-template-columns: 112px 1fr;
-    height: 240px;
+    grid-template-columns: 104px 1fr;
+    height: 292px;
+  }
+  .card[data-open] {
+    min-height: 292px;
+  }
+  .body {
+    padding: 12px 12px 10px;
+  }
+  .stamp {
+    width: 34px;
+    height: 34px;
+    font-size: 17px;
+  }
+  /* the slot's time matters more than the button's word on a phone */
+  .plan,
+  .onList {
+    padding: 7px 9px;
+  }
+  .actLabel {
+    display: none;
+  }
+  .title {
+    font-size: 17px;
+  }
+  .when {
+    font-size: 15px;
+  }
+  .when em {
+    display: none;
+  }
+  .genres,
+  .pop {
+    display: none;
   }
   .glyph {
     width: 48px;
@@ -435,7 +655,11 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .card {
+  .synFull {
     animation: none;
+  }
+  .stream:hover,
+  .plan:active {
+    transform: none;
   }
 }

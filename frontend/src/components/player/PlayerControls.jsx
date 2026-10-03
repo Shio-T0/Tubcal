@@ -51,7 +51,7 @@ export const chapterAt = (chapters, t) => (chapters || []).find((c) => t >= c.st
  *  hover time-chip, and a faint "resume" tick where you last left off. With
  *  chapters it's cut into segments (the chip names the one under the pointer),
  *  and "most replayed" rises over it as a ridge. */
-function Scrubber({ current, duration, buffered, resumeAt, disabled, onSeek, onScrub, heatmap, chapters }) {
+function Scrubber({ current, duration, buffered, resumeAt, disabled, onSeek, onScrub, heatmap, chapters, spans }) {
   const trackRef = useRef(null);
   const [hover, setHover] = useState(false);
   const [scrubbing, setScrubbing] = useState(false);
@@ -120,6 +120,14 @@ function Scrubber({ current, duration, buffered, resumeAt, disabled, onSeek, onS
       {heatmap?.length > 0 && duration > 0 && <Heat values={heatmap} />}
       <div className={s.track} ref={trackRef}>
         <span className={s.buf} style={{ width: `${bufPct}%` }} />
+        {/* an anime episode's opening and ending, shaded where they sit */}
+        {duration > 0 && (spans || []).map((sp) => (
+          <span
+            key={sp.kind}
+            className={s.span}
+            style={{ left: `${(sp.start / duration) * 100}%`, width: `${((sp.end - sp.start) / duration) * 100}%` }}
+          />
+        ))}
         <span className={s.played} style={{ width: `${pct}%` }} />
         {duration > 0 && (chapters || []).slice(1).map((c) => (
           <span key={c.start} className={s.notch} style={{ left: `${(c.start / duration) * 100}%` }} />
@@ -190,9 +198,13 @@ export default function PlayerControls({
   onVolumePersist,
   heatmap,
   chapters,
+  spans,
   onChapters,
   next,
   onNext,
+  ccIndex = -1,
+  onCc,
+  onSubtitleStyle,
 }) {
   const [idle, setIdle] = useState(false);
   const [scrubbing, setScrubbing] = useState(false);
@@ -202,7 +214,12 @@ export default function PlayerControls({
   const [buffering, setBuffering] = useState(false);
   const [remaining, setRemaining] = useState(false);
   const [showKeys, setShowKeys] = useState(false);
-  const [ccIndex, setCcIndex] = useState(subtitles.length ? 0 : -1);
+  const lastCc = useRef(0); // the track C turns back on
+  if (ccIndex >= 0) lastCc.current = ccIndex;
+  const setCcIndex = (v) => {
+    if (v === 'style') onSubtitleStyle?.();
+    else onCc?.(v);
+  };
   const idleTimer = useRef(null);
   const clickTimer = useRef(null);
 
@@ -251,15 +268,8 @@ export default function PlayerControls({
     return undefined;
   }, [ctl.waiting, ctl.playing]);
 
-  // ── captions: drive the <video>'s text tracks from ccIndex ──────────────────
-  useEffect(() => {
-    const v = videoRef.current;
-    if (!v) return;
-    const tracks = v.textTracks;
-    for (let i = 0; i < tracks.length; i += 1) {
-      tracks[i].mode = i === ccIndex ? 'showing' : 'hidden';
-    }
-  }, [ccIndex, playKey, videoRef, subtitles.length]);
+  // Captions are drawn by the card's SubtitleOverlay (components/player/Subtitles.jsx),
+  // which owns the text tracks' modes; this only picks which one.
 
   // ── actions (wrap ctl so buttons + keys share the same feedback) ────────────
   const actToggle = () => {
@@ -291,7 +301,7 @@ export default function PlayerControls({
     ctl.toggleMute();
     flash(<VolumeIcon muted={willMute} volume={ctl.volume} size={36} />);
   };
-  const toggleCC = () => setCcIndex((i) => (i >= 0 ? -1 : 0));
+  const toggleCC = () => onCc?.(ccIndex >= 0 ? -1 : Math.min(lastCc.current, subtitles.length - 1));
   const nudgeSpeed = (d) => {
     const at = SPEEDS.indexOf(rate);
     const r = SPEEDS[Math.max(0, Math.min(SPEEDS.length - 1, (at < 0 ? SPEEDS.indexOf(1) : at) + d))];
@@ -446,6 +456,7 @@ export default function PlayerControls({
           onScrub={setScrubbing}
           heatmap={isLive ? null : heatmap}
           chapters={isLive ? null : chapters}
+          spans={spans}
         />
 
         <div className={s.row}>
@@ -493,21 +504,23 @@ export default function PlayerControls({
               <div className={s.menuWrap}>
                 <button
                   className={`${s.btn} ${ccIndex >= 0 ? s.btnOn : ''}`}
-                  onClick={() => (subtitles.length > 1 ? setMenu(menu === 'cc' ? null : 'cc') : toggleCC())}
-                  aria-label="Captions"
-                  title="Captions (c)"
+                  onClick={() => setMenu(menu === 'cc' ? null : 'cc')}
+                  aria-label="Subtitles"
+                  title="Subtitles (c)"
                 >
                   <Captions size={18} />
                 </button>
-                {subtitles.length > 1 && (
-                  <Menu
-                    open={menu === 'cc'}
-                    value={ccIndex}
-                    onClose={() => setMenu(null)}
-                    onPick={setCcIndex}
-                    items={[{ value: -1, label: 'Off' }, ...subtitles.map((sub, i) => ({ value: i, label: sub.label || sub.lang || `Track ${i + 1}` }))]}
-                  />
-                )}
+                <Menu
+                  open={menu === 'cc'}
+                  value={ccIndex}
+                  onClose={() => setMenu(null)}
+                  onPick={setCcIndex}
+                  items={[
+                    { value: -1, label: 'Off' },
+                    ...subtitles.map((sub, i) => ({ value: i, label: sub.label || sub.lang || `Track ${i + 1}` })),
+                    ...(onSubtitleStyle ? [{ value: 'style', label: 'Subtitle style…' }] : []),
+                  ]}
+                />
               </div>
             )}
 

@@ -1,0 +1,43 @@
+{
+  "name": "tubcal-phone",
+  "private": true,
+  "version": "0.4.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@codemirror/autocomplete": "^6.20.3",
+    "@codemirror/commands": "^6.10.4",
+    "@codemirror/language": "^6.12.4",
+    "@codemirror/language-data": "^6.5.2",
+    "@codemirror/lint": "^6.9.7",
+    "@codemirror/search": "^6.7.1",
+    "@codemirror/state": "^6.7.1",
+    "@codemirror/view": "^6.43.6",
+    "@fontsource-variable/fraunces": "^5.2.5",
+    "@fontsource-variable/inter": "^5.2.8",
+    "@fontsource-variable/schibsted-grotesk": "^5.2.5",
+    "@fontsource-variable/space-grotesk": "^5.2.10",
+    "@fontsource/archivo": "^5.2.8",
+    "@fontsource/ibm-plex-mono": "^5.2.5",
+    "@fontsource/vt323": "^5.2.7",
+    "@replit/codemirror-vim": "^6.3.0",
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/addon-web-links": "^0.12.0",
+    "@xterm/xterm": "^6.0.0",
+    "codemirror-languageserver": "^1.22.0",
+    "hls.js": "^1.6.16",
+    "lucide-react": "^0.511.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "react-router-dom": "^7.6.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.5.0",
+    "vite": "^6.3.5"
+  },
+  "description": "The phone frontend of Tubcal for Android \u2014 phone screens over the desktop app's shared logic (src/pc, synced)."
+}

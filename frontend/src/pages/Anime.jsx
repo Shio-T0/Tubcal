@@ -3,8 +3,8 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft, ArrowRight, Calendar, Check,
   ChevronDown, ChevronLeft, ChevronRight, Clapperboard, Dices,
-  Eye, EyeOff, ExternalLink, Flag, Frown, Heart, History, ListChecks, Meh, Minus, Play,
-  PlayCircle, Plus, Radar, Repeat, Search, SlidersHorizontal, Smile, Sparkles, Star, Tag,
+  Flag, Frown, Heart, History, ListChecks, Meh, Minus, Play,
+  Plus, Radar, Repeat, Search, SlidersHorizontal, Smile, Sparkles, Star, Tag,
   ThumbsDown, ThumbsUp, Trash2, Tv, User, X,
 } from 'lucide-react';
 
@@ -22,13 +22,17 @@ import { ActivityFeed } from '../components/anime/Activity.jsx';
 import { ForumList } from '../components/anime/Forum.jsx';
 import { SOCIAL_MODES, SocialDesk } from '../components/anime/SocialDesk.jsx';
 import Seasons from '../components/anime/Seasons.jsx';
+import Episodes from '../components/anime/Episodes.jsx';
+import { WatchPoster, WatchRow, WatchRowsHead } from '../components/anime/WatchList.jsx';
+import wl from '../components/anime/watchlist.module.css';
+import ThemePlayer from '../components/anime/ThemePlayer.jsx';
 import Schedule from '../components/anime/Schedule.jsx';
 import Ledger from '../components/anime/Ledger.jsx';
 import Community from '../components/anime/Community.jsx';
 import { PeopleGrid } from '../components/anime/People.jsx';
 import { AdvancedFilters, advancedPills, useAdvancedFilters } from '../components/anime/Filters.jsx';
 import {
-  BulkBar, ExportMenu, GatheringDust, LIST_SORTS, LedgerRow, SequelRadar, TonightsPick, matchesText, sortEntries,
+  BulkBar, ExportMenu, GatheringDust, LIST_SORTS, SequelRadar, TonightsPick, matchesText, sortEntries,
 } from '../components/anime/ListTools.jsx';
 import {
   BroadcastLog, CommunityNumbers, CreditsRoll, FranchiseGuide, InfoLedger, LinksShelf, RELATION_LABEL,
@@ -36,8 +40,7 @@ import {
 } from '../components/anime/DetailExtras.jsx';
 import { useHorizontalWheel } from '../lib/useHorizontalWheel.js';
 import { compact } from '../lib/format.js';
-import { clock, formatWhen, timeAgo } from '../lib/time.js';
-import { applyOverlay, COMPLETE_RATIO, useAnimeSync, usePlayer, useProgress, useToast } from '../state.jsx';
+import { applyOverlay, useAnimeSync, usePlayer, useToast } from '../state.jsx';
 import { useAnimeCalc } from '../components/anime/WatchCalculator.jsx';
 import s from './anime.module.css';
 
@@ -1077,51 +1080,6 @@ function ListControls({ media, scoreFormat, viewer }) {
   );
 }
 
-function ListEntryCard({ entry, scoreFormat, showSeen = false, select = null }) {
-  const { overlay, syncState, queueListEdit } = useAnimeSync();
-  const m = entry.media;
-  const eff = applyOverlay(m.id, entry, overlay);
-  if (!eff) return null; // removed locally from elsewhere
-  const status = syncState[m.id];
-  const total = m.episodes;
-  const prog = eff.progress || 0;
-  // Episodes available so far: for an airing show, the episode before the next to
-  // air; otherwise the full run. "Behind" = aired-so-far minus what you've watched.
-  const aired = m.next_episode ? m.next_episode - 1 : (total || 0);
-  const behind = Math.max(0, aired - prog);
-  const behindTag = behind > 0 ? `${behind} ep${behind > 1 ? 's' : ''} behind` : null;
-  const bump = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    queueListEdit(m, { progress: prog + 1 });
-  };
-  return (
-    <div className={`${s.listEntry} ${select?.on ? s.listEntryPicked : ''}`}>
-      {select && (
-        <label className={s.pickBox} title="Select for bulk edit">
-          <input type="checkbox" checked={select.on} onChange={select.toggle} aria-label={`Select ${m.title}`} />
-        </label>
-      )}
-      {/* feed the optimistic entry through so the card's "your rating" stays live */}
-      <AnimeCard media={{ ...m, list_entry: eff }} corner={behindTag} scoreFormat={scoreFormat} />
-      <div className={s.quickRow}>
-        <span className={s.quickProg}>{prog}{total ? ` / ${total}` : ''}</span>
-        {/* The stamp the activity filter reads, so a match explains itself on the card. */}
-        {showSeen && entry.updated_at && (
-          <span className={s.quickSeen} title={`Last activity ${formatWhen(entry.updated_at)}`}>
-            {timeAgo(entry.updated_at)}
-          </span>
-        )}
-        {status && <SyncBadge status={status} label={false} className={s.quickSync} />}
-        {(!total || prog < total) && (
-          <button className={s.quickBtn} onClick={bump} title="Mark next episode watched">
-            <Plus size={12} /> ep
-          </button>
-        )}
-      </div>
-    </div>
-  );
-}
 
 // AniList's natural shelf order; custom lists (no standard status) sort last.
 const STATUS_ORDER = ['CURRENT', 'REPEATING', 'PLANNING', 'COMPLETED', 'PAUSED', 'DROPPED'];
@@ -1393,7 +1351,7 @@ function MyListTab() {
 
       {tool === 'pick' && <TonightsPick entries={uniq} onClose={() => setTool('')} />}
       {tool === 'radar' && <SequelRadar />}
-      {(filter === 'all' || filter === 'CURRENT') && !text && <GatheringDust entries={uniq} />}
+      {(filter === 'all' || filter === 'CURRENT') && !text && <GatheringDust entries={uniq} collapsible />}
       {bulk && <BulkBar selected={selected} onClear={() => setSelected(new Set())} onDone={lists.reload} />}
 
       {filter === 'PLANNING' && planning && (
@@ -1463,9 +1421,10 @@ function MyListTab() {
                     : 'No titles match those release filters.'}
                 </p>
               ) : view === 'rows' ? (
-                <div className={s.register}>
+                <div className={wl.register}>
+                  <WatchRowsHead selectable={bulk} />
                   {entries.map((e) => (
-                    <LedgerRow
+                    <WatchRow
                       key={e.entry_id}
                       entry={e}
                       scoreFormat={scoreFormat}
@@ -1476,9 +1435,9 @@ function MyListTab() {
                   ))}
                 </div>
               ) : (
-                <div className={s.grid}>
+                <div className={wl.grid}>
                   {entries.map((e) => (
-                    <ListEntryCard
+                    <WatchPoster
                       key={e.entry_id}
                       entry={e}
                       scoreFormat={scoreFormat}
@@ -1674,265 +1633,6 @@ function RecStrip({ title, sourceId, recs, canPost, scoreFormat }) {
   );
 }
 
-/** AniList's streaming URLs are often insecure (http) or missing a scheme, which
- *  makes window.open treat them as relative. Force https and add a scheme when
- *  missing — but keep the full path/slug (the id alone can 404; the original
- *  full URL is the form that resolves). */
-function normalizeOfficialUrl(url) {
-  if (!url) return url;
-  let u = url.trim();
-  if (u.startsWith('//')) u = `https:${u}`;
-  else if (!/^https?:\/\//i.test(u)) u = `https://${u.replace(/^\/+/, '')}`;
-  return u.replace(/^http:\/\//i, 'https://');
-}
-
-/** Open an official source in a centered popup window — closest thing to an
- *  embed for a site that forbids framing + uses DRM. Falls back to a tab when
- *  the popup is blocked. */
-function launchOfficial(url) {
-  const target = normalizeOfficialUrl(url);
-  if (!target) return;
-  const w = 1100;
-  const h = 720;
-  const left = Math.round(window.screenX + Math.max(0, (window.outerWidth - w) / 2));
-  const top = Math.round(window.screenY + Math.max(0, (window.outerHeight - h) / 2));
-  const win = window.open(target, 'tubcal-watch', `width=${w},height=${h},left=${left},top=${top}`);
-  if (!win) window.open(target, '_blank', 'noopener,noreferrer');
-}
-
-/** Strip AniList's "Episode N - " / "Episode N: " prefix to the real subtitle. */
-function epSubtitle(title, number) {
-  if (!title) return null;
-  const cleaned = title.replace(/^\s*episode\s+\d+\s*[-:–—]?\s*/i, '').trim();
-  return cleaned && cleaned !== String(number) ? cleaned : null;
-}
-
-const SPOILER_KEY = 'tubcal.anime.spoilerGuard';
-
-function EpisodeList({ media }) {
-  // The aggregator is optional now — it only enables local playback when up.
-  const eps = useApi(`/anime/episodes/${media.id}`);
-  const { open } = usePlayer();
-  const { progress } = useProgress();
-  const { overlay, queueListEdit } = useAnimeSync();
-  const entry = applyOverlay(media.id, media.list_entry, overlay);
-  // Spoiler guard: past your progress, episode art and titles stay veiled (they
-  // routinely give the plot away). Remembered on this machine, on by default.
-  const [guard, setGuard] = useState(() => {
-    try { return localStorage.getItem(SPOILER_KEY) !== '0'; } catch { return true; }
-  });
-  const toggleGuard = () => setGuard((g) => {
-    try { localStorage.setItem(SPOILER_KEY, g ? '0' : '1'); } catch { /* private mode */ }
-    return !g;
-  });
-  const seenUpTo = entry?.progress || 0;
-  const veiled = (n) => guard && !!entry && n > seenUpTo;
-
-  // Playback state per episode, keyed exactly like the player reports it, so the
-  // per-episode progress bars match the Screening Room tiles' resume indicator.
-  const progKey = (n) => `anime:${media.id}:${n}`;
-  const progOf = (n) => progress[progKey(n)];
-  const ratioOf = (n) => {
-    const p = progOf(n);
-    return p && p.duration ? Math.min(1, p.position / p.duration) : 0;
-  };
-
-  // Build the episode list from AniList, then fold in aggregator keys (by number)
-  // so a local stream can play when the source is reachable.
-  const merged = {};
-  for (const se of media.streaming || []) {
-    if (se.number == null) continue;
-    const e = (merged[se.number] ||= { number: se.number });
-    if (!e.image) e.image = se.thumbnail;
-    if (!e.url) { e.url = se.url; e.site = se.site; }
-    if (!e.title) e.title = epSubtitle(se.title, se.number);
-  }
-  for (const ep of eps.data?.episodes || []) {
-    if (ep.number == null) continue;
-    const e = (merged[ep.number] ||= { number: ep.number });
-    if (!e.key) e.key = ep.key;
-    if (!e.image) e.image = ep.image;
-    if (!e.title) e.title = epSubtitle(ep.title, ep.number);
-  }
-
-  // How many episodes have actually aired: for a finished show that's the total;
-  // for an airing one it's the episode before the next to air. Fill any gaps so
-  // released episodes still appear when streamingEpisodes lags / the source is down.
-  let aired = Object.keys(merged).length ? Math.max(...Object.keys(merged).map(Number)) : 0;
-  if (media.next_episode) aired = Math.max(aired, media.next_episode - 1);
-  else if (media.episodes && media.status !== 'NOT_YET_RELEASED') aired = Math.max(aired, media.episodes);
-  for (let n = 1; n <= aired; n++) merged[n] ||= { number: n };
-
-  const list = Object.values(merged).sort((a, b) => a.number - b.number);
-  const links = media.external_links || [];
-  const seriesLink = links[0]?.url || null;
-
-  const playLocal = (e) =>
-    open({
-      id: `anime:${media.id}:${e.number}`,
-      platform: 'anime',
-      title: `${media.title} — Episode ${e.number}`,
-      thumbnail: e.image || media.cover,
-      url: `https://anilist.co/anime/${media.id}`,
-      source: media.title,
-      published_at: 0,
-      extra: { stream_key: e.key, anilist_id: media.id, episode: e.number },
-    });
-
-  // Continue watching: resume the last episode you left unfinished, or — if it's
-  // done — start the next one. Sequential-watch assumption (highest touched ep).
-  // Playable only for local episodes; the player auto-resumes from saved progress.
-  let cont = null; // { ep, mode: 'resume' | 'next', pos }
-  const touched = list.filter((e) => e.key && ratioOf(e.number) > 0);
-  if (touched.length) {
-    const lastN = Math.max(...touched.map((e) => e.number));
-    if (ratioOf(lastN) < COMPLETE_RATIO) {
-      cont = { ep: list.find((e) => e.number === lastN), mode: 'resume', pos: progOf(lastN).position };
-    } else {
-      const next = list.find((e) => e.number > lastN && e.key);
-      if (next) cont = { ep: next, mode: 'next' };
-    }
-  }
-
-  // Launch official source; optionally advance AniList progress on launch.
-  const launch = (url, epNumber) => {
-    launchOfficial(url);
-    if (epNumber != null && entry && epNumber > (entry.progress || 0)) {
-      queueListEdit(media, { progress: epNumber });
-    }
-  };
-
-  return (
-    <div className={s.relBlock}>
-      <div className={s.epHead}>
-        <h3 className={s.blockLabel}>Episodes</h3>
-        {entry && (
-          <button type="button" className={`${s.guardBtn} ${guard ? s.guardOn : ''}`} onClick={toggleGuard}
-                  aria-pressed={guard} title="Hide art and titles of episodes you haven't watched yet">
-            {guard ? <EyeOff size={12} /> : <Eye size={12} />} spoiler guard {guard ? 'on' : 'off'}
-          </button>
-        )}
-      </div>
-
-      {cont && (
-        <button className={s.continueBtn} onClick={() => playLocal(cont.ep)}>
-          <PlayCircle size={16} />
-          <span className={s.continueLabel}>
-            {cont.mode === 'resume' ? 'Continue watching' : 'Up next'}
-          </span>
-          <span className={s.continueEp}>
-            Episode {cont.ep.number}
-            {cont.mode === 'resume' && cont.pos ? ` · ${clock(cont.pos)}` : ''}
-          </span>
-        </button>
-      )}
-
-      {links.length > 0 && (
-        <div className={s.deepLinks}>
-          <span className={s.deepLinkLabel}>Watch official:</span>
-          {links.map((l, i) => (
-            <button
-              key={l.url}
-              style={{ '--i': Math.min(i, 9) }}
-              className={s.deepLink}
-              style={l.color ? { '--ext-c': l.color } : undefined}
-              onClick={() => launch(l.url, null)}
-            >
-              {l.icon && <img src={l.icon} alt="" />}
-              {l.site}
-              <ExternalLink size={12} />
-            </button>
-          ))}
-        </div>
-      )}
-
-      {!list.length && eps.loading && <Receiving label="finding episodes" />}
-      {!list.length && !eps.loading && (
-        <p className={s.muted}>No episode listing available for this title yet.</p>
-      )}
-
-      {list.length > 0 && (
-        <div className={s.episodes}>
-          {list.map((e, i) => {
-            const local = !!e.key;
-            const officialUrl = e.url || seriesLink; // per-episode link, else the series page
-            const primary = local
-              ? () => playLocal(e)
-              : () => officialUrl && launch(officialUrl, e.number);
-            return (
-              // Only the opening screenful is dealt in. Capping --i alone isn't
-              // enough: the animation would still be *created* for all ~1,170 of
-              // One Piece's episodes, and every one past the cap would fire on the
-              // same frame — a thousand elements animating at once, to be watched
-              // by nobody, since they're far below the fold. Past EP_ANIM_MAX the
-              // cards simply start visible.
-              <div
-                key={e.number}
-                className={`${s.episode} ${i < EP_ANIM_MAX ? s.episodeIn : ''}`}
-                style={i < EP_ANIM_MAX ? { '--i': i } : undefined}
-              >
-                <button className={s.epMain} onClick={primary} disabled={!local && !officialUrl}>
-                  <div className={s.epThumb}>
-                    {e.image || media.cover ? (
-                      <img src={e.image || media.cover} alt="" loading="lazy" className={veiled(e.number) ? s.epVeiled : undefined} />
-                    ) : (
-                      <Tv size={18} />
-                    )}
-                    <span className={s.epPlay}>
-                      {local ? <Play size={15} fill="currentColor" /> : <ExternalLink size={15} />}
-                    </span>
-                    {(() => {
-                      const r = ratioOf(e.number);
-                      if (r <= 0) return null;
-                      const p = progOf(e.number);
-                      const done = r >= COMPLETE_RATIO;
-                      return (
-                        <>
-                          {p?.duration ? (
-                            <span className={s.epTime}>
-                              {done ? clock(p.duration) : `${clock(p.position)} / ${clock(p.duration)}`}
-                            </span>
-                          ) : null}
-                          <div
-                            className={s.epProgress}
-                            title={done ? 'Watched' : `${Math.round(r * 100)}% watched`}
-                          >
-                            <div
-                              className={`${s.epProgressFill} ${done ? s.epProgressDone : ''}`}
-                              style={{ width: `${done ? 100 : Math.max(4, r * 100)}%` }}
-                            />
-                          </div>
-                        </>
-                      );
-                    })()}
-                  </div>
-                  <div className={s.epMeta}>
-                    <span className={s.epNum}>Episode {e.number}</span>
-                    {e.title && (veiled(e.number)
-                      ? <span className={`${s.epTitle} ${s.epTitleVeiled}`}>title hidden until you get here</span>
-                      : <span className={s.epTitle}>{e.title}</span>)}
-                  </div>
-                </button>
-                {/* When local play is primary, the official launch is the secondary action. */}
-                {local && officialUrl && (
-                  <button
-                    className={s.epExt}
-                    title={`Watch episode ${e.number} on ${e.site || 'official source'}`}
-                    onClick={() => launch(officialUrl, e.number)}
-                  >
-                    <ExternalLink size={13} />
-                    {e.site || 'Official'}
-                  </button>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
-
 /** The detail dossier's live "next episode" banner: a labeled countdown plus the
  *  exact local air date. Renders nothing when there's no scheduled episode ahead. */
 function NextEpisodeBanner({ next }) {
@@ -1955,10 +1655,6 @@ function NextEpisodeBanner({ next }) {
 // The cast as a theatre programme: character on the left, voice on the right, a
 // leader of dots carrying your eye across. Everything else on this page is poster
 // art, so this block earns its keep by being type instead of pictures.
-
-// How many episode cards get dealt in. Roughly the first screenful; the rest of a
-// long-runner's list is below the fold and starts drawn.
-const EP_ANIM_MAX = 18;
 
 const ROLE_LABEL = { MAIN: 'Main', SUPPORTING: 'Supporting', BACKGROUND: 'Background' };
 const CAST_PREVIEW = 8; // a programme's worth before "show all"
@@ -2116,6 +1812,11 @@ function DetailDossier({ m, trailer, onTrailer, scoreFormat, connected, rankings
               <Play size={15} fill="currentColor" /> Play trailer
             </button>
           )}
+          <ThemePlayer
+            key={m.id}
+            mediaId={m.id}
+            nextEp={m.list_entry ? (m.list_entry.progress || 0) + 1 : null}
+          />
           {connected && <FavToggle kind="anime" id={m.id} initial={m.is_favourite} count={m.favourites} />}
           {/* Explicit, keyboard-reachable twin of the hover+C gesture. */}
           <button className={s.dossierTally} onClick={() => add(m)} title="Add the next unwatched episode to the Reckoner">
@@ -2267,7 +1968,7 @@ export function AnimeDetail() {
               episode (One Piece alone is ~1,170), so anything below it is buried. */}
           <CastSheet characters={m.characters || []} />
 
-          <EpisodeList media={m} />
+          <Episodes media={m} />
 
           <BroadcastLog schedule={ext?.schedule} total={m.episodes} />
 

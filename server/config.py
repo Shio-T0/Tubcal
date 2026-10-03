@@ -76,6 +76,10 @@ TTL_ANILIST_REVIEWS = 600
 TTL_ANILIST_SOCIAL = 300  # follower lists, the following feed
 TTL_ANILIST_STATS = 600  # list-derived statistics (also dropped on any list edit)
 TTL_ANIME_EPISODES = 600  # aggregator episode list
+# AnimeThemes (the title page's opening): a show's themes change only when a new
+# cour adds one, but an airing show's OP often lands days after its premiere.
+TTL_ANIMETHEMES = 86400
+TTL_ANIMETHEMES_EMPTY = 21600
 # GitHub (60 req/hr unauthenticated → cache aggressively)
 TTL_GITHUB_FEED = 600  # 10 min for subscribed repo/user activity
 TTL_GITHUB_SEARCH = 300  # 5 min for search results

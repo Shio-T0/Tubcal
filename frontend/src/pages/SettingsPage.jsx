@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Code2, KeyRound, Library, Minus, Newspaper, Palette, Plus, Settings, Trash2, Rss, Tv, Volume2, Layout } from 'lucide-react';
+import { Captions, Code2, ExternalLink, FileText, KeyRound, Library, Minus, Newspaper, Palette, Plus, Scale, Settings, Trash2, Rss, Tv, Volume2, Layout, X } from 'lucide-react';
 
 import { api, useApi } from '../api/client.js';
 import { SectionHead } from '../components/layout/Section.jsx';
@@ -10,6 +10,7 @@ import { Button, SegmentedControl } from '../components/ui/index.jsx';
 import { useSettings, useSubscriptions, useToast } from '../state.jsx';
 import { THEMES } from '../lib/themes.js';
 import { ROOMS, knownActiveIds } from '../lib/rooms.js';
+import { SubtitleStyleEditor } from '../components/player/Subtitles.jsx';
 import s from './settings.module.css';
 
 function SkinPicker({ value, onChange }) {
@@ -475,6 +476,192 @@ function AnimeSettings() {
           onChange={(v) => updateSettings({ anime_autosync: v === 'on' })}
         />
       </div>
+
+      <div className={s.row}>
+        <div>
+          <div className={s.rowLabel}>Skip openings</div>
+          <div className={s.rowHint}>Jump past an episode's opening by itself. A button brings it back.</div>
+        </div>
+        <SegmentedControl
+          options={[{ value: 'on', label: 'On' }, { value: 'off', label: 'Off' }]}
+          value={settings?.anime_auto_skip === true ? 'on' : 'off'}
+          onChange={(v) => updateSettings({ anime_auto_skip: v === 'on' })}
+        />
+      </div>
+
+      <ThemeAudioSettings />
+    </section>
+  );
+}
+
+const THEME_LENGTHS = [
+  { value: '15', label: '15s' },
+  { value: '30', label: '30s' },
+  { value: '60', label: '1 min' },
+  { value: '0', label: 'Whole song' },
+];
+
+/** The title page's opening theme: whether it plays, for how long, how loud. */
+function ThemeAudioSettings() {
+  const { settings, updateSettings } = useSettings();
+  const on = settings?.anime_theme_audio !== false;
+  const saved = Math.round((settings?.anime_theme_volume ?? 0.35) * 100);
+  const [vol, setVol] = useState(saved);
+  useEffect(() => setVol(saved), [saved]);
+  const commit = () => vol !== saved && updateSettings({ anime_theme_volume: vol / 100 });
+
+  return (
+    <>
+      <div className={s.row}>
+        <div>
+          <div className={s.rowLabel}>Opening theme</div>
+          <div className={s.rowHint}>
+            Play a show's opening when its page opens. The song button under the poster plays it any time.
+          </div>
+        </div>
+        <SegmentedControl
+          options={[{ value: 'on', label: 'On' }, { value: 'off', label: 'Off' }]}
+          value={on ? 'on' : 'off'}
+          onChange={(v) => updateSettings({ anime_theme_audio: v === 'on' })}
+        />
+      </div>
+      {on && (
+        <>
+          <div className={s.row}>
+            <div>
+              <div className={s.rowLabel}>Play for</div>
+              <div className={s.rowHint}>How much of the opening plays before it fades.</div>
+            </div>
+            <SegmentedControl
+              options={THEME_LENGTHS}
+              value={String(settings?.anime_theme_seconds ?? 30)}
+              onChange={(v) => updateSettings({ anime_theme_seconds: Number(v) })}
+            />
+          </div>
+          <div className={s.row}>
+            <div>
+              <div className={s.rowLabel}>Volume</div>
+              <div className={s.rowHint}>How loud the opening plays.</div>
+            </div>
+            <label className={s.rangeField}>
+              <input
+                type="range"
+                min="5"
+                max="100"
+                step="5"
+                value={vol}
+                onChange={(e) => setVol(Number(e.target.value))}
+                onPointerUp={commit}
+                onKeyUp={commit}
+                onBlur={commit}
+                aria-label="Opening theme volume"
+              />
+              <span>{vol}%</span>
+            </label>
+          </div>
+        </>
+      )}
+    </>
+  );
+}
+
+function SubtitleSettings() {
+  return (
+    <section className={`${s.section} glass`} id="subtitles">
+      <h2 className={s.sectionTitle}>
+        <Captions size={17} /> Subtitles
+      </h2>
+      <p className={s.sectionSub}>
+        How subtitles look in every player, here and on the phone. A player's subtitle menu has the
+        same controls, with the episode as the sample.
+      </p>
+      <SubtitleStyleEditor sample />
+    </section>
+  );
+}
+
+// Which build this is: the desktop app or the phone one (set by each vite.config).
+/* global __TUBCAL_APP__ */
+const APP = typeof __TUBCAL_APP__ !== 'undefined'
+  ? __TUBCAL_APP__
+  : { name: 'Tubcal', year: '2026', author: 'shio-t0', source: 'https://github.com/Shio-T0/Tubcal' };
+
+const LEGAL = [
+  { path: '/legal/LICENSE.txt', label: 'Licence', note: 'GNU GPL v3' },
+  { path: '/legal/THIRD_PARTY_NOTICES.md', label: 'Notices', note: 'ani-cli, anipy-api, weeb-cli…' },
+  { path: '/legal/third-party-licenses.txt', label: 'Bundled libraries', note: 'every package in this build' },
+  ...(APP.legal || []),
+];
+
+/** One of the legal texts, read in place. */
+function LegalViewer({ doc, onClose }) {
+  const [text, setText] = useState(null);
+  useEffect(() => {
+    let alive = true;
+    fetch(doc.path)
+      .then((r) => (r.ok ? r.text() : Promise.reject(new Error(`${r.status}`))))
+      .then((t) => alive && setText(t))
+      .catch(() => alive && setText('This text is part of a full build (npm run build) and was not found here.'));
+    return () => { alive = false; };
+  }, [doc.path]);
+  useEffect(() => {
+    const esc = (e) => e.key === 'Escape' && onClose();
+    window.addEventListener('keydown', esc);
+    return () => window.removeEventListener('keydown', esc);
+  }, [onClose]);
+  return (
+    <div className={s.legalScrim} onMouseDown={onClose}>
+      <div className={s.legalSheet} role="dialog" aria-label={doc.label} onMouseDown={(e) => e.stopPropagation()}>
+        <div className={s.legalHead}>
+          <b>{doc.label}</b>
+          <a href={doc.path} target="_blank" rel="noreferrer" title="Open as a file"><ExternalLink size={15} /></a>
+          <button type="button" onClick={onClose} aria-label="Close"><X size={16} /></button>
+        </div>
+        <pre className={s.legalText}>{text ?? 'Loading…'}</pre>
+      </div>
+    </div>
+  );
+}
+
+/** The program's notices (GPL-3.0 §5d asks an interactive program to show them):
+ *  copyright, the licence and the absence of warranty, where the source is, and
+ *  what it builds on. */
+function AboutSettings() {
+  const [doc, setDoc] = useState(null);
+  return (
+    <section className={`${s.section} glass`} id="about">
+      <h2 className={s.sectionTitle}>
+        <Scale size={17} /> About
+      </h2>
+      <div className={s.about}>
+        <p>
+          <b>{APP.name}</b> · Copyright © {APP.year} {APP.author}
+        </p>
+        <p>
+          This program is free software: you can redistribute it and/or modify it under the terms of
+          the GNU General Public License as published by the Free Software Foundation, either version
+          3 of the License, or (at your option) any later version. It comes with <b>absolutely no
+          warranty</b>; see the licence for details.
+        </p>
+        <p>
+          Anime playback follows ani-cli's method and uses anipy-api and weeb-cli, all GPL-3.0. The
+          notices credit them, and the bundled-libraries list carries the licence of every package in
+          this build.
+        </p>
+      </div>
+      <div className={s.legalLinks}>
+        {LEGAL.map((d) => (
+          <button key={d.path} type="button" className={s.legalLink} onClick={() => setDoc(d)}>
+            <FileText size={15} />
+            <span><b>{d.label}</b><em>{d.note}</em></span>
+          </button>
+        ))}
+        <a className={s.legalLink} href={APP.source} target="_blank" rel="noreferrer">
+          <ExternalLink size={15} />
+          <span><b>Source code</b><em>{APP.source.replace(/^https?:\/\//, '')}</em></span>
+        </a>
+      </div>
+      {doc && <LegalViewer doc={doc} onClose={() => setDoc(null)} />}
     </section>
   );
 }
@@ -727,6 +914,8 @@ export default function SettingsPage() {
 
         <AnimeSettings />
 
+        <SubtitleSettings />
+
         <EditorSettings />
 
         <section className={`${s.section} glass`}>
@@ -757,6 +946,8 @@ export default function SettingsPage() {
             />
           ))}
         </section>
+
+        <AboutSettings />
       </div>
 
       <AddSubscriptionModal open={addOpen} onClose={() => setAddOpen(false)} />

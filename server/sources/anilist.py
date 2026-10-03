@@ -1843,6 +1843,11 @@ def _norm_chart(m):
         for l in (m.get("externalLinks") or [])
         if l.get("type") == "STREAMING" and l.get("url")
     ]
+    # start_date pads a missing month/day with 01; the guide must not print
+    # "Oct 1" for a title AniList only knows as "October".
+    sd = m.get("startDate") or {}
+    base["start_exact"] = bool(sd.get("month") and sd.get("day"))
+    base["start_month"] = bool(sd.get("month"))
     return base
 
 

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The app's night "ink" background (Shōwa Set / Evening). Used as the window
+         background so the screen behind the now-transparent system bars is the warm
+         dark of the UI, not black — no visible band where the WebView "stops". -->
+    <color name="ink">#FF1C140D</color>
+</resources>

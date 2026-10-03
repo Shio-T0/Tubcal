@@ -19,7 +19,7 @@ import { ErrorBox, Receiving } from '../layout/Section.jsx';
 import { applyOverlay, useAnimeSync, useToast } from '../../state.jsx';
 import { timeAgo } from '../../lib/time.js';
 import {
-  STATUS_LABEL, STATUS_META, fmtCountdown, fmtDuration, metaLine, personalScore, stripHtml,
+  STATUS_LABEL, STATUS_META, fmtCountdown, fmtDuration, metaLine, stripHtml,
 } from './shared.jsx';
 import lt from './listtools.module.css';
 
@@ -418,9 +418,21 @@ export function SequelRadar() {
 
 const DUST_DAYS = 45;
 
-export function GatheringDust({ entries }) {
+const DUST_KEY = 'tubcal.anime.dust';
+
+/** `collapsible`: folded to one line until opened (remembered on this machine) —
+ *  the desktop's My List keeps it out of the way of the shelf itself. */
+export function GatheringDust({ entries, collapsible = false }) {
   const { overlay, queueListEdit } = useAnimeSync();
   const [open, setOpen] = useState(false);
+  const [shown, setShown] = useState(() => {
+    if (!collapsible) return true;
+    try { return localStorage.getItem(DUST_KEY) === 'open'; } catch { return false; }
+  });
+  const fold = (v) => {
+    setShown(v);
+    try { localStorage.setItem(DUST_KEY, v ? 'open' : 'closed'); } catch { /* private mode */ }
+  };
   const cutoff = Date.now() / 1000 - DUST_DAYS * 86400;
   const dusty = entries
     .filter((e) => {
@@ -429,17 +441,32 @@ export function GatheringDust({ entries }) {
     })
     .sort((a, b) => a.updated_at - b.updated_at);
   if (!dusty.length) return null;
-  const shown = open ? dusty : dusty.slice(0, 4);
+  const note = `${dusty.length} show${dusty.length === 1 ? '' : 's'} you're “watching” but haven't touched in ${DUST_DAYS}+ days`;
+  if (!shown) {
+    return (
+      <button type="button" className={lt.dustBar} onClick={() => fold(true)}>
+        <Clock size={15} />
+        <b>Gathering dust</b>
+        <span className={lt.dustFaces} aria-hidden="true">
+          {dusty.slice(0, 6).map((e) => e.media.cover && <img key={e.entry_id} src={e.media.cover} alt="" loading="lazy" />)}
+        </span>
+        <span className={lt.panelNote}>{note}</span>
+        <span className={lt.dustOpen}>Review</span>
+      </button>
+    );
+  }
+  const visible = open ? dusty : dusty.slice(0, 4);
   return (
     <section className={lt.dust}>
       <header className={lt.panelHead}>
         <span className={lt.panelTitle}><Clock size={16} /> Gathering dust</span>
-        <span className={lt.panelNote}>
-          {dusty.length} show{dusty.length === 1 ? '' : 's'} you're “watching” but haven't touched in {DUST_DAYS}+ days
-        </span>
+        <span className={lt.panelNote}>{note}</span>
+        {collapsible && (
+          <button type="button" className={lt.dustFold} onClick={() => fold(false)}>Hide</button>
+        )}
       </header>
       <div className={lt.dustList}>
-        {shown.map((e) => {
+        {visible.map((e) => {
           const m = e.media;
           return (
             <div key={e.entry_id} className={lt.dustRow}>
@@ -513,40 +540,3 @@ export function BulkBar({ selected, onClear, onDone }) {
 }
 
 // ── the ledger-row view ───────────────────────────────────────────────────────
-
-export function LedgerRow({ entry, scoreFormat, selectable, selected, onSelect }) {
-  const { overlay, queueListEdit } = useAnimeSync();
-  const m = entry.media;
-  const eff = applyOverlay(m.id, entry, overlay);
-  if (!eff) return null;
-  const prog = eff.progress || 0;
-  const total = m.episodes;
-  const pct = total ? Math.min(100, (prog / total) * 100) : 0;
-  const aired = m.next_episode ? m.next_episode - 1 : total || 0;
-  const behind = Math.max(0, aired - prog);
-  const mine = personalScore({ list_entry: eff }, scoreFormat);
-  return (
-    <div className={`${lt.row} ${selected ? lt.rowSelected : ''}`} style={{ '--cover-c': m.color || 'var(--c-anime)' }}>
-      {selectable && (
-        <input type="checkbox" className={lt.rowCheck} checked={selected} onChange={() => onSelect(entry.entry_id)} aria-label={`Select ${m.title}`} />
-      )}
-      <Link to={`/anime/${m.id}`} className={lt.rowCover}>{m.cover && <img src={m.cover} alt="" loading="lazy" />}</Link>
-      <span className={lt.rowTitle}>
-        <Link to={`/anime/${m.id}`}>{m.title}</Link>
-        <em>{metaLine(m)}{entry.private ? ' · private' : ''}{entry.custom_lists?.length ? ` · ${entry.custom_lists.join(', ')}` : ''}</em>
-      </span>
-      <span className={lt.rowProg}>
-        <span className={lt.rowTrack}><span style={{ width: `${total ? pct : prog ? 100 : 0}%` }} /></span>
-        <span className={lt.rowNums}>{prog}{total ? `/${total}` : ''}{behind > 0 ? <b> · {behind} behind</b> : null}</span>
-      </span>
-      <span className={lt.rowScore}>{mine || '—'}</span>
-      <span className={lt.rowStatus}>{STATUS_LABEL[eff.status] || ''}</span>
-      <span className={lt.rowWhen}>{entry.updated_at ? timeAgo(entry.updated_at) : ''}</span>
-      {(!total || prog < total) ? (
-        <button type="button" className={lt.rowBump} onClick={() => queueListEdit(m, { progress: prog + 1 })} title="Mark the next episode watched">
-          <Plus size={12} />
-        </button>
-      ) : <span />}
-    </div>
-  );
-}

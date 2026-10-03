@@ -11,12 +11,13 @@ import time
 from functools import wraps
 from urllib.parse import urljoin
 
-from flask import Blueprint, Response, request, stream_with_context
+from flask import Blueprint, Response, request
 
 from . import err, ok
 from .oauth import get_valid_token
+from .relay import relay
 from .. import cache, config, httpc
-from ..sources import anilist, anime_source
+from ..sources import anilist, anime_source, animethemes
 
 anime_bp = Blueprint("anime", __name__, url_prefix="/api/anime")
 
@@ -770,6 +771,15 @@ def episodes(anilist_id):
         return err(f"episode source unavailable: {e}", 502)
 
 
+@anime_bp.get("/themes/<int:anilist_id>")
+def themes(anilist_id):
+    """The title's openings and endings (AnimeThemes), for the page's theme player."""
+    try:
+        return ok(animethemes.themes(anilist_id))
+    except Exception as e:
+        return err(f"AnimeThemes unavailable: {e}", 502)
+
+
 def _watch(key):
     """Resolve+cache an episode's sources briefly (the proxy handlers reuse it)."""
     data, _ = cache.cached(f"anime:watch:{key}", 300, lambda: anime_source.watch(key))
@@ -782,11 +792,15 @@ def _referer(data):
 
 @anime_bp.get("/stream/<key>")
 def stream(key):
-    """Player stream resolution → {streams:[{kind,itag,quality}], subtitles:[…]}."""
+    """Player stream resolution → {streams:[{kind,itag,quality}], subtitles:[…]},
+    plus what the anime player builds on: `skip` (intro/outro spans), the `audio`
+    actually served, and `audio_keys` — the same episode's key per language, for
+    the Sub/Dub switch."""
     try:
         data = _watch(key)
     except Exception as e:
         return err(f"source resolve failed: {e}", 502)
+    referer = _referer(data)
     streams = []
     for src in data.get("sources") or []:
         if not src.get("url"):
@@ -798,14 +812,28 @@ def stream(key):
         u = sub.get("url") or ""
         if not u or ".vtt" not in u.lower():  # <track> only renders WebVTT
             continue
-        lang = sub.get("lang") or "Subtitles"
-        subs.append({"src": f"/api/anime/sub?u={_b64(u)}", "lang": lang[:8], "label": lang})
-    return ok({"streams": streams, "subtitles": subs})
+        lang = sub.get("lang") or "und"
+        label = sub.get("label") or lang
+        # the subtitle host refuses without the embed origin as Referer
+        r = f"&r={_b64(referer)}" if referer else ""
+        subs.append({"src": f"/api/anime/sub?u={_b64(u)}{r}", "lang": lang[:8], "label": label,
+                     "default": bool(sub.get("default"))})
+    audio = data.get("audio")
+    options = data.get("audio_options") or ([audio] if audio else [])
+    return ok({
+        "streams": streams,
+        "subtitles": subs,
+        "skip": data.get("skip") or {},
+        "audio": audio,
+        # a list for the order (JSON objects come back key-sorted: dub before sub)
+        "audio_options": options,
+        "audio_keys": {a: (key if a == audio else anime_source.with_audio(key, a)) for a in options},
+        "provider": data.get("provider"),
+    })
 
 
 # ── byte/playlist proxy (forwards the source's Referer; relays Range) ─────────
 
-_PASS = ("Content-Type", "Content-Length", "Content-Range", "Accept-Ranges")
 _URI_RE = re.compile(r'URI="([^"]+)"')
 
 
@@ -826,23 +854,31 @@ def _fwd(referer=None):
     return h
 
 
-def _relay(upstream, default_ct="application/octet-stream"):
-    def generate():
-        try:
-            for chunk in upstream.iter_content(chunk_size=65536):
-                if chunk:
-                    yield chunk
-        finally:
-            upstream.close()
+def _open(url, referer=None, *, timeout=(6, 25)):
+    """Open a source's media bytes: transient failures (drops, timeouts, 5xx) are
+    retried, and `reopen(range)` resumes a body that breaks mid-way, so a flaky
+    host doesn't surface as a stalled episode."""
+    headers = _fwd(referer)
+    upstream = httpc.stream_get(url, headers=headers, timeout=timeout)
 
-    headers = {k: upstream.headers[k] for k in _PASS if k in upstream.headers}
-    headers.setdefault("Accept-Ranges", "bytes")
-    return Response(
-        stream_with_context(generate()),
-        status=upstream.status_code,
-        headers=headers,
-        content_type=upstream.headers.get("Content-Type", default_ct),
-    )
+    def reopen(rng):
+        return httpc.stream_get(url, headers={**headers, "Range": rng}, timeout=timeout)
+
+    return upstream, reopen
+
+
+def _playlist(url, referer, attempts=3):
+    """A playlist's text, with a couple of retries — one failed fetch otherwise
+    stops the whole episode."""
+    last = None
+    for i in range(attempts):
+        try:
+            return httpc.get(url, headers=_fwd(referer), timeout=25).text
+        except Exception as e:  # noqa: BLE001 — retried, then reported
+            last = e
+            if i < attempts - 1:
+                time.sleep(0.4 * (i + 1))
+    raise last
 
 
 def _seg_url(abs_url, referer):
@@ -887,7 +923,7 @@ def hls(key, itag):
     if not src:
         return err("no HLS source", 404)
     try:
-        text = httpc.get(src["url"], headers=_fwd(referer), timeout=25).text
+        text = _playlist(src["url"], referer)
     except Exception as e:
         return err(f"playlist fetch failed: {e}", 502)
     return Response(_rewrite(text, src["url"], referer), content_type="application/vnd.apple.mpegurl")
@@ -900,7 +936,7 @@ def hls_pl():
         return err("u required")
     url, referer = _unb64(u), (_unb64(r) if r else None)
     try:
-        text = httpc.get(url, headers=_fwd(referer), timeout=25).text
+        text = _playlist(url, referer)
     except Exception as e:
         return err(f"playlist fetch failed: {e}", 502)
     return Response(_rewrite(text, url, referer), content_type="application/vnd.apple.mpegurl")
@@ -912,8 +948,11 @@ def hls_seg():
     if not u:
         return err("u required")
     url, referer = _unb64(u), (_unb64(r) if r else None)
-    upstream = httpc.session.get(url, headers=_fwd(referer), stream=True, timeout=25, allow_redirects=True)
-    return _relay(upstream, default_ct="video/mp2t")
+    try:
+        upstream, reopen = _open(url, referer)
+    except Exception as e:
+        return err(f"segment fetch failed: {e}", 502)
+    return relay(upstream, reopen=reopen, default_ct="video/mp2t")
 
 
 @anime_bp.get("/stream/<key>/data")
@@ -929,14 +968,23 @@ def stream_data(key):
         or next((x for x in sources if not x.get("isM3U8")), None)
     if not src:
         return err("no progressive source", 502)
-    upstream = httpc.session.get(src["url"], headers=_fwd(referer), stream=True, timeout=25, allow_redirects=True)
-    return _relay(upstream, default_ct="video/mp4")
+    try:
+        upstream, reopen = _open(src["url"], referer)
+    except Exception as e:
+        return err(f"stream fetch failed: {e}", 502)
+    return relay(upstream, reopen=reopen, default_ct="video/mp4")
 
 
 @anime_bp.get("/sub")
 def sub():
-    u = request.args.get("u")
+    u, r = request.args.get("u"), request.args.get("r")
     if not u:
         return err("u required")
-    upstream = httpc.session.get(_unb64(u), headers={"User-Agent": config.BROWSER_UA}, stream=True, timeout=20)
-    return _relay(upstream, default_ct="text/vtt")
+    headers = {"User-Agent": config.BROWSER_UA}
+    if r:
+        headers["Referer"] = _unb64(r)
+    try:
+        upstream = httpc.stream_get(_unb64(u), headers=headers, timeout=(6, 20))
+    except Exception as e:
+        return err(f"subtitle fetch failed: {e}", 502)
+    return relay(upstream, default_ct="text/vtt")

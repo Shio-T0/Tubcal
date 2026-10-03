@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The phone UI's icon (phone/public/icon.svg) on the adaptive-icon grid: the
+     set's amber tube ring, the paper "T", the persimmon pilot light. Kept inside
+     the 66dp safe circle so every launcher mask shows all of it. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:pathData="M24,54 a30,30 0 1,0 60,0 a30,30 0 1,0 -60,0"
+        android:strokeColor="#E6AB5E"
+        android:strokeAlpha="0.45"
+        android:strokeWidth="2.8"
+        android:fillColor="#00000000" />
+    <path
+        android:pathData="M36.4,36.4 h35.2 v8.8 h-13.2 v35.2 h-8.8 v-35.2 h-13.2 z"
+        android:fillColor="#E8D9B8" />
+    <path
+        android:pathData="M52,54 a2,2 0 1,0 4,0 a2,2 0 1,0 -4,0"
+        android:fillColor="#C8643C" />
+</vector>

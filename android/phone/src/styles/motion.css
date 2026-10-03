@@ -1,0 +1,510 @@
+/* Motion for the phone app — one vocabulary, used everywhere.
+
+   Curves:  --e-out     things arriving: fast, then settling
+            --e-in      things leaving: gathering speed
+            --e-spring  a touch answered: a little overshoot, then rest
+            --e-swift   things moving between two places on screen
+   Every rule here stands down for prefers-reduced-motion (Android's "Remove
+   animations"); the reveal engine doesn't even start. */
+
+:root {
+  --e-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --e-in: cubic-bezier(0.55, 0, 0.75, 0.15);
+  --e-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --e-swift: cubic-bezier(0.2, 0.9, 0.25, 1);
+  --d-1: 160ms;
+  --d-2: 280ms;
+  --d-3: 460ms;
+}
+
+/* ── arrival: rows and cards rise into place as they scroll into view ───────── */
+
+html[data-motion='on'] :is(
+  [data-reveal],
+  .pc_wire_reader__thread > *,
+  .pc_modals_comments__comment,
+  .pc_player_watch__comment,
+  .pc_anime_forum__row,
+  .pc_anime_activity__entry
+):not([data-in]) {
+  opacity: 0;
+}
+html[data-motion='on'] [data-in] {
+  animation: ph-rise 0.62s var(--e-out) var(--rd, 0ms) backwards;
+}
+html[data-motion='on'] [data-reveal='pop'][data-in] {
+  animation-name: ph-pop-in;
+  animation-duration: 0.56s;
+}
+html[data-motion='on'] [data-reveal='fade'][data-in] {
+  animation-name: ph-fade-in;
+}
+html[data-motion='on'] [data-reveal='side'][data-in] {
+  animation-name: ph-side-in;
+}
+@keyframes ph-rise {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 22px, 0);
+  }
+}
+@keyframes ph-pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.86) translate3d(0, 10px, 0);
+  }
+  60% {
+    opacity: 1;
+  }
+}
+@keyframes ph-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes ph-side-in {
+  from {
+    opacity: 0;
+    transform: translate3d(26px, 0, 0);
+  }
+}
+
+/* ── pictures fade in as they arrive instead of popping ─────────────────────── */
+
+html[data-motion='on'] img {
+  transition: opacity 0.5s var(--e-out), filter 0.6s var(--e-out);
+}
+html[data-motion='on'] img:not([data-loaded]) {
+  opacity: 0;
+  filter: blur(6px);
+}
+
+/* ── a touch is answered at once: everything pressable gives a little ─────── */
+
+:where(.ph-app, .ph-portal, .ph-player) :where(button, a, [role='button']):not(:where(.ph-reuse *)) {
+  transition: scale 0.42s var(--e-spring), background-color var(--d-1) ease, color var(--d-1) ease,
+    border-color var(--d-1) ease, opacity var(--d-1) ease;
+}
+:where(.ph-app, .ph-portal, .ph-player) :where(button, a, [role='button']):not(:where(.ph-reuse *)):active:not(:disabled) {
+  scale: var(--press, 0.95);
+  transition-duration: 0.09s;
+}
+
+/* ── pages: forward slides in from the right, back from the left, a tab fades up ─ */
+
+.ph-page {
+  animation: ph-page-push 0.44s var(--e-out) both;
+}
+.ph-page[data-enter='back'] {
+  animation-name: ph-page-back;
+}
+.ph-page[data-enter='tab'] {
+  animation-name: ph-page-tab;
+  animation-duration: 0.36s;
+}
+.ph-page[data-enter='none'] {
+  animation: none;
+}
+@keyframes ph-page-push {
+  from {
+    opacity: 0;
+    transform: translate3d(34px, 0, 0);
+  }
+}
+@keyframes ph-page-back {
+  from {
+    opacity: 0;
+    transform: translate3d(-26px, 0, 0);
+  }
+}
+@keyframes ph-page-tab {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 12px, 0) scale(0.99);
+  }
+}
+
+/* While a page slides over (an HN discussion, a Reddit post), the one beneath
+   draws back and dims, the way a card stack does. */
+.ph-app {
+  transition: transform var(--ov-ms, 0.42s) var(--e-swift), filter var(--ov-ms, 0.42s) var(--e-swift);
+}
+html[data-overlay='1'] .ph-app {
+  /* --ovp: how far an edge swipe has pulled the page above away (0–1) */
+  transform: translate3d(calc(-18% * (1 - var(--ovp, 0))), 0, 0);
+  filter: brightness(calc(0.62 + 0.38 * var(--ovp, 0)));
+}
+html[data-ov-drag] .ph-app {
+  transition: none;
+}
+
+/* ── View Transitions: the player's picture travels; the page around it moves ── */
+
+::view-transition-group(ph-stage) {
+  animation-duration: 0.46s;
+  animation-timing-function: var(--e-swift);
+  z-index: 10;
+}
+::view-transition-old(ph-stage),
+::view-transition-new(ph-stage) {
+  animation-duration: 0.3s;
+  height: 100%;
+  object-fit: cover;
+}
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 0.36s;
+}
+/* opening: the watch page rises under the travelling picture */
+html[data-vt='open']::view-transition-old(root) {
+  animation: ph-vt-dim 0.36s ease both;
+}
+html[data-vt='open']::view-transition-new(root) {
+  animation: ph-vt-up 0.46s var(--e-out) both;
+}
+/* closing: the watch page sinks away; the app comes back up */
+html[data-vt='close']::view-transition-old(root) {
+  animation: ph-vt-down 0.38s var(--e-in) both;
+  z-index: 2;
+}
+html[data-vt='close']::view-transition-new(root) {
+  animation: ph-vt-undim 0.4s ease both;
+}
+/* a new skin: the new paint is uncovered by a circle from your finger (JS) */
+html[data-vt='theme']::view-transition-old(root),
+html[data-vt='theme']::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+html[data-vt='theme']::view-transition-new(root) {
+  z-index: 9;
+}
+@keyframes ph-vt-up {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 9%, 0);
+  }
+}
+@keyframes ph-vt-down {
+  to {
+    opacity: 0;
+    transform: translate3d(0, 14%, 0);
+  }
+}
+@keyframes ph-vt-dim {
+  to {
+    opacity: 0.4;
+  }
+}
+@keyframes ph-vt-undim {
+  from {
+    opacity: 0.4;
+  }
+}
+/* during a morph from a card, the mini player's picture isn't the one travelling */
+html[data-vt-from] .ph-stage-mini {
+  view-transition-name: none !important;
+}
+
+/* ── shared keyframes for components ───────────────────────────────────────── */
+
+@keyframes ph-pop {
+  0% {
+    transform: scale(1);
+  }
+  35% {
+    transform: scale(1.28);
+  }
+  70% {
+    transform: scale(0.94);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+@keyframes ph-bump {
+  0% {
+    transform: translate3d(0, 0.35em, 0);
+    opacity: 0;
+  }
+  60% {
+    transform: translate3d(0, -0.06em, 0);
+    opacity: 1;
+  }
+  100% {
+    transform: none;
+  }
+}
+@keyframes ph-float-up {
+  0% {
+    opacity: 0;
+    transform: translate3d(-50%, 6px, 0) scale(0.7);
+  }
+  25% {
+    opacity: 1;
+    transform: translate3d(-50%, -8px, 0) scale(1.1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(-50%, -42px, 0) scale(1);
+  }
+}
+@keyframes ph-pulse-ring {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--ring, var(--signal)) 55%, transparent);
+  }
+  70%,
+  100% {
+    box-shadow: 0 0 0 9px color-mix(in srgb, var(--ring, var(--signal)) 0%, transparent);
+  }
+}
+@keyframes ph-breathe {
+  50% {
+    opacity: 0.45;
+    transform: scale(0.82);
+  }
+}
+@keyframes ph-shimmer {
+  from {
+    background-position: 160% 0;
+  }
+  to {
+    background-position: -60% 0;
+  }
+}
+@keyframes ph-sheen {
+  0%,
+  72% {
+    transform: translateX(-120%) skewX(-18deg);
+  }
+  100% {
+    transform: translateX(260%) skewX(-18deg);
+  }
+}
+@keyframes ph-shake {
+  10%,
+  90% {
+    transform: translateX(-1px);
+  }
+  20%,
+  80% {
+    transform: translateX(3px);
+  }
+  30%,
+  50%,
+  70% {
+    transform: translateX(-5px);
+  }
+  40%,
+  60% {
+    transform: translateX(5px);
+  }
+}
+@keyframes ph-bob {
+  50% {
+    transform: translateY(-6px) rotate(-3deg);
+  }
+}
+@keyframes ph-grow-x {
+  from {
+    transform: scaleX(0);
+  }
+}
+@keyframes ph-kenburns {
+  from {
+    transform: scale(1.12) translate3d(1.5%, 1%, 0);
+  }
+}
+
+/* A number that changes says so: key the element on its value and give it this. */
+.ph-tick {
+  display: inline-block;
+  animation: ph-bump 0.42s var(--e-spring) both;
+}
+.ph-pop {
+  animation: ph-pop 0.5s var(--e-out) both;
+}
+
+/* ── skeletons: the shape of what's coming, with a sheen moving across ──────── */
+
+.ph-skel {
+  padding: 4px 0 12px;
+}
+.ph-skel i {
+  display: block;
+  border-radius: 10px;
+  background: linear-gradient(
+      100deg,
+      color-mix(in srgb, var(--paper) 5%, transparent) 30%,
+      color-mix(in srgb, var(--paper) 13%, transparent) 50%,
+      color-mix(in srgb, var(--paper) 5%, transparent) 70%
+    )
+    var(--surface);
+  background-size: 220% 100%;
+  animation: ph-shimmer 1.5s linear infinite;
+}
+.ph-skel-card {
+  margin-bottom: 18px;
+}
+.ph-skel-card > i:first-child {
+  aspect-ratio: 16 / 9;
+  border-radius: 0;
+}
+.ph-skel-cardText {
+  display: grid;
+  grid-template-columns: 36px 1fr;
+  gap: 8px 11px;
+  padding: 10px 16px 0 14px;
+}
+.ph-skel-cardText i:first-child {
+  grid-row: span 2;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+}
+.ph-skel-cardText i:nth-child(2) {
+  height: 14px;
+  width: 88%;
+}
+.ph-skel-cardText i:nth-child(3) {
+  height: 11px;
+  width: 52%;
+}
+.ph-skel-row {
+  display: grid;
+  grid-template-columns: 42% 1fr;
+  gap: 8px 12px;
+  padding: 8px 16px;
+}
+.ph-skel-row i:first-child {
+  grid-row: span 3;
+  aspect-ratio: 16 / 9;
+}
+.ph-skel-row i:nth-child(2) {
+  height: 13px;
+  margin-top: 4px;
+}
+.ph-skel-row i:nth-child(3) {
+  height: 13px;
+  width: 70%;
+}
+.ph-skel-row i:nth-child(4) {
+  height: 10px;
+  width: 45%;
+}
+.ph-skel-line {
+  display: grid;
+  gap: 8px;
+  padding: 14px 16px;
+  border-bottom: 1px solid color-mix(in srgb, var(--rule) 50%, transparent);
+}
+.ph-skel-line i:first-child {
+  height: 14px;
+  width: 92%;
+}
+.ph-skel-line i:nth-child(2) {
+  height: 14px;
+  width: 64%;
+}
+.ph-skel-line i:nth-child(3) {
+  height: 10px;
+  width: 38%;
+}
+.ph-skel-posters {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px 10px;
+  padding: 12px;
+}
+.ph-skel-posters > span {
+  display: grid;
+  gap: 6px;
+}
+.ph-skel-posters > span i:first-child {
+  aspect-ratio: 2 / 3;
+}
+.ph-skel-posters > span i:nth-child(2) {
+  height: 11px;
+}
+.ph-skel-posters > span i:nth-child(3) {
+  height: 9px;
+  width: 60%;
+}
+.ph-skel > * {
+  animation: ph-fade-in 0.4s ease both;
+}
+.ph-skel > *:nth-child(2) {
+  animation-delay: 60ms;
+}
+.ph-skel > *:nth-child(3) {
+  animation-delay: 120ms;
+}
+.ph-skel > *:nth-child(4) {
+  animation-delay: 180ms;
+}
+
+/* ── reduced motion: everything settles instantly ──────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-delay: 0ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    transition-delay: 0ms !important;
+    scroll-behavior: auto !important;
+  }
+  html[data-overlay='1'] .ph-app {
+    transform: none;
+    filter: none;
+  }
+}
+
+/* ── the reused desktop screens' entrance animations ────────────────────────
+   Some desktop modules say `animation: fadeUp` (or spin/pulse/shimmer) against
+   keyframes that live in base.css; CSS Modules renames the reference, so on the
+   desktop those animations are inert (base.css documents this). The phone's
+   scoped names are stable (vite.config.js), so here they get their keyframes. */
+@keyframes pc_layout_Section__fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+}
+@keyframes pc_pages_anime__fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+}
+@keyframes pc_ui_ui__fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+}
+@keyframes pc_pages_anime__spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes pc_ui_ui__spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes pc_layout_Section__shimmer {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+@keyframes pc_layout_Section__pulse {
+  50% {
+    opacity: 0.4;
+  }
+}

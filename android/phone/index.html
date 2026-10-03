@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <!-- viewport-fit=cover: the app draws edge to edge (the Android shell passes the
+         system-bar insets in as --sa-*); no zoom, so double-tap is a gesture, not a zoom. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <meta name="color-scheme" content="dark light" />
+    <meta name="theme-color" content="#1c140d" />
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <title>Tubcal</title>
+    <style>
+      html { background: #1c140d; }
+      html[data-theme='light'] { background: #e6d8bb; }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
