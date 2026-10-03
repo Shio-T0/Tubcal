@@ -91,7 +91,7 @@ window.TUBCAL = {
     { id: 'layout', title: 'Project layout', sub: 'Where everything lives', chord: 'f', c: 'var(--c-editor)' },
     { id: 'develop', title: 'Develop', sub: 'Dev servers, tests, conventions', chord: 'd', c: 'var(--c-dev)' },
     { id: 'troubleshooting', title: 'Troubleshooting', sub: 'When a room goes quiet', chord: 't', c: 'var(--danger)' },
-    { id: 'license', title: 'License', sub: 'MIT', chord: '', c: 'var(--paper-faint)' },
+    { id: 'license', title: 'License', sub: 'GPL-3.0', chord: '', c: 'var(--paper-faint)' },
   ],
 
   // Environment variables (server/config.py). All optional.
