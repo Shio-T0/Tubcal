@@ -1262,7 +1262,7 @@ function MyListTab() {
         title="Connect AniList to see your lists"
         subtitle="Add your AniList app credentials in Settings → Connections, then connect. Your watching, planning and completed shelves show up here."
         action={
-          <Button onClick={() => (window.location.href = '/settings')}>Open Settings</Button>
+          <Button onClick={() => (window.location.href = '/settings?s=accounts')}>Open Settings</Button>
         }
       />
     );
@@ -1469,7 +1469,7 @@ function TrailerChannel() {
         color="var(--c-anime)"
         title="Connect AniList to tune the channel"
         subtitle="The Anime Channel reels through trailers for shows related to what you've watched. Connect AniList in Settings to build it from your list."
-        action={<Button onClick={() => (window.location.href = '/settings')}>Open Settings</Button>}
+        action={<Button onClick={() => (window.location.href = '/settings?s=accounts')}>Open Settings</Button>}
       />
     );
   }

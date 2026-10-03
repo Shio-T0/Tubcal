@@ -164,13 +164,6 @@ select {
   display: none;
 }
 
-/* The Composing Room isn't part of the phone app: its settings section and its
-   room switch stay on the desktop. */
-.ph-page-settings section:has(> h2 > .lucide-code-xml),
-.ph-page-settings .pc_pages_settings__subRow:has(> [style*='--c-editor']) {
-  display: none;
-}
-
 /* ── the anime player's shared pieces (desktop components), sized for a phone ── */
 /* the skip cue goes top-right: a portrait picture is short, and at the foot it
    would sit on the subtitles */

@@ -17,7 +17,7 @@ The app has two "channels", chosen at `/` (`pages/Home.jsx`, a TV-style chooser)
 console; `frontend/src/lib/rooms.js` is their canonical registry (id, label, color
 token, route, `default_enabled`) — the numbers users see are computed from list
 position, not hardcoded, so adding a room means adding an entry there plus a page in
-`pages/` (and the id to `config.ROOM_IDS`). Rooms are toggleable in Settings → Rooms;
+`pages/` (and the id to `config.ROOM_IDS`). Rooms are toggleable in Settings → Rooms (`/settings?s=rooms`);
 GitHub is the one that ships off by default. The Anime is *not* a room: it's its own
 section with its own top bar (`components/anime/AnimeMasthead.jsx`) and index (see
 below). The old Front Page room is gone; `db.init_db` strips retired ids from the
@@ -379,6 +379,16 @@ count, comment count, tags. The card and the notes share that one request throug
 and the creator/verified/member/hearted/edited marks. Keys while expanded: Space/K,
 J/L, arrows, 0–9, M/F/C, `<`/`>` speed, Ctrl+←/→ chapters, Shift+N next, `?` help,
 Esc to the corner.
+
+**Settings** (`pages/SettingsPage.jsx`) is an index plus one open section:
+- `pages/settingsSections.js` lists the sections, their groups and the words
+  "Find a setting" matches. Each index entry shows the section's current state.
+- `?s=<id>` opens a section and pushes history.
+- Below 820px (the phone) the index is the page and each section opens as its
+  own page. The phone build's `__TUBCAL_APP__.phone` drops desktop-only sections
+  (the Composing Room).
+- Every setting is a `Row` (label + hint left, control right) inside a `Group`:
+  `Switch` for on/off, `Choice` for named options.
 
 **Subtitles** are drawn by Tubcal, not the browser:
 - `components/player/Subtitles.jsx` has `SubtitleOverlay`. It sets the chosen

@@ -5,7 +5,9 @@
 // stays a desktop room — a code editor has no business on a phone.)
 
 import { lazy, Suspense } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
+
+import { SETTINGS_SECTIONS } from '@pc/pages/settingsSections.js';
 
 import { AppBar, Loading } from '../shell/Shell.jsx';
 
@@ -23,11 +25,14 @@ const PAGES = {
 
 export default function Reused({ page }) {
   const params = useParams();
+  const [search] = useSearchParams();
   const p = PAGES[page];
   const sub = page === 'user' ? params.name : null;
+  // Settings opens a section as its own page (`?s=`): the bar names it.
+  const title = page === 'settings' ? SETTINGS_SECTIONS[search.get('s')]?.title || p.title : p.title;
   return (
     <div className={`ph-reuse-page ph-page-${page}`}>
-      <AppBar title={p.title} sub={sub} back backTo={p.back} tone={p.tone} />
+      <AppBar title={title} sub={sub} back backTo={p.back} tone={p.tone} />
       <div className={`ph-reuse ${page.match(/voice|character|studio|user|thread|activity/) ? 'ph-anime' : ''}`}>
         <Suspense fallback={<Loading />}>
           <p.C />
