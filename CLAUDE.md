@@ -43,6 +43,41 @@ fields, the editor, the expanded player, media, and keyboard-focused controls.
 - `android/tools/sync-data.sh` moves user data between the desktop and phone
   databases.
 
+## The Linux installer
+
+`install.sh` (repo root) installs Tubcal for a user on most distros. Run from a
+checkout it sets that checkout up *in place* (its `data/` stays the data); piped
+from curl it clones into `~/.local/share/tubcal/app`. It is one bash script that
+re-execs itself from `sh`, and it keeps its own state in `$TUBCAL_HOME`
+(`~/.local/share/tubcal`):
+- `install.conf` is the install record. The installer writes it and the launcher
+  sources it.
+- `bin/` + `tools/` hold the private yt-dlp, installed with `uv tool`. A
+  `yt-dlp.conf` beside its package adds `--js-runtimes node:<abs path>`, so YouTube's
+  JS challenges solve without Deno. Tubcal finds this copy first because the
+  launcher puts `bin/` first on PATH, and the launcher upgrades it at most daily.
+- `node/` is a private Node, only when the distro's is missing or below 20. It is
+  checksum-verified against nodejs.org's SHASUMS256.
+- `bin/uv` is a private uv, only when no uv ≥ 0.8 exists.
+
+Distro packages come first when there is root, and the plan shows them before
+anything runs. Fedora (and so Fedora Asahi Remix, aarch64 with 16K pages) gets
+Fedora's own `nodejs`, `uv` and `python3.13`. apt/EL/Leap always use the private
+Node. Every binary is smoke-tested after install, and The Archive extra is
+import-tested and dropped (with a warning) when it can't load. The run ends with a
+self-test: the Flask test client against a temp `DATA_DIR`, as in
+`tests/conftest.py`.
+
+`packaging/linux/` holds the templates it renders (`@TUBCAL_HOME@`, `@BIN@`):
+- `tubcal` is the launcher: open/start/stop/status/logs/update/autostart/uninstall/run.
+  It uses systemd `--user` when available (`TUBCAL_SYSTEMD=0` opts out), else a
+  pidfile plus `setsid`. It identifies a running Tubcal by `/api/health`.
+- `tubcal.desktop` and `tubcal.service` are the menu entry and the user unit.
+
+`tubcal update` = `git pull --ff-only` (skipped when the tree is dirty) +
+`install.sh --update`, which never asks for root. Test the installer in containers
+(e.g. `docker run … sh install.sh --yes`), never against your real `$HOME`.
+
 ## Commands
 
 ```bash

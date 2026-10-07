@@ -1,0 +1,21 @@
+[Desktop Entry]
+Type=Application
+Version=1.5
+Name=Tubcal
+GenericName=Media Hub
+Comment=A private broadcast station for one person: YouTube, Reddit, Hacker News, GitHub and anime on localhost
+Exec="@BIN@/tubcal" open
+Icon=tubcal
+Terminal=false
+StartupNotify=false
+Categories=AudioVideo;Video;Network;News;
+Keywords=youtube;reddit;hacker news;anime;anilist;feeds;videos;
+Actions=stop;restart;
+
+[Desktop Action stop]
+Name=Stop the server
+Exec="@BIN@/tubcal" stop
+
+[Desktop Action restart]
+Name=Restart the server
+Exec="@BIN@/tubcal" restart

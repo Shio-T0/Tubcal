@@ -1,0 +1,12 @@
+[Unit]
+Description=Tubcal, a private broadcast station for one person
+
+[Service]
+Type=simple
+ExecStart="@BIN@/tubcal" run
+Restart=on-failure
+RestartSec=5
+# Tubcal binds 127.0.0.1 only and needs nothing beyond your own user.
+
+[Install]
+WantedBy=default.target
