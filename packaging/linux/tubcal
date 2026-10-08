@@ -1,0 +1,315 @@
+#!/usr/bin/env bash
+#
+# tubcal: start, stop and update a Tubcal installed by install.sh.
+#
+# This copy was written by the installer, which filled in TUBCAL_HOME below;
+# everything else comes from the install record ($TUBCAL_HOME/install.conf).
+# Re-run the installer (or `tubcal update`) rather than editing it.
+
+set -uo pipefail
+
+TUBCAL_HOME=${TUBCAL_HOME:-@TUBCAL_HOME@}
+CONF=$TUBCAL_HOME/install.conf
+STATE_DIR=${XDG_STATE_HOME:-$HOME/.local/state}/tubcal
+LOG=$STATE_DIR/tubcal.log
+PIDFILE=$STATE_DIR/tubcal.pid
+UNIT=tubcal.service
+UNIT_FILE=${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user/$UNIT
+AUTOSTART_FILE=${XDG_CONFIG_HOME:-$HOME/.config}/autostart/tubcal.desktop
+SELF=$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || echo "${BASH_SOURCE[0]}")
+
+if [[ -t 1 && -z ${NO_COLOR:-} && ${TERM:-dumb} != dumb ]]; then
+  AMBER=$'\e[38;5;179m' BAD=$'\e[38;5;167m' KAKI=$'\e[38;5;173m'
+  BOLD=$'\e[1m' DIM=$'\e[2m' RST=$'\e[0m'
+else
+  AMBER="" BAD="" KAKI="" BOLD="" DIM="" RST=""
+fi
+
+die() { printf '%stubcal:%s %s\n' "$BAD" "$RST" "$1" >&2; shift; local l; for l in "$@"; do printf '  %s\n' "$l" >&2; done; exit 1; }
+
+[[ -r $CONF ]] || die "no install record at $CONF" "Run Tubcal's install.sh to set it up."
+# shellcheck source=/dev/null
+. "$CONF"
+[[ -d ${APP_DIR:-} ]] || die "the app folder ${APP_DIR:-?} is gone" "Run Tubcal's install.sh again."
+
+# The port: the environment, then the app's own .env (as python-dotenv reads
+# it), then the default.
+PORT=${TUBCAL_PORT:-}
+if [[ -z $PORT && -f $APP_DIR/.env ]]; then
+  PORT=$(sed -nE 's/^[[:space:]]*(export[[:space:]]+)?TUBCAL_PORT[[:space:]]*=[[:space:]]*["'\'']?([0-9]+).*/\2/p' "$APP_DIR/.env" | tail -n 1)
+fi
+PORT=${PORT:-5000}
+URL="http://127.0.0.1:$PORT"
+
+has() { command -v "$1" >/dev/null 2>&1; }
+
+use_systemd() {
+  ((${SYSTEMD:-0})) && [[ ${TUBCAL_SYSTEMD:-1} != 0 && -f $UNIT_FILE ]] &&
+    systemctl --user show-environment >/dev/null 2>&1
+}
+
+# Is *Tubcal* answering on the port (not just anything)?
+healthy() {
+  local body
+  if has curl; then body=$(curl -fsS --max-time 2 "$URL/api/health" 2>/dev/null) || return 1
+  elif has wget; then body=$(wget -qO- -T 2 "$URL/api/health" 2>/dev/null) || return 1
+  else port_open; return; fi
+  [[ $body == *'"status"'* ]]
+}
+port_open() { (exec 3<>"/dev/tcp/127.0.0.1/$PORT") 2>/dev/null; }
+
+ours_running() {
+  if use_systemd; then systemctl --user is-active -q "$UNIT"; return; fi
+  local pid
+  pid=$(cat "$PIDFILE" 2>/dev/null) || return 1
+  [[ -n $pid ]] && kill -0 "$pid" 2>/dev/null && grep -qa main.py "/proc/$pid/cmdline" 2>/dev/null
+}
+
+notify() { # a desktop notification, for when there's no terminal to print to
+  [[ -t 1 ]] && return 0
+  has notify-send && notify-send -a Tubcal -i tubcal "$@" 2>/dev/null
+  return 0
+}
+
+server_env() {
+  # Tubcal's own yt-dlp (and uv, for the anime-scraper updater) come first.
+  local p="$TUBCAL_HOME/bin"
+  [[ -n ${NODE_BIN:-} ]] && p+=":$(dirname "$NODE_BIN")"
+  [[ -n ${UV:-} ]] && p+=":$(dirname "$UV")"
+  export PATH="$p:$PATH" PYTHONUNBUFFERED=1
+}
+
+# yt-dlp breaks whenever YouTube changes something, and the fix ships as a
+# release, so Tubcal's private copy is refreshed in the background at most
+# once a day. TUBCAL_AUTO_UPDATE=0 (the app's own opt-out) turns it off.
+refresh_ytdlp() {
+  [[ ${TUBCAL_AUTO_UPDATE:-1} == 0 || ! -x $TUBCAL_HOME/bin/yt-dlp || -z ${UV:-} ]] && return 0
+  local stamp=$STATE_DIR/yt-dlp.checked
+  [[ -f $stamp && -n $(find "$stamp" -mmin -1200 2>/dev/null) ]] && return 0
+  mkdir -p "$STATE_DIR" && touch "$stamp"
+  (UV_TOOL_DIR="$TUBCAL_HOME/tools" UV_TOOL_BIN_DIR="$TUBCAL_HOME/bin" NO_COLOR=1 \
+    nice -n 10 "$UV" tool upgrade --no-progress yt-dlp >>"$STATE_DIR/yt-dlp-update.log" 2>&1 &)
+}
+
+wait_ready() { # wait_ready: until the API answers, the process dies, or 90s pass
+  local i spin=('▁▃▅' '▃▅▇' '▅▇▅' '▇▅▃' '▅▃▁' '▃▁▃')
+  for ((i = 0; i < 450; i++)); do
+    healthy && { [[ -t 1 ]] && printf '\r\e[K'; return 0; }
+    if ((i > 4)) && ! ours_running; then
+      [[ -t 1 ]] && printf '\r\e[K'
+      return 1
+    fi
+    [[ -t 1 ]] && printf '\r  %s%s%s warming up the set… %s%ds%s' "$AMBER" "${spin[i % 6]}" "$RST" "$DIM" $((i / 5)) "$RST"
+    sleep 0.2
+  done
+  [[ -t 1 ]] && printf '\r\e[K'
+  return 2
+}
+
+show_log_tail() {
+  printf '%s' "$DIM" >&2
+  if use_systemd; then journalctl --user -u "$UNIT" -n 15 --no-pager -o cat 2>/dev/null >&2
+  else tail -n 15 "$LOG" 2>/dev/null >&2; fi
+  printf '%s' "$RST" >&2
+}
+
+cmd_start() {
+  if healthy; then return 0; fi # already on air (perhaps started by hand)
+  if ! ours_running; then
+    if port_open; then
+      die "port $PORT is taken by something that isn't Tubcal" "Set TUBCAL_PORT=<another port> in $APP_DIR/.env"
+    fi
+    if use_systemd; then
+      systemctl --user start "$UNIT" || die "systemd couldn't start $UNIT"
+    else
+      mkdir -p "$STATE_DIR"
+      [[ -f $LOG && $(stat -c %s "$LOG" 2>/dev/null || echo 0) -gt 5000000 ]] && mv -f "$LOG" "$LOG.1"
+      if has setsid; then setsid "$SELF" run >>"$LOG" 2>&1 </dev/null &
+      else nohup "$SELF" run >>"$LOG" 2>&1 </dev/null & fi
+      echo $! >"$PIDFILE"
+    fi
+  fi
+  notify "Tubcal" "Tuning in…"
+  wait_ready
+  case $? in
+    0) return 0 ;;
+    1) notify -u critical "Tubcal didn't start" "See: tubcal logs"
+       show_log_tail; die "the server stopped while starting (above: the end of its log)" ;;
+    *) notify "Tubcal is still starting" "See: tubcal logs"
+       die "still not answering after 90s; \`tubcal logs\` shows what it's doing" ;;
+  esac
+}
+
+open_url() {
+  local b
+  for b in ${TUBCAL_BROWSER:-} xdg-open gio sensible-browser ${BROWSER:-}; do
+    has "$b" || continue
+    if [[ $b == gio ]]; then gio open "$URL" >/dev/null 2>&1 & else "$b" "$URL" >/dev/null 2>&1 & fi
+    return 0
+  done
+  printf '  open %s%s%s in your browser\n' "$AMBER" "$URL" "$RST"
+}
+
+cmd_open() {
+  cmd_start
+  open_url
+  [[ -t 1 ]] && printf '  %s●%s %son air%s  %s\n' "$KAKI" "$RST" "$BOLD" "$RST" "$URL"
+  return 0
+}
+
+cmd_stop() {
+  if use_systemd && systemctl --user is-active -q "$UNIT"; then
+    systemctl --user stop "$UNIT"
+  elif ours_running; then
+    local pid i
+    pid=$(cat "$PIDFILE")
+    kill -TERM "$pid" 2>/dev/null
+    for ((i = 0; i < 50; i++)); do kill -0 "$pid" 2>/dev/null || break; sleep 0.2; done
+    kill -0 "$pid" 2>/dev/null && kill -KILL "$pid" 2>/dev/null
+    rm -f "$PIDFILE"
+  elif healthy; then
+    die "Tubcal on :$PORT wasn't started by \`tubcal\`; stop it where you started it"
+  else
+    [[ -t 1 ]] && printf '  %s○ already off air%s\n' "$DIM" "$RST"
+    return 0
+  fi
+  [[ -t 1 ]] && printf '  %s○%s off air\n' "$DIM" "$RST"
+  return 0
+}
+
+cmd_run() {
+  server_env
+  refresh_ytdlp
+  cd "$APP_DIR" || exit 1
+  exec "$APP_DIR/.venv/bin/python" main.py
+}
+
+cmd_status() {
+  # --quiet: exit 0 = ours and running, 2 = Tubcal answering but started by hand, 1 = off
+  if [[ ${1:-} == -q || ${1:-} == --quiet ]]; then
+    ours_running && return 0
+    healthy && return 2
+    return 1
+  fi
+  local how="" on=0
+  if healthy; then
+    on=1
+    if use_systemd && systemctl --user is-active -q "$UNIT"; then how="systemd --user"
+    elif ours_running; then how="pid $(cat "$PIDFILE")"
+    else how="started by hand"; fi
+  fi
+  local v
+  if ((on)); then printf '\n  %s●%s %sON AIR%s   %s%s%s  %s(%s)%s\n' "$KAKI" "$RST" "$BOLD" "$RST" "$AMBER" "$URL" "$RST" "$DIM" "$how" "$RST"
+  else printf '\n  %s○ off air%s   %s\n' "$DIM" "$RST" "$URL"; fi
+  row() { printf '  %s%-10s%s %s\n' "$DIM" "$1" "$RST" "$2"; }
+  row "App" "${APP_DIR/#$HOME/\~}$( ((${CLONED:-0})) || printf ' (your checkout)')"
+  if [[ -d $APP_DIR/.git ]] && has git; then
+    row "Version" "$(git -C "$APP_DIR" log -1 --format='%h · %cs · %s' 2>/dev/null | cut -c1-60)"
+  fi
+  v=$("$APP_DIR/.venv/bin/python" -c 'import platform; print(platform.python_version())' 2>/dev/null) || v="missing"
+  row "Python" "$v"
+  v=$("$TUBCAL_HOME/bin/yt-dlp" --version 2>/dev/null) || v="missing"
+  row "yt-dlp" "$v"
+  v=$("${NODE_BIN:-node}" --version 2>/dev/null) || v="missing"
+  row "Node" "$v"
+  local x=()
+  ((${EDITOR_X:-0})) && x+=("editor terminal")
+  ((${ARCHIVE:-0})) && x+=("The Archive")
+  row "Extras" "$( ((${#x[@]})) && (IFS=,; echo "${x[*]}" | sed 's/,/, /g') || echo none)"
+  row "Autostart" "$( ((${AUTOSTART:-0})) && echo on || echo off)"
+  if use_systemd; then row "Logs" "tubcal logs (journald)"; else row "Logs" "${LOG/#$HOME/\~}"; fi
+  printf '\n'
+}
+
+cmd_logs() {
+  if use_systemd; then exec journalctl --user -u "$UNIT" -n 200 -f -o cat
+  else
+    [[ -f $LOG ]] || die "no log yet at $LOG"
+    exec tail -n 200 -f "$LOG"
+  fi
+}
+
+cmd_update() {
+  if [[ -d $APP_DIR/.git ]] && has git; then
+    local up
+    up=$(git -C "$APP_DIR" rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null) || up=""
+    if [[ -z $up ]]; then
+      printf '  %s! no upstream branch; rebuilding what is here%s\n' "$AMBER" "$RST"
+    elif [[ -n $(git -C "$APP_DIR" status --porcelain --untracked-files=no) ]]; then
+      printf '  %s! local changes in %s; not pulling, rebuilding what is here%s\n' "$AMBER" "$APP_DIR" "$RST"
+    else
+      printf '  %spulling %s…%s\n' "$DIM" "$up" "$RST"
+      git -C "$APP_DIR" pull --ff-only || die "git pull failed" "Resolve it in $APP_DIR, then run \`tubcal update\` again."
+    fi
+  fi
+  exec bash "$APP_DIR/install.sh" --update
+}
+
+cmd_autostart() {
+  local on
+  case ${1:-} in
+    on|yes|1) on=1 ;; off|no|0) on=0 ;;
+    *) die "usage: tubcal autostart on|off" ;;
+  esac
+  if use_systemd; then
+    if ((on)); then systemctl --user enable -q "$UNIT"; else systemctl --user disable -q "$UNIT" 2>/dev/null; fi
+    rm -f "$AUTOSTART_FILE"
+  elif ((on)); then
+    mkdir -p "$(dirname "$AUTOSTART_FILE")"
+    cat >"$AUTOSTART_FILE" <<EOF
+[Desktop Entry]
+Type=Application
+Name=Tubcal (server)
+Comment=Starts Tubcal's local server at login
+Exec="$SELF" start
+Icon=tubcal
+Terminal=false
+NoDisplay=true
+X-GNOME-Autostart-enabled=true
+EOF
+  else
+    rm -f "$AUTOSTART_FILE"
+  fi
+  sed -i "s/^AUTOSTART=.*/AUTOSTART=$on/" "$CONF"
+  [[ -t 1 ]] && printf '  autostart %s\n' "$( ((on)) && echo on || echo off)"
+  return 0
+}
+
+cmd_uninstall() {
+  [[ -f $APP_DIR/install.sh ]] || die "can't find $APP_DIR/install.sh to run the uninstaller"
+  exec bash "$APP_DIR/install.sh" --uninstall "$@"
+}
+
+usage() {
+  cat <<EOF
+
+  ${BOLD}${AMBER}tubcal${RST}  your private broadcast station  ${DIM}$URL${RST}
+
+  tubcal               start it (if needed) and open it in the browser
+  tubcal start         start the server in the background
+  tubcal stop          stop it
+  tubcal restart       stop, then start
+  tubcal status        on air or not, where, which versions
+  tubcal logs          follow the server's log
+  tubcal update        pull the latest, re-sync, rebuild, restart
+  tubcal autostart on|off
+  tubcal uninstall     remove the launcher, menu entry and private tools
+  tubcal run           run in the foreground (what the service runs)
+
+EOF
+}
+
+case ${1:-open} in
+  open) cmd_open ;;
+  start) cmd_start ;;
+  stop) cmd_stop ;;
+  restart) cmd_stop >/dev/null; cmd_start ;;
+  status) shift; cmd_status "$@" ;;
+  logs|log) cmd_logs ;;
+  run) cmd_run ;;
+  update|upgrade) cmd_update ;;
+  autostart) shift; cmd_autostart "$@" ;;
+  uninstall) shift; cmd_uninstall "$@" ;;
+  -h|--help|help) usage ;;
+  *) usage; exit 2 ;;
+esac

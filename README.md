@@ -18,6 +18,7 @@ One Flask app, bound to `127.0.0.1`.
 *No accounts required · no cloud · no telemetry — the only outbound traffic is the platforms themselves.*
 
 [Quick start](#-quick-start) ·
+[Installation](#-installation) ·
 [Two channels](#-two-channels) ·
 [The Hub](#-channel-1--the-hub) ·
 [The player](#-the-player) ·
@@ -33,7 +34,123 @@ One Flask app, bound to `127.0.0.1`.
 
 ## ⏻ Quick start
 
-You need **Python ≥ 3.12**, **Node**, and **`yt-dlp` on your PATH**. Everything else is optional.
+```bash
+git clone https://github.com/Shio-T0/Tubcal.git && cd Tubcal && ./install.sh
+tubcal    # start it and open http://127.0.0.1:5000
+```
+
+Open the page, pick a channel, add a few YouTube channels and subreddits in
+**Settings**, and the rooms fill in. Other ways in, what the installer does, and how to
+install by hand are under [Installation](#-installation).
+
+---
+
+## 📦 Installation
+
+### The installer
+
+```bash
+git clone https://github.com/Shio-T0/Tubcal.git && cd Tubcal && ./install.sh
+```
+
+Or without cloning first (it clones into `~/.local/share/tubcal/app`):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Shio-T0/Tubcal/main/install.sh | bash
+```
+
+It opens on a test card that reads your system, lets you pick the optional parts,
+and shows its running order (including the exact distro command, if one is needed)
+before anything runs. Then:
+
+1. **Distro packages:** only what's missing, with sudo asked for once and used for
+   nothing else.
+2. **uv, Node.js and Python 3.13:** the distro's own when it has recent enough ones.
+   Otherwise a private uv, a checksum-verified Node 24 LTS and a uv-managed Python,
+   all under your home.
+3. **The backend and the frontend:** `uv sync` with your extras, then a production
+   build of the frontend.
+4. **A private yt-dlp:** Tubcal's own copy, refreshed at most once a day, set up to solve
+   YouTube's JS challenges with Node. Your own yt-dlp, if you have one, is untouched.
+5. **The `tubcal` command, an app-menu entry, and a user service** (systemd, where
+   there is one).
+6. **A self-test:** the app is booted against a throwaway database and has to serve
+   the page and answer its API.
+
+Run it again at any time: it repairs, and it remembers what you chose. Your data
+(`data/tubcal.db`) is never touched.
+
+### Where it runs
+
+| | Distro packages | Node.js | uv | Python 3.13 |
+|---|---|---|---|---|
+| **Fedora Asahi Remix** (Apple Silicon) | dnf | Fedora's | Fedora's | Fedora's |
+| **Fedora** | dnf | Fedora's | Fedora's | Fedora's |
+| **RHEL · AlmaLinux · Rocky** | dnf | private | private | uv's |
+| **Debian · Ubuntu** and derivatives | apt | private | private | uv's |
+| **Arch** and derivatives | pacman | Arch's | Arch's | uv's |
+| **openSUSE Tumbleweed** | zypper | openSUSE's | private | uv's |
+| **Alpine** | apk | Alpine's | Alpine's | uv's |
+| **Void** | xbps | Void's | Void's, else private | uv's |
+| **Silverblue · Kinoite · Bazzite** | — | private | private | uv's |
+| anything else, or no root | — | private | private | uv's |
+
+On Apple Silicon, Fedora Asahi runs a 16K-page kernel, which some prebuilt binaries
+don't survive. So the installer prefers Fedora's own aarch64 builds there and
+smoke-tests every binary it relies on. If The Archive's speech models can't load, it
+leaves that feature out and says why. Tested in containers on Fedora 44 (x86-64, and
+arm64 posing as Fedora Asahi Remix), AlmaLinux 9, Debian 12, Ubuntu 24.04, Arch,
+openSUSE Tumbleweed and Alpine 3.24.
+
+### Choices
+
+| Component | Flag | What it is |
+|---|---|---|
+| Composing Room terminal & LSP | `editor` | flask-sock: a real shell and language servers in the editor room *(on by default)* |
+| The Archive | `archive` | faster-whisper transcription of what you watch, about 300 MB *(off by default)* |
+| App-menu entry & icon | `desktop` | launch Tubcal like any other app *(on)* |
+| Start when I log in | `autostart` | a systemd user service, or XDG autostart *(off)* |
+| Live-stream pings & fast grep | `extras` | `notify-send` and `ripgrep` from your distro *(on when there's root)* |
+
+```bash
+./install.sh --yes                                # no questions: defaults, or your last choices
+./install.sh --with archive,autostart --without extras
+./install.sh --no-sudo                            # never ask for root; everything in your home
+curl -fsSL …/install.sh | bash -s -- --yes        # flags work through curl too
+```
+
+`./install.sh --help` lists the rest (`--dir`, `--no-anim`, `--no-color`, and the
+`TUBCAL_REPO` / `TUBCAL_BRANCH` / `TUBCAL_HOME` / `TUBCAL_BIN_DIR` variables).
+
+### The `tubcal` command
+
+| | |
+|---|---|
+| `tubcal` | start the server if it isn't running, and open it in your browser |
+| `tubcal start` · `stop` · `restart` | the server, in the background |
+| `tubcal status` | on air or not, the URL, and the Python / yt-dlp / Node versions |
+| `tubcal logs` | follow the server log (journald, or `~/.local/state/tubcal/tubcal.log`) |
+| `tubcal update` | `git pull`, re-sync, rebuild and restart, with your saved choices |
+| `tubcal autostart on\|off` | start at login, or don't |
+| `tubcal uninstall` | remove the launcher, menu entry, service and the private tools |
+
+Uninstalling keeps your checkout, your data, and any distro packages it added (it lists
+those). For an install made through `curl`, `tubcal uninstall --purge` also deletes
+the cloned app *and its data*.
+
+### Where things go
+
+| | |
+|---|---|
+| `~/.local/bin/tubcal` | the launcher |
+| `~/.local/share/tubcal/` | the install record, the private yt-dlp / uv / Node, and (curl installs) `app/` |
+| `~/.local/share/applications/tubcal.desktop` | the app-menu entry |
+| `~/.config/systemd/user/tubcal.service` | the user service, where there's systemd |
+| `~/.local/state/tubcal/` | the server log and the installer's logs |
+
+<details>
+<summary><b>By hand</b>, for development: you need <b>Python ≥ 3.12</b>, <b>Node</b>, and <b><code>yt-dlp</code> on your PATH</b></summary>
+<br>
 
 ```bash
 uv sync                                               # backend
@@ -41,8 +158,7 @@ cd frontend && npm install && npm run build && cd ..  # frontend
 uv run python main.py                                 # → http://127.0.0.1:5000
 ```
 
-That's the whole install. Open the page, pick a channel, add a few YouTube channels and
-subreddits in **Settings**, and the rooms fill in.
+</details>
 
 <details>
 <summary><b>Optional extras</b> — the heavier features, each one opt-in</summary>
@@ -52,6 +168,8 @@ subreddits in **Settings**, and the rooms fill in.
 uv sync --extra brain     # The Archive: faster-whisper + numpy (local transcription)
 uv sync --extra editor    # The Composing Room: flask-sock (PTY terminal + LSP bridge)
 ```
+
+The installer offers both as checkboxes (or `--with archive,editor`).
 
 | Also nice to have | Unlocks |
 |---|---|
@@ -320,6 +438,8 @@ frontend/src/
   state.jsx               shared state as a stack of context providers
   styles/                 design tokens + one block per skin
 android/                  the phone app: Gradle project, phone UI (phone/), vendored scrapers
+install.sh                the Linux installer (any distro; Fedora Asahi included)
+packaging/linux/          what it installs: the `tubcal` launcher, menu entry, user service
 data/tubcal.db            everything local (git-ignored)
 ```
 
