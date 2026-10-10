@@ -613,5 +613,5 @@ floats/rails otherwise.
   with the feature simply reporting itself unavailable. Never import them at module
   top level.
 ## Important
-Maintain ~/Projects/papercuts.md, a global log shared by all my Claude sessions of anything that slowed down development. When you lose time to one mid-session, append date · symptom · fix · project. Check this file first when tooling fails mysteriously.
+Maintain ~/Projects/papercuts.md, a global log shared by all my Claude sessions of anything that slowed down development. When you lose time to one mid-session, append date · symptom · fix · project. Check this file first when tooling fails mysteriously. *IGNORE THIS IF THE FILE DOES NOT EXIST OR DOES NOT HAVE THE PURPOSE MENTIONED*
 
