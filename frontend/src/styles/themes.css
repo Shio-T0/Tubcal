@@ -3,7 +3,12 @@
    tokens from tokens.css and (2) restyling the global hooks: base.css classes
    (.app-shell, .glass, .kicker, .search-input), element/selection rules, and the
    structural hooks added in JSX (the hub console: .tc-console, .tc-topline,
-   .tc-wordmark, .tc-nav, .tc-navitem(/-on), .tc-navno; and .tc-sectionhead). Component CSS Modules inherit the
+   .tc-wordmark, .tc-nav, .tc-navitem(/-on), .tc-navno; .tc-sectionhead; and the
+   page areas: .tc-main (a room's page, the Hub's or the Anime's), .tc-index (the
+   Anime's file tree), .tc-bar (the Anime's top bar), .tc-strip (a line of chrome
+   on the bare backdrop: Home's date line and hints), .tc-hero (Home's
+   wordmark) and .tc-float (something that floats over whatever is under it — a
+   toast)). Component CSS Modules inherit the
    palette/fonts/radii for free through var(--token); the hooks carry the layout
    personality the tokens can't express. Backdrop atmospheres live in backdrop.css. */
 
@@ -325,6 +330,7 @@
  * AQUA Y2K — a glossy turn-of-the-century desktop.
  * ===================================================================== */
 [data-theme='aqua'] {
+  --search-inset: 11px;
   --ink: #eef3fb;
   --ink-2: #e4ecf7;
   --ink-3: #d9e4f4;
@@ -389,7 +395,7 @@
   background: #ffffff;
   border: 1px solid var(--rule-strong);
   border-radius: var(--r-pill);
-  padding: 8px 14px 8px 30px;
+  padding: 8px 32px 8px 34px;
 }
 [data-theme='aqua'] .search-input:focus {
   border-color: var(--signal);
@@ -430,6 +436,7 @@
  * DEEP SPACE — glass panels adrift over a nebula.
  * ===================================================================== */
 [data-theme='space'] {
+  --search-inset: 11px;
   --ink: #05060c;
   --ink-2: #0b0e1c;
   --ink-3: #11152a;
@@ -496,7 +503,7 @@
   background: rgba(20, 24, 48, 0.5);
   border: 1px solid var(--rule-strong);
   border-radius: var(--r-input);
-  padding: 9px 14px 9px 30px;
+  padding: 9px 32px 9px 34px;
   backdrop-filter: blur(8px);
 }
 
@@ -699,4 +706,224 @@
 }
 [data-theme='space'] .tc-navitem-on > svg:last-child {
   color: #ffffff;
+}
+
+/* ===================================================================== *
+ * CUTTING MAT — the desk it runs on. Catppuccin Macchiato windows tiled over a
+ * teal self-healing mat, as on a bspwm desktop: each page is a translucent
+ * window with the mat showing faintly through, the console and the Anime's
+ * index are slim near-black bars, and the type is JetBrains Mono (the system's
+ * own, as in the terminal and the bar). The console's top line is lit like the
+ * bench supply's green LCD, and the room you're in is a lualine mode block.
+ * Desktop only (lib/themes.js `desktopOnly`).
+ * ===================================================================== */
+[data-theme='bench'] {
+  --search-inset: 11px;
+  --ink: #161c26;
+  --ink-2: #1c2230;
+  --ink-3: #242a3b;
+  --paper: #cad3f5;
+  --paper-dim: #a5adcb;
+  --paper-faint: #8087a2;
+  --rule: rgba(202, 211, 245, 0.1);
+  --rule-strong: rgba(202, 211, 245, 0.22);
+  --surface: rgba(202, 211, 245, 0.045);
+  --surface-hover: rgba(202, 211, 245, 0.085);
+  --surface-input: rgba(8, 10, 18, 0.42);
+  --backdrop: rgba(10, 18, 22, 0.72);
+  --shadow-modal: 0 24px 70px rgba(4, 14, 16, 0.55);
+  --glow-strength: 0;
+  --grain-opacity: 0;
+
+  /* lualine's NORMAL blue leads; the platforms take the rest of the flavour */
+  --signal: #8aadf4;
+  --signal-soft: rgba(138, 173, 244, 0.16);
+  --c-youtube: #ed8796;
+  --c-reddit: #f5a97f;
+  --c-hn: #eed49f;
+  --c-foryou: #91d7e3;
+  --c-github: #c6a0f6;
+  --c-editor: #a6da95;
+  --c-dev: #8bd5ca;
+  --success: #a6da95;
+  --danger: #ed8796;
+
+  --accent-strong: #f5a97f;
+  --accent-glow: rgba(138, 173, 244, 0.35);
+  --shadow-card: 0 10px 26px rgba(6, 14, 18, 0.32);
+
+  --font-display: 'JetBrains Mono', 'JetBrainsMono Nerd Font', 'IBM Plex Mono', ui-monospace, monospace;
+  --font-body: 'Inter Variable', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'JetBrainsMono Nerd Font', 'IBM Plex Mono', ui-monospace, monospace;
+  --font-code: 'JetBrains Mono', 'JetBrainsMono Nerd Font', 'IBM Plex Mono', ui-monospace, monospace;
+
+  --r-card: 10px;
+  --r-media: 8px;
+  --r-modal: 12px;
+  --r-pill: 999px;
+  --r-input: 8px;
+
+  /* comment rails, and the Composing Room's syntax: keywords blue (signal),
+     functions yellow, strings green, numbers peach, types mauve */
+  --rail-0: #8aadf4;
+  --rail-1: #eed49f;
+  --rail-2: #a6da95;
+  --rail-3: #f5a97f;
+  --rail-4: #c6a0f6;
+
+  /* the skin's own: the mat, the window glass, the bar, the supply's LCD */
+  --bench-mat: #5f948f;
+  --bench-window: rgba(17, 21, 32, 0.88);
+  --bench-edge: rgba(202, 211, 245, 0.07);
+  --bench-bar: rgba(11, 13, 22, 0.95);
+  --bench-lcd: #4cca64;
+  --bench-shadow: 0 16px 40px rgba(8, 26, 28, 0.38);
+}
+
+[data-theme='bench'] body {
+  background: var(--bench-mat);
+}
+
+[data-theme='bench'] h1,
+[data-theme='bench'] h2 {
+  letter-spacing: -0.02em;
+}
+
+[data-theme='bench'] ::selection {
+  background: #8aadf4;
+  color: #1e2030;
+}
+
+[data-theme='bench'] .glass {
+  background: var(--bench-window);
+  border: 1px solid var(--bench-edge);
+  border-radius: var(--r-card);
+}
+
+[data-theme='bench'] .search-input {
+  background: var(--surface-input);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-input);
+  padding: 8px 32px 8px 34px;
+}
+[data-theme='bench'] .search-input:focus {
+  border-color: var(--signal);
+}
+
+/* the windows: every page sits in one, with the mat glowing faintly through */
+[data-theme='bench'] .tc-main {
+  min-height: calc(100vh - 44px);
+  padding: 20px 26px 32px;
+  border-radius: 10px;
+  border: 1px solid var(--bench-edge);
+  background: var(--bench-window);
+  box-shadow: var(--bench-shadow);
+}
+
+/* the bars: near-black, like the one down the screen's edge */
+[data-theme='bench'] .tc-console,
+[data-theme='bench'] .tc-index {
+  border-radius: 10px;
+  border: 1px solid var(--bench-edge);
+  background: var(--bench-bar);
+  box-shadow: var(--bench-shadow);
+}
+[data-theme='bench'] .tc-bar {
+  margin-top: 14px;
+  padding: 10px 16px;
+  border: 1px solid var(--bench-edge);
+  border-radius: 10px;
+  background: var(--bench-bar);
+  box-shadow: inset 0 -2px 0 var(--c-anime), var(--bench-shadow);
+}
+
+/* the top line, lit like the bench supply's display: green segments on glass */
+[data-theme='bench'] .tc-topline {
+  --signal: var(--bench-lcd);
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: #1d211f;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.55), inset 0 3px 10px rgba(0, 0, 0, 0.6);
+  color: color-mix(in srgb, var(--bench-lcd) 70%, #1d211f);
+  text-shadow: 0 0 6px rgba(76, 202, 100, 0.5);
+}
+
+/* the wordmark is a shell prompt */
+[data-theme='bench'] .tc-wordmark {
+  font-variation-settings: normal;
+  font-weight: 800;
+  letter-spacing: -0.05em;
+}
+[data-theme='bench'] .tc-wordmark::before {
+  content: '\276F\00a0';
+  color: var(--c-editor);
+  font-weight: 700;
+}
+[data-theme='bench'] .tc-wordmark em {
+  font-style: normal;
+  color: var(--signal);
+}
+
+/* the rooms: workspace keys; the one you're in is a lualine mode block in the
+   room's own colour, pointed on the right like the status line's segments */
+[data-theme='bench'] .tc-navitem {
+  border-radius: 8px;
+}
+[data-theme='bench'] .tc-navno {
+  border-radius: 6px;
+  background: rgba(202, 211, 245, 0.06);
+  box-shadow: none;
+  font-family: var(--font-mono);
+}
+[data-theme='bench'] .tc-navitem-on,
+[data-theme='bench'] .tc-navitem-on:hover {
+  background: var(--room-c, var(--signal));
+  color: #1e2030;
+  border-radius: 8px 0 0 8px;
+  clip-path: polygon(0 0, calc(100% - 11px) 0, 100% 50%, calc(100% - 11px) 100%, 0 100%);
+  box-shadow: none;
+}
+[data-theme='bench'] .tc-navitem-on .tc-navno {
+  background: #1e2030;
+  color: var(--room-c, var(--signal));
+  box-shadow: none;
+}
+[data-theme='bench'] .tc-navitem-on > svg:last-child {
+  color: #1e2030;
+}
+
+/* Home sits straight on the mat: its date line and hints get a strip of bar to
+   stand on, and the wordmark is the prompt, printed large on the mat */
+[data-theme='bench'] .tc-strip {
+  width: auto;
+  padding: 7px 14px;
+  border: 1px solid var(--bench-edge);
+  border-radius: 10px;
+  background: var(--bench-bar);
+  box-shadow: var(--bench-shadow);
+}
+[data-theme='bench'] .tc-strip:first-child {
+  align-self: stretch;
+}
+[data-theme='bench'] .tc-hero {
+  font-variation-settings: normal;
+  font-weight: 800;
+  letter-spacing: -0.06em;
+  color: #e8ecfb;
+  text-shadow: 0 3px 0 rgba(20, 54, 54, 0.35), 0 10px 30px rgba(10, 30, 32, 0.35);
+}
+[data-theme='bench'] .tc-hero::before {
+  content: '\276F';
+  margin-right: 0.18em;
+  color: #a6da95;
+}
+[data-theme='bench'] .tc-hero em {
+  font-style: normal;
+  color: #8aadf4;
+}
+
+/* a toast can land on the bare mat: give it a bar's dark glass to stand on */
+[data-theme='bench'] .tc-float {
+  background: var(--bench-bar);
 }

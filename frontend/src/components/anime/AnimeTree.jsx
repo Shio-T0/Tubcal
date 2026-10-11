@@ -243,7 +243,7 @@ export function AnimeTree({ tree, rail, onRail }) {
 
   if (rail) {
     return (
-      <nav className={`${t.tree} ${t.rail}`} aria-label="Anime index">
+      <nav className={`${t.tree} ${t.rail} tc-index`} aria-label="Anime index">
         <button type="button" className={t.railToggle} onClick={() => onRail(false)} title="Open the index">
           <ChevronsRight size={15} />
         </button>
@@ -275,7 +275,7 @@ export function AnimeTree({ tree, rail, onRail }) {
   }
 
   return (
-    <nav className={t.tree} aria-label="Anime index">
+    <nav className={`${t.tree} tc-index`} aria-label="Anime index">
       <div className={t.head}>
         <span>index</span>
         <button type="button" onClick={() => onRail(true)} title="Fold the index to icons" aria-label="Fold the index">
@@ -426,7 +426,7 @@ export function AnimeLayout({ children }) {
   return (
     <div className={`${t.layout} ${rail && !phone ? t.layoutRail : ''}`}>
       {phone ? <MobileIndex tree={tree} /> : <AnimeTree tree={tree} rail={rail} onRail={setRail} />}
-      <main className={t.main}>
+      <main className={`${t.main} tc-main`}>
         <PathBar tree={tree} />
         {children ?? <Outlet />}
       </main>

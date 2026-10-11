@@ -8,13 +8,18 @@
 // sequels down the line, each one tap from Planning or Watching. When there's
 // nothing after it, it says so: the story's over.
 //
-// Raised by CurtainCallHost; data from /anime/finale/<id> (one call, mostly cache).
+// Accounts that score by category (AniList's advanced scoring) get a meter per
+// category under the verdict, with their average one tap from becoming the score.
+// On the phone those meters stay read-only until Edit and write only on Save.
+//
+// Raised by CurtainCallHost; data from /anime/finale/<id> (one call, mostly cache)
+// plus /anime/me for the scoring categories (the viewer, cached server-side).
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import {
-  ArrowUpRight, Bookmark, CalendarCheck, Check, Clock, Flag, Frown, MessagesSquare, Meh, PenLine, Play, Smile,
+  ArrowUpRight, Bookmark, CalendarCheck, Check, Clock, Flag, MessagesSquare, PenLine, Play, SlidersHorizontal,
   Sparkles, Star, X,
 } from 'lucide-react';
 
@@ -23,35 +28,20 @@ import { applyOverlay, useAnimeSync, useToast } from '../../state.jsx';
 import { MarkdownComposer } from './Composer.jsx';
 import { ReviewForm } from './Reviews.jsx';
 import { ThreadView } from './Thread.jsx';
+import { CategoryScores, ScoreDial } from './Scoring.jsx';
+import { hundredOf, scoreText, wordFor } from './scoring.js';
 import { STATUS_LABEL, SyncBadge, formatLabel } from './shared.jsx';
 import c from './curtain.module.css';
 
-// ── scores, in any of AniList's five scales ──────────────────────────────────
+// The phone build (its vite config defines this) confirms score edits explicitly.
+/* global __TUBCAL_APP__ */
+const PHONE = typeof __TUBCAL_APP__ !== 'undefined' && !!__TUBCAL_APP__.phone;
 
-const WORDS = ['', 'Appalling', 'Horrible', 'Very bad', 'Bad', 'Average', 'Fine', 'Good', 'Very good', 'Great', 'Masterpiece'];
-const TENS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
-
-/** A score in the viewer's format → the nearest whole 1–10 (for words and tiles). */
-function tenOf(v, f) {
-  if (!v) return 0;
-  if (f === 'POINT_100') return Math.max(1, Math.round(v / 10));
-  if (f === 'POINT_5') return v * 2;
-  if (f === 'POINT_3') return { 1: 3, 2: 6, 3: 9 }[v] || 0;
-  return Math.max(1, Math.round(v));
-}
-/** …and → 0–100, to seed a review's score from the rating. */
-function hundredOf(v, f) {
-  if (!v) return null;
-  if (f === 'POINT_100') return v;
-  if (f === 'POINT_5') return v * 20;
-  if (f === 'POINT_3') return { 1: 35, 2: 60, 3: 85 }[v] ?? null;
-  return Math.round(v * 10);
-}
+// ── your verdict, and the score by category ─────────────────────────────────
 
 function Verdict({ media, format, score, onScore, sync }) {
   const [hover, setHover] = useState(0);
-  const shown = hover || tenOf(score, format);
-  const faces = [[1, Frown, 'Not for me'], [2, Meh, 'It was fine'], [3, Smile, 'Loved it']];
+  const shown = hover || score;
   return (
     <section className={c.card}>
       <h2 className={c.cardHead}>
@@ -59,88 +49,14 @@ function Verdict({ media, format, score, onScore, sync }) {
         {sync && <SyncBadge status={sync} />}
       </h2>
       <p className={c.word} aria-live="polite">
-        {format === 'POINT_3'
-          ? (faces.find(([n]) => n === (hover || score))?.[2] || 'How was it, all told?')
-          : shown ? <><b>{WORDS[shown]}</b><span>{scoreText(hover ? fromHover(hover, format) : score, format)}</span></> : 'How was it, all told?'}
+        {shown
+          ? format === 'POINT_3'
+            ? wordFor(shown, format)
+            : <><b>{wordFor(shown, format)}</b><span>{scoreText(shown, format)}</span></>
+          : 'How was it, all told?'}
       </p>
 
-      {format === 'POINT_5' && (
-        <div className={c.stars} onMouseLeave={() => setHover(0)}>
-          {[1, 2, 3, 4, 5].map((n) => (
-            <button
-              key={n}
-              type="button"
-              className={c.star}
-              data-on={(hover ? hover / 2 : score) >= n ? '' : undefined}
-              onMouseEnter={() => setHover(n * 2)}
-              onClick={() => onScore(score === n ? 0 : n)}
-              aria-label={`${n} of 5`}
-            >
-              <Star size={30} fill="currentColor" />
-            </button>
-          ))}
-        </div>
-      )}
-
-      {format === 'POINT_3' && (
-        <div className={c.faces}>
-          {faces.map(([n, Icon, label]) => (
-            <button
-              key={n}
-              type="button"
-              className={c.face}
-              data-on={score === n ? '' : undefined}
-              onMouseEnter={() => setHover(n)}
-              onMouseLeave={() => setHover(0)}
-              onClick={() => onScore(score === n ? 0 : n)}
-              aria-label={label}
-            >
-              <Icon size={30} />
-            </button>
-          ))}
-        </div>
-      )}
-
-      {!['POINT_5', 'POINT_3'].includes(format) && (
-        <>
-          <div className={c.tens} onMouseLeave={() => setHover(0)} role="radiogroup" aria-label="Score">
-            {TENS.map((n) => {
-              const on = tenOf(score, format) === n;
-              return (
-                <button
-                  key={n}
-                  type="button"
-                  role="radio"
-                  aria-checked={on}
-                  className={c.ten}
-                  data-on={on ? '' : undefined}
-                  data-lit={(hover || tenOf(score, format)) >= n ? '' : undefined}
-                  onMouseEnter={() => setHover(n)}
-                  onClick={() => onScore(fromHover(n, format))}
-                  title={WORDS[n]}
-                >
-                  {n}
-                </button>
-              );
-            })}
-          </div>
-          {(format === 'POINT_100' || format === 'POINT_10_DECIMAL') && score > 0 && (
-            <label className={c.fine}>
-              <span>fine-tune</span>
-              <input
-                type="range"
-                min={format === 'POINT_100' ? 1 : 0.5}
-                max={format === 'POINT_100' ? 100 : 10}
-                step={format === 'POINT_100' ? 1 : 0.5}
-                value={score}
-                style={{ '--pct': `${(score / (format === 'POINT_100' ? 100 : 10)) * 100}%` }}
-                onChange={(e) => onScore(Number(e.target.value))}
-              />
-              <b>{score}</b>
-            </label>
-          )}
-        </>
-      )}
+      <ScoreDial format={format} value={score} onSet={onScore} onPreview={setHover} />
 
       <div className={c.verdictFoot}>
         {media.score ? <span>AniList average <b>{media.score}%</b></span> : <span />}
@@ -150,17 +66,54 @@ function Verdict({ media, format, score, onScore, sync }) {
   );
 }
 
-/** A 1–10 tile (or a star, counted in tens) → a score in the viewer's format. */
-function fromHover(n, format) {
-  if (format === 'POINT_100') return n * 10;
-  if (format === 'POINT_5') return n / 2;
-  return n;
-}
-function scoreText(v, format) {
-  if (!v) return '';
-  if (format === 'POINT_100') return `${v} / 100`;
-  if (format === 'POINT_5') return `${v} / 5`;
-  return `${v} / 10`;
+/** Advanced scoring: a meter per category, or — when the account has it off — an
+ *  offer to switch it on (AniList keeps the category names even while it's off). */
+function ByCategory({ categories, entry, format, score, onScores, onScore, onEnabled }) {
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+
+  if (!categories.length) {
+    const enable = async () => {
+      setBusy(true);
+      try {
+        const st = await api('/anime/settings', { method: 'POST', body: JSON.stringify({ advanced_scoring_enabled: true }) });
+        if (!st?.advanced_scoring?.length) {
+          await api('/anime/settings', {
+            method: 'POST',
+            body: JSON.stringify({ advanced_scoring: ['Story', 'Characters', 'Visuals', 'Audio', 'Enjoyment'] }),
+          });
+        }
+        onEnabled();
+      } catch (e) {
+        toast(e.message, 'error');
+        setBusy(false);
+      }
+    };
+    return (
+      <section className={`${c.card} ${c.catsOff}`}>
+        <h2 className={c.cardHead}><SlidersHorizontal size={15} /> By category</h2>
+        <p>Rate the story, characters, visuals and the rest one by one — AniList calls it advanced scoring, and it's off on your account.</p>
+        <button type="button" className={c.linkBtn} disabled={busy} onClick={enable}>
+          {busy ? 'switching it on…' : 'Turn on category scoring'}
+        </button>
+      </section>
+    );
+  }
+
+  return (
+    <section className={c.card}>
+      <h2 className={c.cardHead}><SlidersHorizontal size={15} /> By category</h2>
+      <CategoryScores
+        categories={categories}
+        scores={entry?.advanced_scores}
+        format={format}
+        verdict={score}
+        onCommit={onScores}
+        onUseAverage={onScore}
+        confirm={PHONE}
+      />
+    </section>
+  );
 }
 
 // ── what comes next ──────────────────────────────────────────────────────────
@@ -309,7 +262,11 @@ const SEASON = { WINTER: 'Winter', SPRING: 'Spring', SUMMER: 'Summer', FALL: 'Fa
 
 export default function CurtainCall({ mediaId, manual, onShown, onDone }) {
   const res = useApi(`/anime/finale/${mediaId}`);
+  const me = useApi('/anime/me');
   const navigate = useNavigate();
+  const sheetRef = useRef(null);
+  const sideRef = useRef(null);
+  const footRef = useRef(null);
   const { overlay, queueListEdit, syncState } = useAnimeSync();
   const [tab, setTab] = useState('talk');
   const d = res.data;
@@ -342,6 +299,24 @@ export default function CurtainCall({ mediaId, manual, onShown, onDone }) {
     [media, overlay],
   );
 
+  // The side column (verdict, categories, what's next) can outgrow the sheet. Stuck
+  // at the top it would hide its own foot behind the sheet's, so it sticks by its
+  // bottom edge instead: it scrolls along until its last card is in view, then stays.
+  useLayoutEffect(() => {
+    const sheet = sheetRef.current;
+    const side = sideRef.current;
+    if (!sheet || !side || typeof ResizeObserver === 'undefined') return undefined;
+    const fit = () => {
+      const room = sheet.clientHeight - (footRef.current?.offsetHeight || 0) - 16;
+      side.style.top = `${Math.min(16, room - side.offsetHeight)}px`;
+    };
+    const ro = new ResizeObserver(fit);
+    ro.observe(sheet);
+    ro.observe(side);
+    fit();
+    return () => ro.disconnect();
+  }, [eligible]);
+
   if (!eligible) {
     if (!manual || !res.loading) return null;
     return createPortal(<div className={c.backdrop}><div className={c.loading}>raising the curtain…</div></div>, document.body);
@@ -350,6 +325,8 @@ export default function CurtainCall({ mediaId, manual, onShown, onDone }) {
   const format = d.score_format;
   const score = entry?.score || 0;
   const setScore = (v) => queueListEdit({ id: media.id, list_entry: entry }, { score: v });
+  const setCategories = (scores) => queueListEdit({ id: media.id, list_entry: entry }, { advanced_scores: scores });
+  const categories = me.data?.advanced_scoring;
   const setSequel = (s, cur, status) => {
     queueListEdit({ id: s.id, list_entry: cur }, status === 'CURRENT' && !cur ? { status, progress: 0 } : { status });
   };
@@ -365,7 +342,7 @@ export default function CurtainCall({ mediaId, manual, onShown, onDone }) {
     <div className={c.backdrop} onMouseDown={onDone} style={{ '--accent': media.color || 'var(--c-anime)' }}>
       <span className={`${c.drape} ${c.drapeL}`} aria-hidden="true" />
       <span className={`${c.drape} ${c.drapeR}`} aria-hidden="true" />
-      <div className={c.sheet} role="dialog" aria-modal="true" aria-labelledby="cc-title" onMouseDown={(e) => e.stopPropagation()}>
+      <div ref={sheetRef} className={c.sheet} role="dialog" aria-modal="true" aria-labelledby="cc-title" onMouseDown={(e) => e.stopPropagation()}>
         <header className={c.hero}>
           {art && <img className={c.heroArt} src={art} alt="" />}
           <span className={c.heroScrim} aria-hidden="true" />
@@ -386,8 +363,19 @@ export default function CurtainCall({ mediaId, manual, onShown, onDone }) {
         </header>
 
         <div className={c.body}>
-          <aside className={c.side}>
+          <aside ref={sideRef} className={c.side}>
             <Verdict media={media} format={format} score={score} onScore={setScore} sync={syncState?.[media.id]} />
+            {categories && (
+              <ByCategory
+                categories={categories}
+                entry={entry}
+                format={format}
+                score={score}
+                onScores={setCategories}
+                onScore={setScore}
+                onEnabled={me.reload}
+              />
+            )}
             <NextUp sequels={d.sequels || []} onSet={setSequel} onOpen={open} />
           </aside>
 
@@ -417,7 +405,7 @@ export default function CurtainCall({ mediaId, manual, onShown, onDone }) {
           </section>
         </div>
 
-        <footer className={c.foot}>
+        <footer ref={footRef} className={c.foot}>
           <button type="button" className={c.linkBtn} onClick={() => open(media.id)}>
             Open the title page <ArrowUpRight size={13} />
           </button>

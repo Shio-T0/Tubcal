@@ -40,9 +40,10 @@
   animation: fadeUp 0.4s ease 0.06s both;
 }
 
+/* --search-inset: skins that draw the input as a box set it so the icon sits inside */
 .searchIcon {
   position: absolute;
-  left: 0;
+  left: var(--search-inset, 0);
   top: 50%;
   transform: translateY(-50%);
   color: var(--paper-faint);
@@ -51,7 +52,7 @@
 
 .searchClear {
   position: absolute;
-  right: 0;
+  right: max(0px, calc(var(--search-inset, 0px) - 5px));
   top: 50%;
   transform: translateY(-50%);
   color: var(--paper-faint);

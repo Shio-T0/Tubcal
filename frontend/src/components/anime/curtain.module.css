@@ -407,6 +407,20 @@
   color: var(--hot);
 }
 
+/* category scoring, when the account has it switched off */
+.catsOff p {
+  margin: 0 0 12px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--paper-dim);
+}
+.catsOff .linkBtn {
+  color: var(--hot);
+}
+.catsOff .linkBtn:disabled {
+  opacity: 0.6;
+}
+
 /* what comes next */
 .sequels {
   display: flex;

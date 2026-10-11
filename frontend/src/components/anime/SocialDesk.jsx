@@ -188,7 +188,7 @@ export function SocialDesk({ mode }) {
           color="var(--c-anime)"
           title="Connect AniList for this"
           subtitle="Your inbox, the people you follow and their activity all come from your AniList account."
-          action={<Button onClick={() => (window.location.href = '/settings')}>Open Settings</Button>}
+          action={<Button onClick={() => (window.location.href = '/settings?s=accounts')}>Open Settings</Button>}
         />
       )}
       {mode === 'forum' && <Forum />}

@@ -39,6 +39,8 @@ export default defineConfig({
   define: {
     __TUBCAL_APP__: JSON.stringify({
       name: 'Tubcal for Android',
+      // the shared pages leave out what has no place on a phone (the Composing Room)
+      phone: true,
       year: '2026',
       author: 'shio-t0',
       source: 'https://github.com/Shio-T0/Tubcal',

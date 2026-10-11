@@ -7,7 +7,7 @@ export default function ToastStack({ toasts }) {
       {toasts.map((t) => (
         <div
           key={t.id}
-          className={`${s.toast} ${t.type === 'error' ? s.toastError : ''} ${t.type === 'success' ? s.toastSuccess : ''}`}
+          className={`${s.toast} tc-float ${t.type === 'error' ? s.toastError : ''} ${t.type === 'success' ? s.toastSuccess : ''}`}
         >
           <span className={s.toastDot} />
           {t.message}

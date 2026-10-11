@@ -193,25 +193,44 @@ function Controls({ item, pb, ctl, full, onFull, onMinimize, onSettings, next, o
     setRipple((r) => ({ side, n: r && r.side === side ? r.n + 10 : 10, key: Date.now() }));
   };
 
-  // Hold-for-2×: while a finger stays down, play fast.
+  // Hold-for-2×: while a finger stays down, play fast. Ending a hold is handed
+  // the gesture itself: `up` clears gesture.current before it gets there, so
+  // reading the ref back would find nothing and leave the video stuck at 2×.
+  const videoEl = () => document.querySelector(`[data-player="${item.id}"] video`);
   const holdStart = () => {
-    const v = gesture.current;
-    if (!v || v.moved) return;
-    v.held = true;
+    const g = gesture.current;
+    if (!g || g.moved) return;
+    g.held = true;
     setFast(true);
     haptic('press');
-    const vid = document.querySelector(`[data-player="${item.id}"] video`);
-    if (vid) { v.prevRate = vid.playbackRate; vid.playbackRate = 2; }
+    const vid = videoEl();
+    if (vid) { g.prevRate = vid.playbackRate; vid.playbackRate = 2; }
   };
-  const holdEnd = () => {
-    const v = gesture.current;
-    if (!v?.held) return;
+  const holdEnd = (g) => {
+    if (!g?.held) return;
+    g.held = false;
     setFast(false);
-    const vid = document.querySelector(`[data-player="${item.id}"] video`);
-    if (vid) vid.playbackRate = v.prevRate || rate;
+    const vid = videoEl();
+    if (vid) vid.playbackRate = g.prevRate || rate;
   };
+  // The finger left without a clean pointerup (the system took the gesture, the
+  // capture was lost): drop the gesture and end any hold.
+  const abandon = () => {
+    const g = gesture.current;
+    gesture.current = null;
+    if (!g) return;
+    clearTimeout(g.lp);
+    holdEnd(g);
+  };
+  // Never leave a hold behind when the app is hidden mid-press or the controls go away.
+  useEffect(() => {
+    const onHide = () => { if (document.visibilityState === 'hidden') abandon(); };
+    document.addEventListener('visibilitychange', onHide);
+    return () => { document.removeEventListener('visibilitychange', onHide); abandon(); };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const down = (e) => {
+    abandon(); // a second finger landing mid-hold starts over cleanly
     gesture.current = { x: e.clientX, y: e.clientY, moved: false, held: false, lp: setTimeout(holdStart, 520) };
   };
   const move = (e) => {
@@ -227,7 +246,7 @@ function Controls({ item, pb, ctl, full, onFull, onMinimize, onSettings, next, o
     gesture.current = null;
     if (!g) return;
     clearTimeout(g.lp);
-    if (g.held) { holdEnd(); return; }
+    if (g.held) { holdEnd(g); return; }
     if (g.moved) return;
     const r = e.currentTarget.getBoundingClientRect();
     const x = (e.clientX - r.left) / r.width;
@@ -261,7 +280,8 @@ function Controls({ item, pb, ctl, full, onFull, onMinimize, onSettings, next, o
       onPointerDown={down}
       onPointerMove={move}
       onPointerUp={up}
-      onPointerCancel={() => { const g = gesture.current; if (g) clearTimeout(g.lp); holdEnd(); gesture.current = null; }}
+      onPointerCancel={abandon}
+      onLostPointerCapture={abandon}
     >
       {ripple && (
         <div key={ripple.key} className={`${p.ripple} ${ripple.side === 'left' ? p.rippleL : p.rippleR}`}>

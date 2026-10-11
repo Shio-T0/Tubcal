@@ -65,7 +65,20 @@ function SpaceLayers() {
   );
 }
 
+// The desk the app runs on: a teal self-healing cutting mat, its grid seen at an
+// angle, lit from the top left.
+function BenchLayers() {
+  return (
+    <>
+      <div className="bd-bench__mat" />
+      <div className="bd-bench__grid" />
+      <div className="bd-bench__light" />
+    </>
+  );
+}
+
 const LAYERS = {
+  bench: BenchLayers,
   terminal: TerminalLayers,
   aqua: AquaLayers,
   bauhaus: BauhausLayers,

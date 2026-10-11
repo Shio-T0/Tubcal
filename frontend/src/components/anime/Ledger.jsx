@@ -303,7 +303,7 @@ export default function Ledger() {
           color="var(--c-anime)"
           title="Connect AniList to open your ledger"
           subtitle="Your statistics, year in review and taste comparisons are all worked out from your AniList list."
-          action={<Button onClick={() => (window.location.href = '/settings')}>Open Settings</Button>}
+          action={<Button onClick={() => (window.location.href = '/settings?s=accounts')}>Open Settings</Button>}
         />
       );
     }

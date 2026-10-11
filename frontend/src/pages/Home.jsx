@@ -63,13 +63,13 @@ export default function Home() {
 
   return (
     <div className={h.home}>
-      <div className={h.topline}>
+      <div className={`${h.topline} tc-strip`}>
         <span>{todayLine()}</span>
         <span>{themeMeta(settings?.theme || 'dark').label}</span>
         <span className={h.power}><span className={h.led} /> select a channel</span>
       </div>
 
-      <h1 className={h.wordmark}>Tubcal<em>.</em></h1>
+      <h1 className={`${h.wordmark} tc-hero`}>Tubcal<em>.</em></h1>
 
       <div className={h.channels}>
         {/* ── Channel 1: the Hub ─────────────────────────────────────────── */}
@@ -138,7 +138,7 @@ export default function Home() {
         </section>
       </div>
 
-      <p className={h.hint}>
+      <p className={`${h.hint} tc-strip`}>
         <kbd>Space</kbd><kbd>g</kbd><kbd>h</kbd> and <kbd>Space</kbd><kbd>g</kbd><kbd>a</kbd> switch channels from anywhere
         · <kbd>Ctrl</kbd><kbd>K</kbd> searches everything
       </p>
