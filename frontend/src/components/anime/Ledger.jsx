@@ -19,6 +19,7 @@ import { BarList, ChartTable, Columns, Dumbbell, StatTile } from './charts.jsx';
 import {
   COUNTRY_LABEL, MONTH_SHORT, SOURCE_LABEL, STATUS_LABEL, fmtDuration, formatLabel, useParamState,
 } from './shared.jsx';
+import { scrollMotion } from '../../lib/motion.js';
 import l from './ledger.module.css';
 
 const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
@@ -189,7 +190,7 @@ function Compare({ fmt, myId }) {
   const [name, setName] = useState(target);
   const ref = useRef(null);
   useEffect(() => {
-    if (target) ref.current?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    if (target) ref.current?.scrollIntoView({ block: 'start', behavior: scrollMotion() });
   }, [target]);
   const following = useApi(`/anime/follows/${myId}`, !!myId);
   const cmp = useApi(`/anime/compare/${encodeURIComponent(target)}`, !!target);
@@ -291,7 +292,7 @@ export default function Ledger() {
   // ledger has drawn, bring that folio into view.
   useEffect(() => {
     if (!d || !hash) return;
-    document.getElementById(hash.slice(1))?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    document.getElementById(hash.slice(1))?.scrollIntoView({ behavior: scrollMotion(), block: 'start' });
   }, [d, hash]);
 
   if (stats.loading && !d) return <Receiving label="totting up the ledger" />;

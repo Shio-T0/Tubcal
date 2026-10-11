@@ -699,7 +699,9 @@ def _history_row_to_item(r):
         or (f"https://i.ytimg.com/vi/{vid}/hqdefault.jpg" if vid else None),
         "source": r["source_name"],
         "published_at": None,
-        "extra": {"video_id": vid, "channel_id": r["source_id"]},
+        # when you last had it open — the home screen orders its "pick up" row by
+        # this against AniList's last-touched stamp on your anime
+        "extra": {"video_id": vid, "channel_id": r["source_id"], "watched_at": r.get("watched_at")},
     }
 
 

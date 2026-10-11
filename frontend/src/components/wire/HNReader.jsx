@@ -21,6 +21,7 @@ import { useSaved, useToast } from '../../state.jsx';
 import { Receiving } from '../layout/Section.jsx';
 import { HnHtml } from './HnHtml.jsx';
 import { lastVisit, visit } from './seen.js';
+import { scrollMotion } from '../../lib/motion.js';
 import r from './reader.module.css';
 
 const KIND = /^(Ask|Show|Tell|Launch) HN:\s*/i;
@@ -126,7 +127,7 @@ export function HNReader({ item, hnId: idProp, onClose, onItem, variant = 'pane'
     if (!fresh.length) return;
     const target = fresh[walk % fresh.length];
     setFolded(new Set()); // a fresh reply may sit inside a folded branch
-    requestAnimationFrame(() => document.getElementById(`hn-${target.id}`)?.scrollIntoView({ block: 'center', behavior: 'smooth' }));
+    requestAnimationFrame(() => document.getElementById(`hn-${target.id}`)?.scrollIntoView({ block: 'center', behavior: scrollMotion() }));
     setWalk((w) => w + 1);
   };
   const copy = async () => {

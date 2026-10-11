@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { ANIME_HOME, HUB_HOME } from '../../lib/rooms.js';
+import { scrollMotion } from '../../lib/motion.js';
 import k from './KeyboardShortcuts.module.css';
 
 // Vim-style global navigation.
@@ -71,7 +72,7 @@ export default function KeyboardShortcuts() {
       // Keep the focused tile centred in its horizontal scroller: near the start
       // it can't centre (no room to scroll left) so it just stays put, and the row
       // only begins to scroll once the selection has reached the middle.
-      el.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
+      el.scrollIntoView({ block: 'nearest', inline: 'center', behavior: scrollMotion() });
     };
 
     const focusEdge = (last) => {

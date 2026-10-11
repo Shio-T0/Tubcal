@@ -22,6 +22,7 @@ import { Spinner } from '../ui/index.jsx';
 import { RichText } from './richText.jsx';
 import { VideoComments } from './VideoComments.jsx';
 import { metaPath, useWatchLinks } from './watchLinks.js';
+import { scrollMotion } from '../../lib/motion.js';
 import w from './watch.module.css';
 
 const PENDING = new Set(['queued', 'transcribing', 'embedding']);
@@ -191,7 +192,7 @@ function Transcript({ chunks, pos, ctx, scrollRoot }) {
   const refs = useRef({});
   useEffect(() => {
     if (!follow || cur < 0) return;
-    refs.current[cur]?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    refs.current[cur]?.scrollIntoView({ block: 'center', behavior: scrollMotion() });
   }, [cur, follow]);
   // A scroll by hand means you're reading ahead — stop following until asked.
   useEffect(() => {

@@ -32,6 +32,10 @@ def create_app():
         theme = db.get_setting("theme", "dark")
         if theme != "dark":
             html = html.replace('data-theme="dark"', f'data-theme="{theme}"')
+        # Fast mode is on <html> before the bundle runs, so the first paint is
+        # already still (styles/base.css holds the rule).
+        if db.get_setting("fast_mode", False) is True:
+            html = html.replace("<html ", '<html data-fast="" ', 1)
         return html, 200, {"Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store"}
 
     @app.route("/", defaults={"path": ""})

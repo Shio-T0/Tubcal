@@ -39,6 +39,7 @@ import {
 import { ago, clock, timeAgo } from '../lib/time.js';
 import { useParamState } from '../lib/urlState.js';
 import { usePlayer, useProgress, useSubscriptions } from '../state.jsx';
+import { scrollMotion } from '../lib/motion.js';
 import s from './screening.module.css';
 
 const SUGGESTIONS = ['@veritasium', '@kurzgesagt', '@3blue1brown', '@fireship'];
@@ -368,7 +369,7 @@ function Programme({ feed, live, onPlay, hasSubs, src, onAdd, reloaders }) {
     const el = document.querySelectorAll('[data-shelf="projection"] [data-kbd-tile]')[idx];
     if (el) {
       el.focus({ preventScroll: true });
-      el.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
+      el.scrollIntoView({ block: 'nearest', inline: 'center', behavior: scrollMotion() });
     }
   }, [projShown]);
 

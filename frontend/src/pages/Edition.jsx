@@ -1,284 +1,39 @@
 // The Edition — today's paper, composed on this machine from every room.
 //
-// It reads like a front page, not a feed. A nameplate with the issue and date in
-// its ears, and under it the page-turns (the previous and next paper, any back
-// issue from the drawer), how much of today you've read, and Recompose. Then the
-// front: the lead story large with its picture, two more down a rail beside it,
-// the rest of the columns ruled in a row, and In Brief — grouped by the room each
-// line came from. Every story says where it's from and what you can do with it:
-// watch it, read the article, open the discussion. Stories you've opened are
-// ticked off, per paper, in this browser.
+// It reads like a front page, not a feed. The nameplate: the issue and date in
+// one ear, how much of this paper you've read (a ring, and a 読了 stamp once it's
+// all done) in the other. Under it the strip: page-turns to the paper before and
+// after, the back-issue drawer, Next unread, Mark all read, Recompose and the
+// paper's settings. Then the front: the lead story (headline over a picture with
+// its copy beside it), two more down a rail, the rest of the columns ruled in a
+// row, and In Brief grouped by the room each line came from. Past the nameplate a
+// slim bar follows you down the page with your progress and Next unread.
 //
-// When the local model wrote copy (an "edited" paper) stories carry a dek and
-// body; a "wire" paper is headlines only, so each story shows its numbers — points,
-// comments, age, source — in the dek's place, and still reads as a page.
+// It moves like paper: the title is pressed in letter by letter, the rule draws
+// out from the middle, stories settle as they scroll into view, a turned page
+// swings in from the side it came from, the lead's picture develops, ticks draw
+// themselves and a press roller sweeps the page while it recomposes. Fast mode
+// (Settings → Appearance) and reduced motion keep all of it still.
+//
+// Keys: u next unread · [ ] the paper before / after · j k (and h l) walk the
+// stories · Enter opens one. Read ticks are per paper, in this browser.
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  ArrowLeft, ArrowRight, BookmarkCheck, Check, ExternalLink, FileText, ListPlus, MessageSquare, Play, RefreshCw,
-} from 'lucide-react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, CheckCheck, RefreshCw, Settings2 } from 'lucide-react';
 
 import { api, useApi } from '../api/client.js';
 import { ErrorBox } from '../components/layout/Section.jsx';
 import RedditPostModal from '../components/modals/RedditPostModal.jsx';
-import { SaveButton } from '../components/ui/ItemActions.jsx';
-import { ReaderSheet, splitKind } from '../components/wire/HNReader.jsx';
-import { compact } from '../lib/format.js';
-import { timeAgo } from '../lib/time.js';
+import { ReaderSheet } from '../components/wire/HNReader.jsx';
+import { Briefs, Lede, Story } from '../components/edition/Stories.jsx';
+import { useReadMarks } from '../components/edition/readMarks.js';
+import { isStill, scrollMotion } from '../lib/motion.js';
 import { useParamState } from '../lib/urlState.js';
 import { usePlayer } from '../state.jsx';
 import e from './edition.module.css';
 
-const ROOM = {
-  youtube: { name: 'Screening Room', c: 'var(--c-youtube)' },
-  reddit: { name: 'The Dispatch', c: 'var(--c-reddit)' },
-  hackernews: { name: 'The Wire', c: 'var(--c-hn)' },
-};
-const roomOf = (it) => ROOM[it?.platform] || ROOM.hackernews;
-
-// ── what you've read, per paper ──────────────────────────────────────────────
-
-const READ_KEY = 'tubcal.edition.read';
-function readAll() {
-  try { return JSON.parse(localStorage.getItem(READ_KEY)) || {}; } catch { return {}; }
-}
-function useReadMarks(date) {
-  const [all, setAll] = useState(readAll);
-  const marks = useMemo(() => new Set(all[date] || []), [all, date]);
-  const mark = useCallback((key) => {
-    if (!date || !key) return;
-    setAll((prev) => {
-      const cur = new Set(prev[date] || []);
-      if (cur.has(key)) return prev;
-      cur.add(key);
-      const next = { ...prev, [date]: [...cur] };
-      // Keep a month of papers; older ticks don't matter.
-      Object.keys(next).sort().slice(0, -31).forEach((d) => delete next[d]);
-      try { localStorage.setItem(READ_KEY, JSON.stringify(next)); } catch { /* fine */ }
-      return next;
-    });
-  }, [date]);
-  return [marks, mark];
-}
-
-// ── bits of a story ──────────────────────────────────────────────────────────
-
-/** "The Wire · spectrum.ieee.org", "Screening Room · Eve", "The Dispatch · r/rust". */
-function kickerOf(item) {
-  if (!item) return '';
-  const where = item.platform === 'hackernews'
-    ? (splitKind(item.title).kind || item.extra?.domain || 'Hacker News')
-    : item.source;
-  return `${roomOf(item).name}${where ? ` · ${where}` : ''}`;
-}
-
-/** The numbers line a wire paper shows where the dek would go. */
-function Numbers({ item }) {
-  if (!item) return null;
-  const bits = [];
-  if (item.platform === 'youtube') {
-    if (item.source) bits.push(item.source);
-  } else {
-    if (item.score != null) bits.push(`▲ ${compact(item.score)} points`);
-    if (item.comments_count != null) bits.push(`${compact(item.comments_count)} comments`);
-  }
-  if (item.published_at) bits.push(`${timeAgo(item.published_at)} ago`);
-  return <p className={e.numbers}>{bits.map((b) => <span key={b}>{b}</span>)}</p>;
-}
-
-/** What you can do with a story's top item, as a row of small buttons. */
-function Acts({ item, on, big = false }) {
-  const { enqueue } = usePlayer();
-  if (!item) return null;
-  const cls = `${e.act} ${big ? e.actBig : ''}`;
-  if (item.platform === 'youtube') {
-    return (
-      <div className={e.acts}>
-        <button type="button" className={`${cls} ${e.actMain}`} onClick={() => on.play(item)}><Play size={13} fill="currentColor" /> Watch</button>
-        <button type="button" className={cls} onClick={() => enqueue(item)} title="Add to Up next"><ListPlus size={14} /> Up next</button>
-        <SaveButton item={item} className={e.save} />
-      </div>
-    );
-  }
-  if (item.platform === 'reddit') {
-    return (
-      <div className={e.acts}>
-        <button type="button" className={`${cls} ${e.actMain}`} onClick={() => on.post(item)}><FileText size={13} /> Read the post</button>
-        {item.comments_count != null && <button type="button" className={cls} onClick={() => on.post(item)}><MessageSquare size={13} /> {compact(item.comments_count)}</button>}
-        <SaveButton item={item} className={e.save} />
-      </div>
-    );
-  }
-  const external = item.url && !item.url.includes('news.ycombinator.com/item');
-  return (
-    <div className={e.acts}>
-      {external && (
-        <a className={`${cls} ${e.actMain}`} href={item.url} target="_blank" rel="noopener noreferrer" onClick={() => on.touched(item)}>
-          Read <ExternalLink size={12} />
-        </a>
-      )}
-      <button type="button" className={`${cls} ${external ? '' : e.actMain}`} onClick={() => on.discuss(item)}>
-        <MessageSquare size={13} /> {item.comments_count != null ? `${compact(item.comments_count)} comments` : 'Discussion'}
-      </button>
-      <SaveButton item={item} className={e.save} />
-    </div>
-  );
-}
-
-/** Where else the same story turned up (an edited paper clusters platforms). */
-function AlsoOn({ items, on }) {
-  const rest = items.slice(1);
-  if (!rest.length) return null;
-  return (
-    <div className={e.also}>
-      <span>also on</span>
-      {rest.slice(0, 5).map((it) => (
-        <button key={it.id} type="button" className={e.alsoChip} style={{ '--c': roomOf(it).c }} onClick={() => on.open(it)} title={it.title}>
-          {roomOf(it).name}{it.platform === 'reddit' ? ` · ${it.source}` : ''}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-/** The headline as the story's main door. */
-function Headline({ story, item, on, as: Tag = 'h3', className }) {
-  const text = story.headline || item?.title;
-  if (item?.platform === 'hackernews' && item.url && !item.url.includes('news.ycombinator.com/item')) {
-    return (
-      <Tag className={className}>
-        <a href={item.url} target="_blank" rel="noopener noreferrer" onClick={() => on.touched(item)}>{text}</a>
-      </Tag>
-    );
-  }
-  return (
-    <Tag className={className}>
-      <button type="button" onClick={() => on.open(item)}>{text}</button>
-    </Tag>
-  );
-}
-
-function Story({ story, on, read, variant = 'column', index = 0 }) {
-  const items = story.items || [];
-  const top = items[0];
-  const pic = variant !== 'rail' ? items.find((i) => i.thumbnail) : null;
-  const [imgOk, setImgOk] = useState(true);
-  return (
-    <article
-      className={`${e.story} ${variant === 'rail' ? e.railStory : e.column} ${read ? e.read : ''}`}
-      style={{ '--c': roomOf(top).c, '--i': index }}
-      data-kbd-tile
-      tabIndex={0}
-      onKeyDown={(ev) => { if (ev.key === 'Enter' && ev.target === ev.currentTarget) on.open(top); }}
-    >
-      <span className={e.kicker}>
-        {read && <Check size={12} className={e.tick} />}
-        {kickerOf(top)}
-      </span>
-      {pic && imgOk && variant === 'column' && (
-        <button type="button" className={e.colPic} onClick={() => on.open(pic)} tabIndex={-1} aria-hidden="true">
-          <img src={pic.thumbnail} alt="" loading="lazy" onError={() => setImgOk(false)} />
-        </button>
-      )}
-      <Headline story={story} item={top} on={on} className={e.headline} />
-      {story.dek ? <p className={e.dek}>{story.dek}</p> : <Numbers item={top} />}
-      {story.body && variant !== 'rail' && <p className={e.body}>{story.body}</p>}
-      <AlsoOn items={items} on={on} />
-      <Acts item={top} on={on} />
-    </article>
-  );
-}
-
-function Lede({ story, on, read }) {
-  const items = story.items || [];
-  const top = items[0];
-  const pic = items.find((i) => i.thumbnail);
-  const [imgOk, setImgOk] = useState(true);
-  const big = pic?.thumbnail?.replace('hqdefault', 'maxresdefault');
-  return (
-    <article className={`${e.story} ${e.lede} ${read ? e.read : ''}`} style={{ '--c': roomOf(top).c }}>
-      <span className={e.kicker}>
-        <em className={e.leadTag}>Lead story</em>
-        {read && <Check size={12} className={e.tick} />}
-        {kickerOf(top)}
-      </span>
-      <Headline story={story} item={top} on={on} as="h2" className={e.ledeHead} />
-      {pic && imgOk && (
-        <button type="button" className={e.ledePic} onClick={() => on.open(pic)} aria-label={`Open ${pic.title}`}>
-          <img
-            src={big || pic.thumbnail}
-            alt=""
-            fetchPriority="high"
-            onLoad={(ev) => { if (ev.currentTarget.naturalWidth <= 120 && ev.currentTarget.src !== pic.thumbnail) ev.currentTarget.src = pic.thumbnail; }}
-            onError={(ev) => { if (ev.currentTarget.src !== pic.thumbnail) ev.currentTarget.src = pic.thumbnail; else setImgOk(false); }}
-          />
-          {pic.platform === 'youtube' && <span className={e.playMark}><Play size={22} fill="currentColor" /></span>}
-        </button>
-      )}
-      {story.dek ? <p className={e.ledeDek}>{story.dek}</p> : <Numbers item={top} />}
-      {story.body && <p className={`${e.body} ${e.ledeBody}`}>{story.body}</p>}
-      {story.transcript_of && <p className={e.fromTranscript}><FileText size={12} /> written from what was said in the video — its transcript is in The Archive</p>}
-      <AlsoOn items={items} on={on} />
-      <Acts item={top} on={on} big />
-    </article>
-  );
-}
-
-function Briefs({ briefs, on, marks }) {
-  const [openAll, setOpenAll] = useState({});
-  const groups = useMemo(() => {
-    const m = new Map();
-    for (const b of briefs) {
-      const p = b.items?.[0]?.platform || 'hackernews';
-      if (!m.has(p)) m.set(p, []);
-      m.get(p).push(b);
-    }
-    return [...m.entries()].sort((a, b) => b[1].length - a[1].length);
-  }, [briefs]);
-  if (!briefs.length) return null;
-  return (
-    <section className={e.briefs} aria-label="In brief">
-      <h2 className={e.section}><span>In brief</span></h2>
-      <div className={e.briefGroups}>
-        {groups.map(([platform, list]) => {
-          const room = ROOM[platform] || ROOM.hackernews;
-          const cap = openAll[platform] ? list.length : 8;
-          return (
-            <div key={platform} className={e.briefGroup} style={{ '--c': room.c }}>
-              <h3 className={e.briefRoom}>{room.name} <em>{list.length}</em></h3>
-              <ol className={e.briefList}>
-                {list.slice(0, cap).map((b) => {
-                  const it = b.items?.[0];
-                  const read = marks.has(it?.id);
-                  return (
-                    <li key={it?.id || b.headline} className={read ? e.read : undefined}>
-                      <button type="button" className={e.briefLine} onClick={() => on.open(it)} data-kbd-tile>
-                        <span className={e.briefHead}>{read && <Check size={11} className={e.tick} />}{b.headline}</span>
-                        <span className={e.briefMeta}>
-                          {platform === 'hackernews'
-                            ? [it?.extra?.domain, it?.score != null ? `▲ ${compact(it.score)}` : null, it?.comments_count ? `${compact(it.comments_count)} cmt` : null].filter(Boolean).join(' · ')
-                            : it?.source}
-                          {it?.published_at ? ` · ${timeAgo(it.published_at)}` : ''}
-                        </span>
-                      </button>
-                    </li>
-                  );
-                })}
-              </ol>
-              {list.length > 8 && (
-                <button type="button" className={e.briefMore} onClick={() => setOpenAll((o) => ({ ...o, [platform]: !o[platform] }))}>
-                  {openAll[platform] ? 'fewer' : `${list.length - 8} more`}
-                </button>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </section>
-  );
-}
-
-// ── the nameplate ────────────────────────────────────────────────────────────
+// ── dates ────────────────────────────────────────────────────────────────────
 
 function longDate(iso) {
   return new Date(`${iso}T00:00:00`).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
@@ -286,66 +41,157 @@ function longDate(iso) {
 function shortDate(iso) {
   return new Date(`${iso}T00:00:00`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
 }
+const hhmm = (epoch) => new Date(epoch * 1000).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
 
-function Nameplate({ paper, archive, onDate, isLatest, onRecompose, recomposing, read, total }) {
-  const dates = (archive || []).map((x) => x.date);
-  const idx = dates.indexOf(paper.date);
-  const older = idx >= 0 ? dates[idx + 1] : null;
-  const newer = idx > 0 ? dates[idx - 1] : null;
-  const edited = paper.status === 'edited';
+// ── the nameplate ────────────────────────────────────────────────────────────
+
+/** "The Edition", pressed in one letter at a time. */
+function Title({ className = e.title, as: Tag = 'h1' }) {
+  const letters = (word, from) => [...word].map((ch, i) => (
+    <span key={i} className={e.letter} style={{ '--i': from + i }}>{ch}</span>
+  ));
   return (
-    <header className={e.nameplate}>
+    <Tag className={className} aria-label="The Edition">
+      <span aria-hidden="true">{letters('The', 0)}</span>{' '}
+      <i aria-hidden="true">{letters('Edition', 3)}</i>
+    </Tag>
+  );
+}
+
+/** How much of this paper you've read, as a ring that fills. */
+function Ring({ read, total, size = 38 }) {
+  const len = 2 * Math.PI * 15;
+  const f = total ? Math.min(1, read / total) : 0;
+  return (
+    <svg className={e.ring} viewBox="0 0 36 36" width={size} height={size} aria-hidden="true" style={{ '--len': `${len}px` }}>
+      <circle cx="18" cy="18" r="15" className={e.ringTrack} />
+      <circle cx="18" cy="18" r="15" className={e.ringFill} style={{ strokeDasharray: `${len}px`, strokeDashoffset: `${len * (1 - f)}px` }} />
+    </svg>
+  );
+}
+
+function Nameplate({ paper, read, total, plateRef }) {
+  const edited = paper.status === 'edited';
+  const done = total > 0 && read >= total;
+  return (
+    <header className={e.nameplate} ref={plateRef}>
       <div className={e.plate}>
         <div className={e.ear}>
           <b>No {paper.issue}</b>
           <span>{longDate(paper.date)}</span>
+          <span className={e.earSmall}>composed {hhmm(paper.generated_at)}</span>
         </div>
-        <h1 className={e.title}>The <i>Edition</i></h1>
+        <Title />
         <div className={`${e.ear} ${e.earRight}`}>
-          <b>{paper.sources} sources</b>
-          <span className={edited ? undefined : e.wireMark}>
-            {edited ? `written by ${paper.model}` : 'wire edition · headlines only'}
+          <span className={e.reading}>
+            {done ? (
+              <span className={e.stamp} role="img" aria-label="Finished reading">
+                <b lang="ja">読了</b>
+                <span>read</span>
+              </span>
+            ) : (
+              <Ring read={read} total={total} />
+            )}
+            <span className={e.readingText}>
+              <b>{done ? 'All read' : `${read} of ${total}`}</b>
+              <span>{done ? 'that’s the paper' : 'stories read'}</span>
+            </span>
           </span>
+          {edited ? (
+            <span className={e.earSmall}>written by {paper.model}</span>
+          ) : (
+            <Link to="/settings?s=edition" className={`${e.earSmall} ${e.wireMark}`} title="A wire edition: headlines only. With a local model (Ollama) the paper is written as stories">
+              headlines only
+            </Link>
+          )}
         </div>
       </div>
-      <div className={e.strip}>
-        <button type="button" className={e.turn} onClick={() => older && onDate(older, dates)} disabled={!older} title="The paper before this one">
+      <div className={e.rule} aria-hidden="true" />
+    </header>
+  );
+}
+
+function Strip({ paper, archive, older, newer, onDate, isLatest, onRecompose, recomposing, unread, onNext, onMarkAll }) {
+  return (
+    <nav className={e.strip} aria-label="This paper">
+      <div className={e.turns}>
+        <button type="button" className={e.turn} onClick={() => older && onDate(older)} disabled={!older} title="The paper before this one ( [ )">
           <ArrowLeft size={14} /> {older ? shortDate(older) : 'first issue'}
         </button>
         <label className={e.issues}>
           <span>Back issues</span>
-          <select value={paper.date} onChange={(ev) => onDate(ev.target.value, dates)}>
+          <select value={paper.date} onChange={(ev) => onDate(ev.target.value)}>
             {(archive?.length ? archive : [{ date: paper.date }]).map((x) => (
               <option key={x.date} value={x.date}>{shortDate(x.date)}{x.status === 'edited' ? '' : ' · wire'}</option>
             ))}
           </select>
         </label>
-        <button type="button" className={e.turn} onClick={() => newer && onDate(newer, dates)} disabled={!newer} title="The paper after this one">
+        <button type="button" className={e.turn} onClick={() => newer && onDate(newer)} disabled={!newer} title="The paper after this one ( ] )">
           {newer ? shortDate(newer) : 'latest'} <ArrowRight size={14} />
         </button>
-        <span className={e.progress} title="Stories you've opened from this paper">
-          <span className={e.progressBar}><i style={{ width: `${total ? (read / total) * 100 : 0}%` }} /></span>
-          {read === total && total > 0 ? <><BookmarkCheck size={13} /> all read</> : `${read} of ${total} read`}
-        </span>
+      </div>
+      <div className={e.tools}>
+        <button type="button" className={`${e.tool} ${e.toolMain}`} onClick={onNext} disabled={!unread} title="Jump to the next story you haven't opened (u)">
+          <ArrowDown size={14} /> Next unread <kbd>u</kbd>
+        </button>
+        {unread > 0 && (
+          <button type="button" className={e.tool} onClick={onMarkAll} title="Tick every story on this paper as read">
+            <CheckCheck size={14} /> Mark all read
+          </button>
+        )}
         {isLatest && (
-          <button type="button" className={e.recompose} onClick={onRecompose} disabled={recomposing} title="Compose today's paper again from the latest signals">
+          <button type="button" className={e.tool} onClick={onRecompose} disabled={recomposing} title="Compose today's paper again from the latest signals">
             <RefreshCw size={14} className={recomposing ? e.spin : ''} /> {recomposing ? 'Recomposing…' : 'Recompose'}
           </button>
         )}
+        <Link to="/settings?s=edition" className={e.toolIcon} title="The Edition's settings" aria-label="The Edition's settings">
+          <Settings2 size={15} />
+        </Link>
       </div>
-    </header>
+    </nav>
   );
 }
+
+/** The slim bar that follows you down the page once the nameplate has gone by. */
+function FollowBar({ show, paper, read, total, unread, onNext }) {
+  return (
+    <div className={e.followWrap}>
+      <div className={`${e.follow} ${show ? e.followOn : ''}`} inert={!show}>
+        <Title as="span" className={e.followName} />
+        <span className={e.followNo}>No {paper.issue}</span>
+        <span className={e.followBar} aria-hidden="true"><i style={{ transform: `scaleX(${total ? read / total : 0})` }} /></span>
+        <span className={e.followCount}>{read}/{total}</span>
+        <button type="button" className={`${e.tool} ${e.toolMain}`} onClick={onNext} disabled={!unread}>
+          <ArrowDown size={14} /> Next unread <kbd>u</kbd>
+        </button>
+        <button
+          type="button"
+          className={e.toolIcon}
+          onClick={() => window.scrollTo({ top: 0, behavior: scrollMotion() })}
+          title="Back to the top"
+          aria-label="Back to the top"
+        >
+          <ArrowUp size={15} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── before the paper ─────────────────────────────────────────────────────────
 
 function PressesWarming({ hour, onCompose, composing }) {
   return (
     <div className={e.warming}>
-      <h1 className={e.title}>The <i>Edition</i></h1>
+      <Title />
+      <div className={e.type} aria-hidden="true">
+        {[86, 64, 92, 48].map((w, i) => <i key={i} style={{ '--w': `${w}%`, '--i': i }} />)}
+      </div>
       <p className={e.warmingSlug}><span className={e.warmingDot} /> the presses are warming</p>
       <p className={e.warmingLine}>
         Your first paper is composed from today's signals{hour != null ? ` after ${String(hour).padStart(2, '0')}:00` : ''}.
       </p>
-      <button type="button" className={e.recompose} onClick={onCompose} disabled={composing}>
+      <button type="button" className={`${e.tool} ${e.toolMain}`} onClick={onCompose} disabled={composing}>
         <RefreshCw size={14} className={composing ? e.spin : ''} /> {composing ? 'Composing…' : 'Compose now'}
       </button>
     </div>
@@ -355,16 +201,46 @@ function PressesWarming({ hour, onCompose, composing }) {
 function Skeleton() {
   return (
     <div className={e.skel} aria-hidden="true">
-      <div className={e.skelPlate} />
+      <div className={e.skelPlate}><Title as="span" /></div>
       <div className={e.skelFront}>
-        <div><i style={{ width: '30%' }} /><b /><b style={{ width: '70%' }} /><div className={e.skelPic} /></div>
-        <div><i /><i style={{ width: '80%' }} /><i /><i style={{ width: '60%' }} /></div>
+        <div>
+          <i style={{ width: '24%' }} /><b /><b style={{ width: '64%' }} />
+          <div className={e.skelSpread}><div className={e.skelPic} /><div><i /><i style={{ width: '80%' }} /><i style={{ width: '55%' }} /></div></div>
+        </div>
+        <div><i style={{ width: '40%' }} /><b /><i /><i style={{ width: '70%' }} /><i style={{ width: '40%' }} /><b /><i /></div>
       </div>
     </div>
   );
 }
 
 // ── the paper ────────────────────────────────────────────────────────────────
+
+/** Stories settle in as they scroll into view — and anything added later (In
+ *  Brief's "more") too. Still screens get everything at once. */
+function useReveal(rootRef, key) {
+  useLayoutEffect(() => {
+    const root = rootRef.current;
+    if (!root) return undefined;
+    const show = (el) => el.setAttribute('data-shown', '');
+    const pending = () => root.querySelectorAll('[data-reveal]:not([data-shown])');
+    if (isStill() || typeof IntersectionObserver === 'undefined') {
+      pending().forEach(show);
+      const mo = new MutationObserver(() => pending().forEach(show));
+      mo.observe(root, { childList: true, subtree: true });
+      return () => mo.disconnect();
+    }
+    const io = new IntersectionObserver((entries) => {
+      for (const en of entries) {
+        if (en.isIntersecting) { show(en.target); io.unobserve(en.target); }
+      }
+    }, { rootMargin: '0px 0px -32px 0px' });
+    const watch = () => pending().forEach((el) => io.observe(el));
+    watch();
+    const mo = new MutationObserver(watch);
+    mo.observe(root, { childList: true, subtree: true });
+    return () => { io.disconnect(); mo.disconnect(); };
+  }, [rootRef, key]);
+}
 
 export default function Edition() {
   const [date, setDate] = useParamState('d', '');
@@ -375,12 +251,21 @@ export default function Edition() {
   const [thread, setThread] = useState(null);
   const [recomposing, setRecomposing] = useState(false);
   const [buildHour, setBuildHour] = useState(null);
+  const [turn, setTurn] = useState('unfold'); // how the next paper arrives: unfold | back | fwd
+  const [stuck, setStuck] = useState(false);
+  const paperRef = useRef(null);
+  const plateRef = useRef(null);
 
   const paper = paperReq.data;
   const noPaper = paperReq.error === 'no edition yet';
   const archiveList = archive.data?.editions;
-  const isLatest = !date || date === archiveList?.[0]?.date;
-  const [marks, mark] = useReadMarks(paper?.date);
+  const dates = (archiveList || []).map((x) => x.date);
+  const isLatest = !date || date === dates[0];
+  const idx = paper ? dates.indexOf(paper.date) : -1;
+  const older = idx >= 0 ? dates[idx + 1] || null : null;
+  const newer = idx > 0 ? dates[idx - 1] : null;
+  const [marks, mark, markMany] = useReadMarks(paper?.date);
+  const paperKey = paper ? `${paper.date}:${paper.generated_at}` : '';
 
   const touched = (it) => mark(it?.id);
   const on = {
@@ -400,14 +285,21 @@ export default function Edition() {
   const recompose = async () => {
     try {
       await api('/edition/rebuild', { method: 'POST' });
+      setTurn('unfold');
       setRecomposing(true);
     } catch { /* best-effort */ }
   };
 
   // While a build is in flight (or the first paper hasn't landed), watch the
-  // presses; when they stop, the fresh paper cross-fades in.
+  // presses; when they stop, the fresh paper unfolds in. Only a build this page
+  // hasn't seen yet reloads it: reloading clears the error for a moment, which
+  // restarts this watcher, and an unconditional reload would go round forever.
   const reload = paperReq.reload;
   const reloadArchive = archive.reload;
+  const seenBuild = useRef(null);
+  useEffect(() => {
+    if (seenBuild.current == null && archiveList?.[0]) seenBuild.current = archiveList[0].built_at;
+  }, [archiveList]);
   useEffect(() => {
     if (!recomposing && !noPaper) return undefined;
     let alive = true;
@@ -416,8 +308,10 @@ export default function Edition() {
         const st = await api('/edition/status');
         if (!alive) return;
         if (st.hour != null) setBuildHour(st.hour);
-        if (!st.building && st.latest) {
-          setRecomposing(false);
+        if (st.building || !st.latest) return; // still printing, or nothing yet
+        setRecomposing(false);
+        if (st.latest.built_at !== seenBuild.current) {
+          seenBuild.current = st.latest.built_at;
           reload();
           reloadArchive();
         }
@@ -428,14 +322,70 @@ export default function Edition() {
     return () => { alive = false; clearInterval(t); };
   }, [recomposing, noPaper, reload, reloadArchive]);
 
-  const goDate = (d, dates) => setDate(d === dates[0] ? '' : d);
+  // Turning to another paper: back to the top, and it swings in from its side.
+  const goDate = useCallback((d) => {
+    if (!d || d === paper?.date) return;
+    setTurn(paper && d < paper.date ? 'back' : 'fwd');
+    setDate(d === dates[0] ? '' : d);
+    if (window.scrollY > 0) window.scrollTo({ top: 0, behavior: scrollMotion() });
+  }, [paper, dates, setDate]);
 
   const columns = paper?.columns || [];
   const rail = columns.slice(0, 2);
   const row = columns.slice(2);
   const everyStory = paper ? [paper.lede, ...columns, ...(paper.briefs || [])].filter(Boolean) : [];
-  const readCount = everyStory.filter((st) => marks.has(st.items?.[0]?.id)).length;
-  const isRead = (st) => marks.has(st?.items?.[0]?.id);
+  const topId = (st) => st?.items?.[0]?.id;
+  const readCount = everyStory.filter((st) => marks.has(topId(st))).length;
+  const unread = everyStory.length - readCount;
+  const isRead = (st) => marks.has(topId(st));
+
+  useReveal(paperRef, paperKey);
+
+  // The follow bar shows once the nameplate has scrolled away above.
+  useEffect(() => {
+    const el = plateRef.current;
+    if (!el || typeof IntersectionObserver === 'undefined') return undefined;
+    const io = new IntersectionObserver(([en]) => setStuck(!en.isIntersecting && en.boundingClientRect.top < 0));
+    io.observe(el);
+    return () => io.disconnect();
+  }, [paperKey]);
+
+  /** Jump to the next story you haven't opened: the first after the one you're on,
+   *  else the first below the top of the screen, else back round to the first. */
+  const nextUnread = useCallback(() => {
+    const root = paperRef.current;
+    if (!root) return;
+    const els = [...root.querySelectorAll('[data-unread]')].filter((el) => el.offsetParent !== null);
+    if (!els.length) return;
+    const cur = document.activeElement;
+    const onStory = cur && root.contains(cur) ? cur.closest('[data-story]') : null;
+    const target = (onStory && els.find((el) => el !== onStory && (onStory.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING)))
+      || els.find((el) => el.getBoundingClientRect().top > 90)
+      || els[0];
+    target.scrollIntoView({ block: 'center', behavior: scrollMotion() });
+    target.focus({ preventScroll: true });
+    target.removeAttribute('data-flash');
+    void target.offsetWidth; // restart the glow if it's still on from last time
+    target.setAttribute('data-flash', '');
+    setTimeout(() => target.removeAttribute('data-flash'), 1400);
+  }, []);
+
+  const markAll = () => markMany(everyStory.map(topId));
+
+  // u · [ · ] — standing down while typing, while a reader or the player is open.
+  useEffect(() => {
+    const onKey = (ev) => {
+      if (ev.ctrlKey || ev.metaKey || ev.altKey || ev.repeat || ev.defaultPrevented) return;
+      if (document.body.dataset.playerExpanded || document.body.dataset.editorFocused || post || thread) return;
+      const t = ev.target;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
+      if (ev.key === 'u') { ev.preventDefault(); nextUnread(); }
+      else if (ev.key === '[' && older) { ev.preventDefault(); goDate(older); }
+      else if (ev.key === ']' && newer) { ev.preventDefault(); goDate(newer); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [nextUnread, goDate, older, newer, post, thread]);
 
   return (
     <div className={e.room}>
@@ -444,16 +394,21 @@ export default function Edition() {
       {paperReq.loading && !paper && !noPaper && <Skeleton />}
 
       {paper && (
-        <div key={paper.generated_at} className={e.paper}>
-          <Nameplate
+        <div key={paperKey} ref={paperRef} className={`${e.paper} ${e[turn]} ${recomposing ? e.pressing : ''}`}>
+          <FollowBar show={stuck} paper={paper} read={readCount} total={everyStory.length} unread={unread} onNext={nextUnread} />
+          <Nameplate paper={paper} read={readCount} total={everyStory.length} plateRef={plateRef} />
+          <Strip
             paper={paper}
             archive={archiveList}
+            older={older}
+            newer={newer}
             onDate={goDate}
             isLatest={isLatest}
             onRecompose={recompose}
             recomposing={recomposing}
-            read={readCount}
-            total={everyStory.length}
+            unread={unread}
+            onNext={nextUnread}
+            onMarkAll={markAll}
           />
 
           <div className={`${e.front} ${rail.length ? '' : e.frontSolo}`}>
@@ -462,7 +417,7 @@ export default function Edition() {
               <aside className={e.rail} aria-label="Also on the front">
                 <h2 className={e.railHead}>Also on the front</h2>
                 {rail.map((st, i) => (
-                  <Story key={st.items?.[0]?.id || i} story={st} on={on} read={isRead(st)} variant="rail" index={i} />
+                  <Story key={topId(st) || i} story={st} on={on} read={isRead(st)} variant="rail" index={i + 1} />
                 ))}
               </aside>
             )}
@@ -471,7 +426,7 @@ export default function Edition() {
           {row.length > 0 && (
             <div className={e.row} data-n={Math.min(row.length, 3)}>
               {row.map((st, i) => (
-                <Story key={st.items?.[0]?.id || i} story={st} on={on} read={isRead(st)} index={i} />
+                <Story key={topId(st) || i} story={st} on={on} read={isRead(st)} index={i} />
               ))}
             </div>
           )}
@@ -479,9 +434,21 @@ export default function Edition() {
           <Briefs briefs={paper.briefs || []} on={on} marks={marks} />
 
           <footer className={e.colophon}>
-            <span>No {paper.issue} · composed {new Date(paper.generated_at * 1000).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })} in {(paper.build_ms / 1000).toFixed(1)}s from the last {paper.window_h || 36} hours</span>
-            <span>set in Fraunces &amp; Schibsted Grotesk · nothing left this machine</span>
+            <div className={e.colTurns}>
+              {older ? (
+                <button type="button" className={e.turn} onClick={() => goDate(older)}><ArrowLeft size={14} /> The paper before · {shortDate(older)}</button>
+              ) : <span />}
+              {newer ? (
+                <button type="button" className={e.turn} onClick={() => goDate(newer)}>The paper after · {shortDate(newer)} <ArrowRight size={14} /></button>
+              ) : <span className={e.colNote}>this is the latest paper</span>}
+            </div>
+            <div className={e.colLine}>
+              <span>No {paper.issue} · composed {hhmm(paper.generated_at)} in {(paper.build_ms / 1000).toFixed(1)}s from the last {paper.window_h || 36} hours · nothing left this machine</span>
+              <span className={e.colKeys}><kbd>u</kbd> next unread · <kbd>[</kbd><kbd>]</kbd> turn the page · <kbd>j</kbd><kbd>k</kbd> walk the stories</span>
+            </div>
           </footer>
+
+          {recomposing && <div className={e.press} aria-hidden="true"><i /></div>}
         </div>
       )}
 

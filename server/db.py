@@ -132,6 +132,9 @@ CREATE TABLE IF NOT EXISTS editions (
 
 DEFAULT_SETTINGS = {
     "theme": "dark",
+    # Fast mode (Settings → Appearance): nothing animates or transitions, anywhere.
+    # Stamped on <html data-fast> at serve time so even the first paint is still.
+    "fast_mode": False,
     "reddit_sort": "hot",
     "hn_list": "top",
     "foryou_weights": {"youtube": 2, "reddit": 2, "hackernews": 1},

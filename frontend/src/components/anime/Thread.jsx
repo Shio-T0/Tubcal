@@ -21,6 +21,7 @@ import { Receiving } from '../layout/Section.jsx';
 import { MarkdownComposer } from './Composer.jsx';
 import { asPerson, UserLink } from './Person.jsx';
 import { AniHtml } from './RichText.jsx';
+import { scrollMotion } from '../../lib/motion.js';
 import t from './thread.module.css';
 
 const fullDate = (s) => (s ? new Date(s * 1000).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : '');
@@ -232,7 +233,7 @@ export function ThreadView({ threadId, variant = 'page', onClose, composerFirst 
       };
       setComments((prev) => (parentId ? insertReply(prev || [], parentId, node) : [...(prev || []), node]));
       toast(parentId ? 'Reply posted' : 'Comment posted', 'success');
-      if (!parentId) requestAnimationFrame(() => document.getElementById(`c${node.id}`)?.scrollIntoView({ block: 'center', behavior: 'smooth' }));
+      if (!parentId) requestAnimationFrame(() => document.getElementById(`c${node.id}`)?.scrollIntoView({ block: 'center', behavior: scrollMotion() }));
       return true;
     } catch (e) {
       toast(e.message, 'error');
@@ -326,7 +327,7 @@ export function ThreadView({ threadId, variant = 'page', onClose, composerFirst 
           {!th.locked && me.data && (
             <a href="#reply" className={t.pill} onClick={(e) => {
               e.preventDefault();
-              document.getElementById(`reply-${threadId}`)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+              document.getElementById(`reply-${threadId}`)?.scrollIntoView({ block: 'center', behavior: scrollMotion() });
               document.querySelector(`#reply-${threadId} textarea`)?.focus({ preventScroll: true });
             }}>
               <Reply size={13} /> Reply

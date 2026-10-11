@@ -324,6 +324,22 @@ function AppearanceSection() {
   const { settings, updateSettings } = useSettings();
   const value = settings?.theme || 'dark';
   return (
+    <>
+      <Group>
+        <Row
+          label="Fast mode"
+          hint="Turns off every animation and transition, everywhere: pages, players, the home screen. Things just appear."
+        >
+          <Switch label="Fast mode" checked={settings?.fast_mode === true} onChange={(v) => updateSettings({ fast_mode: v })} />
+        </Row>
+      </Group>
+      <AppearanceSkins value={value} onPick={(theme) => updateSettings({ theme })} />
+    </>
+  );
+}
+
+function AppearanceSkins({ value, onPick }) {
+  return (
     <div className={s.skins} role="radiogroup" aria-label="Skin">
       {skinsFor(APP.phone).map((t) => {
         const on = value === t.value;
@@ -334,7 +350,7 @@ function AppearanceSection() {
             role="radio"
             aria-checked={on}
             className={on ? s.skinOn : s.skin}
-            onClick={() => updateSettings({ theme: t.value })}
+            onClick={() => onPick(t.value)}
           >
             <span className={s.skinPreview} style={{ background: t.swatch[0] }}>
               <i style={{ background: t.swatch[1] }} />
@@ -732,7 +748,7 @@ function useSummaries(oauth) {
       accounts: linked.length ? `${linked.join(', ')} connected` : 'None connected',
       subscriptions: `${nSubs} followed`,
       history: 'Kept on this machine',
-      appearance: THEMES.find((t) => t.value === (st.theme || 'dark'))?.label || st.theme,
+      appearance: `${THEMES.find((t) => t.value === (st.theme || 'dark'))?.label || st.theme}${st.fast_mode ? ' · fast mode' : ''}`,
       rooms: `${active.length} of ${st.max_active_rooms ?? 6} in the hub`,
       playback: `${st.solo_audio === false ? 'Sound from all' : 'Sound from one'} · ${(st.playback_rate || 1) === 1 ? 'normal speed' : `${st.playback_rate}×`}`,
       subtitles: sub.show

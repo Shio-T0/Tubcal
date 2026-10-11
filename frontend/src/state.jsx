@@ -59,6 +59,12 @@ export function AppProviders({ children }) {
     document.documentElement.dataset.theme = theme;
     loadSkinFonts(theme);  // fetch this skin's fonts on demand (no-op for core skins)
   }, [settings?.theme]);
+  // Fast mode: the server stamped <html data-fast> for the first paint; keep it in
+  // step once settings arrive (and on every toggle). Untouched until then.
+  const fast = settings ? settings.fast_mode === true : null;
+  useEffect(() => {
+    if (fast !== null) document.documentElement.toggleAttribute('data-fast', fast);
+  }, [fast]);
 
   const updateSettings = useCallback(
     async (partial) => {

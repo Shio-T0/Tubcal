@@ -24,8 +24,8 @@ export const SETTINGS_SECTIONS = {
   },
   appearance: {
     title: 'Appearance', icon: Palette,
-    blurb: 'Repaint the whole station. The Shōwa set is home; the rest are other machines.',
-    find: 'skin theme look colours dark light night day terminal bauhaus blueprint aqua space',
+    blurb: 'Repaint the whole station, or keep it still with Fast mode. The Shōwa set is home; the rest are other machines.',
+    find: 'skin theme look colours dark light night day terminal bauhaus blueprint aqua space fast mode animation animations motion transitions still speed reduce',
   },
   rooms: {
     title: 'Rooms', icon: LayoutGrid,

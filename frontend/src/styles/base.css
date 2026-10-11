@@ -226,7 +226,36 @@ h4 {
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
+    animation-delay: 0s !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* ── Fast mode ─────────────────────────────────────────────────────────────
+   Settings → Appearance → Fast mode: nothing moves. The server stamps
+   <html data-fast> before the bundle runs (state.jsx keeps it in step after),
+   so even the first paint is still. Every animation is collapsed to an instant
+   rather than removed: it still lands on its last frame and still fires
+   animationend (the phone's swipe-away waits on that), and an entrance that
+   starts hidden can't be left hidden. Delays go too, so staggered content is
+   all there at once. Script-driven motion (count-ups, smooth scrolling) asks
+   lib/motion.js. Loading spinners keep turning: they're the only sign that
+   something is still on its way. */
+html[data-fast] *,
+html[data-fast] *::before,
+html[data-fast] *::after {
+  animation-duration: 1ms !important;
+  animation-delay: 0s !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0s !important;
+  transition-delay: 0s !important;
+  scroll-behavior: auto !important;
+}
+html[data-fast] .lucide-loader-circle,
+html[data-fast] .lucide-loader,
+html[data-fast] .lucide-refresh-cw,
+html[data-fast] [role='status'][aria-label='Loading'] {
+  animation-duration: 0.9s !important;
+  animation-iteration-count: infinite !important;
 }

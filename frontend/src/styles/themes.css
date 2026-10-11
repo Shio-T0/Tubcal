@@ -6,8 +6,8 @@
    .tc-wordmark, .tc-nav, .tc-navitem(/-on), .tc-navno; .tc-sectionhead; and the
    page areas: .tc-main (a room's page, the Hub's or the Anime's), .tc-index (the
    Anime's file tree), .tc-bar (the Anime's top bar), .tc-strip (a line of chrome
-   on the bare backdrop: Home's date line and hints), .tc-hero (Home's
-   wordmark) and .tc-float (something that floats over whatever is under it — a
+   on the bare backdrop: Home's date line, its summary and hints), .tc-hero (Home's
+   greeting) and .tc-float (something that floats over whatever is under it — a
    toast)). Component CSS Modules inherit the
    palette/fonts/radii for free through var(--token); the hooks carry the layout
    personality the tokens can't express. Backdrop atmospheres live in backdrop.css. */
@@ -893,8 +893,8 @@
   color: #1e2030;
 }
 
-/* Home sits straight on the mat: its date line and hints get a strip of bar to
-   stand on, and the wordmark is the prompt, printed large on the mat */
+/* Home sits straight on the mat: its date line, summary and hints get a strip of
+   bar to stand on, and the greeting is the prompt, printed large on the mat */
 [data-theme='bench'] .tc-strip {
   width: auto;
   padding: 7px 14px;
@@ -922,8 +922,13 @@
   font-style: normal;
   color: #8aadf4;
 }
+/* the greeting's full stop: a mono cell's side-bearing would float it off the word */
+[data-theme='bench'] .tc-hero > em:last-child {
+  margin-left: -0.4em;
+}
 
-/* a toast can land on the bare mat: give it a bar's dark glass to stand on */
+/* a toast (or Home's search button) can land on the bare mat: give it a bar's
+   dark glass to stand on */
 [data-theme='bench'] .tc-float {
   background: var(--bench-bar);
 }

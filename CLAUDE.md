@@ -12,8 +12,8 @@ is no multi-user concept, no auth beyond optional per-provider OAuth, and no
 cloud component — the only outbound traffic is direct fetches to the platforms
 themselves.
 
-The app has two "channels", chosen at `/` (`pages/Home.jsx`, a TV-style chooser):
-**the Hub** and **the Anime**. The Hub is a set of numbered "rooms" beside the hub
+The app has two "channels", **the Hub** and **the Anime**, chosen at `/` (see
+"The home screen" below). The Hub is a set of numbered "rooms" beside the hub
 console; `frontend/src/lib/rooms.js` is their canonical registry (id, label, color
 token, route, `default_enabled`) — the numbers users see are computed from list
 position, not hardcoded, so adding a room means adding an entry there plus a page in
@@ -24,6 +24,25 @@ below). The old Front Page room is gone; `db.init_db` strips retired ids from th
 saved `active_rooms`. Global chords `Space g h` (Hub → /edition) and `Space g a` (the
 Anime) live in `components/layout/KeyboardShortcuts.jsx`; Space stays native in text
 fields, the editor, the expanded player, media, and keyboard-focused controls.
+
+**The home screen** (`/`, `pages/Home.jsx` + `components/home/`) answers "what now?"
+before "where to?":
+- A greeting, then one sentence of links saying what's waiting: new uploads, episodes
+  of shows still airing, who's live, what airs next, today's paper.
+- `TheSet.jsx` is a TV. Its screen is tuned to the first entry of the "pick up" queue.
+  Videos and your shows' next episodes are ordered by when you last touched them
+  (`watched_at` on `/youtube/continue` vs AniList's `updated_at`), topped up with fresh
+  uploads. The presets below the screen are the rest of that queue: hover/focus tunes,
+  press plays. The side panel holds a clock, the two channel knobs (keys 1/2, ignored
+  while the player or editor owns the keyboard), a "coming up" slip (live streams,
+  premieres, your shows' next airings) and the grille with the `tc-wordmark` plate.
+- `Guides.jsx`: Channel 1 shows today's paper plus the rooms with "N new"/live badges.
+  Channel 2 shows your shelf counts, this season's six most popular, and the doors.
+- `lineup.js` builds all of it from reads the rooms already make and cache, so the
+  page adds no new endpoints.
+- The screen and guides use `overflow: clip`, not `hidden`: their glow and cover wall
+  spill past the edges, and a hidden box is still a scroll container that focus and
+  h/j/k/l's `scrollIntoView` would scroll.
 
 **The Android app lives in `android/`**: a Gradle project with Chaquopy and Kotlin
 (`app/`), a separate phone UI (`phone/`, Vite + React) and tools (`tools/`).
@@ -392,7 +411,7 @@ that only it styles:
 - `.tc-main`: a page's area, which becomes a window.
 - `.tc-index`: the Anime's tree.
 - `.tc-bar`: the Anime's top bar.
-- `.tc-strip` and `.tc-hero`: Home's lines and wordmark.
+- `.tc-strip` and `.tc-hero`: Home's lines (date, summary, hints) and greeting.
 - `.tc-float`: toasts.
 
 Anything that can land on the bare mat needs a dark backing in that skin. A room's view state (active tab,
@@ -483,17 +502,46 @@ new counts). Tiles carry an up-next button (`QueueButton`) that feeds `usePlayer
 queue, which auto-advances when a video ends. Channel, playlist and history pages keep
 their tab/sort/search in the URL too.
 
-The Edition (`pages/Edition.jsx`) is laid out as a front page: a nameplate (issue +
-date and sources/status in its ears) over a strip of page-turns, the back-issues
-drawer (`?d=` for any past paper), a read-progress bar and Recompose; then the lede
-(large, picture, drop cap when there's copy) with two more stories down a rail, the
-remaining columns ruled in a row, and In Brief grouped by the room each line came
-from. A "wire" paper (no model) has no dek/body, so every story shows its numbers
-(points, comments, age, source) in the dek's place. Each story has per-platform
-actions (Watch / Up next, Read ↗ + the HN discussion, the Reddit post) and a
-section kicker ("The Wire · domain"). Opened stories are ticked per paper in
-localStorage `tubcal.edition.read`. Layout switches on the page's own width
-(container queries), not the viewport.
+The Edition (`pages/Edition.jsx`, stories in `components/edition/Stories.jsx`) is
+laid out as a front page:
+- **Nameplate:** issue and date in one ear. The other ear shows your reading: a ring
+  that fills, replaced by a 読了 stamp once the paper is done, and "headlines only"
+  linking to the Edition's settings on a wire paper.
+- **Strip:** page-turns, the back-issue drawer (`?d=`), Next unread, Mark all read,
+  Recompose and a settings link.
+- **The front:** the lede (headline over a picture-and-copy spread, a size down when
+  it runs long), two stories down a rail, the rest of the columns ruled in a row,
+  then In Brief by room. In Brief's groups take width by line count, so a long Wire
+  flows into columns.
+- **Follow bar:** past the nameplate, a sticky bar with progress and Next unread.
+  Sticky wrapper is 0px tall; no `backdrop-filter`, which dropped its background in
+  Firefox.
+- **Copy:** an edited story has a dek and body (drop cap on the lede). A wire paper
+  shows numbers where the dek goes, and its "body" is raw source snippets, so it
+  renders as a labelled, cleaned (no links or hashtags), 3-line excerpt.
+- **Keys:** `u` next unread, `[` `]` older/newer paper. Ticks are per paper in
+  localStorage `tubcal.edition.read` (`components/edition/readMarks.js`).
+- **Animation:** letters pressed in, the rule drawn out, stories revealed on scroll
+  (`useReveal`: IntersectionObserver plus a MutationObserver for late rows; still
+  screens show everything), papers swinging in from their side, the lede picture
+  developing, ticks drawing, a press roller while recomposing.
+- **Polling:** the presses watcher reloads only on a `built_at` it hasn't seen; an
+  unconditional reload restarts the watcher and loops.
+- **Layout** follows container queries `page` (the paper) and `lede`, not the
+  viewport. Beside a docked console (~860–950px) the lede spans the width and the
+  rail becomes a row of two.
+
+**Fast mode** (Settings → Appearance, setting `fast_mode`) turns off every animation
+and transition:
+- `serve_index` stamps `<html data-fast>` so even the first paint is still, and
+  `state.jsx` keeps it in sync afterwards.
+- The rule in `styles/base.css` collapses animations to 1ms with no delay rather than
+  removing them, so entrances still land and `animationend` (the phone's
+  swipe-away) still fires. Loader and refresh spinners are exempt.
+- Script-driven motion asks `lib/motion.js`: `isStill()` (fast mode or reduced
+  motion) and `scrollMotion()` for `scrollIntoView` behaviour. New smooth scrolls
+  and JS animations should use them.
+- Tests: `tests/test_fast_mode.py`.
 
 The Wire (`pages/Wire.jsx`) is a teletype board over HN's six lists (`?l=`
 top/best/new/ask/show/job — `hackernews.LISTS`; the last one chosen is also saved
@@ -529,6 +577,8 @@ load on `useInView` to save AniList budget. My List's titles are `components/ani
   airing.
 - `usePlayEpisode` plays an episode from the list through `/anime/episodes`
   (warmed on hover), with the same `episodeItem` as the title page.
+- Both live in `components/anime/watching.js` (re-exported by WatchList.jsx), with no
+  CSS attached, so the eager home screen can use them.
 - What a title offers follows its shelf: next episode and +1 while watching,
   Start for Planning, the score for Completed, and a countdown when you've caught
   up on something airing.
