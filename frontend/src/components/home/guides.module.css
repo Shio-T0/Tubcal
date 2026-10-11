@@ -1,0 +1,632 @@
+/* The channel guides under the set: two lit panels, each with its channel dial in
+   the corner. Channel 1 glows amber and folds today's paper over its rooms;
+   Channel 2 glows persimmon over a drifting wall of this season's covers. */
+
+.guide {
+  --ch: var(--signal);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+  padding: 22px 22px 16px;
+  border-radius: 26px;
+  overflow: clip; /* the cover wall spills past the edges; see set.module.css .screen */
+  isolation: isolate;
+  background:
+    radial-gradient(110% 70% at 50% 0%, color-mix(in srgb, var(--ch) 12%, transparent), transparent 70%),
+    linear-gradient(170deg, var(--ink-2), var(--ink));
+  border: 1px solid var(--rule-strong);
+  box-shadow: var(--shadow-card), inset 0 1px 0 color-mix(in srgb, var(--paper) 8%, transparent);
+  animation: rise 0.7s var(--hand) 0.45s both;
+  transition: transform 0.3s var(--hand), box-shadow 0.3s ease;
+}
+.hub {
+  --ch: var(--signal);
+}
+.anime {
+  --ch: var(--accent-strong);
+  animation-delay: 0.55s;
+}
+.guide:hover,
+.guide:focus-within {
+  transform: translateY(-3px);
+  box-shadow: 0 24px 56px rgba(0, 0, 0, 0.4), 0 0 0 1px color-mix(in srgb, var(--ch) 35%, transparent);
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+}
+
+/* ── the channel's headline ──────────────────────────────────────────────── */
+.head {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 14px;
+  border-radius: 14px;
+  color: inherit;
+  outline: none;
+}
+.head:focus-visible {
+  box-shadow: 0 0 0 2px var(--ch);
+}
+.dial {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background:
+    repeating-conic-gradient(from 0deg, color-mix(in srgb, var(--paper) 10%, transparent) 0 6deg, transparent 6deg 12deg),
+    radial-gradient(circle at 35% 30%, var(--ink-3), var(--ink));
+  border: 2px solid color-mix(in srgb, var(--ch) 65%, var(--rule-strong));
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4), 0 0 18px color-mix(in srgb, var(--ch) 28%, transparent);
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--ch);
+  transition: transform 0.5s var(--hand);
+}
+.guide:hover .dial {
+  transform: rotate(-24deg);
+}
+.headText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.kicker {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ch);
+}
+.title {
+  font-family: var(--font-display);
+  font-size: clamp(30px, 3.2vw, 40px);
+  font-weight: 650;
+  line-height: 1;
+  color: var(--text-primary);
+  transition: color 0.2s ease;
+}
+.title i {
+  margin-left: 10px;
+  font-style: normal;
+  font-family: var(--font-body);
+  font-size: 0.45em;
+  font-weight: 500;
+  color: var(--paper-dim);
+  vertical-align: middle;
+}
+.arrow {
+  color: var(--paper-faint);
+  transition: transform 0.25s var(--hand), color 0.2s ease;
+}
+.head:hover .arrow {
+  transform: translateX(5px);
+  color: var(--ch);
+}
+.head:hover .title {
+  color: var(--ch);
+}
+
+/* ── Channel 1: today's paper ────────────────────────────────────────────── */
+.paper {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid var(--rule);
+  background: color-mix(in srgb, var(--paper) 4%, transparent);
+  color: inherit;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+.paper:hover,
+.paper:focus-visible {
+  background: color-mix(in srgb, var(--ch) 7%, transparent);
+  border-color: color-mix(in srgb, var(--ch) 40%, var(--rule));
+  outline: none;
+}
+.paperMast {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--rule);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--paper-faint);
+}
+.paperMast b {
+  font-weight: 600;
+  color: var(--ch);
+}
+.paperMast span:last-child {
+  margin-left: auto;
+}
+.paperBlank .paperMast {
+  color: var(--ch);
+}
+.paperNote {
+  font-size: 13.5px;
+  color: var(--text-secondary);
+}
+.lead {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: start;
+  gap: 14px;
+}
+.lead img {
+  width: 116px;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: 8px;
+  box-shadow: 0 0 0 1px var(--rule);
+}
+.lead:not(:has(img)) {
+  grid-template-columns: 1fr;
+}
+.headline {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+.more {
+  display: flex;
+  flex-direction: column;
+}
+.moreLine {
+  overflow: hidden;
+  padding: 5px 0 5px 14px;
+  border-top: 1px dashed var(--rule);
+  font-size: 13px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--text-secondary);
+  position: relative;
+}
+.moreLine::before {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 50%;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--ch);
+  opacity: 0.7;
+  transform: translateY(-50%);
+}
+
+/* ── Channel 1: the rooms ────────────────────────────────────────────────── */
+.rooms {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.room {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: 9px 12px 9px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--room-c, var(--ch));
+  background: color-mix(in srgb, var(--surface) 70%, transparent);
+  color: inherit;
+  animation: rise 0.5s var(--hand) calc(0.65s + var(--i, 0) * 0.05s) both;
+  transition: background 0.18s ease, transform 0.18s var(--hand), border-color 0.18s ease;
+}
+.room:hover,
+.room:focus-visible {
+  background: color-mix(in srgb, var(--room-c, var(--ch)) 14%, var(--surface));
+  border-color: color-mix(in srgb, var(--room-c, var(--ch)) 50%, var(--rule));
+  transform: translateX(3px);
+  outline: none;
+}
+.roomNo {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  color: var(--paper-faint);
+}
+.roomName {
+  overflow: hidden;
+  font-family: var(--font-display);
+  font-size: 15.5px;
+  font-weight: 560;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--text-primary);
+}
+.roomBadges {
+  position: absolute;
+  top: 8px;
+  right: 9px;
+  display: flex;
+  gap: 4px;
+}
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 7px;
+  border-radius: var(--r-pill);
+  background: color-mix(in srgb, var(--room-c, var(--ch)) 22%, transparent);
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.06em;
+  color: color-mix(in srgb, var(--room-c, var(--ch)) 70%, var(--paper));
+  animation: pop 0.45s var(--hand) both;
+}
+.badgeLive {
+  background: var(--c-youtube);
+  color: #fff;
+  text-transform: uppercase;
+}
+@keyframes pop {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+}
+
+/* ── Channel 2: covers, shelves and doors ────────────────────────────────── */
+.mosaic {
+  position: absolute;
+  inset: -30% -20% -20%;
+  z-index: 0;
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 10px;
+  transform: rotate(-8deg);
+  opacity: 0.3;
+  filter: saturate(0.8);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 5%, black 45%, black 80%, transparent);
+  mask-image: linear-gradient(to bottom, transparent 5%, black 45%, black 80%, transparent);
+  animation: drift 70s linear infinite alternate;
+  transition: opacity 0.4s ease;
+}
+.mosaic img {
+  width: 100%;
+  aspect-ratio: 2 / 3;
+  object-fit: cover;
+  border-radius: 10px;
+  animation: coverIn 0.9s ease calc(0.5s + var(--i, 0) * 0.04s) both;
+}
+.guide:hover .mosaic {
+  opacity: 0.42;
+}
+@keyframes drift {
+  from {
+    transform: rotate(-8deg) translateY(0);
+  }
+  to {
+    transform: rotate(-8deg) translateY(-14%);
+  }
+}
+@keyframes coverIn {
+  from {
+    opacity: 0;
+  }
+}
+/* dark behind the copy, the covers showing through only in the middle band */
+.anime::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(to bottom,
+    color-mix(in srgb, var(--ink) 94%, transparent) 0%,
+    color-mix(in srgb, var(--ink) 78%, transparent) 30%,
+    color-mix(in srgb, var(--ink) 35%, transparent) 55%,
+    color-mix(in srgb, var(--ink) 60%, transparent) 76%,
+    color-mix(in srgb, var(--ink) 95%, transparent) 100%);
+}
+
+.shelves {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  min-height: 78px;
+}
+.counter {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--ch) 22%, var(--rule));
+  background: color-mix(in srgb, var(--ink) 72%, transparent);
+  backdrop-filter: blur(6px);
+  color: inherit;
+  animation: rise 0.5s var(--hand) calc(0.7s + var(--i, 0) * 0.06s) both;
+  transition: border-color 0.2s ease, background 0.2s ease, transform 0.2s var(--hand);
+}
+.counter:hover,
+.counter:focus-visible {
+  border-color: var(--ch);
+  background: color-mix(in srgb, var(--ch) 16%, var(--ink));
+  transform: translateY(-2px);
+  outline: none;
+}
+.count {
+  font-family: var(--font-display);
+  font-variant-numeric: tabular-nums;
+  font-size: 30px;
+  font-weight: 620;
+  line-height: 1;
+  color: var(--text-primary);
+}
+.countLabel {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ch);
+}
+/* this season, as six doors */
+.reel {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.reelHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--paper-faint);
+}
+.reelHead a {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--ch);
+  transition: gap 0.2s var(--hand);
+}
+.reelHead a:hover {
+  gap: 8px;
+}
+.reelRow {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px;
+}
+.reelItem {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  color: inherit;
+  animation: rise 0.5s var(--hand) calc(0.75s + var(--i, 0) * 0.05s) both;
+}
+.reelPic {
+  position: relative;
+  aspect-ratio: 2 / 3;
+  border-radius: 9px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--cover-c) 30%, var(--ink-2));
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.35), 0 0 0 1px color-mix(in srgb, var(--paper) 10%, transparent);
+  transition: transform 0.35s var(--hand), box-shadow 0.35s ease;
+}
+.reelPic img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.8s var(--hand);
+}
+.reelItem:hover .reelPic,
+.reelItem:focus-visible .reelPic {
+  transform: translateY(-4px) rotate(-1.5deg);
+  box-shadow: 0 14px 26px rgba(0, 0, 0, 0.45), 0 0 0 2px var(--cover-c);
+}
+.reelItem:hover .reelPic img {
+  transform: scale(1.06);
+}
+.reelItem:focus-visible {
+  outline: none;
+}
+.onList {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--ch);
+  box-shadow: 0 0 0 2px var(--ink), 0 0 8px var(--ch);
+}
+.reelName {
+  overflow: hidden;
+  font-size: 11.5px;
+  line-height: 1.3;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--text-secondary);
+  transition: color 0.2s ease;
+}
+.reelItem:hover .reelName {
+  color: var(--text-primary);
+}
+
+.connect {
+  position: relative;
+  z-index: 2;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px dashed color-mix(in srgb, var(--ch) 45%, var(--rule));
+  background: color-mix(in srgb, var(--ink) 72%, transparent);
+  font-size: 13.5px;
+  color: var(--text-secondary);
+}
+.connect:hover {
+  color: var(--text-primary);
+  border-style: solid;
+}
+.doors {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: auto;
+}
+.door {
+  padding: 7px 14px;
+  border-radius: var(--r-pill);
+  border: 1px solid color-mix(in srgb, var(--ch) 40%, var(--rule));
+  background: color-mix(in srgb, var(--ink) 72%, transparent);
+  backdrop-filter: blur(4px);
+  font-size: 13px;
+  color: var(--text-primary);
+  animation: rise 0.5s var(--hand) calc(0.8s + var(--i, 0) * 0.04s) both;
+  transition: background 0.18s ease, border-color 0.18s ease;
+}
+.door:hover,
+.door:focus-visible {
+  background: color-mix(in srgb, var(--ch) 22%, var(--ink));
+  border-color: var(--ch);
+  outline: none;
+}
+
+/* ── footers ─────────────────────────────────────────────────────────────── */
+.foot {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+  margin-top: auto;
+  padding-top: 12px;
+  border-top: 1px solid var(--rule);
+  font-size: 12.5px;
+}
+.hub .rooms + .foot {
+  margin-top: 0;
+}
+.foot a,
+.foot button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.foot a:hover,
+.foot button:hover {
+  color: var(--ch);
+}
+.foot b {
+  margin-left: 2px;
+  padding: 0 6px;
+  border-radius: var(--r-pill);
+  background: var(--surface-hover);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 500;
+}
+.footNote {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--paper-faint);
+}
+.keys {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: auto;
+}
+.keys em {
+  margin: 0 4px;
+  font-style: normal;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--paper-faint);
+}
+.keys kbd {
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 5px;
+  border: 1px solid var(--rule-strong);
+  border-bottom-width: 2px;
+  background: var(--ink-3);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--paper);
+}
+
+@media (max-width: 900px) {
+  .keys {
+    display: none;
+  }
+}
+@media (max-width: 520px) {
+  .rooms,
+  .shelves {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .reelRow {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .lead img {
+    width: 88px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .guide,
+  .room,
+  .badge,
+  .mosaic,
+  .mosaic img,
+  .counter,
+  .reelItem,
+  .door {
+    animation: none;
+  }
+}
