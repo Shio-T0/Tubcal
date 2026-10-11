@@ -46,9 +46,23 @@ export const THEMES = [
     blurb: 'Glass panels adrift over a nebula.',
     swatch: ['#05060c', '#7c5cff', '#22d3ee'],
   },
+  {
+    value: 'bench',
+    label: 'Cutting Mat',
+    blurb: 'Macchiato windows tiled over a teal workbench mat.',
+    swatch: ['#5f948f', '#8aadf4', '#1e2030'],
+    // drawn as tiled windows over a wallpaper — a desktop layout, so the phone
+    // build leaves it out of its pickers
+    desktopOnly: true,
+  },
 ];
 
 export const DEFAULT_THEME = 'dark';
+
+/** The skins a build offers: a phone leaves out the desktop-only ones. */
+export function skinsFor(phone) {
+  return phone ? THEMES.filter((t) => !t.desktopOnly) : THEMES;
+}
 
 const VALUES = THEMES.map((t) => t.value);
 

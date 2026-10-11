@@ -214,7 +214,7 @@ export function HubFrame({ children }) {
   return (
     <div className={`${c.frame} ${rail && !phone ? c.frameRail : ''}`}>
       {phone ? <PhoneBar /> : <Console rail={rail} onRail={setRail} />}
-      <main className={c.main}>{children}</main>
+      <main className={`${c.main} tc-main`}>{children}</main>
     </div>
   );
 }

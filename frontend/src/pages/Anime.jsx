@@ -3,9 +3,9 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft, ArrowRight, Calendar, Check,
   ChevronDown, ChevronLeft, ChevronRight, Clapperboard, Dices,
-  Flag, Frown, Heart, History, ListChecks, Meh, Minus, Play,
-  Plus, Radar, Repeat, Search, SlidersHorizontal, Smile, Sparkles, Star, Tag,
-  ThumbsDown, ThumbsUp, Trash2, Tv, User, X,
+  Heart, History, ListChecks, Minus, Play,
+  Plus, Radar, Search, SlidersHorizontal, Star, Tag,
+  ThumbsDown, ThumbsUp, Tv, User, X,
 } from 'lucide-react';
 
 import { api, useApi } from '../api/client.js';
@@ -16,13 +16,13 @@ import {
   useDebounced,
 } from '../components/layout/Section.jsx';
 import { Button, EmptyState, SegmentedControl } from '../components/ui/index.jsx';
-import { openCurtainCall } from '../components/anime/CurtainCallHost.jsx';
 import { Avatar } from '../components/ui/Avatar.jsx';
 import { ActivityFeed } from '../components/anime/Activity.jsx';
 import { ForumList } from '../components/anime/Forum.jsx';
 import { SOCIAL_MODES, SocialDesk } from '../components/anime/SocialDesk.jsx';
 import Seasons from '../components/anime/Seasons.jsx';
 import Episodes from '../components/anime/Episodes.jsx';
+import ListPanel from '../components/anime/ListPanel.jsx';
 import { WatchPoster, WatchRow, WatchRowsHead } from '../components/anime/WatchList.jsx';
 import wl from '../components/anime/watchlist.module.css';
 import ThemePlayer from '../components/anime/ThemePlayer.jsx';
@@ -40,13 +40,13 @@ import {
 } from '../components/anime/DetailExtras.jsx';
 import { useHorizontalWheel } from '../lib/useHorizontalWheel.js';
 import { compact } from '../lib/format.js';
-import { applyOverlay, useAnimeSync, usePlayer, useToast } from '../state.jsx';
+import { useAnimeSync, usePlayer, useToast } from '../state.jsx';
 import { useAnimeCalc } from '../components/anime/WatchCalculator.jsx';
 import s from './anime.module.css';
 
 import {
-  AnimeCard, CalcCue, CoverRatings, EMPTY_SET, FavToggle, InfiniteSentinel, MEDIA_STATUS, NextEpBadge, SyncBadge,
-  SCORE_MAX, SCORE_STEP, SET_PARAM, STATUS_LABEL, STATUS_META, airingDateLabel,
+  AnimeCard, CalcCue, CoverRatings, EMPTY_SET, FavToggle, InfiniteSentinel, MEDIA_STATUS, NextEpBadge,
+  SET_PARAM, STATUS_LABEL, airingDateLabel,
   discoverHref, fmtCountdown, metaLine, personalScore, stripHtml, titleCase, toggleInSet,
   trailerItem, useCountdownTick, useInfinite, useParamState,
 } from '../components/anime/shared.jsx';
@@ -794,292 +794,6 @@ function BrowseTab() {
     </>
   );
 }
-
-/** An adaptive score control: stars for POINT_5, smileys for POINT_3, and a
- *  slider + numeric badge for the point scales. Commits via onSet(value). */
-function ScoreField({ scoreFormat, value, disabled, onSet }) {
-  const max = SCORE_MAX[scoreFormat] || 10;
-
-  if (scoreFormat === 'POINT_5') {
-    return (
-      <div className={s.stars}>
-        {[1, 2, 3, 4, 5].map((n) => (
-          <button
-            key={n}
-            type="button"
-            className={s.star}
-            data-on={value >= n ? '' : undefined}
-            disabled={disabled}
-            onClick={() => onSet(value === n ? 0 : n)}
-            aria-label={`${n} star${n > 1 ? 's' : ''}`}
-          >
-            <Star size={20} fill={value >= n ? 'currentColor' : 'none'} />
-          </button>
-        ))}
-        {value > 0 && <button type="button" className={s.scoreClear} disabled={disabled} onClick={() => onSet(0)}>clear</button>}
-      </div>
-    );
-  }
-
-  if (scoreFormat === 'POINT_3') {
-    const faces = [[1, Frown, 'Bad'], [2, Meh, 'Meh'], [3, Smile, 'Good']];
-    return (
-      <div className={s.stars}>
-        {faces.map(([n, Icon, label]) => (
-          <button
-            key={n}
-            type="button"
-            className={s.face}
-            data-on={value === n ? '' : undefined}
-            disabled={disabled}
-            onClick={() => onSet(value === n ? 0 : n)}
-            aria-label={label}
-          >
-            <Icon size={22} />
-          </button>
-        ))}
-        {value > 0 && <button type="button" className={s.scoreClear} disabled={disabled} onClick={() => onSet(0)}>clear</button>}
-      </div>
-    );
-  }
-
-  const step = SCORE_STEP[scoreFormat] || 1;
-  return (
-    <div className={s.scoreSlider}>
-      <input
-        type="range"
-        min="0"
-        max={max}
-        step={step}
-        value={value}
-        disabled={disabled}
-        className={s.range}
-        style={{ '--pct': `${(value / max) * 100}%` }}
-        onChange={(e) => onSet(Number(e.target.value))}
-      />
-      <span className={s.scoreBadge} data-empty={value ? undefined : ''}>
-        {value ? value : '—'}<small>/ {max}</small>
-      </span>
-    </div>
-  );
-}
-
-/** Status / progress / score editor for a media's AniList list entry — the
- *  "Your list" panel: status pills, a progress meter, an adaptive score control,
- *  and a foldout for rewatches, dates, notes, category scores, custom lists and
- *  privacy. `viewer` carries the account's custom lists and scoring categories. */
-function ListControls({ media, scoreFormat, viewer }) {
-  const { overlay, syncState, queueListEdit, removeListEntry } = useAnimeSync();
-  const [more, setMore] = useState(false);
-  const entry = applyOverlay(media.id, media.list_entry, overlay);
-  const cats = viewer?.advanced_scoring || [];
-  const customLists = viewer?.custom_lists || [];
-  const status = syncState[media.id];
-  const prog = entry?.progress || 0;
-  const total = media.episodes;
-  const pct = total ? Math.min(100, Math.round((prog / total) * 100)) : 0;
-  const repeat = entry?.repeat || 0;
-
-  // Edits apply locally at once and flush to AniList on a debounce (see state.jsx),
-  // so the controls stay responsive and never block on the network.
-  const save = (patch) => queueListEdit(media, patch);
-  const remove = () => removeListEntry(media, entry?.id);
-  // Mark the whole run watched and complete it in one tap.
-  const finish = () => save({ status: 'COMPLETED', ...(total ? { progress: total } : {}) });
-
-  return (
-    <div className={s.listPanel} data-active={entry ? '' : undefined}>
-      {/* status as pills — tapping one adds the title or moves it between lists */}
-      <div className={s.statusPills}>
-        {STATUS_META.map(([v, label, Icon]) => (
-          <button
-            key={v}
-            type="button"
-            className={s.statusPill}
-            data-on={entry?.status === v ? '' : undefined}
-            onClick={() => save({ status: v })}
-          >
-            <Icon size={14} /> {label}
-          </button>
-        ))}
-        <SyncBadge status={status} className={s.listSync} />
-      </div>
-
-      {!entry && (
-        <p className={s.listHint}>Pick a shelf above to add this to your AniList.</p>
-      )}
-
-      {entry && (
-        <>
-          <div className={s.listFields}>
-            {/* progress: a meter you can scrub with the stepper, plus a finish shortcut */}
-            <div className={s.listField}>
-              <div className={s.listFieldHead}>
-                <span className={s.listLabel}>Progress</span>
-                <span className={s.progCount}>
-                  {prog}{total ? ` / ${total}` : ''} {total ? 'episodes' : 'ep'}
-                </span>
-              </div>
-              <div className={s.progRow}>
-                <button className={s.stepBtn} disabled={prog <= 0} onClick={() => save({ progress: prog - 1 })} aria-label="One fewer">
-                  <Minus size={14} />
-                </button>
-                <div className={s.progTrack} title={total ? `${pct}% watched` : undefined}>
-                  <span className={s.progFill} style={{ width: `${total ? pct : prog > 0 ? 100 : 0}%` }} />
-                </div>
-                <button className={s.stepBtn} disabled={total && prog >= total} onClick={() => save({ progress: prog + 1 })} aria-label="One more">
-                  <Plus size={14} />
-                </button>
-              </div>
-              {total > 0 && prog < total && entry.status !== 'COMPLETED' && (
-                <button className={s.finishBtn} onClick={finish}>
-                  <Flag size={12} /> Finish — mark all {total} watched
-                </button>
-              )}
-              {entry.status === 'COMPLETED' && media.status === 'FINISHED' && (
-                <button className={s.finishBtn} onClick={() => openCurtainCall(media.id)}>
-                  <Sparkles size={12} /> Curtain call — rate it, talk the finale, what's next
-                </button>
-              )}
-            </div>
-
-            {/* score: adaptive to the viewer's chosen format */}
-            <div className={s.listField}>
-              <div className={s.listFieldHead}>
-                <span className={s.listLabel}>Your score</span>
-              </div>
-              <ScoreField
-                scoreFormat={scoreFormat}
-                value={entry.score || 0}
-                onSet={(v) => { if (v !== (entry.score || 0)) save({ score: v }); }}
-              />
-            </div>
-          </div>
-
-          <button className={s.moreToggle} onClick={() => setMore((v) => !v)} data-open={more ? '' : undefined}>
-            <ChevronDown size={14} /> {more ? 'Fewer details' : 'More details'}
-          </button>
-
-          {more && (
-            <div className={s.listExtra}>
-              <div className={s.listField}>
-                <div className={s.listFieldHead}>
-                  <span className={s.listLabel}>Rewatches</span>
-                </div>
-                <div className={s.stepper}>
-                  <button className={s.stepBtn} disabled={repeat <= 0} onClick={() => save({ repeat: repeat - 1 })} aria-label="One fewer rewatch">
-                    <Minus size={14} />
-                  </button>
-                  <span className={s.stepperVal}><Repeat size={12} /> {repeat}×</span>
-                  <button className={s.stepBtn} onClick={() => save({ repeat: repeat + 1 })} aria-label="One more rewatch">
-                    <Plus size={14} />
-                  </button>
-                </div>
-              </div>
-
-              <label className={s.dateField}>
-                <span className={s.listLabel}><Calendar size={12} /> Started</span>
-                <input
-                  type="date"
-                  className={s.dateInput}
-                  defaultValue={entry.started_at || ''}
-                  onChange={(e) => save({ started_at: e.target.value })}
-                />
-              </label>
-              <label className={s.dateField}>
-                <span className={s.listLabel}><Calendar size={12} /> Finished</span>
-                <input
-                  type="date"
-                  className={s.dateInput}
-                  defaultValue={entry.completed_at || ''}
-                  onChange={(e) => save({ completed_at: e.target.value })}
-                />
-              </label>
-
-              <label className={s.notesField}>
-                <span className={s.listLabel}>Notes</span>
-                <textarea
-                  className={s.notesInput}
-                  rows={2}
-                  placeholder="A private note for this title…"
-                  defaultValue={entry.notes || ''}
-                  onBlur={(e) => { if (e.target.value !== (entry.notes || '')) save({ notes: e.target.value }); }}
-                />
-              </label>
-
-              {/* Per-category scores, only when the account uses AniList's
-                  advanced scoring (Story, Characters, Visuals…). */}
-              {cats.length > 0 && (
-                <div className={s.advScores}>
-                  <span className={s.listLabel}>Scored by category</span>
-                  {cats.map((c) => {
-                    const v = Number(entry.advanced_scores?.[c] || 0);
-                    return (
-                      <label key={c} className={s.advRow}>
-                        <span>{c}</span>
-                        <input
-                          type="range"
-                          min="0"
-                          max={SCORE_MAX[scoreFormat] || 10}
-                          step={SCORE_STEP[scoreFormat] || 1}
-                          defaultValue={v}
-                          onChange={(e) => save({ advanced_scores: { ...(entry.advanced_scores || {}), [c]: Number(e.target.value) } })}
-                        />
-                        <b>{v || '—'}</b>
-                      </label>
-                    );
-                  })}
-                </div>
-              )}
-
-              {customLists.length > 0 && (
-                <div className={s.customLists}>
-                  <span className={s.listLabel}>Custom lists</span>
-                  <div className={s.customChips}>
-                    {customLists.map((c) => {
-                      const on = (entry.custom_lists || []).includes(c);
-                      return (
-                        <button
-                          key={c}
-                          type="button"
-                          className={on ? s.customOn : s.custom}
-                          aria-pressed={on}
-                          onClick={() => save({
-                            custom_lists: on
-                              ? (entry.custom_lists || []).filter((x) => x !== c)
-                              : [...(entry.custom_lists || []), c],
-                          })}
-                        >
-                          {on ? <Check size={11} /> : <Plus size={11} />} {c}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              <div className={s.privacy}>
-                <label className={s.privacyRow}>
-                  <input type="checkbox" checked={!!entry.private} onChange={(e) => save({ private: e.target.checked })} />
-                  <span><b>Private</b> — hidden from your public list and activity</span>
-                </label>
-                <label className={s.privacyRow}>
-                  <input type="checkbox" checked={!!entry.hidden} onChange={(e) => save({ hidden: e.target.checked })} />
-                  <span><b>Hide from status lists</b> — show only under its custom lists</span>
-                </label>
-              </div>
-            </div>
-          )}
-
-          <button className={s.removeLink} onClick={remove}>
-            <Trash2 size={12} /> Remove from list
-          </button>
-        </>
-      )}
-    </div>
-  );
-}
-
 
 // AniList's natural shelf order; custom lists (no standard status) sort last.
 const STATUS_ORDER = ['CURRENT', 'REPEATING', 'PLANNING', 'COMPLETED', 'PAUSED', 'DROPPED'];
@@ -1955,12 +1669,7 @@ export function AnimeDetail() {
             rankings={ext?.rankings}
           />
 
-          {me.data && (
-            <div className={s.yourList}>
-              <h3 className={s.blockLabel}>Your list</h3>
-              <ListControls media={m} scoreFormat={me.data.score_format} viewer={me.data} />
-            </div>
-          )}
+          {me.data && <ListPanel media={m} viewer={me.data} />}
 
           {m.description && <Synopsis html={m.description} tags={m.tags} />}
 

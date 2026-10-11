@@ -21,7 +21,7 @@ import { api, useApi } from '../api/client.js';
 import { Avatar } from '../components/ui/Avatar.jsx';
 import AddSubscriptionModal from '../components/modals/AddSubscriptionModal.jsx';
 import { useSettings, useSubscriptions, useToast } from '../state.jsx';
-import { THEMES } from '../lib/themes.js';
+import { THEMES, skinsFor } from '../lib/themes.js';
 import { ROOMS, knownActiveIds } from '../lib/rooms.js';
 import { latestParams } from '../lib/urlState.js';
 import { subtitleStyle, SUBTITLE_FONTS } from '../lib/subtitleStyle.js';
@@ -325,7 +325,7 @@ function AppearanceSection() {
   const value = settings?.theme || 'dark';
   return (
     <div className={s.skins} role="radiogroup" aria-label="Skin">
-      {THEMES.map((t) => {
+      {skinsFor(APP.phone).map((t) => {
         const on = value === t.value;
         return (
           <button

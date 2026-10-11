@@ -175,6 +175,9 @@ def _norm_entry(e):
         "custom_lists": _custom_lists(e.get("customLists")) if "customLists" in e else None,
         # {category: score} when the viewer uses advanced scoring, else None
         "advanced_scores": e.get("advancedScores") or None,
+        # unix seconds; only the detail page and mutation echoes ask for these
+        "updated_at": e.get("updatedAt"),
+        "created_at": e.get("createdAt"),
     }
 
 
@@ -791,7 +794,7 @@ def media(media_id, token=None):
         + " isFavourite"
         + " mediaListEntry { id repeat notes startedAt { year month day }"
           " completedAt { year month day } private hiddenFromStatusLists"
-          " customLists(asArray:true) advancedScores }"
+          " customLists(asArray:true) advancedScores updatedAt createdAt }"
         + " tags { name rank isMediaSpoiler }"
         # ROLE first so mains lead; 24 is a full programme without a second page.
         + " characters(sort:[ROLE,RELEVANCE,ID],perPage:24) { edges { role"
@@ -807,9 +810,10 @@ def media(media_id, token=None):
         + "} }"
     )
     # mediaListEntry depends on the token, so don't share the cache across auth states.
-    # The trailing v2 retires rows cached before the payload gained recommendation
-    # votes and list privacy; the `anilist:media:{id}:` prefix still invalidates it.
-    key = f"anilist:media:{media_id}:{'auth' if token else 'anon'}:v2"
+    # The trailing version retires rows cached before the payload gained recommendation
+    # votes and list privacy (v2) and the entry's timestamps (v3); the
+    # `anilist:media:{id}:` prefix still invalidates it.
+    key = f"anilist:media:{media_id}:{'auth' if token else 'anon'}:v3"
 
     def fetch():
         d = _post(query, {"id": media_id}, token=token)
@@ -992,7 +996,7 @@ def _date_input(s):
 
 _ENTRY_ECHO = (
     " id status score progress repeat notes private hiddenFromStatusLists"
-    " customLists(asArray:true) advancedScores"
+    " customLists(asArray:true) advancedScores updatedAt createdAt"
     " startedAt { year month day } completedAt { year month day }"
 )
 

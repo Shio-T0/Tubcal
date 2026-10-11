@@ -344,11 +344,23 @@ index it hangs in the shell's left margin on ≥1780px, folds to an icon rail
 the `.tc-console`/`.tc-nav`/`.tc-navitem(-on)`/`.tc-navno`/`.tc-topline`/`.tc-wordmark`
 hooks at the end of `styles/themes.css`. `Home` (eager) is `/`; the Anime routes sit under `AnimeSection`. CSS Modules per page/component, design tokens in `styles/tokens.css`
 and `styles/themes.css`. Skins are a registry in `lib/themes.js` (`dark`, `light`,
-`terminal`, `bauhaus`, `blueprint`, `aqua`, `space`) — each is a `[data-theme]`
+`terminal`, `bauhaus`, `blueprint`, `aqua`, `space`, `bench`) — each is a `[data-theme]`
 block overriding tokens, so component CSS restyles for free via `var(--token)`;
 the saved theme is injected server-side into `index.html` on first paint. Note
 `dark`/`light` are not the only two: `bauhaus` and `aqua` are light-backed as well
-(`--ink` is the background), which matters for anything reading `color-scheme`. A room's view state (active tab,
+(`--ink` is the background), which matters for anything reading `color-scheme`.
+`bench` ("Cutting Mat") is drawn from the user's own desktop. It shows Catppuccin
+Macchiato windows over a teal cutting-mat backdrop, uses the system's JetBrains
+Mono, and draws the current room as a lualine block. It is `desktopOnly`, so the
+phone's pickers skip it (`skinsFor(phone)`). It works through a few global hooks
+that only it styles:
+- `.tc-main`: a page's area, which becomes a window.
+- `.tc-index`: the Anime's tree.
+- `.tc-bar`: the Anime's top bar.
+- `.tc-strip` and `.tc-hero`: Home's lines and wordmark.
+- `.tc-float`: toasts.
+
+Anything that can land on the bare mat needs a dark backing in that skin. A room's view state (active tab,
 filters, search) belongs in the query string, not `useState` — opening a detail
 route unmounts the room, so local state is lost on back. `useParamState` in
 `lib/urlState.js` (re-exported by `components/anime/shared.jsx`) is the reference: it writes with `replace` (a filter toggle is
@@ -488,6 +500,23 @@ load on `useInView` to save AniList budget. My List's titles are `components/ani
 - The register has column headings, and "Gathering dust" is folded to one line
   there (`collapsible`).
 
+The title page's "Your list" deck is `components/anime/ListPanel.jsx` (desktop only;
+the phone has its own title page):
+- A shelf rail. Completing from it also marks every episode watched.
+- Two wells. *Where you are* has a counter you can type into and a tape of
+  episode cells (a continuous strip past 52 episodes). It also has −/+1,
+  play/resume (`watchState` + `usePlayEpisode` from `WatchList.jsx`) and Finish.
+  *Your score* has `ScoreDial`, the words, and how it sits against AniList's average.
+- The record, an index card with tabs (`?rec=`): By category, Journal (dates,
+  rewatches, time watched; `updated_at`/`created_at` come from the detail query),
+  Notes, and Lists & privacy.
+- Remove takes two presses.
+
+Scores are one vocabulary across the room: `components/anime/scoring.js` holds the
+pure maths (words, tens, `categoryAverage`). `Scoring.jsx` has `ScoreDial` and
+`CategoryScores`, one segmented meter per advanced-scoring category. Its `confirm`
+mode is read-only until Edit and writes only on Save; the phone uses it.
+
 The title page's episode section is
 `components/anime/Episodes.jsx`. A desk works out where you are from AniList
 progress *and* local resume points, and shows a per-episode reel. Below it is a
@@ -520,7 +549,10 @@ are inserted in place instead of refetching.
 
 The curtain call (`components/anime/CurtainCall.jsx`) is the screen after you
 finish a season: rate it (a 1–10 tile row with words, or stars/faces, in the
-viewer's own score format), the finale's episode thread (`ThreadView` with
+viewer's own score format), score it by category (`CategoryScores`, with the
+viewer's categories from `/anime/me`; live on desktop, Edit → Save on the phone via
+`__TUBCAL_APP__.phone`; an account with advanced scoring off is offered a switch),
+the finale's episode thread (`ThreadView` with
 `composerFirst`; or start that thread if AniList has none), an inline `ReviewForm`
 (its score seeded from the rating, drafts kept in localStorage), and the next ≤3
 sequels one tap from Planning/Watching — or a "終 · series finished" card. The

@@ -243,6 +243,19 @@ def test_advanced_scores_follow_category_order():
     assert anilist.advanced_score_list(None, cats) == [0.0, 0.0, 0.0]
 
 
+def test_entry_carries_its_timestamps_and_category_scores():
+    # the title page's list panel shows "last changed" and "on your list since"
+    e = anilist._norm_entry({
+        "id": 1, "status": "COMPLETED", "score": 80, "progress": 10,
+        "advancedScores": {"Story": 85, "Audio": 0}, "updatedAt": 1790000000, "createdAt": 1768700000,
+    })
+    assert e["updated_at"] == 1790000000 and e["created_at"] == 1768700000
+    assert e["advanced_scores"] == {"Story": 85, "Audio": 0}
+    # lighter card queries don't ask for them: absent, not an error
+    bare = anilist._norm_entry({"id": 2, "status": "PLANNING"})
+    assert bare["updated_at"] is None and bare["created_at"] is None
+
+
 def test_custom_list_memberships():
     assert anilist._custom_lists([{"name": "Comfy", "enabled": True},
                                   {"name": "Rewatch", "enabled": False}]) == ["Comfy"]

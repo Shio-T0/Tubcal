@@ -14,6 +14,8 @@ const LOADERS = {
     () => import('@fontsource-variable/space-grotesk'),
     () => import('@fontsource-variable/inter'),
   ],
+  // headings and code use the system's JetBrains Mono (as the terminal does)
+  bench: [() => import('@fontsource-variable/inter')],
 };
 
 const loaded = new Set();

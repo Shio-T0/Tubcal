@@ -53,7 +53,7 @@ export default function AnimeMasthead() {
   const theme = settings?.theme || 'dark';
   const upcoming = themeMeta(nextTheme(theme));
   return (
-    <header className={b.bar}>
+    <header className={`${b.bar} tc-bar`}>
       <Link to="/" className={b.brand} title="Home — choose Hub or Anime">
         <span className={b.word}>Tubcal<em>.</em></span>
         <span className={b.channel}>

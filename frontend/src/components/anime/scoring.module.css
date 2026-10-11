@@ -1,0 +1,364 @@
+/* The shared score controls. Controls are drawn in the room's amber (--hot,
+   which a host may set; it falls back to the anime accent) so a near-black or pale
+   cover colour can never make one unreadable. */
+
+/* ── the overall score ──────────────────────────────────────────────────────── */
+
+.dial {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.tens {
+  display: grid;
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+  gap: 4px;
+}
+.ten {
+  height: 42px;
+  border-radius: 9px;
+  border: 1px solid var(--rule);
+  background: color-mix(in srgb, var(--paper) 4%, transparent);
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--paper-dim);
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease, transform 0.12s var(--hand);
+}
+.ten[data-lit] {
+  color: var(--paper);
+  border-color: color-mix(in srgb, var(--hot, var(--c-anime)) 45%, var(--rule));
+  background: color-mix(in srgb, var(--hot, var(--c-anime)) 22%, transparent);
+}
+.ten[data-on] {
+  color: var(--ink);
+  border-color: transparent;
+  background: var(--hot, var(--c-anime));
+  box-shadow: 0 0 16px color-mix(in srgb, var(--hot, var(--c-anime)) 55%, transparent);
+}
+.ten:hover {
+  transform: translateY(-2px);
+}
+.ten:focus-visible {
+  outline: 2px solid var(--hot, var(--c-anime));
+  outline-offset: 2px;
+}
+
+.fine {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.fine span {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--paper-faint);
+}
+.fine input {
+  flex: 1;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 6px;
+  border-radius: 999px;
+  background: linear-gradient(90deg,
+    var(--hot, var(--c-anime)) var(--pct, 0%),
+    color-mix(in srgb, var(--paper) 10%, transparent) var(--pct, 0%));
+  cursor: pointer;
+}
+.fine input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--hot, var(--c-anime)) 80%, white);
+  border: 2px solid var(--ink);
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.35);
+}
+.fine input::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--hot, var(--c-anime)) 80%, white);
+  border: 2px solid var(--ink);
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.35);
+}
+.fine b {
+  min-width: 34px;
+  text-align: right;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--paper);
+}
+
+.stars {
+  display: flex;
+  gap: 6px;
+}
+.star {
+  color: color-mix(in srgb, var(--paper) 16%, transparent);
+  cursor: pointer;
+  transition: color 0.12s ease, transform 0.12s var(--hand);
+}
+.star svg {
+  width: 30px;
+  height: 30px;
+}
+.star[data-on] {
+  color: #f0bf4c;
+  filter: drop-shadow(0 0 8px rgba(240, 191, 76, 0.45));
+}
+.star:hover {
+  transform: scale(1.1);
+}
+.faces {
+  display: flex;
+  gap: 10px;
+}
+.face {
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  border: 1px solid var(--rule);
+  color: var(--paper-dim);
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.face svg {
+  width: 30px;
+  height: 30px;
+}
+.face:hover {
+  color: var(--paper);
+  border-color: var(--rule-strong);
+}
+.face[data-on] {
+  color: var(--ink);
+  background: var(--hot, var(--c-anime));
+  border-color: transparent;
+}
+
+/* ── category scores ────────────────────────────────────────────────────────── */
+
+.cats {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.catRows {
+  /* rows share one grid, so the meters line up behind the longest name */
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px 14px;
+}
+.catRows[data-step] {
+  grid-template-columns: max-content minmax(0, 1fr) auto auto;
+}
+.catRow {
+  display: contents;
+}
+.catName {
+  max-width: 9rem;
+  overflow: hidden;
+  font-size: 13px;
+  color: var(--paper-dim);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.catVal {
+  min-width: 2.2rem;
+  font-family: var(--font-mono);
+  font-size: 13.5px;
+  font-weight: 600;
+  text-align: right;
+  color: var(--paper);
+  font-variant-numeric: tabular-nums;
+}
+.catVal[data-empty] {
+  font-weight: 400;
+  color: var(--paper-faint);
+}
+
+/* The meter: ten segments, cut out of three stacked strips by one mask — the dim
+   track, a ghost of where the pointer is, and the lit part clipped to the score. */
+.meter {
+  position: relative;
+  height: 11px;
+  border-radius: 3px;
+  touch-action: pan-y;
+  outline: none;
+}
+.meter[data-live] {
+  cursor: pointer;
+}
+.meterTrack,
+.meterGhost,
+.meterLit {
+  position: absolute;
+  inset: 0;
+  -webkit-mask: repeating-linear-gradient(90deg, #000 0 calc(10% - 3px), transparent calc(10% - 3px) 10%);
+  mask: repeating-linear-gradient(90deg, #000 0 calc(10% - 3px), transparent calc(10% - 3px) 10%);
+  -webkit-mask-size: calc(100% + 3px) 100%;
+  mask-size: calc(100% + 3px) 100%;
+}
+.meterTrack {
+  background: color-mix(in srgb, var(--paper) 9%, transparent);
+}
+.meter[data-live]:hover .meterTrack {
+  background: color-mix(in srgb, var(--paper) 13%, transparent);
+}
+.meterGhost {
+  background: color-mix(in srgb, var(--hot, var(--c-anime)) 32%, transparent);
+  clip-path: inset(0 calc((1 - var(--g)) * 100%) 0 0);
+}
+.meterLit {
+  background: linear-gradient(90deg,
+    color-mix(in srgb, var(--hot, var(--c-anime)) 55%, var(--paper-faint)),
+    var(--hot, var(--c-anime)) 70%,
+    color-mix(in srgb, var(--hot, var(--c-anime)) 75%, white));
+  background-size: 100% 100%;
+  clip-path: inset(0 calc((1 - var(--f)) * 100%) 0 0);
+  transition: clip-path 0.22s var(--hand);
+}
+.meter[data-drag] .meterLit {
+  transition: none;
+}
+.meter:focus-visible {
+  box-shadow: 0 0 0 2px var(--ink), 0 0 0 4px var(--hot, var(--c-anime));
+}
+.meterTip {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: calc(var(--g) * 100%);
+  transform: translateX(-50%);
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.catStep {
+  display: inline-flex;
+  gap: 4px;
+}
+.catStep button {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  border: 1px solid var(--rule);
+  background: color-mix(in srgb, var(--paper) 4%, transparent);
+  color: var(--paper-dim);
+}
+.catStep button:disabled {
+  opacity: 0.35;
+}
+
+.catFoot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 14px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--rule);
+}
+.catAvg {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--paper-faint);
+}
+.catAvg > span {
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.catAvg b {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 620;
+  line-height: 1;
+  color: var(--paper);
+}
+.catAvg em {
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-style: normal;
+  color: var(--paper-dim);
+}
+.catCount {
+  font-style: normal;
+  padding: 1px 7px;
+  border-radius: var(--r-pill);
+  background: color-mix(in srgb, var(--paper) 7%, transparent);
+}
+.catActs {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-left: auto;
+}
+.useAvg,
+.editBtn,
+.cancelBtn,
+.saveBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--rule);
+  font-size: 12.5px;
+  color: var(--paper-dim);
+  cursor: pointer;
+  transition: color 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+}
+.useAvg {
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--hot, var(--c-anime)) 55%, var(--rule));
+  color: color-mix(in srgb, var(--hot, var(--c-anime)) 75%, var(--paper));
+}
+.useAvg:hover,
+.editBtn:hover,
+.cancelBtn:hover {
+  color: var(--paper);
+  border-color: var(--rule-strong);
+  background: color-mix(in srgb, var(--paper) 5%, transparent);
+}
+.useAvg:hover {
+  border-style: solid;
+  border-color: var(--hot, var(--c-anime));
+}
+.saveBtn {
+  border-color: transparent;
+  background: var(--hot, var(--c-anime));
+  color: var(--ink);
+  font-weight: 650;
+}
+.saveBtn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .meterLit,
+  .ten,
+  .star {
+    transition: none;
+  }
+}

@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 
 import { DEFAULT_ACTIVE_ROOMS } from '@pc/lib/rooms.js';
-import { THEMES } from '@pc/lib/themes.js';
+import { skinsFor } from '@pc/lib/themes.js';
 import { usePlayer, useSaved, useSettings } from '@pc/state.jsx';
 
 import { appVersion, haptic } from '../lib/bridge.js';
@@ -88,7 +88,7 @@ export default function More() {
 
       <SectionTitle><Palette size={14} /> Skin</SectionTitle>
       <div className={m.skins}>
-        {THEMES.map((t) => (
+        {skinsFor(true).map((t) => (
           <button
             key={t.value}
             type="button"
