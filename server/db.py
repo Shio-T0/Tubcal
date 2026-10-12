@@ -181,15 +181,24 @@ DEFAULT_SETTINGS = {
 }
 
 
+_prepared = set()  # DB paths whose dir exists and whose file is already in WAL
+
+
 def connect():
-    config.DATA_DIR.mkdir(exist_ok=True)
-    con = sqlite3.connect(config.DB_PATH, timeout=10)
+    path = config.DB_PATH
+    first = path not in _prepared
+    if first:
+        config.DATA_DIR.mkdir(exist_ok=True)
+    con = sqlite3.connect(path, timeout=10)
     con.row_factory = sqlite3.Row
-    # journal_mode is persisted in the file; the rest are per-connection tuning.
-    # synchronous=NORMAL is safe (durable) under WAL and much faster on writes;
-    # mmap reads avoid syscalls; a 16 MB page cache and in-memory temp tables cut
-    # per-request latency for this local, single-user workload.
-    con.execute("PRAGMA journal_mode=WAL")
+    # journal_mode is persisted in the file, so it is set once per path rather than
+    # on every connection (it takes a lock to check); the rest are per-connection
+    # tuning. synchronous=NORMAL is safe (durable) under WAL and much faster on
+    # writes; mmap reads avoid syscalls; a 16 MB page cache and in-memory temp
+    # tables cut per-request latency for this local, single-user workload.
+    if first:
+        con.execute("PRAGMA journal_mode=WAL")
+        _prepared.add(path)
     con.execute("PRAGMA synchronous=NORMAL")
     con.execute("PRAGMA mmap_size=268435456")   # 256 MB
     con.execute("PRAGMA cache_size=-16000")      # 16 MB (negative = KiB)
@@ -550,15 +559,16 @@ def list_saved(platform=None, limit=500):
     con = connect()
     if platform:
         rows = con.execute(
-            "SELECT payload FROM saved WHERE platform=? ORDER BY saved_at DESC LIMIT ?",
+            "SELECT payload, saved_at FROM saved WHERE platform=? ORDER BY saved_at DESC LIMIT ?",
             (platform, limit),
         ).fetchall()
     else:
         rows = con.execute(
-            "SELECT payload FROM saved ORDER BY saved_at DESC LIMIT ?", (limit,)
+            "SELECT payload, saved_at FROM saved ORDER BY saved_at DESC LIMIT ?", (limit,)
         ).fetchall()
     con.close()
-    return [json.loads(r["payload"]) for r in rows]
+    # saved_at rides along so the Saved page can say when each was kept
+    return [{**json.loads(r["payload"]), "saved_at": r["saved_at"]} for r in rows]
 
 
 # ---- the archive (local second brain) ----
