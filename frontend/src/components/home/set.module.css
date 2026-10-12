@@ -152,6 +152,10 @@
   grid-template-columns: minmax(0, 1.08fr) minmax(0, 1fr);
   gap: 28px;
   align-items: center;
+  /* centred in the tube: the control strip usually makes the screen taller than
+     the programme, and the slack splits evenly above and below it rather than
+     pooling between it and the presets (whose top margin this replaces) */
+  margin-block: auto;
   animation: tuneIn 0.5s var(--hand) both;
 }
 @keyframes tuneIn {
@@ -374,7 +378,6 @@
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 12px;
-  margin-top: auto;
   padding-top: 16px;
   border-top: 1px solid color-mix(in srgb, var(--paper) 10%, transparent);
 }
