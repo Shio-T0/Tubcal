@@ -103,21 +103,7 @@ def warm(key, ttl, fetcher):
 def cached(key, ttl, fetcher):
     """Return (payload, stale). Raises only if there is no stale fallback."""
     now = time.time()
-
-    with _lock:
-        entry = _mem.get(key)
-
-    if entry is None:
-        con = db.connect()
-        row = con.execute(
-            "SELECT payload, fetched_at FROM cache WHERE key=?", (key,)
-        ).fetchone()
-        con.close()
-        if row:
-            entry = {"payload": json.loads(row["payload"]), "fetched_at": row["fetched_at"]}
-            with _lock:
-                _mem[key] = entry
-
+    entry = _load_entry(key)
     if entry and now - entry["fetched_at"] < ttl:
         return entry["payload"], False
 
@@ -128,18 +114,7 @@ def cached(key, ttl, fetcher):
             return entry["payload"], True
         raise
 
-    entry = {"payload": payload, "fetched_at": now}
-    with _lock:
-        _mem[key] = entry
-    con = db.connect()
-    with con:
-        con.execute(
-            "INSERT INTO cache (key, payload, fetched_at, ttl) VALUES (?, ?, ?, ?) "
-            "ON CONFLICT(key) DO UPDATE SET payload=excluded.payload, "
-            "fetched_at=excluded.fetched_at, ttl=excluded.ttl",
-            (key, json.dumps(payload), int(now), ttl),
-        )
-    con.close()
+    _store(key, payload, now, ttl)
     return payload, False
 
 
@@ -218,7 +193,11 @@ def invalidate(prefix=""):
             del _mem[k]
     con = db.connect()
     with con:
-        cur = con.execute("DELETE FROM cache WHERE key LIKE ?", (prefix + "%",))
+        # substr, not LIKE: keys carry `_` (YouTube ids, `yt_…`), which LIKE
+        # reads as a wildcard and so drops neighbours that merely look alike.
+        cur = con.execute(
+            "DELETE FROM cache WHERE substr(key, 1, ?) = ?", (len(prefix), prefix)
+        )
         n = cur.rowcount
     con.close()
     return n

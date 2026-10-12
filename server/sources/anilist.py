@@ -1554,7 +1554,7 @@ def save_thread_comment(token, thread_id, text, parent_id=None):
         "mutation (" + ",".join(decl) + "){ SaveThreadComment(" + ",".join(args) + "){ id comment(asHtml:true) createdAt } }",
         variables, token=token,
     )
-    cache.invalidate(f"anilist:thread:{thread_id}")
+    cache.invalidate(f"anilist:thread:{thread_id}:")
     return d.get("SaveThreadComment")
 
 
@@ -1736,7 +1736,7 @@ def delete_thread_comment(token, comment_id, thread_id=None):
 def delete_activity_reply(token, reply_id, activity_id=None):
     """Delete one of the viewer's own replies on an activity."""
     d = _post("mutation ($id:Int){ DeleteActivityReply(id:$id){ deleted } }", {"id": int(reply_id)}, token=token)
-    cache.invalidate(f"anilist:areplies:{activity_id}" if activity_id else "anilist:areplies:")
+    cache.invalidate(f"anilist:areplies:{activity_id}:" if activity_id else "anilist:areplies:")
     cache.invalidate("anilist:activity:")
     return d.get("DeleteActivityReply")
 
@@ -1744,7 +1744,7 @@ def delete_activity_reply(token, reply_id, activity_id=None):
 def save_activity_reply(token, activity_id, text):
     d = _post("mutation ($id:Int,$t:String){ SaveActivityReply(activityId:$id, text:$t){ id text(asHtml:true) createdAt } }",
               {"id": activity_id, "t": text}, token=token)
-    cache.invalidate(f"anilist:areplies:{activity_id}")
+    cache.invalidate(f"anilist:areplies:{activity_id}:")
     return d.get("SaveActivityReply")
 
 

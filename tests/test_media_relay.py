@@ -81,6 +81,14 @@ def test_stream_get_swaps_in_a_refreshed_url_on_refusal(monkeypatch):
     assert sess.calls[1][1]["Range"] == "bytes=10-20"  # the same bytes, from the new URL
 
 
+def test_stream_get_refusal_on_the_last_attempt_still_tries_the_replacement(monkeypatch):
+    sess = FakeSession([FakeResp(503), FakeResp(403), FakeResp(206, b"bytes")])
+    monkeypatch.setattr(httpc, "anon_session", sess)
+    monkeypatch.setattr(httpc.time, "sleep", lambda s: None)
+    r = httpc.stream_get("https://old/a", anonymous=True, attempts=2, refresh=lambda s: "https://new/a")
+    assert r.status_code == 206 and sess.calls[2][0] == "https://new/a"
+
+
 def test_stream_get_refusal_without_a_replacement_is_returned(monkeypatch):
     sess = FakeSession([FakeResp(403)])
     monkeypatch.setattr(httpc, "anon_session", sess)
@@ -177,7 +185,8 @@ def test_segment_proxy_still_refuses_other_hosts(client):
     assert r.status_code == 403
 
 
-def test_fresh_url_matches_the_same_rendition(monkeypatch):
+def test_fresh_url_matches_the_same_rendition(client, monkeypatch):
+    # `client` points the cache at a throwaway DB: _fresh_url invalidates rows.
     monkeypatch.setattr(feeds, "_FRESH", {})
     monkeypatch.setattr(feeds, "_refreshed_at", {})
     monkeypatch.setattr(feeds.youtube, "video_streams", lambda vid: {

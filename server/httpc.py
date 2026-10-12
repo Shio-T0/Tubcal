@@ -1,5 +1,3 @@
-"""Shared HTTP client: one requests.Session, per-host minimum spacing."""
-
 """Shared HTTP client: one requests.Session, per-host minimum spacing, and
 dynamic rate-limit tracking driven by response headers (e.g. Reddit's
 x-ratelimit-remaining/x-ratelimit-reset).
@@ -173,26 +171,32 @@ def stream_get(url, *, headers=None, anonymous=False, timeout=(6, 25), attempts=
     resp = None
     last_exc = None
     refreshed = False
-    for i in range(attempts):
+    tries = 0
+    while tries < attempts:
         if resp is not None:
             resp.close()
             resp = None
+        tries += 1
+        last = tries >= attempts
         try:
             resp = sess.get(url, headers=hdrs, stream=True, timeout=timeout, allow_redirects=True)
         except requests.RequestException as e:
             last_exc = e
-            if i < attempts - 1:
-                time.sleep(min(2.0, 0.3 * 2 ** i))
+            if not last:
+                time.sleep(min(2.0, 0.3 * 2 ** (tries - 1)))
             continue
         if resp.status_code in _STALE_STATUS and refresh and not refreshed:
             refreshed = True
             fresh = refresh(url)
             if fresh and fresh != url:
+                # A new URL is a fresh start, not a retry: even a refusal on the
+                # final attempt still gets its one go at the replacement.
                 url = fresh
+                tries = min(tries, attempts - 1)
                 continue
             return resp
-        if resp.status_code in _RETRY_STATUS and i < attempts - 1:
-            time.sleep(min(2.0, 0.3 * 2 ** i))
+        if resp.status_code in _RETRY_STATUS and not last:
+            time.sleep(min(2.0, 0.3 * 2 ** (tries - 1)))
             continue
         return resp
     if resp is not None:
