@@ -11,6 +11,7 @@ export default function OfflineBanner() {
   useEffect(() => {
     let alive = true;
     const ping = async () => {
+      if (document.hidden) return; // a background tab needn't knock every 15s
       try {
         const res = await fetch('/api/health', { cache: 'no-store' });
         if (alive) setOffline(!res.ok);
@@ -20,9 +21,11 @@ export default function OfflineBanner() {
     };
     ping();
     const t = setInterval(ping, 15000);
+    document.addEventListener('visibilitychange', ping); // ...but asks again on return
     return () => {
       alive = false;
       clearInterval(t);
+      document.removeEventListener('visibilitychange', ping);
     };
   }, []);
 
@@ -32,7 +35,7 @@ export default function OfflineBanner() {
     <div className={s.banner} role="alert">
       <WifiOff size={15} />
       <span>
-        Lost contact with the Tubcal server on <code>127.0.0.1:5000</code>. Showing the last
+        Lost contact with the Tubcal server on <code>{window.location.host}</code>. Showing the last
         loaded data — start the server to refresh.
       </span>
     </div>
