@@ -95,9 +95,11 @@ function usePlayEntry() {
  *  stays underneath while the next fades in, so changing channel never dips. */
 function Ambient({ src }) {
   const [layers, setLayers] = useState([]);
+  const seq = useRef(0);
   useEffect(() => {
     if (!src) return;
-    setLayers((ls) => (ls.at(-1)?.src === src ? ls : [...ls.slice(-1), { src, n: Date.now() }]));
+    // a counter, not Date.now(): two tunings in one millisecond would share a key
+    setLayers((ls) => (ls.at(-1)?.src === src ? ls : [...ls.slice(-1), { src, n: ++seq.current }]));
   }, [src]);
   return (
     <div className={s.ambient} aria-hidden="true">

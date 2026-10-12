@@ -1,8 +1,96 @@
+/* ── the shelf strip: what's kept, and a room to narrow it to ─────────────── */
+
+.shelf {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-6);
+  padding-bottom: var(--space-4);
+  border-bottom: 1px dashed var(--rule);
+}
+
+.chip {
+  --tone: var(--c-foryou);
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 12px 5px 10px;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  background: var(--surface-glass);
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease;
+}
+
+.chip b {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.chip:hover {
+  border-color: var(--rule-strong);
+  color: var(--text-primary);
+}
+
+.chipOn {
+  border-color: color-mix(in srgb, var(--tone) 55%, var(--rule));
+  background: color-mix(in srgb, var(--tone) 12%, var(--surface-glass));
+  color: var(--text-primary);
+}
+
+.chipOn b {
+  color: var(--tone);
+}
+
+.chip:focus-visible,
+.card:focus-visible {
+  outline: 2px solid var(--tone);
+  outline-offset: 2px;
+}
+
+.since {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.none {
+  margin: var(--space-4) 0 var(--space-7);
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.none button {
+  margin-left: 4px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--signal);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+/* ── groups ───────────────────────────────────────────────────────────────── */
+
 .group {
   margin-bottom: var(--space-7);
 }
 
 .groupHead {
+  --tone: var(--c-foryou);
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
   font-family: var(--font-display);
   font-size: 15px;
   letter-spacing: 0.02em;
@@ -10,7 +98,30 @@
   border-bottom: 1px solid var(--rule);
   padding-bottom: var(--space-2);
   margin-bottom: var(--space-4);
+  position: relative;
 }
+
+/* a short stroke of the group's colour under its name */
+.groupHead::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: -1px;
+  width: 36px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--tone);
+  opacity: 0.8;
+}
+
+.groupHead span {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+/* ── index cards ──────────────────────────────────────────────────────────── */
 
 .cards {
   display: grid;
@@ -19,19 +130,46 @@
 }
 
 .card {
+  --tone: var(--c-foryou);
   position: relative;
-  padding: var(--space-4);
-  padding-right: 38px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: var(--space-4) var(--space-4) var(--space-3) calc(var(--space-4) + 3px);
+  padding-right: 42px;
   border: 1px solid var(--rule);
   border-radius: var(--r-card);
-  background: var(--surface-glass);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--tone) 5%, transparent), transparent 60%),
+    var(--surface-glass);
   cursor: pointer;
-  transition: border-color 0.15s ease, transform 0.12s ease;
+  overflow: clip;
+  transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.2s ease;
+  animation: savedIn 0.35s var(--hand, ease) both;
+  animation-delay: calc(var(--i, 0) * 30ms);
+}
+
+/* the room's colour down the card's spine */
+.card::before {
+  content: '';
+  position: absolute;
+  inset: 10px auto 10px 0;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--tone);
+  opacity: 0.7;
+  transition: opacity 0.15s ease, inset 0.2s ease;
 }
 
 .card:hover {
-  border-color: var(--rule-strong);
+  border-color: color-mix(in srgb, var(--tone) 35%, var(--rule-strong));
   transform: translateY(-2px);
+  box-shadow: 0 8px 22px -14px color-mix(in srgb, var(--tone) 60%, transparent);
+}
+
+.card:hover::before {
+  opacity: 1;
+  inset: 0 auto 0 0;
 }
 
 .cardSave {
@@ -41,28 +179,110 @@
 }
 
 .cardTag {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
   font-family: var(--font-mono);
   font-size: 10px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--c-reddit);
-  display: block;
-  margin-bottom: 6px;
+  color: var(--tone);
 }
 
-.cardTag[data-platform='hackernews'] {
-  color: var(--c-hn);
+.cardDot {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--tone);
+}
+
+.cardDomain {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  color: var(--text-muted);
+}
+
+.cardDomain::before {
+  content: '· ';
 }
 
 .cardTitle {
   font-size: 15px;
   font-weight: 600;
   line-height: 1.32;
-  margin-bottom: 8px;
+  text-wrap: pretty;
+}
+
+.cardExcerpt {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-secondary);
 }
 
 .cardMeta {
   font-family: var(--font-mono);
   font-size: 11.5px;
   color: var(--text-muted);
+}
+
+.cardFoot {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin-top: auto;
+  padding-top: var(--space-2);
+  border-top: 1px dotted var(--rule);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.cardFoot:empty {
+  display: none;
+}
+
+.cardFoot > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.kept {
+  margin-left: auto;
+  font-style: italic;
+  letter-spacing: 0.02em;
+}
+
+@keyframes savedIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card {
+    animation: none;
+  }
+
+  .card:hover {
+    transform: none;
+  }
 }

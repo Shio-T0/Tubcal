@@ -359,37 +359,42 @@ export function AppProviders({ children }) {
       })
       .catch(() => {});
   }, []);
+  // The request goes out from the handler, not from inside a state updater (React
+  // may run an updater twice, which sent every save/unsave twice). The ref lets a
+  // quick double-tap see the first tap's result before React re-renders.
+  const savedRef = useRef(saved);
+  savedRef.current = saved;
   const toggleSaved = useCallback((item) => {
     if (!item?.id) return;
-    setSaved((prev) => {
-      const next = { ...prev };
-      const wasSaved = !!next[item.id];
-      if (next[item.id]) {
-        delete next[item.id];
-      } else {
-        next[item.id] = item;
-      }
-      if (wasSaved) {
-        api(`/saved/${encodeURIComponent(item.id)}`, { method: 'DELETE' }).catch((err) => {
-          console.error('[saved] DELETE failed', err);
-          // Roll back: re-add the item
-          setSaved((p) => ({ ...p, [item.id]: item }));
-          toast('Failed to unsave item', 'error');
+    const cur = savedRef.current;
+    const was = cur[item.id];
+    let next;
+    if (was) {
+      next = { ...cur };
+      delete next[item.id];
+    } else {
+      // newest first, as the server lists them; saved_at dates the card
+      next = { [item.id]: { ...item, saved_at: Math.floor(Date.now() / 1000) }, ...cur };
+    }
+    savedRef.current = next;
+    setSaved(next);
+    if (was) {
+      api(`/saved/${encodeURIComponent(item.id)}`, { method: 'DELETE' }).catch((err) => {
+        console.error('[saved] DELETE failed', err);
+        setSaved((p) => ({ ...p, [item.id]: was })); // roll back
+        toast('Failed to unsave item', 'error');
+      });
+    } else {
+      api('/saved', { method: 'POST', body: JSON.stringify({ item }) }).catch((err) => {
+        console.error('[saved] POST failed', err);
+        setSaved((p) => { // roll back
+          const n = { ...p };
+          delete n[item.id];
+          return n;
         });
-      } else {
-        api('/saved', { method: 'POST', body: JSON.stringify({ item }) }).catch((err) => {
-          console.error('[saved] POST failed', err);
-          // Roll back: remove the item we just added
-          setSaved((p) => {
-            const next = { ...p };
-            delete next[item.id];
-            return next;
-          });
-          toast('Failed to save item', 'error');
-        });
-      }
-      return next;
-    });
+        toast('Failed to save item', 'error');
+      });
+    }
   }, [toast]);
   const savedApi = { saved, toggleSaved };
 

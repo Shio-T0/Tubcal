@@ -165,9 +165,13 @@ export function airingBacklog(entries, progress) {
 export function slotLabel(epochSeconds, now) {
   const d = new Date(epochSeconds * 1000);
   const time = d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  // Count calendar days between local midnights: a day across a DST change is 23
+  // or 25 hours long, so dividing raw milliseconds misnames the day after it.
   const start = new Date(now);
   start.setHours(0, 0, 0, 0);
-  const days = Math.floor((d - start) / (DAY * 1000));
+  const that = new Date(d);
+  that.setHours(0, 0, 0, 0);
+  const days = Math.round((that - start) / (DAY * 1000));
   if (days <= 0) return { day: 'Today', time };
   if (days === 1) return { day: 'Tmrw', time };
   if (days < 7) return { day: d.toLocaleDateString(undefined, { weekday: 'short' }), time };
