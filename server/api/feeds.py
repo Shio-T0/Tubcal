@@ -762,6 +762,27 @@ def saved_add():
     return ok({"saved": True})
 
 
+SAVED_NOTE_MAX = 2000
+
+
+@feeds_bp.patch("/saved/<path:item_id>")
+def saved_update(item_id):
+    """Write a note on a kept entry, or mark it done / not done."""
+    body = request.get_json(force=True, silent=True) or {}
+    note = body.get("note")
+    done = body.get("done")
+    if note is None and done is None:
+        return err("note or done required")
+    if note is not None and not isinstance(note, str):
+        return err("note must be text")
+    if done is not None and not isinstance(done, bool):
+        return err("done must be true or false")
+    item = db.update_saved(item_id, note=None if note is None else note.strip()[:SAVED_NOTE_MAX], done=done)
+    if item is None:
+        return err("not saved", 404)
+    return ok(item)
+
+
 @feeds_bp.delete("/saved/<path:item_id>")
 def saved_remove(item_id):
     try:

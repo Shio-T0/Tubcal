@@ -39,7 +39,7 @@
 
 .row {
   display: grid;
-  grid-template-columns: 36px 1fr auto;
+  grid-template-columns: 36px 1fr auto auto; /* icon, words, stats, bookmark */
   align-items: start;
   gap: var(--space-3);
   padding: 13px var(--space-4);
@@ -179,11 +179,28 @@
 
 @media (max-width: 640px) {
   .row {
-    grid-template-columns: 28px 1fr;
+    grid-template-columns: 28px 1fr auto;
   }
 
   .stats {
     grid-column: 2;
     margin-top: 4px;
+  }
+}
+.save {
+  align-self: center;
+  border: 0;
+  background: none;
+  backdrop-filter: none;
+  color: var(--paper-faint);
+}
+.save:hover {
+  background: var(--surface-hover);
+  color: var(--c-github);
+}
+@media (max-width: 640px) {
+  .save {
+    grid-column: 3;
+    grid-row: 1;
   }
 }

@@ -16,6 +16,7 @@ export const LEADER_BINDINGS = [
   { key: 'o', label: 'other pane' },
   { key: 'r', label: 'run file' },
   { key: 'g', label: 'refresh git' },
+  { key: 'b', label: 'save file to Saved' },
 ];
 
 export default function WhichKey({ onRun, onClose }) {

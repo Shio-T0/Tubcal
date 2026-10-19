@@ -29,8 +29,8 @@ export const SETTINGS_SECTIONS = {
   },
   rooms: {
     title: 'Rooms', icon: LayoutGrid,
-    blurb: 'Which rooms sit in the hub. A room left out still opens from its address.',
-    find: 'rooms hub console numbers enable disable max edition screening wire archive workbench github dispatch',
+    blurb: 'Which rooms each channel shows. A room left out still opens from its address.',
+    find: 'rooms channels social coding video console numbers enable disable max edition screening wire archive workbench github dispatch anime',
   },
   playback: {
     title: 'Playback', icon: Volume2,

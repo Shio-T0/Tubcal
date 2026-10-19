@@ -4,6 +4,7 @@ import { useApi } from '../../api/client.js';
 import { compact } from '../../lib/format.js';
 import { timeAgo } from '../../lib/time.js';
 import { Spinner } from '../ui/index.jsx';
+import { SaveButton } from '../ui/ItemActions.jsx';
 import CommentThread from './CommentThread.jsx';
 import Modal from './Modal.jsx';
 import SafeHtml from './SafeHtml.jsx';
@@ -44,6 +45,7 @@ export default function RedditPostModal({ item, onClose }) {
             <ExternalLink size={13} />
             Open on Reddit
           </a>
+          <SaveButton label item={item} />
         </div>
 
         {showImage && <img className={s.postImage} src={item.thumbnail} alt="" />}

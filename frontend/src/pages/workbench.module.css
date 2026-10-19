@@ -380,6 +380,7 @@ a.stamp:hover {
 }
 
 .filmCard {
+  position: relative;
   flex: 0 0 236px;
   display: flex;
   flex-direction: column;
@@ -743,7 +744,7 @@ a.stamp:hover {
 
 .postRow {
   display: grid;
-  grid-template-columns: 118px minmax(0, 1fr) auto;
+  grid-template-columns: 118px minmax(0, 1fr) auto auto;
   align-items: baseline;
   gap: var(--space-3);
   padding: 8px 0;
@@ -796,6 +797,7 @@ a.stamp:hover {
 }
 
 .docCard {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 5px;
@@ -1007,5 +1009,66 @@ a.stamp:hover {
 
   .postSource {
     display: none;
+  }
+}
+
+/* the bookmarks: quiet in a row until you're on it, kept lit once saved */
+.save {
+  flex: none;
+  align-self: center;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  background: none;
+  backdrop-filter: none;
+  color: var(--paper-faint);
+  opacity: 0;
+}
+.episode:hover .save,
+.releaseRow:hover .save,
+.postRow:hover .save,
+.repoRow:hover .save,
+.save:focus-visible,
+.save[aria-pressed='true'] {
+  opacity: 1;
+}
+.save:hover {
+  background: var(--surface-hover);
+  color: var(--lang-c);
+}
+.filmSave {
+  position: absolute;
+  top: 14px;
+  right: 6px;
+  z-index: 2;
+  opacity: 0;
+}
+.filmCard:hover .filmSave,
+.filmSave:focus-visible,
+.filmSave[aria-pressed='true'] {
+  opacity: 1;
+}
+.docSave {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  border: 0;
+  background: none;
+  backdrop-filter: none;
+  color: var(--paper-faint);
+  opacity: 0;
+}
+.docCard:hover .docSave,
+.docSave:focus-visible,
+.docSave[aria-pressed='true'] {
+  opacity: 1;
+}
+
+/* touch screens have no hover: keep the bookmarks in sight */
+@media (hover: none) {
+  .save,
+  .filmSave,
+  .docSave {
+    opacity: 1;
   }
 }

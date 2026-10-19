@@ -4,6 +4,7 @@ import { useApi } from '../../api/client.js';
 import { compact } from '../../lib/format.js';
 import { timeAgo } from '../../lib/time.js';
 import { Spinner } from '../ui/index.jsx';
+import { SaveButton } from '../ui/ItemActions.jsx';
 import Modal from './Modal.jsx';
 import SafeHtml from './SafeHtml.jsx';
 import s from './Modal.module.css';
@@ -57,6 +58,7 @@ export default function RepoDetailModal({ item, onClose }) {
             <ExternalLink size={13} />
             Open on GitHub
           </a>
+          <SaveButton label item={item} />
         </div>
 
         {extra.topics?.length > 0 && (

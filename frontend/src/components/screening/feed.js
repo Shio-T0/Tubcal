@@ -1,7 +1,7 @@
 // The Screening Room's shared reads, and what "new" means in it.
 //
 // Two things on screen want the same data at once — the room itself and its index
-// in the hub console (channel list, new counts, what's live) — so they read it
+// in the Video console (channel list, new counts, what's live) — so they read it
 // through `useShared` (lib/useShared.js): one request between them.
 //
 // "New" is per channel, like an inbox: an upload is new until you've watched any

@@ -133,9 +133,9 @@ HOST_INTERVALS = {
     "yewtu.be": 1.0,
 }
 
-# Room ids — mirrors frontend/src/lib/rooms.js ROOM_IDS. These are the hub's rooms;
-# "/" is the channel chooser and The Anime is its own section beside the hub, so
-# neither is a room any more.
+# Room ids — mirrors frontend/src/lib/rooms.js ROOM_IDS: the rooms Settings → Rooms
+# can switch off, across the three channels (Social, Coding, Video). "/" is the
+# channel chooser and The Anime is always on, so neither is listed here.
 ROOM_IDS = [
     "edition",
     "youtube",

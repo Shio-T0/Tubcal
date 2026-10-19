@@ -1,18 +1,27 @@
-// The two channel guides under the set — where to go, with a word on what's there.
+// The three channel guides under the set — where to go, with a word on what's there.
 //
-//   HubGuide     Channel 1: today's paper (its lead and two more headlines), then the
-//                rooms you have switched on as numbered keys, each with what's new in it
-//   AnimeGuide   Channel 2: your AniList shelves at a glance, this season's most
-//                popular titles (the rest of the season drifts behind), and doors
-//                straight into the Anime's views
+//   SocialGuide  Channel 1: today's paper (its lead and two more headlines), then
+//                the Social rooms as numbered keys
+//   CodingGuide  Channel 2: the files open in the editor, the Workbench's languages,
+//                what GitHub follows, then the Coding rooms
+//   VideoGuide   Channel 3, the widest: the newest uploads from your channels on one
+//                side; your AniList shelves, this season's most popular titles and
+//                doors into the Anime on the other, over a drifting wall of covers
+//
+// Each guide's foot says how much you've saved in that channel (a door into the
+// Saved page, filtered to it) and the keys that open the channel.
 
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Bookmark, Radio, Search, Settings } from 'lucide-react';
+import { ArrowRight, Bookmark, FileCode2, Play, Radio, Search } from 'lucide-react';
 
+import { useApi } from '../../api/client.js';
 import { isStill } from '../../lib/motion.js';
-import { ANIME_HOME, HUB_HOME } from '../../lib/rooms.js';
-import { openPalette } from '../layout/HubConsole.jsx';
+import { ANIME_HOME } from '../../lib/rooms.js';
+import { channelOfItem } from '../../lib/saveable.js';
+import { useShared } from '../../lib/useShared.js';
+import { usePlayer, useSaved, useSubscriptions } from '../../state.jsx';
+import { openPalette, useChannelHomes } from '../channels/common.jsx';
 import { tallyShelves } from './lineup.js';
 import g from './guides.module.css';
 
@@ -112,39 +121,128 @@ function Paper({ req, now }) {
   );
 }
 
-export function HubGuide({ rooms, paper, now, newUploads, liveNow, savedCount }) {
-  const badges = {
-    youtube: (
-      <>
-        {liveNow > 0 && <span className={`${g.badge} ${g.badgeLive}`}><Radio size={10} /> live</span>}
-        {newUploads > 0 && <span className={g.badge}>{newUploads} new</span>}
-      </>
-    ),
-  };
+/** A guide's foot: what you've saved in this channel, search, and its keys. */
+function Foot({ channel, n, children }) {
+  const { saved } = useSaved();
+  const kept = Object.values(saved || {}).filter((it) => channelOfItem(it) === channel).length;
+  const key = { social: 's', coding: 'c', video: 'v' }[channel];
   return (
-    <section className={`${g.guide} ${g.hub}`} aria-labelledby="ch-hub">
-      <ChannelHead n={1} id="ch-hub" to={HUB_HOME} kicker="Channel 1 · the broadsheet" title="Hub" />
+    <footer className={g.foot}>
+      <Link to={`/saved?ch=${channel}`}><Bookmark size={13} /> Saved here{kept ? <b>{kept}</b> : null}</Link>
+      {children}
+      <Keys keys={[String(n), 'or', 'Space', 'g', key]} />
+    </footer>
+  );
+}
+
+function RoomKeys({ rooms, badges = {}, label }) {
+  return (
+    <nav className={g.rooms} aria-label={label}>
+      {rooms.map((r, i) => (
+        <Link key={r.id} to={r.route} className={g.room} style={{ '--room-c': r.color, '--i': i }} data-kbd-tile>
+          <span className={g.roomNo}>{String(i + 1).padStart(2, '0')}</span>
+          <span className={g.roomName}>{r.label}</span>
+          <span className={g.roomBadges}>{badges[r.id]}</span>
+        </Link>
+      ))}
+    </nav>
+  );
+}
+
+export function SocialGuide({ rooms, paper, now }) {
+  const homes = useChannelHomes();
+  return (
+    <section className={`${g.guide} ${g.social}`} aria-labelledby="ch-social">
+      <ChannelHead n={1} id="ch-social" to={homes.social} kicker="Channel 1 · Edition, Wire, Dispatch" title="Social" />
       <Paper req={paper} now={now} />
-      <nav className={g.rooms} aria-label="Hub rooms">
-        {rooms.map((r, i) => (
-          <Link key={r.id} to={r.route} className={g.room} style={{ '--room-c': r.color, '--i': i }} data-kbd-tile>
-            <span className={g.roomNo}>No {String(i + 1).padStart(2, '0')}</span>
-            <span className={g.roomName}>{r.label}</span>
-            <span className={g.roomBadges}>{badges[r.id]}</span>
-          </Link>
-        ))}
-      </nav>
-      <footer className={g.foot}>
-        <Link to="/saved"><Bookmark size={13} /> Saved{savedCount ? <b>{savedCount}</b> : null}</Link>
-        <Link to="/settings"><Settings size={13} /> Settings</Link>
+      <RoomKeys rooms={rooms} label="Social rooms" />
+      <Foot channel="social" n={1}>
         <button type="button" onClick={openPalette}><Search size={13} /> Search</button>
-        <Keys keys={['1', 'or', 'Space', 'g', 'h']} />
-      </footer>
+      </Foot>
     </section>
   );
 }
 
 // ── Channel 2 ────────────────────────────────────────────────────────────────
+
+/** The files left open in the editor, each a door straight back to it. */
+function OpenFiles({ on }) {
+  const state = useApi(on ? '/editor/state' : '', on);
+  const status = useShared(on ? '/editor/status' : '', { enabled: on });
+  if (!on) return null;
+  const tabs = [...new Set((state.data?.session?.panes || []).flatMap((p) => p.tabs || []))].slice(0, 4);
+  const root = status.data?.root?.replace(/^\/home\/[^/]+/, '~');
+  return (
+    <div className={g.block}>
+      <div className={g.blockHead}>
+        <span>Open in the editor</span>
+        {root && <span className={g.blockNote}>{root}</span>}
+      </div>
+      {tabs.length > 0 ? (
+        <ul className={g.files}>
+          {tabs.map((t, i) => {
+            const name = t.split('/').pop();
+            const dir = t.slice(0, -name.length);
+            return (
+              <li key={t} style={{ '--i': i }}>
+                <Link to={`/editor?open=${encodeURIComponent(t)}`} data-kbd-tile title={t}>
+                  <FileCode2 size={13} />
+                  <span className={g.fileDir}>{dir}</span>
+                  <span className={g.fileName}>{name}</span>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      ) : (
+        <p className={g.blockEmpty}>{state.loading ? 'Reading the session…' : 'Nothing open. Space f inside the editor finds a file.'}</p>
+      )}
+    </div>
+  );
+}
+
+/** The Workbench's languages, as spines to pull. */
+function Languages({ on }) {
+  const langs = useApi(on ? '/dev/languages' : '', on);
+  if (!on) return null;
+  const list = langs.data?.languages || [];
+  return (
+    <div className={g.block}>
+      <div className={g.blockHead}><span>On the Workbench</span></div>
+      <div className={g.langs}>
+        {list.map((l, i) => (
+          <Link key={l.id} to={`/dev?l=${l.id}`} className={g.lang} style={{ '--lang-c': l.accent, '--i': i }} title={l.tagline} data-kbd-tile>
+            <span aria-hidden="true">{l.mascot}</span>{l.name}
+          </Link>
+        ))}
+        {langs.loading && !list.length && <span className={g.blockEmpty}>Pulling the manuals…</span>}
+      </div>
+    </div>
+  );
+}
+
+export function CodingGuide({ rooms }) {
+  const homes = useChannelHomes();
+  const { subs } = useSubscriptions();
+  const ids = new Set(rooms.map((r) => r.id));
+  const following = subs?.github?.length || 0;
+  const badges = {
+    github: following > 0 ? <span className={g.badge}>{following} followed</span> : null,
+  };
+  return (
+    <section className={`${g.guide} ${g.coding}`} aria-labelledby="ch-coding">
+      <ChannelHead n={2} id="ch-coding" to={homes.coding} kicker="Channel 2 · Editor, Workbench, GitHub" title="Coding" />
+      <OpenFiles on={ids.has('editor')} />
+      <Languages on={ids.has('dev')} />
+      <RoomKeys rooms={rooms} badges={badges} label="Coding rooms" />
+      <Foot channel="coding" n={2}>
+        {!ids.has('github') && <Link to="/settings?s=rooms">GitHub is off</Link>}
+      </Foot>
+    </section>
+  );
+}
+
+// ── Channel 3 ────────────────────────────────────────────────────────────────
 
 const DOORS = [
   ['Browse', '/anime'],
@@ -205,38 +303,81 @@ function Reel({ covers }) {
   );
 }
 
-export function AnimeGuide({ anime, covers }) {
-  const behind = covers.slice(REEL);
+/** The newest uploads from your channels: press one and it plays. */
+function Uploads({ feed, newUploads, liveNow }) {
+  const { open } = usePlayer();
+  const items = (feed.data?.items || []).filter((i) => !i.extra?.live_status).slice(0, 3);
   return (
-    <section className={`${g.guide} ${g.anime}`} aria-labelledby="ch-anime">
+    <div className={g.uploads}>
+      {items.map((item, i) => (
+        <button key={item.id} type="button" className={g.upload} style={{ '--i': i }} onClick={() => open(item)} title={item.title} data-kbd-tile>
+          <span className={g.uploadPic}>
+            <img src={item.thumbnail} alt="" loading="lazy" />
+            <span className={g.uploadPlay}><Play size={14} fill="currentColor" /></span>
+          </span>
+          <span className={g.uploadText}>
+            <span className={g.uploadTitle}>{item.title}</span>
+            <span className={g.uploadFrom}>{item.source}</span>
+          </span>
+        </button>
+      ))}
+      {!items.length && (
+        <p className={g.blockEmpty}>{feed.loading ? 'Tuning in…' : 'Follow a channel in the Screening Room and its uploads land here.'}</p>
+      )}
+      <span className={g.uploadBadges}>
+        {liveNow > 0 && <span className={`${g.badge} ${g.badgeLive}`}><Radio size={10} /> {liveNow} live</span>}
+        {newUploads > 0 && <span className={g.badge}>{newUploads} new</span>}
+      </span>
+    </div>
+  );
+}
+
+export function VideoGuide({ rooms, anime, covers, feed, newUploads, liveNow }) {
+  const homes = useChannelHomes();
+  const behind = covers.slice(REEL);
+  const archive = rooms.find((r) => r.id === 'archive');
+  return (
+    <section className={`${g.guide} ${g.video}`} aria-labelledby="ch-video">
       {behind.length > 0 && (
         <div className={g.mosaic} aria-hidden="true">
           {behind.map((m, i) => <img key={m.id} src={m.cover} alt="" loading="lazy" style={{ '--i': i }} />)}
         </div>
       )}
-      <ChannelHead
-        n={2} id="ch-anime" to={ANIME_HOME} kicker="Channel 2 · the picture scroll" title="Anime"
-        extra={<i lang="ja">アニメ</i>}
-      />
-      {anime.entries ? (
-        <Shelves entries={anime.entries} />
-      ) : !anime.loading && !anime.connected ? (
-        <Link to="/settings?s=accounts" className={g.connect}>
-          Connect AniList in Settings to bring your shelves, your next episodes and their air dates here.
-        </Link>
-      ) : (
-        <div className={g.shelves} aria-hidden="true" />
-      )}
-      {covers.length > 0 && <Reel covers={covers} />}
-      <nav className={g.doors} aria-label="Anime sections">
-        {DOORS.map(([label, to], i) => (
-          <Link key={label} to={to} className={g.door} style={{ '--i': i }} data-kbd-tile>{label}</Link>
-        ))}
-      </nav>
-      <footer className={g.foot}>
-        <span className={g.footNote}>its own section, beside the hub</span>
-        <Keys keys={['2', 'or', 'Space', 'g', 'a']} />
-      </footer>
+      <ChannelHead n={3} id="ch-video" to={homes.video} kicker="Channel 3 · Screening Room, Anime, Archive" title="Video" />
+      <div className={g.halves}>
+        <div className={g.half}>
+          <Link to="/youtube" className={g.halfHead} style={{ '--room-c': 'var(--c-youtube)' }}>
+            Screening Room <ArrowRight size={14} />
+          </Link>
+          <Uploads feed={feed} newUploads={newUploads} liveNow={liveNow} />
+          {archive && (
+            <Link to={archive.route} className={g.halfHead} style={{ '--room-c': archive.color }}>
+              The Archive <ArrowRight size={14} />
+            </Link>
+          )}
+        </div>
+        <div className={g.half}>
+          <Link to={ANIME_HOME} className={g.halfHead} style={{ '--room-c': 'var(--c-anime)' }}>
+            The Anime <i lang="ja">アニメ</i> <ArrowRight size={14} />
+          </Link>
+          {anime.entries ? (
+            <Shelves entries={anime.entries} />
+          ) : !anime.loading && !anime.connected ? (
+            <Link to="/settings?s=accounts" className={g.connect}>
+              Connect AniList in Settings to bring your shelves, your next episodes and their air dates here.
+            </Link>
+          ) : (
+            <div className={g.shelves} aria-hidden="true" />
+          )}
+          {covers.length > 0 && <Reel covers={covers} />}
+          <nav className={g.doors} aria-label="Anime sections">
+            {DOORS.map(([label, to], i) => (
+              <Link key={label} to={to} className={g.door} style={{ '--i': i }} data-kbd-tile>{label}</Link>
+            ))}
+          </nav>
+        </div>
+      </div>
+      <Foot channel="video" n={3} />
     </section>
   );
 }

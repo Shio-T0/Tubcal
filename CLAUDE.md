@@ -12,18 +12,67 @@ is no multi-user concept, no auth beyond optional per-provider OAuth, and no
 cloud component — the only outbound traffic is direct fetches to the platforms
 themselves.
 
-The app has two "channels", **the Hub** and **the Anime**, chosen at `/` (see
-"The home screen" below). The Hub is a set of numbered "rooms" beside the hub
-console; `frontend/src/lib/rooms.js` is their canonical registry (id, label, color
-token, route, `default_enabled`) — the numbers users see are computed from list
-position, not hardcoded, so adding a room means adding an entry there plus a page in
-`pages/` (and the id to `config.ROOM_IDS`). Rooms are toggleable in Settings → Rooms (`/settings?s=rooms`);
-GitHub is the one that ships off by default. The Anime is *not* a room: it's its own
-section with its own top bar (`components/anime/AnimeMasthead.jsx`) and index (see
-below). The old Front Page room is gone; `db.init_db` strips retired ids from the
-saved `active_rooms`. Global chords `Space g h` (Hub → /edition) and `Space g a` (the
-Anime) live in `components/layout/KeyboardShortcuts.jsx`; Space stays native in text
-fields, the editor, the expanded player, media, and keyboard-focused controls.
+The app has three **channels**, chosen at `/` (see "The home screen" below), each a
+group of numbered "rooms" in a frame of its own (`frontend/src/components/channels/`):
+- **1 Social** — the Edition, the Wire (HN), the Dispatch (Reddit). `SocialFrame`: a
+  newspaper section bar across the top (sticky; it sets `--chrome-top` so sticky
+  things inside — the Edition's follow bar, the Wire's reader pane — sit under it).
+- **2 Coding** — the Composing Room, the Workbench, GitHub. `CodingFrame`: an
+  editor-style activity bar down the left and a mono title bar (a path, plus the
+  editor's workspace root and tools when you're in it).
+- **3 Video** — the Screening Room, the Anime, the Archive. `VideoFrame`: the
+  wood-cabinet console down the left (room keys; the room you're in opens its own
+  index under it via `PLACES`: `ScreeningIndex`, and the Anime's file tree with your
+  AniList account on top, `AnimePlaces` in `components/anime/AnimeTree.jsx`). Folds to
+  a rail (`tubcal.hub.console.rail`), becomes a top bar on phones.
+
+`frontend/src/lib/rooms.js` is the canonical registry: `ROOMS` (id, label, short,
+color token, route, `default_enabled` — the rooms Settings → Rooms can switch off,
+`config.ROOM_IDS` on the server), `FIXED` (the Anime, always on) and `CHANNELS` (which
+rooms each holds, in order). Room numbers are computed from position inside the
+channel, never hardcoded; `channelRooms`/`channelHome`/`roomOfPath`/`channelOfPath`
+are the helpers. Adding a room = an entry in `ROOMS` + its id in a channel + a page in
+`pages/` + a route under that channel's layout in `App.jsx` (+ `config.ROOM_IDS`).
+GitHub ships off by default. `db.init_db` strips retired ids from `active_rooms`.
+Saved and Settings belong to no channel: `DeskFrame` (a bar with "Back to <the room
+you came from>", remembered per tab in sessionStorage by `useRememberPlace`).
+Every frame shares `components/channels/common.jsx`: `ChannelKnobs` (1 2 3),
+`PocketButtons`, `SkinButton`, `openPalette()`, `openPocket(tab)`. Pages inside a
+frame don't carry a title/blurb header — `SectionHead` given only children renders
+just its control bar.
+
+Keys (`components/layout/KeyboardShortcuts.jsx`): `Space g s/c/v` the channels,
+`Space g a` the Anime, `Space g h` home, `Space s` / `Space ,` the Saved / Settings
+drawer; `g` + letter jumps rooms. Space stays native in text fields, the editor, the
+expanded player, media, and keyboard-focused controls. An element marked
+`data-kbd-scope` (the drawer) confines h/j/k/l to itself.
+
+**Saving** works on everything, and it all lands in one place:
+- One `saved` table (`db.add_saved`/`update_saved`/`list_saved`), API `GET/POST
+  /api/saved`, `PATCH /api/saved/<id>` (`note`, `done`), `DELETE`. Entries are
+  feed-item-shaped and stored whole. A POST carrying `saved_at` (an Undo) keeps that
+  date. Tests: `tests/test_api.py`.
+- `lib/saveable.js` builds the items that aren't platform feed items (anime titles,
+  characters/staff/studios, threads, archive moments, playlists, YouTube channels,
+  subreddits, editor files, Workbench podcasts/posts/manuals, any page) and says what
+  each is: `kindOf` (from `extra.kind`, else the platform), `KINDS` (label + channel),
+  `channelOfItem`, `toneOf`.
+- `SaveButton` (`components/ui/ItemActions.jsx`) works inside links and clickable
+  tiles (it keeps the click), offers Undo when taking something off, and has a
+  `label` pill form for headers. `useSaved()` has `toggleSaved`, `addSaved`,
+  `removeSaved(ids, {undo})`, `updateSaved(id, {note|done})`; `toast()` takes an
+  `{action}` for the Undo button.
+- The drawer (`components/pocket/Pocket.jsx`, mounted once in `App.jsx`): Saved (save
+  this page, find, open in place, done/remove) and Settings (skins, common switches,
+  every section). `components/saved/useOpenSaved.jsx` opens any entry the right way
+  (player, Reddit/HN/repo readers, in-app route, new tab) for the drawer, the Saved
+  page and the command palette (which also searches saved entries).
+- `pages/SavedPage.jsx`: a catalogue by channel → kind with counts, To do / Done,
+  search over titles, sources and notes, sort, shelves (each kind its own layout) or a
+  dense list, notes, select-many. All view state in the URL.
+- The editor opens `/editor?open=<path>` over the restored session; `<leader> b` and
+  the tab strip's bookmark save the current file. The phone's Saved screen routes the
+  new kinds by `kindOf` and hides desktop-only ones (files).
 
 **The home screen** (`/`, `pages/Home.jsx` + `components/home/`) answers "what now?"
 before "where to?":
@@ -33,11 +82,14 @@ before "where to?":
   Videos and your shows' next episodes are ordered by when you last touched them
   (`watched_at` on `/youtube/continue` vs AniList's `updated_at`), topped up with fresh
   uploads. The presets below the screen are the rest of that queue: hover/focus tunes,
-  press plays. The side panel holds a clock, the two channel knobs (keys 1/2, ignored
-  while the player or editor owns the keyboard), a "coming up" slip (live streams,
-  premieres, your shows' next airings) and the grille with the `tc-wordmark` plate.
-- `Guides.jsx`: Channel 1 shows today's paper plus the rooms with "N new"/live badges.
-  Channel 2 shows your shelf counts, this season's six most popular, and the doors.
+  press plays. The side panel holds a clock, the three channel knobs (keys 1/2/3,
+  ignored while the player or editor owns the keyboard), a "coming up" slip (live
+  streams, premieres, your shows' next airings) and the grille with the `tc-wordmark`
+  plate. Search, Saved and Settings sit beside the greeting.
+- `Guides.jsx`: Social shows today's paper plus its rooms; Coding the files left open
+  in the editor (`/editor/state`), the Workbench's languages and its rooms; Video (full
+  width) the newest uploads beside your AniList shelf counts, this season's six most
+  popular and the Anime's doors. Each foot links to Saved filtered to that channel.
 - `lineup.js` builds all of it from reads the rooms already make and cache, so the
   page adds no new endpoints.
 - The screen and guides use `overflow: clip`, not `hidden`: their glow and cover wall
@@ -295,7 +347,7 @@ no ORM.
   same day — that redundancy is the whole point. Imports are lazy and guarded; the
   provider class is instantiated directly rather than via weeb-cli's registry,
   whose `pkgutil` discovery finds nothing under Chaquopy on the Android build.
-- `dev.py` — The Workbench (No 09, route `/dev`): one programming language per
+- `dev.py` — The Workbench (Coding channel, route `/dev`): one programming language per
   "service manual". `LANGUAGES` is a pure-curation registry (facts, docs, podcast
   RSS dials, core-team blog feeds, GitHub repo, per-language accent) — adding a
   language is adding one dict, no new endpoints or UI. Shelves are one endpoint
@@ -315,7 +367,7 @@ no ORM.
   the Front Page "For You" feed.
 
 **The Edition (`server/brain/{cluster,feed_index,edition}.py` + `server/api/edition.py`)**
-is the daily synthesized paper (room "No 00", route `/edition`). Architecture rule:
+is the daily synthesized paper (Social channel, route `/edition`). Architecture rule:
 the request path computes nothing — a background thread (started in `main.py` via
 `brain.edition.start()`) builds one JSON payload per day into the `editions` table,
 and `GET /api/edition/latest` is a single row read. `cluster.py` is pure functions
@@ -362,7 +414,7 @@ no passage is ever sent twice. The response's `expanded` list marks which citati
 the deep read; the UI rings those chips. Tests: `tests/test_brain_ask.py`.
 
 **The Composing Room (`server/api/editor.py` + `server/editor/` + `frontend/src/components/editor/`)**
-is the code editor room (No 08, route `/editor`): CodeMirror 6 with real modal vim
+is the code editor room (Coding channel, route `/editor`): CodeMirror 6 with real modal vim
 (`@replit/codemirror-vim`), file tree, tabs/splits, go-to-file, project grep (rg with
 an os.walk fallback), git gutter/branch, a which-key leader menu, session restore
 (`editor_state` table), an integrated PTY terminal, and an optional LSP bridge.
@@ -385,18 +437,16 @@ shared state as a stack of context providers (`useSettings`, `useSubscriptions`,
 `usePlayer`, `useProgress`, `useSaved`, `useAnimeSync`) wrapped by `AppProviders`.
 One page component per "room" in `pages/` (Edition, ScreeningRoom, Dispatch, Wire,
 Archive, Composer, Github, Workbench, plus SavedPage and SettingsPage), all
-lazy-loaded and routed in `App.jsx` under `HubLayout` (the hub console + its own
-Suspense) — keep the route, the `pages/` component, and the `lib/rooms.js` entry in
-sync. The hub has no masthead: `components/layout/HubConsole.jsx` (`HubFrame`) is a
-sticky panel down the left — wordmark, Channel 1/2 switch, a search button that opens
-the command palette (`openPalette()` fires `tubcal:palette`), the rooms as numbered
-preset keys, Saved/Settings/skin — so every room's page starts at the top of the
-screen. The room you're in opens its own index under it: a room opts in by adding a
-component to `PLACES` there (only the Screening Room has one so far). Like the anime
-index it hangs in the shell's left margin on ≥1780px, folds to an icon rail
-(`tubcal.hub.console.rail`), and becomes a top bar on phones. Skins restyle it through
-the `.tc-console`/`.tc-nav`/`.tc-navitem(-on)`/`.tc-navno`/`.tc-topline`/`.tc-wordmark`
-hooks at the end of `styles/themes.css`. `Home` (eager) is `/`; the Anime routes sit under `AnimeSection`. CSS Modules per page/component, design tokens in `styles/tokens.css`
+lazy-loaded and routed in `App.jsx` under their channel's layout route
+(`SocialLayout`, `CodingLayout`, `VideoLayout` — each a frame from
+`components/channels/` around its own Suspense; the Anime's routes nest inside
+`VideoLayout` under `AnimeSection`, and Saved/Settings sit under `DeskLayout`) — keep
+the route, the `pages/` component, and the `lib/rooms.js` entry in sync. No frame has
+a tall masthead, so every room's page starts near the top of the screen. The Video
+console and the Coding activity bar hang in the shell's left margin on wide screens.
+Skins restyle the frames through the
+`.tc-console`/`.tc-bar`/`.tc-nav`/`.tc-navitem(-on)`/`.tc-navno`/`.tc-topline`/`.tc-wordmark`
+hooks (see the head of `styles/themes.css`). `Home` (eager) is `/`. CSS Modules per page/component, design tokens in `styles/tokens.css`
 and `styles/themes.css`. Skins are a registry in `lib/themes.js` (`dark`, `light`,
 `terminal`, `bauhaus`, `blueprint`, `aqua`, `space`, `bench`) — each is a `[data-theme]`
 block overriding tokens, so component CSS restyles for free via `var(--token)`;
@@ -409,10 +459,10 @@ Mono, and draws the current room as a lualine block. It is `desktopOnly`, so the
 phone's pickers skip it (`skinsFor(phone)`). It works through a few global hooks
 that only it styles:
 - `.tc-main`: a page's area, which becomes a window.
-- `.tc-index`: the Anime's tree.
-- `.tc-bar`: the Anime's top bar.
+- `.tc-console` and `.tc-bar`: the channels' consoles and bars (the active room is
+  the lualine block).
 - `.tc-strip` and `.tc-hero`: Home's lines (date, summary, hints) and greeting.
-- `.tc-float`: toasts.
+- `.tc-float`: toasts and the Saved & Settings drawer.
 
 Anything that can land on the bare mat needs a dark backing in that skin. A room's view state (active tab,
 filters, search) belongs in the query string, not `useState` — opening a detail
@@ -558,13 +608,12 @@ HN HTML goes through `HnHtml.jsx` (allow-list walk, ">" paragraphs drawn as quot
 HN item links opened in the reader). Tests: `tests/test_wire.py`.
 
 The Anime's views (Browse, Seasons, Schedule, My List, Ledger, Community, Channel,
-Social) have no header or tab strip: they're chosen from the index, a file tree down
-the left built in `components/anime/AnimeTree.jsx` (`buildTree` is the one place the
-views and their sub-places — shelves with counts, next season, Ledger anchors, the
-inbox badge — are listed; `AnimeLayout` renders index + path bar + page for every
-anime route). On ≥1780px screens the index hangs in the shell's empty left margin so
-content keeps the full 1280 shell; it folds to an icon rail (with flyouts) and becomes
-chip rows on phones. Views live in `components/anime/` with their own CSS module and a
+Social) have no header or tab strip: they're chosen from the index, a file tree
+built in `components/anime/AnimeTree.jsx` that the Video console shows under "The
+Anime" (`AnimePlaces`; `buildTree` is the one place the views and their sub-places —
+shelves with counts, next season, Ledger anchors, the inbox badge — are listed;
+`AnimeLayout` adds the one-line path bar over every anime route). It becomes chip rows
+on phones. Views live in `components/anime/` with their own CSS module and a
 deliberately different layout; `pages/Anime.jsx`'s default export only renders the
 view the URL names; card/badge/URL-state helpers they all share are in
 `components/anime/shared.jsx` (not in `pages/Anime.jsx`), charts in
@@ -653,8 +702,8 @@ Discussion threads matched by `match_episode_thread`) + `sequel_chain` (SEQUEL h
 via `pick_sequel` over the cached `relations_batch`) + your list status for each.
 
 The anime routes (`/anime`, `/anime/:id`, `/anime/voice/:id`, `/anime/character/:id`,
-`/anime/studio/:id`) are wrapped in a shared layout route (`AnimeSection` in `App.jsx`) that
-renders the Anime top bar and `AnimeLayout`, and mounts one
+`/anime/studio/:id`) are wrapped in a shared layout route (`AnimeSection` in `App.jsx`,
+nested in the Video channel's layout) that renders `AnimeLayout`, and mounts one
 `AnimeCalcProvider` (`components/anime/WatchCalculator.jsx`) across the whole section
 — "The Reckoner", a watch-time calculator docked in the page's side margin. Hovering
 any `AnimeCard`/`BrowseCard`/detail dossier arms it (via `useAnimeCalc().hoverProps`,

@@ -1,4 +1,4 @@
-// No 02 — the Screening Room. Your YouTube, without YouTube.
+// The Screening Room (Video channel). Your YouTube, without YouTube.
 //
 // No page title and no blurb: the room opens on a slim control bar (search all of
 // YouTube, the three ways to look at your channels, the knobs) and then straight
@@ -33,6 +33,7 @@ import {
   markSeen, seenSince, useChannelFeed, useChannelRoster, useSeen, useShared, useWatched,
 } from '../components/screening/feed.js';
 import { SubscribeButton } from '../components/screening/SubscribeButton.jsx';
+import { playlistItem, ytChannelItem } from '../lib/saveable.js';
 import {
   ChannelLink, LiveBadge, Shelf, VideoRow, VideoTile, Wall, useChannelFaces,
 } from '../components/screening/tiles.jsx';
@@ -686,6 +687,11 @@ function PlaylistCard({ playlist }) {
         <div className={s.plCount}><ListVideo size={13} /> {playlist.video_count ?? '—'}</div>
       </div>
       <div className={s.plTitle}>{playlist.title}</div>
+      <SaveButton
+        item={playlistItem({ id: playlist.playlist_id, title: playlist.title, thumbnail: playlist.thumbnail, count: playlist.video_count })}
+        className={s.plSave}
+        size={14}
+      />
     </Link>
   );
 }
@@ -788,6 +794,7 @@ export function ChannelPage() {
               <Play size={14} /> Play all
             </button>
           )}
+          <SaveButton label item={ytChannelItem({ id: channelId, name, thumbnail: avatar })} />
           <SubscribeButton channelId={channelId} sub={sub} name={name} />
         </div>
       </header>
@@ -883,12 +890,17 @@ export function PlaylistPage() {
             </span>
           )}
         </div>
-        {items.length > 0 && (
-          <div className={s.chActs}>
-            <button type="button" className={s.playAll} onClick={() => playAll(items)}><Play size={14} fill="currentColor" /> Play all</button>
-            <button type="button" className={s.ghostBtn} onClick={() => playAll(shuffled(items))}><Shuffle size={14} /> Shuffle</button>
-          </div>
-        )}
+        <div className={s.chActs}>
+          {items.length > 0 && (
+            <>
+              <button type="button" className={s.playAll} onClick={() => playAll(items)}><Play size={14} fill="currentColor" /> Play all</button>
+              <button type="button" className={s.ghostBtn} onClick={() => playAll(shuffled(items))}><Shuffle size={14} /> Shuffle</button>
+            </>
+          )}
+          {pl.data && (
+            <SaveButton label item={playlistItem({ id: playlistId, title, thumbnail: cover, author: pl.data.author, count })} />
+          )}
+        </div>
       </header>
 
       {items.length > 8 && (

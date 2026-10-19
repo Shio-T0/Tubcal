@@ -42,10 +42,13 @@ function recordWatch(item, toast) {
 
 export function AppProviders({ children }) {
   const [toasts, setToasts] = useState([]);
-  const toast = useCallback((message, type = 'info') => {
+  // `action` ({ label, run }) adds a button to the toast (an Undo, say) and keeps
+  // it up a little longer so there's time to reach it.
+  const toast = useCallback((message, type = 'info', { action } = {}) => {
     const id = Math.random().toString(36).slice(2);
-    setToasts((t) => [...t, { id, message, type }]);
-    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 4200);
+    const dismiss = () => setToasts((t) => t.filter((x) => x.id !== id));
+    setToasts((t) => [...t, { id, message, type, action, dismiss }]);
+    setTimeout(dismiss, action ? 6500 : 4200);
   }, []);
 
   const [settings, setSettings] = useState(null);
@@ -364,39 +367,71 @@ export function AppProviders({ children }) {
   // quick double-tap see the first tap's result before React re-renders.
   const savedRef = useRef(saved);
   savedRef.current = saved;
-  const toggleSaved = useCallback((item) => {
-    if (!item?.id) return;
-    const cur = savedRef.current;
-    const was = cur[item.id];
-    let next;
-    if (was) {
-      next = { ...cur };
-      delete next[item.id];
-    } else {
-      // newest first, as the server lists them; saved_at dates the card
-      next = { [item.id]: { ...item, saved_at: Math.floor(Date.now() / 1000) }, ...cur };
-    }
+  const addSaved = useCallback((item) => {
+    // newest first, as the server lists them; saved_at dates the card (an undo
+    // brings back the original date)
+    const entry = { ...item, saved_at: item.saved_at || Math.floor(Date.now() / 1000) };
+    const next = { [item.id]: entry, ...savedRef.current };
     savedRef.current = next;
     setSaved(next);
-    if (was) {
-      api(`/saved/${encodeURIComponent(item.id)}`, { method: 'DELETE' }).catch((err) => {
+    api('/saved', { method: 'POST', body: JSON.stringify({ item: entry }) }).catch((err) => {
+      console.error('[saved] POST failed', err);
+      setSaved((p) => { // roll back
+        const n = { ...p };
+        delete n[item.id];
+        return n;
+      });
+      toast('Failed to save item', 'error');
+    });
+  }, [toast]);
+
+  /** Take entries off the list. With `undo`, the toast offers them back. */
+  const removeSaved = useCallback((ids, { undo = false } = {}) => {
+    const cur = savedRef.current;
+    const gone = ids.map((id) => cur[id]).filter(Boolean);
+    if (!gone.length) return;
+    const next = { ...cur };
+    for (const it of gone) delete next[it.id];
+    savedRef.current = next;
+    setSaved(next);
+    for (const it of gone) {
+      api(`/saved/${encodeURIComponent(it.id)}`, { method: 'DELETE' }).catch((err) => {
         console.error('[saved] DELETE failed', err);
-        setSaved((p) => ({ ...p, [item.id]: was })); // roll back
+        setSaved((p) => ({ ...p, [it.id]: it })); // roll back
         toast('Failed to unsave item', 'error');
       });
-    } else {
-      api('/saved', { method: 'POST', body: JSON.stringify({ item }) }).catch((err) => {
-        console.error('[saved] POST failed', err);
-        setSaved((p) => { // roll back
-          const n = { ...p };
-          delete n[item.id];
-          return n;
-        });
-        toast('Failed to save item', 'error');
+    }
+    if (undo) {
+      const label = gone.length === 1 ? `Removed “${gone[0].title || 'item'}” from Saved` : `Removed ${gone.length} items from Saved`;
+      toast(label, 'info', {
+        action: { label: 'Undo', run: () => gone.forEach((it) => addSaved(it)) },
       });
     }
+  }, [toast, addSaved]);
+
+  const toggleSaved = useCallback((item, opts) => {
+    if (!item?.id) return;
+    if (savedRef.current[item.id]) removeSaved([item.id], opts);
+    else addSaved(item);
+  }, [addSaved, removeSaved]);
+
+  /** Change a kept entry: its `note`, or `done` (true/false). */
+  const updateSaved = useCallback((id, patch) => {
+    const cur = savedRef.current[id];
+    if (!cur) return;
+    const local = { ...cur };
+    if ('note' in patch) local.note = patch.note || '';
+    if ('done' in patch) local.done_at = patch.done ? Math.floor(Date.now() / 1000) : null;
+    const next = { ...savedRef.current, [id]: local };
+    savedRef.current = next;
+    setSaved(next);
+    api(`/saved/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(patch) }).catch((err) => {
+      console.error('[saved] PATCH failed', err);
+      setSaved((p) => ({ ...p, [id]: cur })); // roll back
+      toast('Failed to update a saved item', 'error');
+    });
   }, [toast]);
-  const savedApi = { saved, toggleSaved };
+  const savedApi = { saved, toggleSaved, addSaved, removeSaved, updateSaved };
 
   // ── Anime list sync ─────────────────────────────────────────────────────────
   // AniList edits (status / progress / score / …) apply locally at once and push

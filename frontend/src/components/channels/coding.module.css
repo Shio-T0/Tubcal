@@ -1,0 +1,347 @@
+/* The Coding channel's frame: an editor window. A narrow activity bar of icon
+   keys down the left (the room you're in marked by a bar in its colour, like an
+   IDE's active tool), and a mono title bar across the top that reads as a path. */
+
+.frame {
+  --act-w: 70px;
+  --act-gap: 18px;
+  display: grid;
+  grid-template-columns: var(--act-w) minmax(0, 1fr);
+  gap: var(--act-gap);
+  align-items: start;
+  padding-top: var(--space-4);
+}
+/* Wide screens: hang the bar in the shell's empty left margin, so the page keeps
+   the shell's full width. */
+@media (min-width: 1500px) {
+  .frame {
+    margin-left: calc(-1 * (var(--act-w) + var(--act-gap)));
+  }
+}
+
+/* ── the activity bar ────────────────────────────────────────────────────── */
+.activity {
+  position: sticky;
+  top: 14px;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  height: calc(100vh - 28px);
+  padding: 12px 6px 10px;
+  border-radius: 14px;
+  border: 1px solid var(--rule);
+  background: color-mix(in srgb, var(--ink) 70%, var(--ink-2));
+  box-shadow: var(--shadow-card);
+  animation: barIn 0.35s var(--hand) both;
+}
+@keyframes barIn {
+  from {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+}
+.mark {
+  display: block;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--rule);
+  font-family: var(--font-mono);
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1;
+  text-align: center;
+  color: var(--paper);
+}
+.mark em {
+  font-style: normal;
+  color: var(--c-coding);
+}
+.acts {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.act {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 9px 2px 7px;
+  border-radius: 10px;
+  color: var(--paper-faint);
+  transition: color 0.15s ease, background 0.15s ease;
+}
+.act::before {
+  content: '';
+  position: absolute;
+  left: -6px;
+  top: 10px;
+  bottom: 10px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--room-c);
+  transform: scaleY(0);
+  transition: transform 0.25s var(--hand);
+}
+.act:hover {
+  color: var(--paper);
+  background: var(--surface-hover);
+}
+.actIcon {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 30px;
+  border-radius: 8px;
+  transition: background 0.18s ease, color 0.18s ease;
+}
+.actLabel {
+  max-width: 100%;
+  overflow: hidden;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.actOn,
+.actOn:hover {
+  color: var(--paper);
+  background: color-mix(in srgb, var(--room-c) 10%, transparent);
+}
+.actOn::before {
+  transform: none;
+}
+.actOn .actIcon {
+  color: var(--room-c);
+}
+.spacer {
+  flex: 1;
+}
+.knobs {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding-top: 8px;
+  border-top: 1px solid var(--rule);
+}
+.knob {
+  display: grid;
+  place-items: center;
+  height: 26px;
+  border-radius: 7px;
+  color: var(--paper-faint);
+}
+.knob b {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+}
+.knob:hover {
+  color: var(--paper);
+  background: var(--surface-hover);
+}
+.knobOn,
+.knobOn:hover {
+  background: color-mix(in srgb, var(--ch-c) 22%, transparent);
+  color: var(--ch-c);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ch-c) 55%, transparent);
+}
+
+/* ── the title bar ───────────────────────────────────────────────────────── */
+.work {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+.titlebar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 44px;
+  padding: 5px 6px 5px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--rule);
+  background: color-mix(in srgb, var(--ink) 70%, var(--ink-2));
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  animation: barIn 0.35s var(--hand) 0.05s both;
+}
+.path {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  color: var(--paper-dim);
+}
+.path i {
+  font-style: normal;
+  color: var(--paper-faint);
+  opacity: 0.6;
+}
+.path span > i {
+  margin-right: 7px;
+}
+.path a:hover {
+  color: var(--paper);
+}
+.channel {
+  color: var(--c-coding);
+}
+.here {
+  font-weight: 600;
+  color: var(--paper);
+  box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--room-c) 70%, transparent);
+}
+
+.colophon {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  min-width: 0;
+}
+.root {
+  overflow: hidden;
+  padding: 2px 9px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--rule);
+  font-size: 11px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--paper-dim);
+}
+.cap,
+.capOn {
+  padding: 1px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--rule);
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--paper-faint);
+  opacity: 0.6;
+}
+.capOn {
+  color: var(--c-editor);
+  border-color: color-mix(in srgb, var(--c-editor) 40%, transparent);
+  opacity: 1;
+}
+
+.tools {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+}
+.colophon + .tools {
+  margin-left: 6px;
+}
+.search,
+.tool {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-width: 32px;
+  height: 32px;
+  padding: 0 8px;
+  border-radius: 8px;
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--paper-dim);
+  transition: color 0.15s ease, background 0.15s ease;
+}
+.search {
+  padding: 0 8px 0 10px;
+  margin-right: 4px;
+  border: 1px solid var(--rule);
+  background: var(--surface-input);
+}
+.search kbd {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--paper-faint);
+}
+.search:hover,
+.tool:hover {
+  color: var(--paper);
+  background: var(--surface-hover);
+}
+.count {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--signal);
+}
+
+.main {
+  min-width: 0;
+}
+
+/* ── phones: the bar lies flat across the top ────────────────────────────── */
+.flat {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0 10px;
+  border-bottom: 1px solid var(--rule);
+}
+.flat .mark {
+  padding: 0;
+  border: 0;
+  font-family: var(--font-display);
+  font-size: 24px;
+}
+.flat .acts {
+  flex-direction: row;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.flat .act {
+  flex-direction: row;
+  padding: 4px 10px 4px 4px;
+}
+.flat .act::before {
+  left: 8px;
+  right: 8px;
+  top: auto;
+  bottom: -2px;
+  width: auto;
+  height: 2px;
+  transform: scaleX(0);
+}
+.flat .actOn::before {
+  transform: none;
+}
+.flat .actIcon {
+  width: 28px;
+  height: 26px;
+}
+.flat .actLabel {
+  font-size: 12px;
+}
+.flat .knobs {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .frame {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+    padding-top: 0;
+  }
+  .path {
+    flex: 1;
+  }
+  .tools {
+    margin-left: 0;
+  }
+}

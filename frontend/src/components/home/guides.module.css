@@ -1,6 +1,7 @@
-/* The channel guides under the set: two lit panels, each with its channel dial in
-   the corner. Channel 1 glows amber and folds today's paper over its rooms;
-   Channel 2 glows persimmon over a drifting wall of this season's covers. */
+/* The channel guides under the set: three lit panels, each with its channel dial
+   in the corner and glowing in its channel's dye. Social folds today's paper over
+   its rooms; Coding lists open files and the Workbench's languages; Video, the
+   wide one, sets your uploads beside the Anime over a drifting wall of covers. */
 
 .guide {
   --ch: var(--signal);
@@ -21,12 +22,17 @@
   animation: rise 0.7s var(--hand) 0.45s both;
   transition: transform 0.3s var(--hand), box-shadow 0.3s ease;
 }
-.hub {
-  --ch: var(--signal);
+.social {
+  --ch: var(--c-social);
 }
-.anime {
-  --ch: var(--accent-strong);
-  animation-delay: 0.55s;
+.coding {
+  --ch: var(--c-coding);
+  animation-delay: 0.52s;
+}
+.video {
+  --ch: var(--c-video);
+  grid-column: 1 / -1;
+  animation-delay: 0.6s;
 }
 .guide:hover,
 .guide:focus-within {
@@ -220,12 +226,12 @@
   transform: translateY(-50%);
 }
 
-/* ── Channel 1: the rooms ────────────────────────────────────────────────── */
+/* ── a channel's rooms ───────────────────────────────────────────────────── */
 .rooms {
   position: relative;
   z-index: 2;
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
 }
 .room {
@@ -297,13 +303,238 @@
   }
 }
 
-/* ── Channel 2: covers, shelves and doors ────────────────────────────────── */
+/* ── Channel 2: open files, languages ────────────────────────────────────── */
+.block {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.blockHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--paper-faint);
+}
+.blockNote {
+  overflow: hidden;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--ch);
+}
+.blockEmpty {
+  margin: 0;
+  font-size: 13px;
+  color: var(--paper-faint);
+}
+.files {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-radius: 12px;
+  border: 1px solid var(--rule);
+  background: color-mix(in srgb, var(--ink) 50%, transparent);
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+}
+.files li + li {
+  border-top: 1px solid var(--rule);
+}
+.files a {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 7px 12px;
+  color: var(--paper-dim);
+  animation: rise 0.45s var(--hand) calc(0.7s + var(--i, 0) * 0.05s) both;
+}
+.files a svg {
+  flex: none;
+  color: var(--ch);
+}
+.files a:hover,
+.files a:focus-visible {
+  background: color-mix(in srgb, var(--ch) 10%, transparent);
+  color: var(--paper);
+  outline: none;
+}
+.fileDir {
+  overflow: hidden;
+  min-width: 0;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  direction: rtl;
+  text-align: left;
+  color: var(--paper-faint);
+}
+.fileName {
+  flex: none;
+  color: var(--text-primary);
+}
+.langs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.lang {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px 5px 8px;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--lang-c) 45%, var(--rule));
+  border-left-width: 3px;
+  background: color-mix(in srgb, var(--lang-c) 8%, transparent);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-primary);
+  animation: rise 0.45s var(--hand) calc(0.75s + var(--i, 0) * 0.04s) both;
+  transition: background 0.18s ease, transform 0.18s var(--hand);
+}
+.lang:hover,
+.lang:focus-visible {
+  background: color-mix(in srgb, var(--lang-c) 22%, transparent);
+  transform: translateY(-2px);
+  outline: none;
+}
+
+/* ── Channel 3: two halves ───────────────────────────────────────────────── */
+.halves {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: 22px;
+}
+.half {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+.halfHead {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  align-self: flex-start;
+  padding-bottom: 3px;
+  border-bottom: 2px solid color-mix(in srgb, var(--room-c) 60%, transparent);
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.halfHead i {
+  font-style: normal;
+  font-family: var(--font-body);
+  font-size: 12px;
+  color: var(--paper-dim);
+}
+.halfHead svg {
+  color: var(--room-c);
+  transition: transform 0.25s var(--hand);
+}
+.halfHead:hover svg {
+  transform: translateX(4px);
+}
+.uploads {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.upload {
+  display: grid;
+  grid-template-columns: 128px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  padding: 6px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  background: color-mix(in srgb, var(--ink) 55%, transparent);
+  text-align: left;
+  animation: rise 0.5s var(--hand) calc(0.7s + var(--i, 0) * 0.06s) both;
+  transition: border-color 0.18s ease, background 0.18s ease;
+}
+.upload:hover,
+.upload:focus-visible {
+  border-color: color-mix(in srgb, var(--c-youtube) 45%, var(--rule));
+  background: color-mix(in srgb, var(--c-youtube) 10%, var(--ink));
+  outline: none;
+}
+.uploadPic {
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 16 / 9;
+  border-radius: 8px;
+  background: var(--ink-3);
+}
+.uploadPic img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.uploadPlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.35);
+  opacity: 0;
+  transition: opacity 0.18s ease;
+}
+.upload:hover .uploadPlay,
+.upload:focus-visible .uploadPlay {
+  opacity: 1;
+}
+.uploadText {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.uploadTitle {
+  display: -webkit-box;
+  overflow: hidden;
+  font-size: 13.5px;
+  font-weight: 560;
+  line-height: 1.3;
+  color: var(--text-primary);
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.uploadFrom {
+  overflow: hidden;
+  font-size: 12px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--paper-faint);
+}
+.uploadBadges {
+  position: absolute;
+  top: -34px;
+  right: 0;
+  display: flex;
+  gap: 4px;
+}
+
+/* ── Channel 3: covers, shelves and doors ────────────────────────────────── */
 .mosaic {
   position: absolute;
-  inset: -30% -20% -20%;
+  inset: -30% -8% -20% 36%;
   z-index: 0;
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(7, 1fr);
   gap: 10px;
   transform: rotate(-8deg);
   opacity: 0.3;
@@ -337,7 +568,7 @@
   }
 }
 /* dark behind the copy, the covers showing through only in the middle band */
-.anime::before {
+.video::before {
   content: '';
   position: absolute;
   inset: 0;
@@ -539,9 +770,6 @@
   border-top: 1px solid var(--rule);
   font-size: 12.5px;
 }
-.hub .rooms + .foot {
-  margin-top: 0;
-}
 .foot a,
 .foot button {
   display: inline-flex;
@@ -605,6 +833,11 @@
     display: none;
   }
 }
+@media (max-width: 900px) {
+  .halves {
+    grid-template-columns: 1fr;
+  }
+}
 @media (max-width: 520px) {
   .rooms,
   .shelves {
@@ -626,7 +859,10 @@
   .mosaic img,
   .counter,
   .reelItem,
-  .door {
+  .door,
+  .files a,
+  .lang,
+  .upload {
     animation: none;
   }
 }

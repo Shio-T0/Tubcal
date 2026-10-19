@@ -456,8 +456,9 @@
 /* the bar that follows you down the page */
 .followWrap {
   position: sticky;
-  top: 10px;
-  z-index: 30;
+  /* under the Social channel's bar */
+  top: calc(var(--chrome-top, 0px) + 10px);
+  z-index: 29;
   height: 0;
 }
 .follow {

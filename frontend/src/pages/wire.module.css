@@ -172,8 +172,9 @@
 }
 .pane {
   position: sticky;
-  top: 14px;
-  max-height: calc(100vh - 28px);
+  /* under the Social channel's bar */
+  top: calc(var(--chrome-top, 0px) + 14px);
+  max-height: calc(100vh - var(--chrome-top, 0px) - 28px);
   overflow-y: auto;
   overscroll-behavior: contain;
   border-radius: var(--r-media);

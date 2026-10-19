@@ -8,9 +8,19 @@ export default function ToastStack({ toasts }) {
         <div
           key={t.id}
           className={`${s.toast} tc-float ${t.type === 'error' ? s.toastError : ''} ${t.type === 'success' ? s.toastSuccess : ''}`}
+          role={t.type === 'error' ? 'alert' : 'status'}
         >
           <span className={s.toastDot} />
-          {t.message}
+          <span className={s.toastText}>{t.message}</span>
+          {t.action && (
+            <button
+              type="button"
+              className={s.toastAction}
+              onClick={() => { t.action.run(); t.dismiss(); }}
+            >
+              {t.action.label}
+            </button>
+          )}
         </div>
       ))}
     </div>

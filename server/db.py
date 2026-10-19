@@ -536,14 +536,43 @@ def get_continue_watching(limit=30, ratio=0.95):
 # ---- saved (watch-later / bookmarks, cross-platform) ----
 
 def add_saved(item):
+    now = int(time.time())
+    # An undo puts an entry back with the date it was first kept; anything else
+    # (missing, nonsense, or in the future) is kept as of now.
+    try:
+        at = int(item.get("saved_at") or 0)
+    except (TypeError, ValueError):
+        at = 0
+    if not 0 < at <= now:
+        at = now
     con = connect()
     with con:
         con.execute(
             "INSERT INTO saved (platform, item_id, payload, saved_at) VALUES (?, ?, ?, ?) "
             "ON CONFLICT(item_id) DO UPDATE SET payload=excluded.payload",
-            (item.get("platform"), item.get("id"), json.dumps(item), int(time.time())),
+            (item.get("platform"), item.get("id"), json.dumps(item), at),
         )
     con.close()
+
+
+def update_saved(item_id, note=None, done=None):
+    """Change a kept entry's note and/or done mark. Returns the entry, or None
+    when nothing is saved under `item_id`."""
+    con = connect()
+    try:
+        with con:
+            row = con.execute("SELECT payload, saved_at FROM saved WHERE item_id=?", (item_id,)).fetchone()
+            if not row:
+                return None
+            item = json.loads(row["payload"])
+            if note is not None:
+                item["note"] = note
+            if done is not None:
+                item["done_at"] = int(time.time()) if done else None
+            con.execute("UPDATE saved SET payload=? WHERE item_id=?", (json.dumps(item), item_id))
+    finally:
+        con.close()
+    return {**item, "saved_at": row["saved_at"]}
 
 
 def remove_saved(item_id):

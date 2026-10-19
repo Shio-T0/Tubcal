@@ -1,85 +1,59 @@
-/* The Anime's index — a file tree in a slim cabinet down the left. Folders in the
-   display face with their icon, files hanging off a hairline guide by little
-   "├─" ticks, the open file lit in the room's amber. */
+/* The Anime's index — a file tree hung under "The Anime" in the Video console.
+   Folders in the display face with their icon, files hanging off a hairline
+   guide by little "├─" ticks, the open file lit in the room's amber. Your
+   AniList account sits above it. */
 
-.layout {
-  --tree-w: 216px;
-  --tree-gap: 26px;
-  display: grid;
-  grid-template-columns: var(--tree-w) minmax(0, 1fr);
-  gap: var(--tree-gap);
-  align-items: start;
-}
-.layoutRail {
-  --tree-w: 48px;
-}
-/* Wide screens: hang the index in the shell's empty left margin, so the content
-   keeps the shell's full width (and the Reckoner still docks in the right one). */
-@media (min-width: 1780px) {
-  .layout {
-    margin-left: calc(-1 * (var(--tree-w) + var(--tree-gap)));
-  }
-}
-@media (max-width: 900px) {
-  .layout {
-    grid-template-columns: minmax(0, 1fr);
-    gap: var(--space-3);
-  }
-}
 .main {
   min-width: 0;
 }
 
-/* ── the tree ─────────────────────────────────────────────────────────────── */
-.tree {
-  position: sticky;
-  top: 14px;
-  max-height: calc(100vh - 28px);
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  padding: 8px 6px 10px;
-  border-radius: var(--r-card);
-  border: 1px solid var(--rule);
-  background:
-    linear-gradient(to bottom, color-mix(in srgb, var(--c-anime) 5%, transparent), transparent 120px),
-    var(--surface);
-  scrollbar-width: thin;
-  animation: slideIn 0.35s var(--hand) both;
-}
-@keyframes slideIn {
-  from {
-    opacity: 0;
-    transform: translateX(-8px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-.head {
+/* ── your account ─────────────────────────────────────────────────────────── */
+.account {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 2px 4px 7px 10px;
-  margin-bottom: 4px;
-  border-bottom: 1px solid var(--rule);
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--paper-faint);
+  gap: 8px;
+  margin: 2px 0 8px;
+  min-width: 0;
 }
-.head button {
-  display: grid;
-  place-items: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 6px;
-  color: var(--paper-faint);
+.profile {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 3px 12px 3px 4px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--rule);
+  background: color-mix(in srgb, var(--c-anime) 7%, var(--surface));
+  color: inherit;
 }
-.head button:hover {
+.profile:hover {
+  border-color: color-mix(in srgb, var(--c-anime) 55%, var(--rule));
+}
+.profileName {
+  overflow: hidden;
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
   color: var(--text-primary);
-  background: var(--surface-hover);
+}
+.sync {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 5px;
+}
+.sync em {
+  font-style: normal;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--paper-faint);
+}
+
+/* ── the tree ─────────────────────────────────────────────────────────────── */
+.tree {
+  margin-left: -6px;
 }
 .folders,
 .files {
@@ -270,86 +244,6 @@
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--paper-faint);
-}
-
-/* ── folded to a rail of icons ────────────────────────────────────────────── */
-.rail {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  padding: 6px 4px;
-  overflow: visible; /* the flyouts reach out past the rail */
-}
-.railSlot {
-  position: relative;
-}
-.flyout {
-  position: absolute;
-  z-index: 40;
-  left: calc(100% + 8px);
-  top: -6px;
-  min-width: 200px;
-  padding: 8px 6px 6px;
-  border-radius: var(--r-card);
-  border: 1px solid var(--rule-strong);
-  background: var(--ink-2);
-  box-shadow: var(--shadow-modal);
-  opacity: 0;
-  visibility: hidden;
-  transform: translateX(-4px);
-  transition: opacity 0.14s ease, transform 0.14s ease, visibility 0s linear 0.14s;
-}
-/* a hair of invisible bridge so the pointer can cross the gap to the flyout */
-.flyout::before {
-  content: '';
-  position: absolute;
-  right: 100%;
-  top: 0;
-  width: 10px;
-  height: 100%;
-}
-.railSlot:hover .flyout,
-.railSlot:focus-within .flyout {
-  opacity: 1;
-  visibility: visible;
-  transform: none;
-  transition: opacity 0.14s ease, transform 0.14s ease;
-}
-.flyoutTitle {
-  display: block;
-  padding: 0 8px 6px;
-  font-family: var(--font-display);
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-.flyout .files {
-  margin-top: 0;
-}
-.railToggle,
-.railItem {
-  display: grid;
-  place-items: center;
-  width: 36px;
-  height: 34px;
-  border-radius: 9px;
-  color: var(--paper-faint);
-  transition: color 0.14s ease, background 0.14s ease;
-}
-.railToggle {
-  margin-bottom: 4px;
-  border-bottom: 1px solid var(--rule);
-  border-radius: 9px 9px 0 0;
-}
-.railToggle:hover,
-.railItem:hover {
-  color: var(--text-primary);
-  background: var(--surface-hover);
-}
-.railOn {
-  color: var(--c-anime);
-  background: color-mix(in srgb, var(--c-anime) 14%, transparent);
 }
 
 /* ── the path line (what used to be a whole header) ───────────────────────── */

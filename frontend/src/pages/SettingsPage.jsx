@@ -22,7 +22,7 @@ import { Avatar } from '../components/ui/Avatar.jsx';
 import AddSubscriptionModal from '../components/modals/AddSubscriptionModal.jsx';
 import { useSettings, useSubscriptions, useToast } from '../state.jsx';
 import { THEMES, skinsFor } from '../lib/themes.js';
-import { ROOMS, knownActiveIds } from '../lib/rooms.js';
+import { CHANNELS, ROOMS, getRoomById, knownActiveIds } from '../lib/rooms.js';
 import { latestParams } from '../lib/urlState.js';
 import { subtitleStyle, SUBTITLE_FONTS } from '../lib/subtitleStyle.js';
 import { SubtitleStyleEditor } from '../components/player/Subtitles.jsx';
@@ -374,22 +374,21 @@ function RoomsSection() {
   // Retired ids (the old Front Page, The Anime) are ignored so they can't eat the cap.
   const active = knownActiveIds(settings?.active_rooms);
   const max = settings?.max_active_rooms ?? 6;
-  const rooms = ROOMS.filter((r) => !(APP.phone && r.id === 'editor'));
+  const full = (on) => active.length >= max && !on;
   const toggle = (id) => {
     const next = new Set(active);
     if (next.has(id)) next.delete(id);
     else {
-      if (next.size >= max) { toast(`The hub holds ${max} rooms — raise the limit first`, 'error'); return; }
+      if (next.size >= max) { toast(`${max} rooms are on — raise the limit first`, 'error'); return; }
       next.add(id);
     }
     updateSettings({ active_rooms: ROOMS.filter((r) => next.has(r.id)).map((r) => r.id) });
   };
   const setMax = (v) => updateSettings({ max_active_rooms: Math.max(1, Math.min(12, v)) });
-  let n = 0;
   return (
     <>
       <Group>
-        <Row label="Rooms in the hub" hint={`${active.length} of ${max} places taken`}>
+        <Row label="Rooms switched on" hint={`${active.length} of ${max} places taken`}>
           <div className={s.stepper}>
             <button type="button" disabled={max <= 1} onClick={() => setMax(max - 1)} aria-label="Fewer"><Minus size={14} /></button>
             <span>{max}</span>
@@ -397,27 +396,38 @@ function RoomsSection() {
           </div>
         </Row>
       </Group>
-      <Group>
-        {rooms.map((room) => {
-          const on = active.includes(room.id);
-          const full = active.length >= max && !on;
-          if (on) n += 1;
-          return (
-            <Row
-              key={room.id}
-              label={(
-                <span className={s.room} style={{ '--room-c': room.color }} data-off={on ? undefined : ''}>
-                  <span className={s.roomNo}>{on ? String(n).padStart(2, '0') : '—'}</span>
-                  {room.label}
-                </span>
-              )}
-              hint={full ? 'The hub is full' : null}
-            >
-              <Switch checked={on} onChange={() => (full ? toast(`The hub holds ${max} rooms — raise the limit first`, 'error') : toggle(room.id))} label={room.label} />
-            </Row>
-          );
-        })}
-      </Group>
+      {CHANNELS.map((ch) => {
+        const rooms = ch.rooms.map(getRoomById).filter((r) => r && !(APP.phone && r.id === 'editor'));
+        let n = 0;
+        return (
+          <Group key={ch.id} title={`${ch.n} · ${ch.label}`}>
+            {rooms.map((room) => {
+              const on = room.fixed || active.includes(room.id);
+              if (on) n += 1;
+              return (
+                <Row
+                  key={room.id}
+                  label={(
+                    <span className={s.room} style={{ '--room-c': room.color }} data-off={on ? undefined : ''}>
+                      <span className={s.roomNo}>{on ? String(n).padStart(2, '0') : '—'}</span>
+                      {room.label}
+                    </span>
+                  )}
+                  hint={room.fixed ? 'Always on' : full(on) ? 'Every place is taken' : null}
+                >
+                  {!room.fixed && (
+                    <Switch
+                      checked={on}
+                      onChange={() => (full(on) ? toast(`${max} rooms are on — raise the limit first`, 'error') : toggle(room.id))}
+                      label={room.label}
+                    />
+                  )}
+                </Row>
+              );
+            })}
+          </Group>
+        );
+      })}
     </>
   );
 }
@@ -749,7 +759,7 @@ function useSummaries(oauth) {
       subscriptions: `${nSubs} followed`,
       history: 'Kept on this machine',
       appearance: `${THEMES.find((t) => t.value === (st.theme || 'dark'))?.label || st.theme}${st.fast_mode ? ' · fast mode' : ''}`,
-      rooms: `${active.length} of ${st.max_active_rooms ?? 6} in the hub`,
+      rooms: `${active.length} of ${st.max_active_rooms ?? 6} switched on`,
       playback: `${st.solo_audio === false ? 'Sound from all' : 'Sound from one'} · ${(st.playback_rate || 1) === 1 ? 'normal speed' : `${st.playback_rate}×`}`,
       subtitles: sub.show
         ? `${SUBTITLE_FONTS.find((f) => f.value === sub.font)?.label} · ${Math.round(sub.size * 100)}%`

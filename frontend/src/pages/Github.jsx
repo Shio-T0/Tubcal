@@ -109,9 +109,7 @@ function GithubRow({ item, index, onOpen }) {
           <span className={s.issues}>{compact(item.comments_count)} issues</span>
         )}
       </div>
-      <span style={{ position: 'relative', alignSelf: 'center' }}>
-        <SaveButton item={item} />
-      </span>
+      <SaveButton item={item} className={s.save} />
     </div>
   );
 }
@@ -275,14 +273,9 @@ export default function Github() {
 
   return (
     <>
-      <SectionHead
-        kicker="No 07 — GitHub"
-        title="Activity from your repos"
-        note="Releases, commits, and events from the repos and users you follow."
-        color="var(--c-github)"
-      >
+      <SectionHead color="var(--c-github)">
         <Button variant="ghost" onClick={() => setManageOpen(true)}>
-          <ListTree size={14} /> saved ({subs.github.length})
+          <ListTree size={14} /> following ({subs.github.length})
         </Button>
         <Button onClick={() => setAddOpen(true)}>
           <Plus size={14} /> add repo or user

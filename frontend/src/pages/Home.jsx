@@ -4,11 +4,11 @@
 // line what's waiting (new uploads, episodes of shows still airing, whoever's live,
 // what airs next, today's paper), each part a link. Under it the set (TheSet.jsx)
 // is tuned to whatever you'd pick up next, with the rest of that queue as presets,
-// a clock, the two channel knobs and a slip of what's coming up. Under the set the
-// two channel guides (Guides.jsx) say what's in each channel: Channel 1 is the
-// Hub (today's paper, then every room you've switched on in Settings → Rooms),
-// Channel 2 is The Anime. Keys: 1 and 2 here, Space g h and Space g a from
-// anywhere, h j k l to walk the screen.
+// a clock, the three channel knobs and a slip of what's coming up. Under the set
+// the three channel guides (Guides.jsx) say what's in each channel: 1 Social (the
+// Edition, the Wire, the Dispatch), 2 Coding (the Composing Room, the Workbench,
+// GitHub) and 3 Video (the Screening Room, the Anime, the Archive). Keys: 1 2 3
+// here, Space g s/c/v from anywhere, h j k l to walk the screen.
 //
 // Everything is read from what the rooms already fetch and cache, so the front of
 // the set costs next to nothing (components/home/lineup.js).
@@ -18,13 +18,15 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Search } from 'lucide-react';
 
 import { useApi } from '../api/client.js';
+import { Bookmark, Settings } from 'lucide-react';
+
 import { useProgress, useSaved, useSettings } from '../state.jsx';
 import { themeMeta } from '../lib/themes.js';
-import { ANIME_HOME, HUB_HOME, getActiveRooms, knownActiveIds } from '../lib/rooms.js';
-import { openPalette } from '../components/layout/HubConsole.jsx';
+import { CHANNELS, channelRooms } from '../lib/rooms.js';
+import { openPalette, openPocket, useChannelHomes } from '../components/channels/common.jsx';
 import { useChannelFeed, useSeen } from '../components/screening/feed.js';
 import TheSet from '../components/home/TheSet.jsx';
-import { AnimeGuide, HubGuide } from '../components/home/Guides.jsx';
+import { CodingGuide, SocialGuide, VideoGuide } from '../components/home/Guides.jsx';
 import {
   airingBacklog, slotLabel, tallyShelves, useAnimeEntries, useComingUp, useMinute, usePickUp,
 } from '../components/home/lineup.js';
@@ -107,7 +109,8 @@ export default function Home() {
   const { settings } = useSettings();
   const { progress } = useProgress();
   const { saved } = useSaved();
-  const rooms = getActiveRooms(knownActiveIds(settings?.active_rooms));
+  const homes = useChannelHomes();
+  const rooms = Object.fromEntries(CHANNELS.map((ch) => [ch.id, channelRooms(ch.id, settings?.active_rooms)]));
 
   const anime = useAnimeEntries();
   const pickUp = usePickUp(anime.entries);
@@ -115,7 +118,7 @@ export default function Home() {
   const comingUp = useComingUp(anime.entries, live, now);
   const { newCount } = useSeen();
   const paper = useApi('/edition/latest');
-  // This season's covers behind Channel 2 — the browse shelf is cached server-side
+  // This season's covers behind Channel 3 — the browse shelf is cached server-side
   // for half an hour, so the home screen costs AniList next to nothing.
   const season = useApi('/anime/browse?kind=seasonal');
   const covers = (season.data?.items || []).filter((m) => m.cover).slice(0, 30);
@@ -130,23 +133,27 @@ export default function Home() {
   const comingReady = !anime.loading && !(hasSubs && live.loading && !live.data);
   const { hello, part } = daypart(now);
 
-  // Channel numbers: 1 → Hub, 2 → Anime (plain keys, only on this screen — and
-  // never while the player or the editor has the keyboard).
+  // Channel numbers: 1 Social, 2 Coding, 3 Video (plain keys, only on this
+  // screen — and never while the player or the editor has the keyboard).
   useEffect(() => {
     const onKey = (e) => {
       if (e.ctrlKey || e.metaKey || e.altKey || e.repeat || e.defaultPrevented) return;
       if (document.body.dataset.playerExpanded || document.body.dataset.editorFocused) return;
       const el = e.target;
       if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable)) return;
-      if (e.key === '1') { e.preventDefault(); navigate(HUB_HOME); }
-      if (e.key === '2') { e.preventDefault(); navigate(ANIME_HOME); }
+      const ch = CHANNELS.find((c) => String(c.n) === e.key);
+      if (ch) { e.preventDefault(); navigate(homes[ch.id]); }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [navigate]);
+  }, [navigate, homes]);
 
-  const hubSub = rooms.length ? plural(rooms.length, 'room') : 'no rooms on';
-  const animeSub = anime.entries ? `${tallyShelves(anime.entries).watching} watching` : 'AniList';
+  const savedCount = Object.keys(saved || {}).length;
+  const subs = {
+    social: paperToday ? 'paper’s out' : plural(rooms.social.length, 'room'),
+    coding: plural(rooms.coding.length, 'room'),
+    video: newUploads ? `${newUploads} new` : anime.entries ? `${tallyShelves(anime.entries).watching} watching` : plural(rooms.video.length, 'room'),
+  };
 
   return (
     <div className={h.home}>
@@ -166,34 +173,42 @@ export default function Home() {
           ))}
           <em aria-hidden="true">.</em>
         </h1>
-        <button type="button" className={`${h.search} tc-float`} onClick={openPalette} title="Search YouTube, Reddit, HN and GitHub at once">
-          <Search size={15} />
-          <span>Search everything</span>
-          <kbd>Ctrl</kbd><kbd>K</kbd>
-        </button>
+        <span className={h.tools}>
+          <button type="button" className={`${h.search} tc-float`} onClick={openPalette} title="Search YouTube, Reddit, HN and GitHub at once">
+            <Search size={15} />
+            <span>Search everything</span>
+            <kbd>Ctrl</kbd><kbd>K</kbd>
+          </button>
+          <button type="button" className={`${h.pocket} tc-float`} onClick={() => openPocket('saved')} title="Saved (Space s)">
+            <Bookmark size={15} />
+            <span>Saved</span>
+            {savedCount > 0 && <b>{savedCount}</b>}
+          </button>
+          <button type="button" className={`${h.pocket} tc-float`} onClick={() => openPocket('settings')} title="Settings (Space ,)" aria-label="Settings">
+            <Settings size={15} />
+          </button>
+        </span>
         <Summary
           ready={ready} part={part} live={liveRows} newUploads={newUploads} backlog={backlog}
           soon={soon} paperToday={paperToday} now={now}
         />
       </header>
 
-      <TheSet
-        pickUp={pickUp} comingUp={comingUp} comingReady={comingReady} now={now}
-        hubSub={hubSub} animeSub={animeSub}
-      />
+      <TheSet pickUp={pickUp} comingUp={comingUp} comingReady={comingReady} now={now} subs={subs} />
 
       <div className={h.guides}>
-        <HubGuide
-          rooms={rooms} paper={paper} now={now} newUploads={newUploads} liveNow={liveRows.length}
-          savedCount={Object.keys(saved || {}).length}
+        <SocialGuide rooms={rooms.social} paper={paper} now={now} />
+        <CodingGuide rooms={rooms.coding} />
+        <VideoGuide
+          rooms={rooms.video} anime={anime} covers={covers}
+          feed={feed} newUploads={newUploads} liveNow={liveRows.length}
         />
-        <AnimeGuide anime={anime} covers={covers} />
       </div>
 
       <p className={`${h.hint} tc-strip`}>
-        <kbd>Space</kbd><kbd>g</kbd><kbd>h</kbd> and <kbd>Space</kbd><kbd>g</kbd><kbd>a</kbd> switch channels from anywhere
+        <kbd>Space</kbd><kbd>g</kbd> then <kbd>s</kbd> <kbd>c</kbd> <kbd>v</kbd> switch channels from anywhere
+        · <kbd>Space</kbd><kbd>s</kbd> Saved · <kbd>Space</kbd><kbd>,</kbd> Settings
         · <kbd>h</kbd><kbd>j</kbd><kbd>k</kbd><kbd>l</kbd> walk the screen
-        · <kbd>Ctrl</kbd><kbd>K</kbd> searches everything
       </p>
     </div>
   );

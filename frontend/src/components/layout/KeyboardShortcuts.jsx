@@ -1,14 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { ANIME_HOME, HUB_HOME } from '../../lib/rooms.js';
+import { ANIME_HOME } from '../../lib/rooms.js';
 import { scrollMotion } from '../../lib/motion.js';
+import { openPocket, useChannelHomes } from '../channels/common.jsx';
 import k from './KeyboardShortcuts.module.css';
 
 // Vim-style global navigation.
-//   Space g h    the Hub (The Edition)       — the two channels, from anywhere
-//   Space g a    The Anime
-//   g + letter   jump between rooms (gh home, ge/gy/gr/gn/gc/gs)
+//   Space g s/c/v  the channels: Social, Coding, Video — from anywhere
+//   Space g a      The Anime · Space g h  Home
+//   Space s        the drawer on Saved · Space ,  the drawer on Settings
+//   g + letter   jump between rooms (gh home, ge/gy/gr/gn/gc/ga/gd/gs)
 //   gg / G       jump to the first / last tile on the page
 //   h j k l      move a roving focus across tiles by geometry — works in both the
 //                horizontal shelves and the wall grids (arrows mirror them once a
@@ -24,6 +26,8 @@ const GOTO = {
   n: '/hackernews',
   w: '/hackernews',
   c: '/editor',
+  a: ANIME_HOME,
+  d: '/dev',
   s: '/saved',
 };
 
@@ -36,8 +40,9 @@ const typingInField = (el) =>
   el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable);
 
 // The Space leader: Space, then g, then a destination — each step within this long.
+// (Or Space, then s or , for the drawer.)
 const LEADER_MS = 1500;
-const LEADER_GOTO = { a: ANIME_HOME, h: HUB_HOME };
+const LEADER_POCKET = { s: 'saved', ',': 'settings' };
 
 // Space keeps its own meaning on a control you *reached with the keyboard*: a
 // focus-visible button presses, a checkbox toggles, a video plays. A control only
@@ -55,6 +60,9 @@ const spaceIsNative = (el) => {
 
 export default function KeyboardShortcuts() {
   const navigate = useNavigate();
+  const homes = useChannelHomes();
+  const goto = useRef({});
+  goto.current = { s: homes.social, c: homes.coding, v: homes.video, a: ANIME_HOME, h: '/' };
   const gPending = useRef(0);
   // stage 1: Space pressed, waiting for g · stage 2: Space g, waiting for a/h
   const leader = useRef({ stage: 0, at: 0 });
@@ -62,9 +70,13 @@ export default function KeyboardShortcuts() {
   const hintTimer = useRef(null);
 
   useEffect(() => {
-    // visible tiles only (an off-screen / display:none tile has no offsetParent)
-    const tiles = () =>
-      Array.from(document.querySelectorAll('[data-kbd-tile]')).filter((el) => el.offsetParent !== null);
+    // visible tiles only (an off-screen / display:none tile has no offsetParent) —
+    // and only inside an open drawer or dialog that marks itself as the scope
+    const tiles = () => {
+      const scopes = document.querySelectorAll('[data-kbd-scope]');
+      const root = scopes.length ? scopes[scopes.length - 1] : document;
+      return Array.from(root.querySelectorAll('[data-kbd-tile]')).filter((el) => el.offsetParent !== null);
+    };
 
     const focusTile = (el) => {
       if (!el) return;
@@ -140,7 +152,8 @@ export default function KeyboardShortcuts() {
       if (ld.stage && Date.now() - ld.at < LEADER_MS) {
         if (e.key === ' ' && e.repeat) { e.preventDefault(); return; } // held Space: no scroll
         if (ld.stage === 1 && e.key === 'g') { e.preventDefault(); setStage(2); return; }
-        const dest = ld.stage === 2 && LEADER_GOTO[e.key.toLowerCase()];
+        if (ld.stage === 1 && LEADER_POCKET[e.key]) { e.preventDefault(); setStage(0); openPocket(LEADER_POCKET[e.key]); return; }
+        const dest = ld.stage === 2 && goto.current[e.key.toLowerCase()];
         setStage(0); // anything else ends the chord (and keeps its own meaning)
         if (dest) { e.preventDefault(); navigate(dest); return; }
         if (e.key === 'Escape') return;
@@ -192,12 +205,19 @@ export default function KeyboardShortcuts() {
     <div className={k.leader} role="status" aria-live="polite">
       <kbd>Space</kbd>
       {hint === 1 ? (
-        <span className={k.next}><kbd>g</kbd> go to…</span>
+        <>
+          <span className={k.next}><kbd>g</kbd> go to…</span>
+          <span className={k.next}><kbd>s</kbd> Saved</span>
+          <span className={k.next}><kbd>,</kbd> Settings</span>
+        </>
       ) : (
         <>
           <kbd>g</kbd>
-          <span className={k.next}><kbd>h</kbd> Hub</span>
+          <span className={k.next}><kbd>s</kbd> Social</span>
+          <span className={k.next}><kbd>c</kbd> Coding</span>
+          <span className={k.next}><kbd>v</kbd> Video</span>
           <span className={k.next}><kbd>a</kbd> Anime</span>
+          <span className={k.next}><kbd>h</kbd> Home</span>
         </>
       )}
     </div>

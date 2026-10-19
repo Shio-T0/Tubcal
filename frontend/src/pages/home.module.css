@@ -139,6 +139,42 @@
 }
 
 /* search, the one other thing you'd come here for */
+.tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+.pocket {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 7px;
+  height: 40px;
+  padding: 0 13px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--rule-strong);
+  background: var(--surface);
+  font-size: 13.5px;
+  color: var(--text-secondary);
+  animation: rise 0.6s var(--hand) 0.26s both;
+  transition: border-color 0.2s ease, color 0.2s ease, background 0.2s ease, transform 0.2s var(--hand);
+}
+.pocket:hover,
+.pocket:focus-visible {
+  border-color: color-mix(in srgb, var(--signal) 60%, var(--rule-strong));
+  background: var(--surface-hover);
+  color: var(--text-primary);
+  transform: translateY(-1px);
+  outline: none;
+}
+.pocket b {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--signal);
+}
 .search {
   display: inline-flex;
   flex: none;
@@ -184,7 +220,7 @@
 /* ── the guides ──────────────────────────────────────────────────────────── */
 .guides {
   display: grid;
-  grid-template-columns: minmax(0, 1.12fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: var(--space-5);
 }
 
@@ -219,6 +255,12 @@
   }
   .search {
     justify-content: center;
+  }
+  .tools {
+    justify-content: flex-start;
+  }
+  .pocket span {
+    display: none;
   }
   .skin {
     display: none;

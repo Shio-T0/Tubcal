@@ -1,6 +1,6 @@
-/* The Hub's console: a wood-cabinet side panel with a column of channel-preset
-   keys. The room you're in is the key that's pressed in and lit with the room's
-   own dye; its index hangs off it on a thin guide rail. */
+/* The Video channel's console: a wood-cabinet side panel with a column of
+   channel-preset keys. The room you're in is the key that's pressed in and lit
+   with the room's own dye; its index hangs off it on a thin guide rail. */
 
 .frame {
   --console-w: 236px;
@@ -128,10 +128,10 @@
   background: var(--surface-hover);
 }
 
-/* channel 1 / channel 2 */
+/* the three channel keys */
 .channels {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 3px;
   padding: 3px;
   border-radius: 11px;
@@ -142,11 +142,11 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 7px;
+  gap: 5px;
   min-width: 0;
-  padding: 5px 8px;
+  padding: 5px 3px;
   border-radius: 8px;
-  font-size: 12.5px;
+  font-size: 12px;
   color: var(--paper-faint);
   transition: color 0.15s ease, background 0.15s ease;
 }
@@ -158,13 +158,18 @@
 .ch:hover {
   color: var(--paper);
 }
+.ch span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .chOn {
   color: var(--paper);
   background: var(--surface-hover);
   box-shadow: inset 0 1px 0 color-mix(in srgb, var(--paper) 6%, transparent);
 }
 .chOn b {
-  color: var(--signal);
+  color: var(--ch-c, var(--signal));
 }
 
 .search {
@@ -343,6 +348,19 @@
   flex: none;
   width: 34px;
 }
+.footCount {
+  padding: 0 5px;
+  border-radius: var(--r-pill);
+  background: var(--signal-soft);
+  color: var(--signal);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 15px;
+}
+.frameRail .footCount,
+.phoneKnobs .footCount {
+  display: none;
+}
 .footOn,
 .footOn:hover {
   color: var(--signal);
@@ -410,7 +428,7 @@
 }
 .phone .channels {
   flex: none;
-  width: 72px;
+  width: 96px;
 }
 .phone .ch {
   padding: 3px 0;

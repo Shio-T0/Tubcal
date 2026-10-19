@@ -6,10 +6,13 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } fro
 import { EditorView } from '@codemirror/view';
 import { EditorSelection } from '@codemirror/state';
 import { languageServer } from 'codemirror-languageserver';
+import { useSearchParams } from 'react-router-dom';
 import { FolderTree, Search, SquareTerminal, X } from 'lucide-react';
 
 import { api, useApi } from '../../api/client.js';
-import { useSettings, useToast } from '../../state.jsx';
+import { fileItem } from '../../lib/saveable.js';
+import { useSaved, useSettings, useToast } from '../../state.jsx';
+import { SaveButton } from '../ui/ItemActions.jsx';
 import EditorPane, { roomApiRef, mapLeader } from './EditorPane.jsx';
 import FileTree from './FileTree.jsx';
 import GoToFile from './GoToFile.jsx';
@@ -45,6 +48,10 @@ export default function EditorRoom() {
   const [git, setGit] = useState(null);
   const [treeRefresh, setTreeRefresh] = useState(0);
   const [sidebarW, setSidebarW] = useState(230);
+  const [sessionReady, setSessionReady] = useState(false);
+  const [params, setParams] = useSearchParams();
+  const openParam = params.get('open');
+  const { saved, toggleSaved } = useSaved();
   const [termH, setTermH] = useState(220);
 
   const buffers = useRef(new Map());     // path -> {content, savedContent, mtime}
@@ -340,8 +347,20 @@ export default function EditorRoom() {
           if (loaded[0].active) fetchGit(loaded[0].active);
         }
       } catch { /* fresh galley */ }
+      setSessionReady(true);
     })();
   }, [statusData, fetchGit]);
+
+  // `/editor?open=<path>` (a saved file, a file on the home screen) opens that
+  // file over the restored session, then leaves the address clean so a reload
+  // doesn't open it again.
+  useEffect(() => {
+    if (!sessionReady || !openParam) return;
+    openFile(openParam);
+    const next = new URLSearchParams(window.location.search);
+    next.delete('open');
+    setParams(next, { replace: true });
+  }, [sessionReady, openParam]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!restored.current) return;
@@ -413,9 +432,17 @@ export default function EditorRoom() {
       case 'o': setPanes((prev) => { if (prev.length > 1) setFocusedPane(prev.find((p) => p.id !== focusedPane)?.id ?? focusedPane); return prev; }); break;
       case 'r': runCurrent(); break;
       case 'g': if (activePath) { fetchGit(activePath); refreshGitMarks(activePath); } focusActive(); break;
+      case 'b':
+        if (activePath) {
+          const was = !!saved[fileItem(activePath).id];
+          toggleSaved(fileItem(activePath), { undo: true });
+          if (!was) toast(`saved ${activePath}`, 'success');
+        }
+        focusActive();
+        break;
       default: focusActive();
     }
-  }, [activePath, focusedPane, save, closeTab, vsplit, toggleTerminal, runCurrent, fetchGit, refreshGitMarks, focusActive]);
+  }, [activePath, focusedPane, save, closeTab, vsplit, toggleTerminal, runCurrent, fetchGit, refreshGitMarks, focusActive, saved, toggleSaved, toast]);
 
   // ---------- render ----------
 
@@ -519,6 +546,9 @@ export default function EditorRoom() {
                       </button>
                     );
                   })}
+                  {pane.active && (
+                    <SaveButton item={fileItem(pane.active)} className={s.tabSave} size={13} />
+                  )}
                 </div>
                 <div className={s.paneBody}>
                   {pane.active ? (

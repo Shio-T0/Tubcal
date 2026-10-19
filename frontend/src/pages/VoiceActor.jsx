@@ -15,6 +15,8 @@ import { ErrorBox, Receiving } from '../components/layout/Section.jsx';
 import { Avatar } from '../components/ui/Avatar.jsx';
 import { compact } from '../lib/format.js';
 import { FavToggle, metaLine } from '../components/anime/shared.jsx';
+import { SaveButton } from '../components/ui/ItemActions.jsx';
+import { anilistEntityItem } from '../lib/saveable.js';
 import s from './voiceactor.module.css';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -308,6 +310,10 @@ export default function VoiceActor() {
 
               <div className={s.fileActions}>
                 {me.data && <FavToggle kind="staff" id={d.id} initial={d.is_favourite} count={d.favourites} />}
+                <SaveButton
+                  label
+                  item={anilistEntityItem('staff', { id: d.id, name: d.name, image: d.image, native: d.native, sub: d.occupations?.[0] || 'Voice actor' })}
+                />
                 {d.site_url && (
                   <a className={s.source} href={d.site_url} target="_blank" rel="noreferrer">
                     AniList record <ExternalLink size={11} />

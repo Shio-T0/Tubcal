@@ -34,6 +34,11 @@
   --c-anime: var(--signal);   /* The Anime room — adopts each skin's accent */
   --c-editor: #9aae64;        /* The Composing Room — matcha, kin to --rail-2 */
   --c-dev: #8fae9b;           /* The Workbench — verdigris, patina on the tools */
+  /* the three channels — each takes the dye of a room inside it, so every skin
+     that recolours the rooms recolours the channels for free */
+  --c-social: var(--c-hn);
+  --c-coding: var(--c-editor);
+  --c-video: var(--c-youtube);
   --success: #9aae64;
   --danger: #c75a44;
 

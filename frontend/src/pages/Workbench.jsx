@@ -1,4 +1,4 @@
-// No 09 — The Workbench. A shelf of service manuals, one per programming
+// The Workbench (Coding channel). A shelf of service manuals, one per programming
 // language: pull one onto the bench and its whole world opens — talks on film,
 // the bench radio, the change log, the reference shelf, and what's being built.
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -13,7 +13,9 @@ import {
 } from 'lucide-react';
 
 import { useApi } from '../api/client.js';
-import { ErrorBox, Receiving, SectionHead } from '../components/layout/Section.jsx';
+import { ErrorBox, Receiving } from '../components/layout/Section.jsx';
+import { SaveButton } from '../components/ui/ItemActions.jsx';
+import { devPostItem, docItem, podcastItem } from '../lib/saveable.js';
 import { usePlayer } from '../state.jsx';
 import { useHorizontalWheel } from '../lib/useHorizontalWheel.js';
 import { compact } from '../lib/format.js';
@@ -176,13 +178,19 @@ function VideoShelf({ langId }) {
       )}
       <div className={s.filmstrip} ref={rowRef}>
         {items.map((item) => (
-          <button
+          // a div, not a button: the bookmark inside is a button of its own
+          <div
             key={item.id}
-            type="button"
+            role="button"
+            tabIndex={0}
             className={s.filmCard}
             onClick={() => playVideo(item)}
+            onKeyDown={(e) => {
+              if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); playVideo(item); }
+            }}
             title={item.title}
           >
+            <SaveButton item={item} className={s.filmSave} />
             <span className={s.filmThumbWrap}>
               <img className={s.filmThumb} src={item.thumbnail} alt="" loading="lazy" />
               {item.extra?.length_seconds ? (
@@ -198,7 +206,7 @@ function VideoShelf({ langId }) {
               {item.score != null ? ` · ${compact(item.score)} views` : ''}
               {item.published_at ? ` · ${timeAgo(item.published_at)}` : ''}
             </span>
-          </button>
+          </div>
         ))}
       </div>
     </section>
@@ -309,6 +317,7 @@ function PodcastSection({ langId, radio }) {
                   {ep.duration ? ` · ${fmtClock(ep.duration)}` : ''}
                 </span>
               </div>
+              <SaveButton item={podcastItem(ep, langId)} className={s.save} />
               {ep.url && (
                 <a
                   className={s.epLink}
@@ -364,6 +373,7 @@ function Updates({ langId }) {
                 {r.published_at ? (
                   <span className={s.releaseDate}>{fmtDate(r.published_at)}</span>
                 ) : null}
+                <SaveButton item={devPostItem(r, langId)} className={s.save} size={13} />
               </a>
             ))}
           </div>
@@ -380,7 +390,8 @@ function Updates({ langId }) {
             >
               <span className={s.postSource}>{p.source}</span>
               <span className={s.postTitle}>{p.title}</span>
-              {p.published_at ? <span className={s.postDate}>{timeAgo(p.published_at)}</span> : null}
+              {p.published_at ? <span className={s.postDate}>{timeAgo(p.published_at)}</span> : <span />}
+              <SaveButton item={devPostItem(p, langId)} className={s.save} size={13} />
             </a>
           ))}
         </div>
@@ -407,6 +418,7 @@ function ReferenceShelf({ lang }) {
             target="_blank"
             rel="noopener noreferrer"
           >
+            <SaveButton item={docItem(d, lang.name)} className={s.docSave} size={13} />
             <span className={s.docKind}>{KIND_LABEL[d.kind] || d.kind}</span>
             <span className={s.docTitle}>{d.title}</span>
             <span className={s.docNote}>{d.note}</span>
@@ -459,6 +471,7 @@ function FloorSection({ langId }) {
                 </span>
               )}
             </span>
+            <SaveButton item={item} className={s.save} size={13} />
           </a>
         ))}
       </div>
@@ -527,13 +540,6 @@ export default function Workbench() {
 
   return (
     <>
-      <SectionHead
-        kicker="No 09 — The Workbench"
-        title="One language on the bench"
-        note="Pull a manual from the shelf: its films, its radio, its change log, its references — all laid out."
-        color="var(--c-dev)"
-      />
-
       <div className={s.bench} style={accent ? { '--lang-c': accent } : undefined}>
         {languages.error && <ErrorBox message={languages.error} />}
         {languages.data && (

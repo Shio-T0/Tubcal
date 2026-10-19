@@ -1,26 +1,28 @@
-// The Anime's index — a file tree down the left of the section.
+// The Anime's index — a file tree, hung under "The Anime" in the Video console.
 //
 // Every view of the Anime is a folder (Browse, Seasons, Schedule, My List…) and
 // every useful place inside one is a file you can open in one click: a shelf of
 // your list with its live count, next season, Hot takes in the Ledger, the Inbox
 // with its unread badge. Folders open by themselves when you're inside them and
-// remember the ones you opened by hand. On wide screens the index hangs in the
-// page's empty left margin so the content keeps its full width; it can fold to a
-// rail of icons; on a phone it becomes two rows of chips.
+// remember the ones you opened by hand. Your AniList account sits above it: your
+// face (to your profile) and whether every edit has reached AniList yet. On a
+// phone it becomes two rows of chips.
 //
-// It lives in the section's layout, not in the Anime page, so it stays put — and
-// stays useful — on a title, a character or a studio page too.
+// The console keeps it put — and useful — on a title, a character or a studio
+// page too. The section's layout (AnimeLayout) adds the one-line path bar.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import {
-  CalendarDays, CalendarRange, Check, ChevronRight, ChevronsLeft, ChevronsRight, Compass, Library,
+  CalendarDays, CalendarRange, Check, ChevronRight, Compass, Library,
   MessagesSquare, Scale, Tv, Users,
 } from 'lucide-react';
 
 import { api, useApi } from '../../api/client.js';
-import { useMedia } from '../../lib/useMedia.js';
-import { STATUS_LABEL } from './shared.jsx';
+import { useShared } from '../../lib/useShared.js';
+import { useAnimeSync } from '../../state.jsx';
+import { asPerson, PersonAvatar } from './Person.jsx';
+import { STATUS_LABEL, SyncBadge } from './shared.jsx';
 import t from './animetree.module.css';
 
 // ── the tree's shape ──────────────────────────────────────────────────────────
@@ -208,7 +210,6 @@ function useCurrent() {
 // ── persistence (a convenience: works without it) ─────────────────────────────
 
 const OPEN_KEY = 'tubcal.anime.tree.open';
-const RAIL_KEY = 'tubcal.anime.tree.rail';
 const load = (k, fallback) => {
   try { const v = localStorage.getItem(k); return v == null ? fallback : JSON.parse(v); } catch { return fallback; }
 };
@@ -234,54 +235,15 @@ function FileRow({ folder, file, current, index }) {
   );
 }
 
-export function AnimeTree({ tree, rail, onRail }) {
+export function AnimeTree({ tree }) {
   const current = useCurrent();
   const [explicit, setExplicit] = useState(() => load(OPEN_KEY, { list: true }));
   const setOpen = useCallback((id, v) => {
     setExplicit((prev) => { const next = { ...prev, [id]: v }; save(OPEN_KEY, next); return next; });
   }, []);
 
-  if (rail) {
-    return (
-      <nav className={`${t.tree} ${t.rail} tc-index`} aria-label="Anime index">
-        <button type="button" className={t.railToggle} onClick={() => onRail(false)} title="Open the index">
-          <ChevronsRight size={15} />
-        </button>
-        {tree.map((f) => {
-          const Icon = f.icon;
-          return (
-            // Folded, each icon still opens onto its files: a flyout on hover or
-            // keyboard focus, so nothing in the index is out of reach.
-            <div key={f.id} className={t.railSlot}>
-              <Link to={hrefFor(f, f.files.find((x) => !x.sep && !x.toggle), current)}
-                    className={`${t.railItem} ${current.tab === f.id ? t.railOn : ''}`} aria-label={f.label}>
-                <Icon size={17} />
-              </Link>
-              <div className={t.flyout}>
-                <span className={t.flyoutTitle}>{f.label}</span>
-                {f.files.length > 0 && (
-                  <ul className={t.files}>
-                    {f.files.map((file, i) => (
-                      <FileRow key={file.sep ? `sep-${i}` : `${file.label}-${i}`} folder={f} file={file} current={current} index={i} />
-                    ))}
-                  </ul>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </nav>
-    );
-  }
-
   return (
-    <nav className={`${t.tree} tc-index`} aria-label="Anime index">
-      <div className={t.head}>
-        <span>index</span>
-        <button type="button" onClick={() => onRail(true)} title="Fold the index to icons" aria-label="Fold the index">
-          <ChevronsLeft size={14} />
-        </button>
-      </div>
+    <nav className={t.tree} aria-label="Anime index">
       <ul className={t.folders}>
         {tree.map((f) => {
           const Icon = f.icon;
@@ -396,17 +358,52 @@ function PathBar({ tree }) {
   );
 }
 
-// ── the section's layout: top bar above, index + page below ───────────────────
+// ── your account, above the tree ──────────────────────────────────────────────
 
-export function AnimeLayout({ children }) {
+/** Worst-of sync status across every title with a pending/in-flight edit — at a
+ *  glance you know whether everything has reached AniList or is still flushing. */
+function SyncStatus() {
+  const { syncState } = useAnimeSync();
+  const vals = Object.values(syncState || {});
+  const status = vals.includes('syncing') ? 'syncing'
+    : vals.includes('pending') ? 'pending'
+      : vals.includes('error') ? 'error' : null;
+  if (!status) return null;
+  const n = vals.filter((v) => v === status).length;
+  return (
+    <span className={t.sync}>
+      <SyncBadge status={status} />
+      {n > 1 && <em>{n}</em>}
+    </span>
+  );
+}
+
+/** The connected AniList account: your face, to your profile page (where the
+ *  profile studio, your AniList settings, is one button away). */
+function Account() {
+  const me = useApi('/anime/me');
+  const u = asPerson(me.data);
+  if (!u) return null;
+  return (
+    <div className={t.account}>
+      <Link to={`/anime/user/${encodeURIComponent(u.name)}`} className={t.profile} title="Your AniList profile">
+        <PersonAvatar user={u} size="sm" />
+        <span className={t.profileName}>{u.name}</span>
+      </Link>
+      <SyncStatus />
+    </div>
+  );
+}
+
+// ── the tree's data ───────────────────────────────────────────────────────────
+
+/** The tree with live counts: your shelves (refreshed when you come back to My
+ *  List, since they go stale as you edit) and the inbox's unread badge. */
+function useLiveTree() {
   const current = useCurrent();
-  const lists = useApi('/anime/lists');
+  const lists = useShared('/anime/lists', { maxAge: 60_000 });
   const [unread, setUnread] = useState(0);
-  const [rail, setRailState] = useState(() => !!load(RAIL_KEY, false));
-  const phone = useMedia('(max-width: 900px)');
-  const setRail = (v) => { setRailState(v); save(RAIL_KEY, v); };
 
-  // Shelf counts go stale as you edit; refresh them whenever you come back to the list.
   const firstTab = useRef(true);
   useEffect(() => {
     if (firstTab.current) { firstTab.current = false; return; }
@@ -421,15 +418,31 @@ export function AnimeLayout({ children }) {
     return () => { alive = false; window.removeEventListener('anime-inbox-read', read); };
   }, []);
 
-  const tree = useMemo(() => buildTree({ lists: lists.data?.lists, unread }), [lists.data, unread]);
+  return useMemo(() => buildTree({ lists: lists.data?.lists, unread }), [lists.data, unread]);
+}
 
+/** The Anime's index as the Video console shows it, under "The Anime": your
+ *  account and the tree — or, on a phone (`compact`), the two rows of chips. */
+export function AnimePlaces({ compact = false }) {
+  const tree = useLiveTree();
+  if (compact) return <MobileIndex tree={tree} />;
   return (
-    <div className={`${t.layout} ${rail && !phone ? t.layoutRail : ''}`}>
-      {phone ? <MobileIndex tree={tree} /> : <AnimeTree tree={tree} rail={rail} onRail={setRail} />}
-      <main className={`${t.main} tc-main`}>
-        <PathBar tree={tree} />
-        {children ?? <Outlet />}
-      </main>
+    <>
+      <Account />
+      <AnimeTree tree={tree} />
+    </>
+  );
+}
+
+// ── the section's layout: the path bar over the page ──────────────────────────
+
+export function AnimeLayout({ children }) {
+  const lists = useShared('/anime/lists', { maxAge: 60_000 });
+  const tree = useMemo(() => buildTree({ lists: lists.data?.lists, unread: 0 }), [lists.data]);
+  return (
+    <div className={t.main}>
+      <PathBar tree={tree} />
+      {children ?? <Outlet />}
     </div>
   );
 }

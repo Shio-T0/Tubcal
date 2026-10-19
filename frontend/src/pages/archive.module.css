@@ -453,3 +453,36 @@
   .block { animation: none; }
   .pillDot { animation: none; }
 }
+
+/* save a moment (a search hit) or a whole video (a shelf row) */
+.resultSave,
+.rowSave {
+  flex: none;
+  align-self: center;
+  border: 0;
+  background: none;
+  backdrop-filter: none;
+  color: var(--paper-faint);
+  opacity: 0;
+}
+.result:hover .resultSave,
+.row:hover .rowSave,
+.resultSave:focus-visible,
+.rowSave:focus-visible,
+.resultSave[aria-pressed='true'],
+.rowSave[aria-pressed='true'] {
+  opacity: 1;
+}
+.resultSave:hover,
+.rowSave:hover {
+  background: var(--surface);
+  color: var(--signal);
+}
+
+/* touch screens have no hover: keep the bookmarks in sight */
+@media (hover: none) {
+  .resultSave,
+  .rowSave {
+    opacity: 1;
+  }
+}

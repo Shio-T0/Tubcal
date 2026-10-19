@@ -15,6 +15,8 @@ import { ErrorBox, Receiving } from '../components/layout/Section.jsx';
 import { Avatar } from '../components/ui/Avatar.jsx';
 import { compact } from '../lib/format.js';
 import { AniText, FavToggle, fuzzyDateLabel, metaLine } from '../components/anime/shared.jsx';
+import { SaveButton } from '../components/ui/ItemActions.jsx';
+import { anilistEntityItem } from '../lib/saveable.js';
 import s from './character.module.css';
 
 const ROLE = { MAIN: 'Lead', SUPPORTING: 'Supporting', BACKGROUND: 'Background' };
@@ -93,6 +95,10 @@ export default function AnimeCharacter() {
 
               <div className={s.actions}>
                 {me.data && <FavToggle kind="character" id={d.id} initial={d.is_favourite} count={d.favourites} />}
+                <SaveButton
+                  label
+                  item={anilistEntityItem('character', { id: d.id, name: d.name, image: d.image, native: d.native, sub: apps[0]?.media?.title ? `in ${apps[0].media.title}` : 'Character' })}
+                />
                 {d.site_url && (
                   <a className={s.source} href={d.site_url} target="_blank" rel="noreferrer">AniList <ExternalLink size={11} /></a>
                 )}
