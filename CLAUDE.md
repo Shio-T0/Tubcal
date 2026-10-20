@@ -153,6 +153,10 @@ before "where to?":
 - Build: `cd android && ANDROID_HOME=~/Android/Sdk ./gradlew :app:assembleDebug`.
 - `android/tools/sync-data.sh` moves user data between the desktop and phone
   databases.
+- `android/tools/release.sh` publishes the debug APK as GitHub release
+  `phone-v<versionName>` (marked latest), which `tubcal phone` installs. Raise
+  `versionCode`/`versionName` first. Every release must come from the same machine's
+  debug key, or phones can't update in place.
 
 ## The Linux installer
 
@@ -199,9 +203,28 @@ import-tested and dropped (with a warning) when it can't load. The run ends with
 self-test: the Flask test client against a temp `DATA_DIR`, as in
 `tests/conftest.py`.
 
+**The phone.** `install.sh --phone` (what `tubcal phone` runs, and what an
+interactive install offers at the end when it sees a phone) puts Tubcal for Android
+on a phone over adb:
+- From the repo's latest GitHub release: `tubcal-phone.apk` and `tubcal-phone.txt`
+  (version, code, sha256, size, min_sdk, abis; read line by line and checked, never
+  sourced), both written by `android/tools/release.sh`. `TUBCAL_PHONE_URL` points
+  elsewhere; `--apk FILE` installs a local build.
+- Phones are found in sysfs (an ff/42/01 interface: USB debugging on; an "MTP"
+  interface only: off) and in `adb devices -l`. During an install adb is asked only
+  when sysfs shows a debugging phone or adb's server already runs; a server the run
+  started is stopped on exit.
+- `phone_ready` waits (q stops it, five minutes at most) and says what to do for
+  each state: debugging off, unauthorized, no permissions (udev), no adb (the distro
+  package, asked first). Several ready phones: a chooser, or `ANDROID_SERIAL`.
+- The phone's SDK and ABIs are checked against the release before the download, the
+  APK against its sha256 (kept in `~/.cache/tubcal` until it's installed). Then
+  `adb install -r`, and adb's failure codes become sentences. `--replace` uninstalls
+  first (a copy signed with another key; it deletes the phone's data).
+
 `packaging/linux/` holds the templates it renders (`@TUBCAL_HOME@`, `@BIN@`):
 - `tubcal` is the launcher: open/start/stop/status/logs/update/rooms/add/remove/
-  autostart/uninstall/run. It exports `TUBCAL_MODULES` from the record for the server.
+  phone/autostart/uninstall/run. It exports `TUBCAL_MODULES` from the record for the server.
   It uses systemd `--user` when available (`TUBCAL_SYSTEMD=0` opts out), else a
   pidfile plus `setsid`. It identifies a running Tubcal by `/api/health`.
 - `tubcal.desktop` and `tubcal.service` are the menu entry and the user unit.

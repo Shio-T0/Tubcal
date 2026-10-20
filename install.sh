@@ -17,7 +17,8 @@
 # Python + the backend (uv sync) → the frontend build → a private,
 # self-updating yt-dlp (with the Screening Room) → the `tubcal` launcher,
 # app-menu entry and optional login autostart → a self-test against a
-# throwaway database.
+# throwaway database → if a phone is plugged in, an offer to put Tubcal for
+# Android on it too (what `tubcal phone` does any time).
 #
 # Fedora (Fedora Asahi Remix on Apple Silicon included), RHEL/Alma/Rocky,
 # Debian/Ubuntu/Mint/Pop!_OS, Arch/Manjaro/EndeavourOS/CachyOS, openSUSE,
@@ -59,6 +60,7 @@ CONF=$TUBCAL_HOME/install.conf
 # ── arguments ────────────────────────────────────────────────────────────────
 
 MODE=install YES=0 NO_SUDO=0 PURGE=0 ANIM=1 NOCOLOR_FLAG=0 CLONE_DIR="" EXACT=""
+APK_FILE="" REPLACE=0 # --phone: --apk FILE, --replace
 declare -A FORCE=()
 CHANGE_ADD=() CHANGE_REMOVE=() # --add / --remove: rooms, as typed
 
@@ -82,6 +84,11 @@ Options
       --add LIST       add rooms to an installed Tubcal (`tubcal add`)
       --remove LIST    take rooms out of it (`tubcal remove`)
       --list           the rooms, and which are installed (`tubcal rooms`)
+      --phone          put Tubcal for Android on a phone connected over USB
+                       (`tubcal phone`); it needs USB debugging on
+      --apk FILE       with --phone: install this APK instead of the latest release
+      --replace        with --phone: uninstall a Tubcal signed with another key
+                       first (this deletes its data on the phone)
       --uninstall      remove the launcher, menu entry, service and private tools
       --purge          with --uninstall: also delete a cloned app and its data
       --no-anim        skip the tuning-in animation
@@ -110,6 +117,9 @@ Environment
   TUBCAL_HOME                  installer-owned files (default ~/.local/share/tubcal)
   TUBCAL_BIN_DIR               where `tubcal` goes (default ~/.local/bin)
   TUBCAL_SYSTEMD=0             manage the server without systemd --user
+  TUBCAL_PHONE_URL             where --phone downloads from (default: the latest
+                               GitHub release of TUBCAL_REPO)
+  ANDROID_SERIAL               the phone to use, when several are connected
 EOF
 }
 
@@ -136,6 +146,10 @@ parse_args() {
         shift ;;
       --with=*|--without=*|--rooms=*|--modules=*|--add=*|--remove=*) set -- "${1%%=*}" "${1#*=}" "${@:2}"; continue ;;
       --list) MODE=list ;;
+      --phone) MODE=phone ;;
+      --apk) [[ $# -ge 2 ]] || { echo "--apk needs a file" >&2; exit 2; }; APK_FILE=$2; shift ;;
+      --apk=*) APK_FILE=${1#*=} ;;
+      --replace) REPLACE=1 ;;
       --dir) [[ $# -ge 2 ]] || { echo "--dir needs a path" >&2; exit 2; }; CLONE_DIR=$2; shift ;;
       --dir=*) CLONE_DIR=${1#*=} ;;
       --no-sudo) NO_SUDO=1 ;;
@@ -427,6 +441,11 @@ pkgname() {
     zypper:notify) echo libnotify-tools ;;
     *:notify) echo libnotify ;;
     *:ripgrep) echo ripgrep ;;
+    apt:adb) echo adb ;; # its udev rules come along (android-sdk-platform-tools-common)
+    pacman:adb) echo android-tools android-udev ;;
+    fedora:adb|zypper:adb|apk:adb|xbps:adb) echo android-tools ;;
+    pacman:udev) echo android-udev ;;
+    apt:udev) echo android-sdk-platform-tools-common ;;
   esac
   return 0
 }
@@ -1033,7 +1052,9 @@ cleanup() {
   [[ -n ${CUR_PID:-} ]] && kill_tree "$CUR_PID"
   show_cursor
   [[ -n $STTY_SAVED ]] && stty "$STTY_SAVED" </dev/tty 2>/dev/null
-  [[ -n ${NOTE_FILE:-} ]] && rm -f "$NOTE_FILE"
+  [[ -n ${NOTE_FILE:-} ]] && rm -f "$NOTE_FILE" "$NOTE_FILE.why"
+  # adb's server, if this run started it (the phone step), goes again
+  ((${ADB_STARTED:-0})) && "$ADB" kill-server >/dev/null 2>&1
   return 0
 }
 on_interrupt() {
@@ -1104,6 +1125,25 @@ pkg_cmd_text() {
 }
 
 _priv() { if [[ $PRIV == sudo ]]; then sudo -n "$@"; elif [[ $PRIV == doas ]]; then doas "$@"; else "$@"; fi; }
+
+# pkg_step LABEL: PKGS from the distro, as one step (sudo asked for once).
+pkg_step() {
+  if [[ $PRIV == sudo ]] && ! sudo -n true 2>/dev/null; then
+    printf '\n'
+    note "sudo, once, for: ${PKGS[*]}"
+    sudo -v </dev/tty || { printf '\n'; return 1; }
+    printf '\n'
+  fi
+  if [[ $PRIV == doas ]]; then
+    # doas can't lend a password to a background job, so this one runs in the open.
+    STEP_N=$((STEP_N + 1))
+    note "doas for: ${PKGS[*]}"
+    install_packages </dev/tty || return 1
+  else
+    run --soft "$1" install_packages || return 1
+  fi
+  PKGS_ADDED="${PKGS_ADDED:+$PKGS_ADDED }${PKGS[*]}"
+}
 
 install_packages() {
   local p failed=()
@@ -1412,6 +1452,498 @@ PY
   note_out "page + API answer"
 }
 
+# ── the phone ────────────────────────────────────────────────────────────────
+#
+# Tubcal for Android (android/) is published as a GitHub release of two files:
+# the APK and tubcal-phone.txt, which gives its version, checksum, size, the
+# oldest Android it runs on and the CPUs it's built for (android/tools/release.sh
+# writes both). It goes on over adb, so the phone needs USB debugging on (or
+# wireless debugging, paired and connected with adb first).
+
+PHONE_PKG=com.tubcal.app
+PHONE_CACHE=${XDG_CACHE_HOME:-$HOME/.cache}/tubcal
+ADB="" ADB_STARTED=0 WHY_FILE=""
+P_SERIAL=() P_STATE=() P_NAME=() PI=-1 # what phone_scan found; PI: the one to use
+PHONE="" PHONE_NAME="" PHONE_WANT=${ANDROID_SERIAL:-}
+P_SDK="" P_ANDROID="" P_ABIS="" P_HAS="" P_HAS_CODE=""
+declare -A REL=() # tubcal-phone.txt
+PHONE_DONE="" PHONE_SEEN=0
+
+find_adb() {
+  local c
+  for c in "$(command -v adb 2>/dev/null)" "${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/nonexistent}}/platform-tools/adb" \
+    "$HOME/Android/Sdk/platform-tools/adb"; do
+    [[ -n $c && -x $c ]] && { ADB=$c; return 0; }
+  done
+  return 1
+}
+adbq() { if has timeout; then timeout 20 "$ADB" "$@"; else "$ADB" "$@"; fi; } # the quick questions
+adb_running() { (exec 3<>"/dev/tcp/127.0.0.1/${ANDROID_ADB_SERVER_PORT:-5037}") 2>/dev/null; }
+adb_start() { # adb's server, started if it isn't running (and stopped again on the way out)
+  ((ADB_STARTED)) || adb_running && return 0
+  adbq start-server >/dev/null 2>&1 && ADB_STARTED=1
+}
+
+# Phones on USB, read from sysfs, so without adb: "debug" when USB debugging is
+# on (an interface of class ff/42/01, the one adb looks for), "files" when only
+# file transfer (MTP) is. iPhones (Apple's vendor id) are passed over.
+# → lines: KIND<TAB>SERIAL<TAB>NAME
+usb_phones() {
+  local d i kind
+  for d in /sys/bus/usb/devices/*; do
+    [[ -r $d/idVendor && $(<"$d/idVendor") != 05ac ]] || continue
+    kind=""
+    for i in "$d/${d##*/}":*; do
+      [[ -r $i/bInterfaceClass ]] || continue
+      if [[ $(<"$i/bInterfaceClass")$(<"$i/bInterfaceSubClass")$(<"$i/bInterfaceProtocol") == ff4201 ]]; then
+        kind=debug
+        break
+      fi
+      [[ $(cat "$i/interface" 2>/dev/null) == MTP ]] && kind=files
+    done
+    [[ -n $kind ]] && printf '%s\t%s\t%s\n' "$kind" "$(cat "$d/serial" 2>/dev/null)" "$(cat "$d/product" 2>/dev/null)"
+  done
+  return 0
+}
+
+# adb's view, USB and Wi-Fi: device, unauthorized, offline, no permissions, …
+# → lines: STATE<TAB>SERIAL<TAB>NAME
+adb_devices() {
+  local line serial rest state name
+  while IFS= read -r line; do
+    [[ $line == List* || $line == '*'* || $line != *[[:space:]]* ]] && continue
+    serial=${line%%[[:space:]]*} rest=${line#"$serial"} rest=${rest##+([[:space:]])}
+    state=${rest%%[[:space:]]*} name=""
+    [[ $state == no ]] && state="no permissions"
+    [[ $rest =~ model:([^[:space:]]+) ]] && name=${BASH_REMATCH[1]//_/ }
+    [[ $serial == emulator-* ]] && name="the emulator"
+    printf '%s\t%s\t%s\n' "$state" "$serial" "$name"
+  done < <(adbq devices -l 2>/dev/null)
+}
+
+phone_scan() { # → P_SERIAL / P_STATE / P_NAME
+  P_SERIAL=() P_STATE=() P_NAME=()
+  local usb kind serial name seen=" "
+  local -A usbname=()
+  usb=$(usb_phones)
+  while IFS=$'\t' read -r kind serial name; do [[ -n $serial ]] && usbname[$serial]=$name; done <<<"$usb"
+  # During an install, adb only when there's something for it to see: a phone
+  # with USB debugging on, or an adb server already running (it may hold Wi-Fi
+  # connections). Asked for a phone (--phone), always: an emulator or a phone
+  # paired over Wi-Fi shows up only once adb's server is running.
+  if find_adb && { [[ $MODE == phone || $'\n'$usb == *$'\n'debug$'\t'* ]] || adb_running; }; then
+    adb_start
+    while IFS=$'\t' read -r kind serial name; do
+      [[ -n $serial ]] || continue
+      P_SERIAL+=("$serial") P_STATE+=("$kind") P_NAME+=("${name:-${usbname[$serial]:-}}")
+      seen+="$serial "
+    done < <(adb_devices)
+  fi
+  while IFS=$'\t' read -r kind serial name; do
+    [[ -n $kind ]] || continue
+    [[ -n $serial && $seen == *" $serial "* ]] && continue
+    if [[ $kind == files ]]; then kind="no debugging"
+    elif [[ -n $ADB ]]; then kind=connecting # adb hasn't caught up with it yet
+    else kind="no adb"; fi
+    P_SERIAL+=("$serial") P_STATE+=("$kind") P_NAME+=("$name")
+  done <<<"$usb"
+}
+
+# phone_pick → PI: ANDROID_SERIAL's phone, the one that's ready, or the one
+# nearest to ready. False when there's none; 2 when you didn't choose one.
+phone_pick() {
+  local i r best=-1 ready=()
+  PI=-1
+  if [[ -n $PHONE_WANT ]]; then
+    for i in "${!P_SERIAL[@]}"; do [[ ${P_SERIAL[i]} == "$PHONE_WANT" ]] && { PI=$i; return 0; }; done
+    return 1
+  fi
+  for i in "${!P_SERIAL[@]}"; do [[ ${P_STATE[i]} == device ]] && ready+=("$i"); done
+  if ((${#ready[@]} == 1)); then PI=${ready[0]}; return 0; fi
+  ((${#ready[@]} > 1)) && { phone_choose "${ready[@]}"; return; }
+  for i in "${!P_SERIAL[@]}"; do
+    case ${P_STATE[i]} in
+      unauthorized) r=5 ;; "no permissions") r=4 ;; connecting|offline|authorizing) r=3 ;;
+      "no adb") r=2 ;; "no debugging") r=1 ;; *) r=0 ;;
+    esac
+    ((r > best)) && { best=$r; PI=$i; }
+  done
+  ((PI >= 0))
+}
+
+phone_choose() { # phone_choose INDEX…: several phones are ready; which one?
+  local i k n=0 picks=("$@")
+  if ((!CAN_ASK)); then
+    say "Several phones are connected. Choose one with ANDROID_SERIAL=<serial>:"
+    for i in "$@"; do note "${P_SERIAL[i]}  ${P_NAME[i]}"; done
+    return 2
+  fi
+  printf '\n'
+  say "Several phones are connected:"
+  for i in "$@"; do n=$((n + 1)); printf '     %s%d%s  %s %s%s%s\n' "$AMBER" "$n" "$RST" "${P_NAME[i]:-a phone}" "$DIM" "${P_SERIAL[i]}" "$RST"; done
+  printf '\n  %s?%s Which one? %s[1-%d]%s ' "$AMBER" "$RST" "$DIM" "$n" "$RST"
+  while :; do
+    IFS= read -rsn1 k </dev/tty || k=q
+    if [[ $k == [1-9] ]] && ((k <= n)); then
+      printf '%s\n' "$k"
+      PI=${picks[k - 1]} PHONE_WANT=${P_SERIAL[PI]}
+      return 0
+    fi
+    [[ $k == [qQnN] || $k == $'\e' ]] && { printf 'none\n'; return 2; }
+  done
+}
+
+android_name() { # android_name SDK → REPLY: "8.0", "14", …
+  case $1 in
+    26) REPLY=8.0 ;; 27) REPLY=8.1 ;; 28) REPLY=9 ;; 29) REPLY=10 ;; 30) REPLY=11 ;; 31|32) REPLY=12 ;;
+    *) if (($1 >= 33)); then REPLY=$(($1 - 20)); else REPLY="API $1"; fi ;;
+  esac
+}
+
+# phone_why STATE NAME → REPLY: what to do about it, a line each
+phone_why() {
+  local n fix
+  yours "${2:-the phone}"; n=$REPLY
+  case $1 in
+    none) REPLY="No phone found. Connect your Android phone with a USB cable.
+USB debugging has to be on: on the phone, open Settings → About phone
+and tap Build number seven times, then turn on USB debugging in
+Settings → System → Developer options. (Over Wi-Fi: \`adb pair\` and
+\`adb connect\` it first.)" ;;
+    "no debugging") REPLY="${n^} is connected, but USB debugging is off. On the phone, open
+Settings → About phone and tap Build number seven times, then turn on
+USB debugging in Settings → System → Developer options." ;;
+    unauthorized) REPLY="On ${n}, tap Allow when it asks \"Allow USB debugging?\". Tick
+\"Always allow from this computer\" to skip the question next time.
+No question on the phone? Unplug it and plug it back in." ;;
+    "no permissions")
+      fix=$(pkgname udev)
+      if [[ -n $fix ]]; then fix="Install them (the $fix package), then unplug the phone and plug it back in."
+      else fix="Install your distribution's udev rules for Android, then unplug the phone and plug it back in."; fi
+      REPLY="This computer can see ${n} but isn't allowed to use it: the udev
+rules for Android phones are missing.
+$fix" ;;
+    connecting|offline|authorizing) REPLY="${n^} isn't answering yet. If this lasts, unplug it and plug it back in." ;;
+    *) REPLY="${n^} is in $1 mode. Start it up normally." ;;
+  esac
+  ((UTF)) || REPLY=${REPLY//→/>}
+}
+
+# phone_ready: wait for a phone with USB debugging allowed for this computer,
+# saying what to do on the way. → PHONE, PHONE_NAME. False when you stop it
+# (q), after five minutes, or at once when there's no terminal to wait on.
+phone_ready() {
+  local st name last="" t0=$SECONDS i=0 k l spin settling
+  while :; do
+    phone_scan
+    phone_pick
+    case $? in 0) st=${P_STATE[PI]} name=${P_NAME[PI]} ;; 2) return 1 ;; *) st=none name="" ;; esac
+    ((i)) && printf '%s' "$CLR"
+    case $st in
+      device) PHONE=${P_SERIAL[PI]} PHONE_NAME=${name:-the phone}; return 0 ;;
+      "no adb") phone_get_adb || return 1; continue ;;
+    esac
+    # A phone adb has only just seen (or a server only just started) takes a
+    # moment to answer: no advice yet.
+    settling=0
+    if [[ $st == @(connecting|offline|authorizing) ]] || { [[ $st == none ]] && ((ADB_STARTED)); }; then
+      ((SECONDS - t0 < 5)) && settling=1
+    fi
+    if [[ $st == none && -n $PHONE_WANT ]]; then REPLY="No phone $PHONE_WANT (ANDROID_SERIAL) is connected."
+    else phone_why "$st" "$name"; fi
+    if ((!settling)) && [[ $REPLY != "$last" ]]; then
+      last=$REPLY
+      printf '\n'
+      while IFS= read -r l; do say "$l"; done <<<"$REPLY"
+      printf '\n'
+      if ((!CAN_ASK)); then
+        say "Then run \`tubcal phone\` again."
+        return 1
+      fi
+    fi
+    if ((SECONDS - t0 > 300)); then
+      say "Stopped waiting. Run \`tubcal phone\` when the phone is ready."
+      return 1
+    fi
+    if ((!CAN_ASK)); then sleep 1; continue; fi
+    if ((UTF)); then spin=${_BRAILLE[i % 10]}; else spin=${_SPIN[i % 4]}; fi
+    printf '%s  %s%s%s waiting for the phone %s(q to stop)%s' "$CLR" "$AMBER" "$spin" "$RST" "$DIM" "$RST"
+    i=$((i + 1))
+    if IFS= read -rsn1 -t 1 k </dev/tty && [[ $k == [qQnN] || $k == $'\e' ]]; then
+      printf '%s' "$CLR"
+      say "Stopped. Run \`tubcal phone\` when the phone is ready."
+      return 1
+    fi
+  done
+}
+
+# adb isn't installed: from the distro when there's a package and root, asked
+# first; otherwise, where to get it.
+phone_get_adb() {
+  local pk
+  pk=$(pkgname adb)
+  printf '\n'
+  say "Putting Tubcal on a phone needs adb, Android's debugging tool,"
+  say "and it isn't installed."
+  if ((CAN_PKG && CAN_ASK)) && [[ -n $pk ]]; then
+    read -ra PKGS <<<"$pk"
+    pkg_cmd_text
+    if ask "Install it now? ($REPLY)" Y && pkg_step "adb (Android's debugging tool)" && find_adb; then
+      record_pkgs
+      return 0
+    fi
+  fi
+  printf '\n'
+  say "Install adb, then run \`tubcal phone\`:"
+  if [[ -n $pk ]]; then pkg_cmd_text; note "$REPLY"
+  else note "your distribution's adb or android-tools package"; fi
+  note "or Google's platform tools: developer.android.com/tools/releases/platform-tools"
+  return 1
+}
+
+record_pkgs() { # the install record keeps what came from the distro (uninstall lists it)
+  [[ -w $CONF ]] || return 0
+  local l
+  while IFS= read -r l; do
+    if [[ $l == PKGS_ADDED=* ]]; then printf 'PKGS_ADDED=%q\n' "$PKGS_ADDED"; else printf '%s\n' "$l"; fi
+  done <"$CONF" >"$CONF.new" && mv "$CONF.new" "$CONF"
+}
+
+phone_base() { # → REPLY: where the release's files are
+  if [[ -n ${TUBCAL_PHONE_URL:-} ]]; then REPLY=${TUBCAL_PHONE_URL%/}; return 0; fi
+  local re='github\.com[:/]+([^/]+)/([^/]+)$' r=${TUBCAL_REPO%/}
+  [[ $r =~ $re ]] || return 1
+  REPLY="https://github.com/${BASH_REMATCH[1]}/${BASH_REMATCH[2]%.git}/releases/latest/download"
+}
+
+# tubcal-phone.txt → REL[version code sha256 size min_sdk abis]. It's read
+# line by line and checked, never sourced.
+phone_release() {
+  [[ -n ${REL[version]:-} ]] && return 0
+  local txt k v ok
+  local word='^[0-9A-Za-z.+_-]{1,40}$' num='^[0-9]{1,12}$' hex='^[0-9a-f]{64}$' abis='^[a-z0-9_ -]{1,80}$'
+  phone_base || return 1
+  txt=$(curl -fsSL --retry 2 --max-time 30 "$REPLY/tubcal-phone.txt" 2>/dev/null) || return 1
+  while IFS='=' read -r k v; do
+    v=${v%$'\r'} ok=0
+    case $k in
+      version) [[ $v =~ $word ]] && ok=1 ;;
+      code|size|min_sdk) [[ $v =~ $num ]] && ok=1 ;;
+      sha256) [[ $v =~ $hex ]] && ok=1 ;;
+      abis) [[ $v =~ $abis ]] && ok=1 ;;
+    esac
+    ((ok)) && REL[$k]=$v
+  done <<<"$txt"
+  [[ -n ${REL[version]:-} && -n ${REL[code]:-} && -n ${REL[sha256]:-} ]] || { REL=(); return 1; }
+}
+
+phone_facts() { # → P_SDK P_ANDROID P_ABIS PHONE_NAME, and P_HAS / P_HAS_CODE when Tubcal is on it
+  local out l model=""
+  out=$(adbq -s "$PHONE" shell "getprop ro.build.version.sdk; getprop ro.build.version.release; getprop ro.product.cpu.abilist; getprop ro.product.model; pm path $PHONE_PKG >/dev/null 2>&1 && dumpsys package $PHONE_PKG | grep -m2 -E 'versionCode=|versionName='" 2>/dev/null) || [[ -n $out ]] || return 1
+  out=${out//$'\r'/}
+  { read -r P_SDK; read -r P_ANDROID; read -r P_ABIS; read -r model; } <<<"$out"
+  [[ $P_SDK =~ ^[0-9]+$ ]] || return 1
+  P_HAS="" P_HAS_CODE=""
+  [[ $out =~ versionCode=([0-9]+) ]] && P_HAS_CODE=${BASH_REMATCH[1]}
+  [[ $out =~ versionName=([^[:space:]]+) ]] && P_HAS=${BASH_REMATCH[1]}
+  [[ -n $P_HAS_CODE && -z $P_HAS ]] && P_HAS="(build $P_HAS_CODE)"
+  [[ -n $model && $PHONE != emulator-* ]] && PHONE_NAME=$model
+  return 0
+}
+
+mb() { REPLY="$((($1 + 524288) / 1048576)) MB"; } # mb BYTES
+yours() { if [[ $1 == "the "* ]]; then REPLY=$1; else REPLY="your $1"; fi; } # "your Pixel 9a", "the emulator"
+
+phone_download() { # phone_download BASE FILE: the release's APK, checked against its sha256
+  local f=$2 sum="${REL[sha256]}"
+  mkdir -p "$PHONE_CACHE" || return 1
+  if [[ -f $f ]] && echo "$sum  $f" | sha256sum -c - >/dev/null 2>&1; then
+    note_out "already here $SEP sha256 ok"
+    return 0
+  fi
+  rm -f "$PHONE_CACHE"/tubcal-phone-*.apk "$PHONE_CACHE"/tubcal-phone-*.part
+  curl -fL --retry 3 --progress-bar -o "$f.part" "$1/tubcal-phone.apk" || return 1
+  if ! echo "$sum  $f.part" | sha256sum -c - >/dev/null 2>&1; then
+    rm -f "$f.part"
+    echo "the download doesn't match its checksum; run this again"
+    return 1
+  fi
+  mv "$f.part" "$f"
+  mb "$(stat -c %s "$f" 2>/dev/null || wc -c <"$f")"
+  note_out "$REPLY $SEP sha256 ok"
+}
+
+phone_push() { # phone_push APK: adb install, keeping the app's data (unless --replace)
+  local out
+  if ((REPLACE)) && [[ -n $P_HAS ]]; then
+    "$ADB" -s "$PHONE" uninstall "$PHONE_PKG" || return 1
+  fi
+  # (some adb builds log their own internals to stderr: "I0000 … adb_install.cpp")
+  out=$("$ADB" -s "$PHONE" install -r "$1" 2>&1 | grep -vE '^(I[0-9]{4} |WARNING: All log messages)' | tee /dev/stderr)
+  if [[ $out == *Success* && $out != *Failure* ]]; then
+    note_out "${REL[version]:-installed}"
+    return 0
+  fi
+  phone_failure "$out" >"$WHY_FILE"
+  return 1
+}
+
+phone_failure() { # phone_failure ADB-OUTPUT → stdout: what went wrong, in words
+  local f
+  case $1 in
+    *UPDATE_INCOMPATIBLE*|*SHARED_USER_INCOMPATIBLE*|*"signatures do not match"*)
+      echo "The Tubcal already on the phone was signed with a different key (a build"
+      echo "of your own?), so it can't be updated in place. \`tubcal phone --replace\`"
+      echo "uninstalls it first, which deletes Tubcal's data on the phone." ;;
+    *VERSION_DOWNGRADE*) echo "The phone has a newer Tubcal than this one, so it was left as it is." ;;
+    *INSUFFICIENT_STORAGE*) echo "There isn't enough free space on the phone." ;;
+    *USER_RESTRICTED*|*INSTALL_FAILED_ABORTED*)
+      echo "The phone refused the install: look for a question on its screen. On"
+      echo "Xiaomi, Redmi and POCO phones, turn on Install via USB in Developer options." ;;
+    *VERIFICATION_FAILURE*|*VERIFICATION_TIMEOUT*)
+      echo "Play Protect stopped the install. Run this again and choose Install"
+      echo "anyway on the phone when it asks." ;;
+    *NO_MATCHING_ABIS*) echo "Tubcal for Android isn't built for this phone's processor." ;;
+    *OLDER_SDK*|*DEPRECATED_SDK_VERSION*) echo "This phone's Android is too old for Tubcal." ;;
+    *offline*|*"not found"*|*"no devices"*) echo "The phone disconnected. Connect it again and run \`tubcal phone\`." ;;
+    *)
+      f=$(grep -m1 -oE 'Failure \[[^]]*\]' <<<"$1") || f=$(grep -v '^[[:space:]]*$' <<<"$1" | tail -n 1)
+      echo "adb couldn't install it: ${f:-no reason given}" ;;
+  esac
+}
+
+# phone_put: Tubcal for Android on the phone phone_ready found: the latest
+# release (or --apk FILE), unless it's already there.
+phone_put() {
+  local apk base label
+  if ! phone_facts; then
+    say "Couldn't read ${PHONE_NAME}'s details over adb."
+    say "Unplug it, plug it back in and try again."
+    return 1
+  fi
+  android_name "$P_SDK"; local android="Android ${P_ANDROID:-$REPLY}"
+  yours "$PHONE_NAME"; local on=$REPLY # "your Pixel 9a"
+  if [[ -n $APK_FILE ]]; then
+    apk=$APK_FILE label="Installing $(basename "$APK_FILE") on $on"
+  else
+    if ! phone_release; then
+      if phone_base; then base="$REPLY/tubcal-phone.txt"; else base="nowhere: TUBCAL_REPO isn't on GitHub (set TUBCAL_PHONE_URL)"; fi
+      say "Couldn't get Tubcal for Android's release details from"
+      note "$base"
+      note "Check this computer's internet connection and try again."
+      return 1
+    fi
+    phone_base; base=$REPLY
+    if ((P_SDK < ${REL[min_sdk]:-26})); then
+      android_name "${REL[min_sdk]:-26}"
+      say "Tubcal for Android needs Android $REPLY or newer, and $on has $android."
+      return 1
+    fi
+    if [[ -n ${REL[abis]:-} ]]; then
+      local a fits=0
+      for a in ${P_ABIS//,/ }; do [[ " ${REL[abis]} " == *" $a "* ]] && fits=1; done
+      if ((!fits)); then
+        say "Tubcal for Android is built for ${REL[abis]// / and } processors, and"
+        say "$on has ${P_ABIS%%,*}."
+        return 1
+      fi
+    fi
+  fi
+  if [[ $MODE == phone ]]; then
+    kv "Phone" "$PHONE_NAME $SEP $android $SEP ${P_ABIS%%,*}"
+    if [[ -n $P_HAS ]]; then kv "On it" "Tubcal $P_HAS"; else kv "On it" "no Tubcal yet"; fi
+    if [[ -z $APK_FILE ]]; then mb "${REL[size]:-0}"; kv "Release" "Tubcal for Android ${REL[version]} $SEP $REPLY"; fi
+    printf '\n'
+  fi
+  if [[ -z $APK_FILE && -n $P_HAS_CODE ]] && ((!REPLACE)); then
+    if ((P_HAS_CODE == ${REL[code]})); then
+      step_done "Tubcal for Android ${REL[version]}" "already on $on"
+      return 0
+    elif ((P_HAS_CODE > ${REL[code]})); then
+      step_done "Tubcal for Android" "${on^} has a newer one ($P_HAS)"
+      return 0
+    fi
+  fi
+  if ((REPLACE)) && [[ -n $P_HAS ]]; then
+    say "--replace uninstalls the Tubcal on $on first, and with it the"
+    say "phone's Tubcal data: subscriptions, sign-ins, history and saved things."
+    if ((CAN_ASK)) && ! ask "Replace it?" N; then return 1; fi
+  fi
+  if [[ -z $APK_FILE ]]; then
+    apk="$PHONE_CACHE/tubcal-phone-${REL[version]}.apk"
+    run "Downloading Tubcal for Android ${REL[version]}" phone_download "$base" "$apk" || {
+      say "The download failed. Check this computer's internet connection and try again."
+      return 1
+    }
+    label="Installing it on $on"
+    [[ -n $P_HAS ]] && label="Updating Tubcal on $on (was $P_HAS)"
+  fi
+  ((REPLACE)) && [[ -n $P_HAS ]] && label="Replacing the Tubcal on $on"
+  : >"$WHY_FILE"
+  note "If the phone asks about installing Tubcal, allow it."
+  if ! run --soft "$label" phone_push "$apk"; then
+    local l
+    while IFS= read -r l; do say "$l"; done <"$WHY_FILE"
+    return 1
+  fi
+  # The copy downloaded is on the phone now; the next one is downloaded fresh.
+  [[ -z $APK_FILE ]] && rm -f "$apk"
+  return 0
+}
+
+# During an install: a phone that's plugged in is offered Tubcal for Android.
+phone_offer() {
+  [[ $MODE == install ]] || return 0
+  local t
+  for t in 1 2 3 4; do # adb's first look at a phone can lag by a second
+    phone_scan
+    [[ " ${P_STATE[*]} " == *" connecting "* ]] || break
+    sleep 1
+  done
+  ((${#P_SERIAL[@]})) || return 0
+  if ((!CAN_ASK)); then PHONE_SEEN=1; return 0; fi
+  local q name=${P_NAME[0]:-} i ready=0
+  ((${#P_SERIAL[@]} == 1)) || name=""
+  for i in "${!P_STATE[@]}"; do [[ ${P_STATE[i]} == device ]] && ready=$((ready + 1)); done
+  # One phone, ready, with Tubcal on it: ask only when there's a newer one.
+  if ((${#P_SERIAL[@]} == 1 && ready == 1)); then
+    PHONE=${P_SERIAL[0]} PHONE_NAME=${name:-the phone}
+    if phone_facts && [[ -n $P_HAS_CODE ]]; then
+      phone_release && ((${REL[code]} > P_HAS_CODE)) || return 0
+      yours "$PHONE_NAME"
+      q="${REPLY^} has Tubcal $P_HAS. Update it to ${REL[version]} too?"
+    fi
+  fi
+  if [[ -z ${q:-} ]]; then
+    if [[ $name == "the emulator" ]]; then q="The Android emulator is running."
+    elif [[ -n $name ]]; then q="Your $name is plugged in."
+    else q="A phone is plugged in."; fi
+    q+=" Put Tubcal for Android on it too?"
+  fi
+  ask "$q" Y || return 0
+  phone_ready && phone_put && PHONE_DONE=$PHONE_NAME
+  return 0 # the phone never fails the install
+}
+
+do_phone() {
+  detect_system
+  [[ -r $CONF ]] && PKGS_ADDED=$(. "$CONF" >/dev/null 2>&1; printf '%s' "${PKGS_ADDED:-}")
+  if [[ -n $APK_FILE ]]; then
+    [[ -f $APK_FILE ]] || die "There's no file $APK_FILE."
+    APK_FILE=$(cd "$(dirname "$APK_FILE")" && pwd -P)/$(basename "$APK_FILE")
+  fi
+  printf '\n  %sTubcal%s %s for Android %s\n' "$BOLD$AMBER" "$RST" "$DIM" "$RST"
+  rule "THE PHONE"
+  phone_ready || { printf '\n'; exit 1; }
+  phone_put || { printf '\n'; exit 1; }
+  if [[ -n $P_HAS_CODE && -z $APK_FILE ]] && ((P_HAS_CODE >= ${REL[code]:-0} && !REPLACE)); then printf '\n'; return; fi
+  yours "$PHONE_NAME"
+  printf '\n  %s%s%s Tubcal for Android%s is on %s. Open it from the app drawer.\n' "$GOOD" "$G_OK" "$RST" \
+    "${REL[version]:+ ${REL[version]}}" "$REPLY"
+  note "It keeps its own subscriptions and sign-ins, separate from this computer's."
+  printf '\n'
+}
+
 # ── screens ──────────────────────────────────────────────────────────────────
 
 test_card() {
@@ -1505,12 +2037,19 @@ on_air() {
   local inner=$((W - 4)) lines=() l cw=$((${#cmd} + 14))
   lines+=("")
   lines+=("$KAKI$G_ON$RST ${BOLD}ON AIR${RST}   Tubcal is installed.")
+  if [[ -n $PHONE_DONE ]]; then
+    l=$PHONE_DONE
+    ((${#l} > 36)) && l="${l:0:35}…"
+    yours "$l"
+    lines+=("           It's on $REPLY too.")
+  fi
   lines+=("")
   lines+=("$(printf '%-*s' "$cw" "$cmd")${DIM}start it and open the browser${RST}")
   lines+=("$(printf '%-*s' "$cw" "$cmd stop")${DIM}stop the server${RST}")
   lines+=("$(printf '%-*s' "$cw" "$cmd status")${DIM}what's on, where, which versions${RST}")
   lines+=("$(printf '%-*s' "$cw" "$cmd update")${DIM}pull, rebuild, restart${RST}")
   lines+=("$(printf '%-*s' "$cw" "$cmd add ROOM")${DIM}add a room you left out${RST}")
+  lines+=("$(printf '%-*s' "$cw" "$cmd phone")${DIM}put Tubcal on your Android phone${RST}")
   lines+=("$(printf '%-*s' "$cw" "$cmd uninstall")${DIM}take it all down again${RST}")
   lines+=("")
   local tailline="$AMBER$url$RST"
@@ -1528,6 +2067,7 @@ on_air() {
 
   local notes=()
   [[ ":$PATH:" == *":$BIN_DIR:"* ]] || { tilde "$BIN_DIR"; notes+=("$REPLY isn't on your PATH yet; add it to use plain \`tubcal\`."); }
+  ((PHONE_SEEN)) && notes+=("A phone is plugged in: \`tubcal phone\` puts Tubcal for Android on it.")
   if ((ON[archive] || ON[edition])) && ! has ollama; then
     local writers=()
     for l in edition archive; do ((ON[$l])) && writers+=("$l"); done
@@ -1579,26 +2119,8 @@ do_install() {
 
   rule "ON THE FLOOR"
   if ((${#PKGS[@]})); then
-    local ok=1
-    if [[ $PRIV == sudo ]] && ! sudo -n true 2>/dev/null; then
-      printf '\n'
-      note "sudo, once, for: ${PKGS[*]}"
-      sudo -v </dev/tty || ok=0
-      printf '\n'
-    fi
-    if [[ $PRIV == doas ]]; then
-      # doas can't lend a password to a background job, so this one runs in the open.
-      STEP_N=$((STEP_N + 1))
-      note "doas for: ${PKGS[*]}"
-      install_packages </dev/tty || ok=0
-    elif ((ok)) && ! run --soft "Distro packages" install_packages; then
-      ok=0
-    fi
-    if ((ok)); then
-      PKGS_ADDED="${PKGS_ADDED:+$PKGS_ADDED }${PKGS[*]}"
-    else
+    pkg_step "Distro packages" ||
       warn "Some distro packages didn't install; using user-space fallbacks where there are any."
-    fi
   fi
 
   if ((CLONED)) && [[ $MODE != change ]]; then
@@ -1680,6 +2202,7 @@ do_install() {
     changed_done
     return
   fi
+  phone_offer
   on_air
 }
 
@@ -1785,7 +2308,7 @@ do_uninstall() {
   rm -f "$BIN_DIR/tubcal" "$APPS_DIR/tubcal.desktop" "$ICON_DIR/tubcal.svg" "$XDG_CONF/autostart/tubcal.desktop"
   has update-desktop-database && update-desktop-database -q "$APPS_DIR" 2>/dev/null
   rm -rf "${TUBCAL_HOME:?}/bin" "$TUBCAL_HOME/tools" "$TUBCAL_HOME/node" "$CONF"
-  rm -rf "$STATE_DIR"
+  rm -rf "$STATE_DIR" "$PHONE_CACHE"
   # Only ever a folder that is unmistakably a Tubcal clone.
   if ((cloned && PURGE)) && is_tubcal_dir "$APP_DIR"; then rm -rf "$APP_DIR"; fi
   rmdir "$TUBCAL_HOME" 2>/dev/null
@@ -1802,12 +2325,13 @@ main() {
   mkdir -p "$STATE_DIR"
   LOG="$STATE_DIR/install-$(date +%Y%m%d-%H%M%S).log"
   NOTE_FILE=$(mktemp "${TMPDIR:-/tmp}/tubcal-note.XXXXXX")
-  WARN_FILE="$NOTE_FILE.warn"
+  WARN_FILE="$NOTE_FILE.warn" WHY_FILE="$NOTE_FILE.why"
   # keep the five newest install logs
   ls -1t "$STATE_DIR"/install-*.log 2>/dev/null | tail -n +6 | while IFS= read -r f; do rm -f "$f"; done
   case $MODE in
     uninstall) do_uninstall ;;
     list) do_list ;;
+    phone) do_phone ;;
     *) do_install ;;
   esac
   rm -f "$WARN_FILE"

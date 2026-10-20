@@ -194,6 +194,35 @@ ANDROID_HOME=~/Android/Sdk ./gradlew :app:assembleDebug
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
+Without building: `tubcal phone` (the desktop launcher) installs the latest GitHub
+release, or updates the copy on the phone. It's `install.sh --phone`, and the
+installer offers the same when it sees a phone. It finds the phone in sysfs and adb,
+says what to do while it isn't ready (USB debugging off, "Allow USB debugging?" not
+yet tapped, missing udev rules), checks the phone's Android version and ABI against
+the release, then downloads the APK, checks its SHA-256 and runs `adb install -r`.
+`tubcal phone --apk FILE` installs your own build the same way.
+
+### Publishing a release
+
+```bash
+tools/release.sh --dry-run   # build; write app/build/release/tubcal-phone.{apk,txt}
+tools/release.sh             # build, then publish GitHub release phone-v<versionName>
+```
+
+- Raise `versionCode` and `versionName` in `app/build.gradle.kts` first. A phone
+  only takes an update with a higher `versionCode`, and the script refuses a code that
+  isn't above the last release's.
+- `tubcal-phone.txt` gives the version, code, SHA-256, size, minimum SDK and ABIs,
+  read from the APK with `aapt2`. `install.sh` reads it line by line from
+  `releases/latest/download/`, so the release is marked latest.
+- The tag points at HEAD, which must be committed and pushed, so every published
+  APK's source is on GitHub.
+- Releases are the debug build: `tools/sync-data.sh` needs a debuggable app. They're
+  signed with the building machine's debug key (`~/.android/debug.keystore`), and a
+  phone can only update in place from an APK with the same key. So build every
+  release on the same machine. A copy signed with another key can only be replaced:
+  `tubcal phone --replace`, which deletes the phone's Tubcal data.
+
 Before every build, Gradle runs two steps of its own (`app/build.gradle.kts`):
 - `syncDesktopPython` copies `../server` and `../main.py` (as `desktop_main.py`)
   into `app/build/generated/desktop-python`, which Chaquopy packs beside
