@@ -116,6 +116,11 @@
           </div>
           <p>To add a room later, type <code>tubcal add</code> and its name, for example <code>tubcal add anime</code>. <code>tubcal remove</code> takes one out again; what you saved, followed and watched there is kept, and comes back if you add the room again. To change the options, run the install command again: your earlier choices are already selected, and your data isn't touched.</p>
 
+          <h3 id="phone">On your phone</h3>
+          <p>Tubcal also comes as an Android app, laid out for a phone, and it runs entirely on the phone. If your phone is plugged in while you install, the installer offers to put the app on it. You can also do it any time with <code>tubcal phone</code>, which installs the newest version, or updates the one already on the phone.</p>
+          <p>The phone needs <b>USB debugging</b> turned on. Open <b>Settings → About phone</b> and tap <b>Build number</b> seven times, then turn on <b>USB debugging</b> in <b>Settings → System → Developer options</b>. When you plug the phone in, it asks whether to allow USB debugging from this computer: tap <b>Allow</b>. If your computer doesn't have adb (Android's debugging tool), Tubcal offers to install it.</p>
+          <p>The app keeps its own subscriptions and sign-ins, separate from the ones on your computer.</p>
+
           <h3>Opening Tubcal</h3>
           <p>Open <b>Tubcal</b> from your app menu, or type <code>tubcal</code> in a terminal. It opens in your web browser at <b>127.0.0.1:5000</b>, an address that only works on the computer Tubcal is installed on. Then go on to <a href="#first-steps">First steps</a>.</p>
           <div class="callout"><strong>If you already have the code</strong> (from <code>git clone</code>, for example), run <code>./install.sh</code> from inside that folder instead. Tubcal is then set up in that folder, and its data is kept there.</div>
@@ -160,6 +165,7 @@
                 <tr><td class="nowrap"><code>tubcal rooms</code></td><td>Lists the rooms, and which ones you have.</td></tr>
                 <tr><td class="nowrap"><code>tubcal add anime</code></td><td>Adds a room you left out (here, the Anime), then restarts. Reload the page to see it.</td></tr>
                 <tr><td class="nowrap"><code>tubcal remove anime</code></td><td>Takes a room out again. What you saved there is kept.</td></tr>
+                <tr><td class="nowrap"><code>tubcal phone</code></td><td>Puts the Android app on a phone plugged in with a USB cable, or updates it. See <a href="#phone">On your phone</a>.</td></tr>
                 <tr><td class="nowrap"><code>tubcal autostart on</code></td><td>Starts Tubcal whenever you log in. <code>tubcal autostart off</code> undoes it.</td></tr>
                 <tr><td class="nowrap"><code>tubcal logs</code></td><td>Shows what Tubcal is doing. Useful when something isn't working.</td></tr>
                 <tr><td class="nowrap"><code>tubcal uninstall</code></td><td>Removes the command, the menu entry and Tubcal's tools. Your data is kept.</td></tr>
@@ -463,7 +469,7 @@
         <div class="faq faq-q">
           <details><summary>Is it free?</summary><p>Yes. There's no paid version and no subscription. It's free software, so you can also share it and change it.</p></details>
           <details><summary>Does it run on Windows or macOS?</summary><p>No, only on Linux for now. Apple Silicon Macs running Fedora Asahi Remix work, since that's Linux.</p></details>
-          <details><summary>Is there a phone app?</summary><p>There's an Android version with its own phone layout, and it runs entirely on the phone. It isn't in any app store yet, so you'd have to build it from the source code.</p></details>
+          <details><summary>Is there a phone app?</summary><p>Yes, for Android. It has its own layout for a phone and runs entirely on the phone. It isn't in an app store: plug your phone into your computer and run <code>tubcal phone</code>. <a href="#phone">On your phone</a> explains what the phone needs first.</p></details>
           <details><summary>Do I need a YouTube account?</summary><p>No. You can follow channels by name or link. Connecting an account only imports the subscriptions you already have.</p></details>
           <details><summary>Can YouTube see what I watch?</summary><p>The videos still come from YouTube's servers, so YouTube sees your internet connection requesting them. But Tubcal never signs in or keeps cookies, so nothing goes into an account history and your viewing isn't tied together into a profile.</p></details>
           <details><summary>Can I install only the parts I want?</summary><p>Yes. The installer asks which rooms you want, and a room you leave out isn't downloaded. You can add or remove rooms later with <code>tubcal add</code> and <code>tubcal remove</code>; see <a href="#everyday">Starting &amp; updating</a>.</p></details>

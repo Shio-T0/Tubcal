@@ -163,6 +163,7 @@ curl -fsSL …/install.sh | bash -s -- --yes        # flags work through curl to
 | `tubcal rooms` | every room, and which ones are installed |
 | `tubcal add ROOM…` | add rooms you left out: downloads their files and packages, rebuilds, restarts |
 | `tubcal remove ROOM…` | take rooms out again; what you saved, followed and watched stays in your database |
+| `tubcal phone` | put Tubcal for Android on a phone plugged in over USB, or update it ([On a phone](#-on-a-phone)) |
 | `tubcal autostart on\|off` | start at login, or don't |
 | `tubcal uninstall` | remove the launcher, menu entry, service and the private tools |
 
@@ -536,6 +537,22 @@ phone: the Flask backend runs inside the APK and a phone-made UI sits on top. It
 builds from the desktop code in this repo, nothing is copied. See
 [android/README.md](android/README.md). The desktop app doesn't need it, and
 ignores it.
+
+To put it on your phone, turn on USB debugging (Settings → About phone: tap Build
+number seven times, then Settings → System → Developer options → USB debugging),
+plug the phone in and run:
+
+```bash
+tubcal phone
+```
+
+It finds the phone (and waits while you tap Allow on its "Allow USB debugging?"
+question), downloads the latest release from GitHub, checks its SHA-256, and
+installs it with adb, or updates the copy already there. Without adb it offers your
+distro's package. If a phone is plugged in while `install.sh` runs, the installer
+asks whether to do the same. `tubcal phone --apk FILE` installs a build of your
+own instead. The app keeps its own data; `android/tools/sync-data.sh` copies yours
+across.
 
 ## License
 

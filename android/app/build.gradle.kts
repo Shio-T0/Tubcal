@@ -13,8 +13,8 @@ android {
         applicationId = "com.tubcal.app"
         minSdk = 26          // Android 8.0 — needed for notification channels & modern WebView
         targetSdk = 34
-        versionCode = 14
-        versionName = "0.4.0"
+        versionCode = 15
+        versionName = "0.5.0"
 
         // Chaquopy must build for the ABIs you'll run on. arm64 covers every
         // modern phone; x86_64 covers the emulator. (More ABIs = bigger APK.)
