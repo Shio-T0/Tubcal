@@ -16,3 +16,11 @@ export function sanitizeHtml(html) {
     .replace(/\son\w+\s*=\s*'[^']*'/gi, '')
     .replace(/(href|src)\s*=\s*(["'])\s*javascript:[^"']*\2/gi, '$1=$2#$2');
 }
+
+const HN_KIND = /^(Ask|Show|Tell|Launch) HN:\s*/i;
+
+/** "Ask HN: Why…" → { kind: 'Ask HN', rest: 'Why…' } */
+export function splitKind(title = '') {
+  const m = HN_KIND.exec(title);
+  return m ? { kind: `${m[1][0].toUpperCase()}${m[1].slice(1).toLowerCase()} HN`, rest: title.slice(m[0].length) } : { kind: null, rest: title };
+}

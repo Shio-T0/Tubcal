@@ -4,6 +4,8 @@ import { BookOpen, CornerDownLeft, FileText, Play, Sparkles, Trash2 } from 'luci
 import { api, useApi } from '../api/client.js';
 import { SectionHead } from '../components/layout/Section.jsx';
 import { EmptyState, SegmentedControl, Spinner } from '../components/ui/index.jsx';
+import { SaveButton } from '../components/ui/ItemActions.jsx';
+import { momentItem } from '../lib/saveable.js';
 import { clock, timeAgo } from '../lib/time.js';
 import { usePlayer } from '../state.jsx';
 import s from './archive.module.css';
@@ -167,7 +169,17 @@ function SearchBlock({ onJump }) {
           )}
           <div className={s.results}>
             {state.results.map((r, i) => (
-              <button key={i} className={s.result} onClick={() => onJump(r, r.t_start)}>
+              // a div, not a button: the bookmark (save this moment) is a button of its own
+              <div
+                key={i}
+                role="button"
+                tabIndex={0}
+                className={s.result}
+                onClick={() => onJump(r, r.t_start)}
+                onKeyDown={(e) => {
+                  if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); onJump(r, r.t_start); }
+                }}
+              >
                 {r.thumbnail && <img className={s.resultThumb} src={r.thumbnail} alt="" />}
                 <span className={s.resultBody}>
                   <span className={s.resultTop}>
@@ -178,7 +190,8 @@ function SearchBlock({ onJump }) {
                   </span>
                   <span className={s.resultSnippet}>{r.snippet}</span>
                 </span>
-              </button>
+                <SaveButton item={momentItem(toItem(r), r.t_start, r.snippet)} className={s.resultSave} size={13} />
+              </div>
             ))}
           </div>
         </>
@@ -254,6 +267,7 @@ function BrowseBlock({ docs, onOpen, onRemove }) {
               </span>
             </button>
             <StatusPill status={d.status} />
+            <SaveButton item={toItem(d)} className={s.rowSave} size={14} />
             <button className={s.rowDel} title="Remove from Archive" onClick={() => onRemove(d.item_id)}>
               <Trash2 size={14} />
             </button>
@@ -300,12 +314,7 @@ export default function Archive() {
 
   return (
     <>
-      <SectionHead
-        kicker="No 05 — The Archive"
-        title="The Archive"
-        note="Everything you’ve watched, transcribed and searchable — a private memory that never leaves this machine."
-        color={SIGNAL}
-      >
+      <SectionHead color={SIGNAL}>
         {brain && (
           <span className={s.engine} data-on={!!brain.whisper}>
             <span className={s.engineDot} />

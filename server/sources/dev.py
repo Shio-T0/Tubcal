@@ -15,7 +15,7 @@ never blanks a shelf.
 from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import quote
 
-from .. import cache, config, httpc
+from .. import cache, config, httpc, modules
 
 LANGUAGES = {
     "rust": {
@@ -351,7 +351,7 @@ def _fetch_feed(url):
 def videos(lang_id):
     """Talks & tutorials — YouTube-wide search via Invidious, playable in-app."""
     lang = get_language(lang_id)
-    if not lang:
+    if not lang or not modules.has("youtube"):  # the search and the player are the Screening Room's
         return {"items": []}
     from . import invidious
     return invidious.search(lang["video_query"], page=1)
@@ -487,7 +487,6 @@ def release(lang_id):
         return {}
 
     def fetch():
-        from . import github
         if lang.get("version_url"):
             try:
                 data = httpc.get(lang["version_url"]).json()
@@ -502,6 +501,9 @@ def release(lang_id):
                     }
             except Exception:
                 pass
+        if not modules.has("github"):  # the rest asks the GitHub API, through its module
+            return {}
+        from . import github
         if not lang.get("tag_re"):
             try:
                 r = github._fetch(f"/repos/{quote(lang['repo'])}/releases/latest")
@@ -535,14 +537,16 @@ def release(lang_id):
             pass
         return {}
 
-    data, _ = cache.cached(f"dev:release:{lang['id']}", config.TTL_DEV_RELEASE, fetch)
+    # keyed on GitHub being there, so adding its module doesn't wait out a blank stamp
+    key = f"dev:release:{lang['id']}" + ("" if modules.has("github") else ":local")
+    data, _ = cache.cached(key, config.TTL_DEV_RELEASE, fetch)
     return data or {}
 
 
 def repos(lang_id, period="weekly"):
     """What's being built — trending repos in this language, via the GitHub source."""
     lang = get_language(lang_id)
-    if not lang:
+    if not lang or not modules.has("github"):
         return {"items": []}
     from . import github
     return github.trending(period=period, language=lang["gh_language"])

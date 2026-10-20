@@ -2,33 +2,43 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import {
-  Bookmark, Clapperboard, Code2, CornerDownLeft, GitBranch, Hash, History, Library, Newspaper, Play, Radio, ScrollText,
+  Bookmark, Clapperboard, Code2, CornerDownLeft, GitBranch, Hash, History, House, Library, Play, Radio, ScrollText,
   Search, Settings, Tv, Wrench,
 } from 'lucide-react';
 
 import { api } from '../../api/client.js';
-import { ROOMS } from '../../lib/rooms.js';
-import { usePlayer } from '../../state.jsx';
+import { CHANNELS, channelHome, getRoomById } from '../../lib/rooms.js';
+import { hasModule } from '../../lib/modules.js';
+import { usePlayer, useSaved, useSettings } from '../../state.jsx';
+import { openPocket } from '../channels/common.jsx';
+import { repoPath } from '../../lib/gh.js';
+import { KindIcon, kindLine } from '../saved/kinds.jsx';
+import { useOpenSaved } from '../saved/useOpenSaved.jsx';
 import s from './CommandPalette.module.css';
 
-// Every room in the registry (whether or not it's switched on — the palette is the
-// way in either way), then the places that aren't rooms.
+// The channels, then every room in the registry by channel (whether or not it's
+// switched on — the palette is the way in either way), then the places that
+// aren't rooms. Typing also finds what you've saved.
 const ROOM_ICONS = {
   edition: ScrollText, youtube: Clapperboard, reddit: Radio, hackernews: Hash, archive: Library,
-  editor: Code2, github: GitBranch, dev: Wrench,
+  editor: Code2, github: GitBranch, dev: Wrench, anime: Tv,
 };
-const NAV = [
-  ...ROOMS.map((r) => {
-    const Icon = ROOM_ICONS[r.id] || ScrollText;
-    return { id: `nav:${r.route}`, label: r.label, icon: <Icon size={15} />, to: r.route };
-  }),
-  { id: 'nav:/youtube/history', label: 'Screening Room — watch history', icon: <History size={15} />, to: '/youtube/history' },
-  { id: 'nav:/youtube?v=latest', label: 'Screening Room — latest uploads', icon: <Clapperboard size={15} />, to: '/youtube?v=latest' },
-  { id: 'nav:/anime', label: 'The Anime', icon: <Tv size={15} />, to: '/anime' },
-  { id: 'nav:/', label: 'Home — choose Hub or Anime', icon: <Newspaper size={15} />, to: '/' },
-  { id: 'nav:/saved', label: 'Saved', icon: <Bookmark size={15} />, to: '/saved' },
-  { id: 'nav:/settings', label: 'Settings', icon: <Settings size={15} />, to: '/settings' },
+const ROOM_NAV = CHANNELS.flatMap((ch) => ch.rooms.map(getRoomById).filter(Boolean).map((r) => {
+  const Icon = ROOM_ICONS[r.id] || ScrollText;
+  return { id: `nav:${r.route}`, label: r.label, sub: ch.label, icon: <Icon size={15} />, to: r.route };
+}));
+const PLACE_NAV = [
+  ...(hasModule('youtube') ? [
+    { id: 'nav:/youtube/history', label: 'Screening Room — watch history', icon: <History size={15} />, to: '/youtube/history' },
+    { id: 'nav:/youtube?v=latest', label: 'Screening Room — latest uploads', icon: <Clapperboard size={15} />, to: '/youtube?v=latest' },
+  ] : []),
+  { id: 'nav:/', label: 'Home', sub: 'Choose a channel', icon: <House size={15} />, to: '/' },
+  { id: 'pocket:saved', label: 'Saved', sub: 'Open the drawer · Space s', icon: <Bookmark size={15} />, pocket: 'saved' },
+  { id: 'nav:/saved', label: 'Saved page', sub: 'Everything you kept', icon: <Bookmark size={15} />, to: '/saved' },
+  { id: 'pocket:settings', label: 'Settings', sub: 'Open the drawer · Space ,', icon: <Settings size={15} />, pocket: 'settings' },
+  { id: 'nav:/settings', label: 'Settings page', icon: <Settings size={15} />, to: '/settings' },
 ];
+const SAVED_MAX = 6;
 
 const typingInField = (el) =>
   el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable);
@@ -36,6 +46,9 @@ const typingInField = (el) =>
 export default function CommandPalette() {
   const navigate = useNavigate();
   const { open: playVideo } = usePlayer();
+  const { saved } = useSaved();
+  const { settings } = useSettings();
+  const { openItem, modals } = useOpenSaved();
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState('');
   const [results, setResults] = useState({ youtube: [], reddit: [], hackernews: [] });
@@ -73,9 +86,28 @@ export default function CommandPalette() {
   const flat = useMemo(() => {
     const out = [];
     const ql = q.trim().toLowerCase();
-    NAV.filter((n) => !ql || n.label.toLowerCase().includes(ql)).forEach((n) =>
-      out.push({ key: n.id, label: n.label, icon: n.icon, hint: 'Go', run: () => navigate(n.to) }),
-    );
+    const channelNav = CHANNELS.map((ch) => ({
+      id: `channel:${ch.id}`,
+      label: `${ch.label}`,
+      sub: `Channel ${ch.n} · ${ch.rooms.map((id) => getRoomById(id)?.label).filter(Boolean).join(', ')}`,
+      icon: <span className={s.chNo} style={{ '--ch-c': ch.color }}>{ch.n}</span>,
+      to: channelHome(ch.id, settings?.active_rooms),
+    }));
+    [...channelNav, ...ROOM_NAV, ...PLACE_NAV]
+      .filter((n) => !ql || `${n.label} ${n.sub || ''}`.toLowerCase().includes(ql))
+      .forEach((n) => out.push({
+        key: n.id, label: n.label, sub: n.sub, icon: n.icon, hint: n.pocket ? 'Open' : 'Go',
+        run: () => (n.pocket ? openPocket(n.pocket) : navigate(n.to)),
+      }));
+    if (ql) {
+      Object.values(saved || {})
+        .filter((it) => `${it.title} ${it.source || ''} ${it.note || ''}`.toLowerCase().includes(ql))
+        .slice(0, SAVED_MAX)
+        .forEach((it) => out.push({
+          key: `saved:${it.id}`, label: it.title, sub: `Saved · ${kindLine(it)}`,
+          icon: <KindIcon item={it} size={14} />, hint: 'Open', run: () => openItem(it),
+        }));
+    }
     results.youtube.forEach((item) =>
       out.push({
         key: item.id,
@@ -96,8 +128,18 @@ export default function CommandPalette() {
         run: () => window.open(item.url, '_blank', 'noopener'),
       }),
     );
+    (results.github || []).forEach((item) =>
+      out.push({
+        key: item.id,
+        label: item.source || item.title,
+        sub: item.extra?.description || 'GitHub repository',
+        icon: <GitBranch size={14} />,
+        hint: 'Open',
+        run: () => navigate(repoPath(item.source)),
+      }),
+    );
     return out;
-  }, [results, q, navigate, playVideo]);
+  }, [results, q, navigate, playVideo, saved, settings?.active_rooms, openItem]);
 
   useEffect(() => {
     setActive((a) => Math.min(a, Math.max(0, flat.length - 1)));
@@ -116,7 +158,7 @@ export default function CommandPalette() {
         setOpen(true);
       }
     };
-    // The hub console's search button (and anything else) can ask for it too.
+    // The channel frames' search buttons (and anything else) can ask for it too.
     const onAsk = () => setOpen(true);
     window.addEventListener('keydown', onKey);
     window.addEventListener('tubcal:palette', onAsk);
@@ -130,7 +172,7 @@ export default function CommandPalette() {
     if (open) setTimeout(() => inputRef.current?.focus(), 0);
   }, [open]);
 
-  if (!open) return null;
+  if (!open) return modals;
 
   const onKeyDown = (e) => {
     if (e.key === 'Escape') {
@@ -151,56 +193,61 @@ export default function CommandPalette() {
     }
   };
 
-  return createPortal(
-    <div className={s.backdrop} onMouseDown={(e) => e.target === e.currentTarget && close()}>
-      <div className={s.palette} role="dialog" aria-modal="true" aria-label="Command palette">
-        <div className={s.inputRow}>
-          <Search size={17} className={s.searchIcon} />
-          <input
-            ref={inputRef}
-            className={s.input}
-            value={q}
-            onChange={(e) => {
-              setQ(e.target.value);
-              setActive(0);
-            }}
-            onKeyDown={onKeyDown}
-            placeholder="Search YouTube, Reddit, HN — or jump to a room…"
-            spellCheck={false}
-          />
-          <kbd className={s.kbd}>esc</kbd>
-        </div>
-
-        <div className={s.list}>
-          {flat.length === 0 && (
-            <div className={s.empty}>
-              {q.trim().length < 2 ? 'Type to search across every room.' : 'No matches.'}
+  return (
+    <>
+      {modals}
+      {createPortal(
+        <div className={s.backdrop} onMouseDown={(e) => e.target === e.currentTarget && close()}>
+          <div className={s.palette} role="dialog" aria-modal="true" aria-label="Command palette">
+            <div className={s.inputRow}>
+              <Search size={17} className={s.searchIcon} />
+              <input
+                ref={inputRef}
+                className={s.input}
+                value={q}
+                onChange={(e) => {
+                  setQ(e.target.value);
+                  setActive(0);
+                }}
+                onKeyDown={onKeyDown}
+                placeholder="Search YouTube, Reddit, HN and your saved things — or jump to a room…"
+                spellCheck={false}
+              />
+              <kbd className={s.kbd}>esc</kbd>
             </div>
-          )}
-          {flat.map((item, i) => (
-            <button
-              key={item.key}
-              className={`${s.row} ${i === active ? s.rowActive : ''}`}
-              onMouseEnter={() => setActive(i)}
-              onClick={() => {
-                item.run();
-                close();
-              }}
-            >
-              <span className={s.rowIcon}>{item.icon}</span>
-              <span className={s.rowText}>
-                <span className={s.rowLabel}>{item.label}</span>
-                {item.sub && <span className={s.rowSub}>{item.sub}</span>}
-              </span>
-              <span className={s.rowHint}>
-                {item.hint}
-                {i === active && <CornerDownLeft size={12} />}
-              </span>
-            </button>
-          ))}
-        </div>
-      </div>
-    </div>,
-    document.body,
+
+            <div className={s.list}>
+              {flat.length === 0 && (
+                <div className={s.empty}>
+                  {q.trim().length < 2 ? 'Type to search across every room.' : 'No matches.'}
+                </div>
+              )}
+              {flat.map((item, i) => (
+                <button
+                  key={item.key}
+                  className={`${s.row} ${i === active ? s.rowActive : ''}`}
+                  onMouseEnter={() => setActive(i)}
+                  onClick={() => {
+                    item.run();
+                    close();
+                  }}
+                >
+                  <span className={s.rowIcon}>{item.icon}</span>
+                  <span className={s.rowText}>
+                    <span className={s.rowLabel}>{item.label}</span>
+                    {item.sub && <span className={s.rowSub}>{item.sub}</span>}
+                  </span>
+                  <span className={s.rowHint}>
+                    {item.hint}
+                    {i === active && <CornerDownLeft size={12} />}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>,
+        document.body,
+      )}
+    </>
   );
 }

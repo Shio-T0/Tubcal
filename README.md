@@ -2,10 +2,11 @@
 
 # Tubcal<sub>.</sub>
 
-### A private broadcast station for one person.
+### YouTube, Reddit, Hacker News, GitHub and anime in one app on your own computer.
 
-YouTube · Reddit · Hacker News · GitHub · AniList — a daily paper written on your own
-machine, a second brain over what you've watched, and a vim-handed code editor.<br>
+Three channels: **Social** (a daily paper, Hacker News, Reddit), **Coding** (a code
+editor, programming-language news, GitHub) and **Video** (YouTube, anime, and a
+searchable archive of what you've watched).<br>
 One Flask app, bound to `127.0.0.1`.
 
 ![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-3b2a1a?style=flat-square&logo=python&logoColor=e6ab5e)
@@ -15,14 +16,16 @@ One Flask app, bound to `127.0.0.1`.
 ![Localhost only](https://img.shields.io/badge/binds-127.0.0.1%20only-3b2a1a?style=flat-square)
 ![License GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-3b2a1a?style=flat-square)
 
-*No accounts required · no cloud · no telemetry — the only outbound traffic is the platforms themselves.*
+*You don't need an account except for the anime part (AniList). There's no cloud and no
+telemetry: Tubcal only connects to the sites you use through it.*
 
+**[The tour and the manual](https://shio-t0.github.io/Tubcal/)** ·
 [Quick start](#-quick-start) ·
 [Installation](#-installation) ·
-[Two channels](#-two-channels) ·
-[The Hub](#-channel-1--the-hub) ·
+[Three channels](#-three-channels) ·
+[Saving](#-saving) ·
 [The player](#-the-player) ·
-[The Anime](#-channel-2--the-anime) ·
+[The Anime](#-the-anime) ·
 [Keyboard](#-keyboard) ·
 [Privacy](#-privacy) ·
 [Configuration](#-configuration) ·
@@ -59,23 +62,28 @@ Or without cloning first (it clones into `~/.local/share/tubcal/app`):
 curl -fsSL https://raw.githubusercontent.com/Shio-T0/Tubcal/main/install.sh | bash
 ```
 
-It opens on a test card that reads your system, lets you pick the optional parts,
-and shows its running order (including the exact distro command, if one is needed)
-before anything runs. Then:
+It opens on a test card that reads your system, lets you pick the rooms you want and
+a few options, and shows its running order (including the exact distro command, if
+one is needed) before anything runs. Then:
 
 1. **Distro packages:** only what's missing, with sudo asked for once and used for
    nothing else.
-2. **uv, Node.js and Python 3.13:** the distro's own when it has recent enough ones.
+2. **Tubcal itself, with only the rooms you picked.** A curl install makes a partial
+   clone and checks out just those rooms' files, so a room you leave out is never
+   downloaded. Run from your own git checkout, it leaves the other rooms' files out of
+   that checkout (files you've changed stay).
+3. **uv, Node.js and Python 3.13:** the distro's own when it has recent enough ones.
    Otherwise a private uv, a checksum-verified Node 24 LTS and a uv-managed Python,
    all under your home.
-3. **The backend and the frontend:** `uv sync` with your extras, then a production
-   build of the frontend.
-4. **A private yt-dlp:** Tubcal's own copy, refreshed at most once a day, set up to solve
-   YouTube's JS challenges with Node. Your own yt-dlp, if you have one, is untouched.
-5. **The `tubcal` command, an app-menu entry, and a user service** (systemd, where
+4. **The backend and the frontend:** `uv sync` with the Python packages your rooms
+   use, then a production build of the frontend with only their pages.
+5. **A private yt-dlp,** if you picked the Screening Room: Tubcal's own copy, refreshed
+   at most once a day, set up to solve YouTube's JS challenges with Node. Your own
+   yt-dlp, if you have one, is untouched.
+6. **The `tubcal` command, an app-menu entry, and a user service** (systemd, where
    there is one).
-6. **A self-test:** the app is booted against a throwaway database and has to serve
-   the page and answer its API.
+7. **A self-test:** the app is booted against a throwaway database and has to serve
+   the page, answer its API, and have the rooms you picked.
 
 Run it again at any time: it repairs, and it remembers what you chose. Your data
 (`data/tubcal.db`) is never touched.
@@ -102,18 +110,39 @@ leaves that feature out and says why. Tested in containers on Fedora 44 (x86-64,
 arm64 posing as Fedora Asahi Remix), AlmaLinux 9, Debian 12, Ubuntu 24.04, Arch,
 openSUSE Tumbleweed and Alpine 3.24.
 
-### Choices
+### Rooms
 
-| Component | Flag | What it is |
+Every room is optional. A room you leave out has no files, Python packages or pages on
+your machine, and Tubcal's channels, home screen and settings show only the rooms you
+have. A channel with none of its rooms installed isn't shown.
+
+| Room | Name | What it adds |
 |---|---|---|
-| Composing Room terminal & LSP | `editor` | flask-sock: a real shell and language servers in the editor room *(on by default)* |
-| The Archive | `archive` | faster-whisper transcription of what you watch, about 300 MB *(off by default)* |
+| The Edition | `edition` | the daily paper; numpy, about 20 MB |
+| The Wire | `hackernews` (or `wire`) | Hacker News |
+| The Dispatch | `reddit` (or `dispatch`) | Reddit |
+| The Composing Room | `editor` | the code editor, with flask-sock for its terminal and language servers |
+| The Workbench | `dev` (or `workbench`) | the programming-language manuals |
+| GitHub | `github` | the GitHub room *(off by default in a curl install)* |
+| The Screening Room | `youtube` (or `screening`) | YouTube, and the private yt-dlp, about 60 MB |
+| The Anime | `anime` | the Anime and its scrapers, about 100 MB |
+| The Archive | `archive` | faster-whisper transcription, about 300 MB; needs the Screening Room *(off by default)* |
+
+Some rooms use others when they're there: the Edition reads the Wire, the Dispatch and
+the Screening Room; the Workbench's talks need the Screening Room and its trending repos
+need GitHub. Without them those parts don't appear.
+
+### Options
+
+| Option | Flag | What it is |
+|---|---|---|
 | App-menu entry & icon | `desktop` | launch Tubcal like any other app *(on)* |
 | Start when I log in | `autostart` | a systemd user service, or XDG autostart *(off)* |
-| Live-stream pings & fast grep | `extras` | `notify-send` and `ripgrep` from your distro *(on when there's root)* |
+| Distro extras | `extras` | `notify-send` for live-stream pings (Screening Room) and `ripgrep` for the editor's search (Composing Room) *(on when there's root)* |
 
 ```bash
 ./install.sh --yes                                # no questions: defaults, or your last choices
+./install.sh --rooms wire,dispatch,anime          # exactly these rooms
 ./install.sh --with archive,autostart --without extras
 ./install.sh --no-sudo                            # never ask for root; everything in your home
 curl -fsSL …/install.sh | bash -s -- --yes        # flags work through curl too
@@ -131,6 +160,9 @@ curl -fsSL …/install.sh | bash -s -- --yes        # flags work through curl to
 | `tubcal status` | on air or not, the URL, and the Python / yt-dlp / Node versions |
 | `tubcal logs` | follow the server log (journald, or `~/.local/state/tubcal/tubcal.log`) |
 | `tubcal update` | `git pull`, re-sync, rebuild and restart, with your saved choices |
+| `tubcal rooms` | every room, and which ones are installed |
+| `tubcal add ROOM…` | add rooms you left out: downloads their files and packages, rebuilds, restarts |
+| `tubcal remove ROOM…` | take rooms out again; what you saved, followed and watched stays in your database |
 | `tubcal autostart on\|off` | start at login, or don't |
 | `tubcal uninstall` | remove the launcher, menu entry, service and the private tools |
 
@@ -169,7 +201,9 @@ uv sync --extra brain     # The Archive: faster-whisper + numpy (local transcrip
 uv sync --extra editor    # The Composing Room: flask-sock (PTY terminal + LSP bridge)
 ```
 
-The installer offers both as checkboxes (or `--with archive,editor`).
+The installer installs each with its room (`--with archive,editor`, or `tubcal add`
+later). A plain `uv sync` also installs the Anime's scrapers (the `anime` dependency
+group); `--no-group anime` leaves them out.
 
 | Also nice to have | Unlocks |
 |---|---|
@@ -185,105 +219,123 @@ just reports itself unavailable.
 
 ---
 
-## 📡 Two channels
+## 📡 Three channels
 
-The set has two channels, chosen at `/` — a TV-style chooser (press `1` or `2`):
+Tubcal opens on a home screen that shows what to pick up next: the video or episode you
+left halfway, new uploads, who's live, what airs soon and today's paper. From there you
+go into one of three channels. Each channel holds a few numbered rooms and has a layout
+of its own.
 
-|  | Channel | What's on |
-|:---:|---|---|
-| **1** | **The Hub** | Today's paper, your videos, the wire, the archive and the workshop — a set of numbered rooms beside a console. |
-| **2** | **The Anime** | All of AniList — the season, the week's schedule, your list and its ledger, the community — as a section of its own. |
+| | Channel | Rooms | Layout |
+|:---:|---|---|---|
+| **1** | **Social** | The Edition · The Wire · The Dispatch | a newspaper-style section bar across the top |
+| **2** | **Coding** | The Composing Room · The Workbench · GitHub | an editor-style activity bar down the left, and a title bar with the path you're on |
+| **3** | **Video** | The Screening Room · The Anime · The Archive | a wooden console down the left; the room you're in lists its own places under its key |
 
-From anywhere, <kbd>Space</kbd> <kbd>g</kbd> <kbd>h</kbd> goes to the Hub and <kbd>Space</kbd> <kbd>g</kbd> <kbd>a</kbd> to the Anime.
+Press <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> on the home screen, or <kbd>Space</kbd>
+<kbd>g</kbd> then <kbd>s</kbd> / <kbd>c</kbd> / <kbd>v</kbd> from anywhere. Room numbers
+are each room's position inside its channel, so switching one off in **Settings → Rooms**
+renumbers the rest. A room you didn't install isn't shown at all.
 
----
-
-## 🗞 Channel 1 · The Hub
-
-There's no masthead. A slim **console** runs down the left — the wordmark, the channel
-switch, a search-everything button, your rooms as numbered preset keys, and Saved /
-Settings / skin — so every room starts at the top of the screen. The room you're in opens
-its own index under it (the Screening Room lists its views, your channels with their new
-counts, and what's queued). It folds to an icon rail, and becomes a top bar on a phone.
-
-The numbers aren't hardcoded — they're each room's position in your own running order, so
-switching one off in **Settings → Rooms** renumbers the rest. The default set:
+### Social
 
 | | Room | What it is |
 |---:|---|---|
-| **01** | **The Edition** | A daily front page composed on this machine. The same story found across YouTube, Reddit and HN is clustered into one article and ranked by editorial salience; with Ollama running it's written up as grounded, citation-checked prose, and without any AI it still prints a headlines-only "wire" edition. Nameplate with back issues, a lede with its picture and a rail beside it, ruled columns, In Brief grouped by room — and each story ticked off once you've opened it. Built once a day in the background; opening the page is a single SQLite read. |
-| **02** | **Screening Room** | Your YouTube, without YouTube. The newest upload on a big screen beside what just came in and what's live; pick-up-where-you-left-off; **The Projection**, recommendations built only from your own watch history; a shelf per channel, busiest first. A *Latest* view of every upload by day, "new" badges per channel until you've watched or looked, an up-next queue, channel and playlist pages, and a day-by-day history. |
-| **03** | **The Dispatch** | Reddit as an editorial broadsheet — serif headlines, per-subreddit pages, full-text search, threaded comments. |
-| **04** | **The Wire** | Hacker News on a teletype board: Top, Best, New, Ask, Show and Jobs, and a search of the whole archive (newest-first, past day/week/month/year). Each line has a heat gauge and says how many comments arrived since you last read the thread; open one and the discussion sits beside the board — OP marked, branches foldable, new comments walked through. |
-| **05** | **The Archive** | A second brain over the videos you actually watched. A background worker transcribes them with Whisper, chunks and embeds the transcripts into SQLite, and answers questions with cosine search plus a local LLM — reading a little around each excerpt before it answers. Fully offline. |
-| **06** | **The Composing Room** | A real code editor: CodeMirror 6 with modal vim, file tree, tabs and splits, go-to-file, project grep, git gutter and branch, a which-key leader menu, session restore, an integrated PTY terminal and an optional LSP bridge. Sandboxed to one root directory. |
-| **07** | **The Workbench** | One programming language per "service manual" — Rust, Python, Go, TypeScript. Curated facts and docs, talks, a podcast rail that plays in the page's own bench radio, core-team blog updates, trending repos, and a best-effort "current stable" stamp. |
-| **—** | **GitHub** | Follow repositories and read releases and activity as a room. *Off by default* — switch it on in Settings → Rooms. |
+| **01** | **The Edition** | A front page made each morning from your channels, subreddits and Hacker News. Posts about the same story are grouped into one; with Ollama running, the top stories are written up as short articles that cite their sources, and without it you get the headlines. It's built in the background once a day, keeps back issues, and ticks stories off as you read them. |
+| **02** | **The Wire** | Hacker News: Top, Best, New, Ask, Show and Jobs, and a search of the whole archive. Each line shows how fast the story is gaining points and how many comments are new since you last looked. Open one and the discussion sits beside the list, with branches you can fold. |
+| **03** | **The Dispatch** | Your subreddits laid out like a newspaper, with search and comments. Signing in to Reddit adds scores and threaded comments. |
+
+### Coding
+
+| | Room | What it is |
+|---:|---|---|
+| **01** | **The Composing Room** | A code editor: CodeMirror 6 with vim keys, a file tree, tabs and splits, go-to-file, project search, git status, a leader-key menu, a terminal and optional language servers. It can only open files inside one folder (`~/Projects` unless you set another). |
+| **02** | **The Workbench** | A page each for Rust, Python, Go and TypeScript: talks, podcasts that play on the page, posts from each language's core team, trending projects and the current stable version. |
+| **03** | **GitHub** | The projects and people you follow, drawn as a commit graph of commits, releases, issues and pull requests. Read a project's files, issues and pull requests here, see what's trending, and clone a project into your workspace to open it in the editor. Link your account (the GitHub CLI's sign-in or a token) for your notifications, your open work and your stars. *Off by default.* |
+
+### Video
+
+| | Room | What it is |
+|---:|---|---|
+| **01** | **The Screening Room** | The YouTube channels you follow, without ads or an account. The newest upload on a big screen beside what just came in and what's live; the videos you didn't finish; **The Projection**, suggestions based only on what you've watched in Tubcal; a shelf per channel; every upload by day; an up-next queue; channel, playlist and history pages. |
+| **02** | **The Anime** | Your AniList, with episodes to watch. See [The Anime](#-the-anime). |
+| **03** | **The Archive** | Transcribes the videos you choose on your own computer with Whisper, so you can search what was said. With Ollama it also summarises them and answers questions, linking each answer to the moments it came from. *Not installed by default.* |
+
+---
+
+## 🔖 Saving
+
+Nearly everything has a bookmark: videos, playlists and channels, Reddit posts and
+subreddits, Hacker News stories, anime titles, characters, voice actors, studios and
+threads, GitHub projects and releases, Workbench talks, podcasts and posts, moments in
+the Archive, and files in the editor (<kbd>Space</kbd> <kbd>b</kbd>). The drawer's
+**Save page** keeps any other page.
+
+Everything lands in one place. **Saved** and **Settings** open in a drawer at the side of
+any page (<kbd>Space</kbd> <kbd>s</kbd>, <kbd>Space</kbd> <kbd>,</kbd>), so you don't
+lose your place. The Saved page sorts what you've kept by channel and kind, splits it into
+To do and Done, and lets you add notes, search titles and notes, switch between shelves
+and a list, and clear many things at once.
 
 ---
 
 ## 🎞 The player
 
-Every video — from any room — plays in one global player, straight from YouTube's own
-streams: real 1080p, no account, no embed, no third party.
+Every video, from any room, plays in one player, straight from YouTube's own streams at
+up to 1080p, with no account and no embed.
 
-- **A theatre, not a pop-up.** The room goes dark, the picture's colours glow softly
-  around it, and it's sized to the largest 16:9 that fits. Underneath: the title, the
-  channel's face and subscriber count, Subscribe, Save, and a link that starts at this
-  very second.
-- **A seek bar that knows the video** — YouTube's *most replayed* as a ridge above it, cut
-  at every chapter, with the chapter's name on hover and beside the clock.
-- **Programme notes beside it.** The description with every timestamp seeking, every
-  link to another video opening in the player and every hashtag searching the room;
-  chapters; comments with faces, creator / verified / member / pinned / hearted marks,
-  replies in place, Top or Newest, loading as you scroll; and The Archive's transcript
-  (it follows the playhead) and summary.
-- **Keeps playing when you leave.** <kbd>Esc</kbd> tucks it into a corner dock that
-  stacks and reorders; an up-next queue rolls into the next video when one ends.
+- The page dims and the video plays as large as fits. Under it are the title, the
+  channel with its subscriber count, Subscribe, Save, and a button that copies a link
+  to the current second.
+- The seek bar is split at the chapters, and a line above it shows where people
+  replay most.
+- Beside the video: the description (timestamps seek, links to other videos open in
+  the player), chapters, comments, and, from the Archive, the transcript and a summary.
+- <kbd>Esc</kbd> moves the video to a corner, where it keeps playing while you browse.
+  An up-next queue plays videos one after another.
+- Tubcal draws subtitles itself, so their font, size, colour and position are yours to
+  set, in every player.
 
 ---
 
-## 🌸 Channel 2 · The Anime
+## 🌸 The Anime
 
-A whole section built on AniList — its own top bar, and a **file-tree index** down the left
-where every view (and every useful place inside one) is one click away.
+The Anime is a room in the Video channel, built on AniList. While you're in it, its views
+are listed under its key in the console, with your AniList account at the top.
 
 | | |
 |---|---|
-| **Browse** | Trending, popular, top-rated and more, plus a genre/tag finder with every AniList filter — infinite scroll. |
-| **Seasons · Schedule** | Any season's line-up; the week ahead as an airing grid with countdowns. |
-| **My List** | Your shelves with fast editing, bulk tools, custom lists, export (JSON, CSV, MyAnimeList XML) and the sequel radar — what comes next after everything you've finished. Synced to AniList as you tap. |
-| **Ledger** | Your statistics computed from the list itself: genres, formats, scores, time spent, hot takes. |
-| **Community** | Reviews, people's recommendation pairings (vote on them), today's birthdays and the hall of fame. |
-| **Social** | The forum (threads beside the list), the activity stream, your inbox and people — profile pages, follow, message — with a live preview of every post as others will see it. |
-| **Title pages** | The full dossier: cast with every dub's voice actors, characters, staff, studios, rankings, trends, a franchise watch-order guide, reviews and discussion. |
+| **Browse** | Trending, popular, top-rated and this season, plus a finder that filters by any mix of genres and tags. More loads as you scroll. |
+| **Seasons · Schedule** | Any season's shows; the week ahead as a timetable with countdowns. |
+| **My List** | Your shelves, saved to AniList as you change them, with bulk editing, custom lists, export (JSON, CSV, MyAnimeList XML) and the sequel radar, which finds what comes after the shows you've finished. |
+| **Ledger** | Statistics worked out from your list: genres, formats, scores, time spent, the shows you rate unlike everyone else. |
+| **Community** | Reviews, recommendations (vote on them), today's birthdays and the hall of fame. |
+| **Social** | The forum, the activity stream, your inbox and people's profiles, with a live preview of every post as others will see it. |
+| **Title pages** | Cast with every dub's voice actors, staff, studios, rankings, trends, a watch-order guide for long series, reviews and discussion. |
 
-**Watching** happens in-app through two independent scrapers (two unrelated sites rarely
-break on the same day), and finishing an episode advances your AniList progress on its
-own. **The Reckoner** sits in the margin: hover any title, tap <kbd>C</kbd>, and it tallies
-how long the next episodes take — and when you'd finish if you started now.
-
-When you finish a season, **the curtain call** comes up: velvet drapes part on the title,
-and in one place you can score it (in your own AniList scale), join the finale's episode
-discussion, write the review while it's fresh, and put the next sequels on Planning or
-Watching — or read *終*, series finished.
+Episodes play in Tubcal's own player, from public anime sites (two independent ones, so
+one breaking doesn't stop playback), and finishing one moves your AniList progress on.
+**The Reckoner** sits in the page margin: point at a show, press <kbd>C</kbd>, and it adds
+up how long its next episodes take and when you'd finish if you started now. When you
+finish a season, **the curtain call** lets you score it, join the last episode's
+discussion, write a review and put the sequel on your list.
 
 ---
 
 ## 🎨 The look
 
-Seven skins, each a `[data-theme]` block overriding design tokens — so every component
-restyles for free, down to the editor buffer and the terminal's ANSI palette. Cycle them
-from the console.
+Eight skins, each a `[data-theme]` block that overrides design tokens, so every component
+restyles with it, down to the editor and the terminal's colours. Change it with the skin
+button in any channel's bar, or in Settings.
 
 | | | |
 |---|---|---|
-| **Shōwa Night** — warm wood cabinet, amber tube | **Shōwa Day** — same set, tatami daylight | **Phosphor Terminal** — green text on a black tube |
-| **Aqua Y2K** — a glossy turn-of-the-century desktop | **Bauhaus Print** — a constructivist poster | **Blueprint** — cyan hairlines on drafting navy |
-| **Deep Space** — glass panels adrift over a nebula | | |
+| **Shōwa Night**: dark wood and amber, like an old TV set (the default) | **Shōwa Day**: the same set in light colours | **Phosphor Terminal**: green text on black |
+| **Aqua Y2K**: glossy blue and white, like a 2000s desktop | **Bauhaus Print**: red, blue and black on off-white | **Blueprint**: pale blue lines on navy |
+| **Deep Space**: see-through panels over a dark purple nebula | **Cutting Mat**: dark windows on a teal cutting mat (desktop only) | |
 
-Your choice is injected server-side into `index.html`, so there's no flash of the wrong
-theme on first paint.
+The chosen skin is written into `index.html` by the server, so the first paint already
+has the right colours. **Fast mode** (Settings → Appearance) turns off every animation.
 
 ---
 
@@ -291,12 +343,15 @@ theme on first paint.
 
 | Keys | |
 |---|---|
-| <kbd>Space</kbd> <kbd>g</kbd> <kbd>h</kbd> · <kbd>Space</kbd> <kbd>g</kbd> <kbd>a</kbd> | The Hub · the Anime, from anywhere |
-| <kbd>g</kbd> + letter | Jump between rooms — `ge` Edition · `gy` Screening Room · `gr` Dispatch · `gn` Wire · `gc` Composing Room · `gs` Saved · `gh` home |
-| <kbd>h</kbd> <kbd>j</kbd> <kbd>k</kbd> <kbd>l</kbd> | Move a roving focus across tiles by geometry — shelves and walls alike |
+| <kbd>Space</kbd> <kbd>g</kbd> <kbd>s</kbd> · <kbd>c</kbd> · <kbd>v</kbd> | Social · Coding · Video, from anywhere |
+| <kbd>Space</kbd> <kbd>g</kbd> <kbd>a</kbd> · <kbd>h</kbd> | The Anime · the home screen |
+| <kbd>Space</kbd> <kbd>s</kbd> · <kbd>Space</kbd> <kbd>,</kbd> | The Saved drawer · the Settings drawer |
+| <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> | The channels, on the home screen |
+| <kbd>g</kbd> + letter | Jump to a room: `ge` Edition · `gn` Wire · `gr` Dispatch · `gc` Composing Room · `gd` Workbench · `gy` Screening Room · `ga` Anime · `gs` Saved · `gh` home |
+| <kbd>h</kbd> <kbd>j</kbd> <kbd>k</kbd> <kbd>l</kbd> | Move between tiles by where they are on screen |
 | <kbd>g</kbd> <kbd>g</kbd> · <kbd>G</kbd> | First · last tile on the page |
-| <kbd>/</kbd> or <kbd>Ctrl</kbd> <kbd>K</kbd> | Command palette — every room, and search across YouTube, Reddit and HN |
-| <kbd>C</kbd> | Tally the next episode in The Reckoner (anime) |
+| <kbd>/</kbd> or <kbd>Ctrl</kbd> <kbd>K</kbd> | Command palette: every room, a search across YouTube, Reddit and HN, and your saved things |
+| <kbd>C</kbd> | Add the next episode to the Reckoner (anime) |
 
 <details>
 <summary><b>In the player</b></summary>
@@ -317,8 +372,9 @@ theme on first paint.
 
 </details>
 
-The global bindings stand down while you're typing, while a video is on the big screen,
-and while the Composing Room has focus — those own their own keys.
+The global keys stand down while you're typing, while a video is on the big screen, and
+while the Composing Room has focus; those have their own keys. After <kbd>Space</kbd>, a
+small menu shows what the next key does.
 
 ---
 
@@ -327,8 +383,8 @@ and while the Composing Room has focus — those own their own keys.
 Binds to `127.0.0.1` and nothing else. Self-hosted fonts, no trackers, no analytics.
 Every YouTube read is anonymous — no cookies stored or sent, so there's no stable id
 linking your searches, feeds and playback. Subscriptions, settings, watch history,
-playback progress, saved items, OAuth tokens and every byte of Archive data live in one
-git-ignored SQLite file, `data/tubcal.db`.
+playback progress, saved things and their notes, OAuth tokens and all of the Archive's
+data live in one git-ignored SQLite file, `data/tubcal.db`.
 
 ---
 
@@ -345,33 +401,35 @@ you'd want to change while the app is running lives in **Settings** instead.
 | `TUBCAL_INVIDIOUS` | *(auto)* | Comma-separated Invidious instances (trending, comments, search fallback). |
 | `TUBCAL_EDITOR_ROOT` | `~/Projects` | The only directory the Composing Room can reach. |
 | `TUBCAL_EDITOR_MAX_FILE_BYTES` | `4194304` | Refuse to open files larger than this. |
-| `TUBCAL_GITHUB_TOKEN` | *(none)* | A classic PAT — lifts GitHub's 60 req/hr/IP ceiling to 5000. Can be pasted into Settings instead. |
-| `TUBCAL_ANIME_PROVIDER` | *(auto)* | Prefer one anime scraper: `allanime` or `animekai`. |
+| `TUBCAL_GITHUB_TOKEN` | *(none)* | A GitHub token, for setups that can't use Settings → Accounts (which takes the GitHub CLI's sign-in or a pasted token). Raises GitHub's limit from 60 requests an hour to 5,000. |
+| `TUBCAL_ANIME_PROVIDER` | *(auto)* | Which anipy-api provider to try first (`allanime` or `animekai`) when hianime can't play an episode. |
 | `TUBCAL_ANIME_WATCHED_PERCENT` | `80` | Auto-mark an episode watched on AniList past this %. `0` disables. |
 | `TUBCAL_AUTO_UPDATE` | `1` | Set `0` to stop upgrading `anipy-api` from PyPI on startup. |
 
 ### Connecting accounts (all optional)
 
-Everything works logged out. **Settings → Connections** shows the redirect URIs to
-register if you want more:
+Everything but the Anime works without signing in. **Settings → Accounts** shows the
+redirect URIs to register if you want more:
 
 - **Reddit** — logged out, Reddit only serves RSS (it blocks anonymous JSON), so you get
   no scores and flattened comments. An OAuth *web app* (reddit.com/prefs/apps) upgrades
   everything to full data.
 - **YouTube / Google** — an OAuth *Web application* client with the YouTube Data API v3
   enabled pulls in your real subscriptions.
-- **AniList** — required for the Anime channel: AniList now refuses unauthenticated
-  queries, and your list, progress sync and the social side all need it.
-- **GitHub** — no OAuth flow; paste a classic PAT into Settings.
+- **AniList** — needed for the Anime: AniList now refuses unauthenticated queries, and
+  your list, progress sync and the social side all need it.
+- **GitHub** — no OAuth app to register. If the GitHub CLI is signed in, one press takes
+  its token; otherwise paste a classic token (`repo`, `notifications`, `user:follow`).
+  The token is checked against GitHub, kept in the database and never sent to the page.
 
 ---
 
 ## 🛠 How it works
 
-> **Caching is the load-bearing wall.** Two layers — an in-memory dict over a `cache`
-> table in SQLite — so caches survive restarts. Expired rows are kept *on purpose*: if an
-> upstream fetch fails, the stale payload is served instead of an error. That single
-> decision is why Reddit's rate limiting can't take the app down.
+> **Most of it rests on the cache.** It has two layers, an in-memory dict over a `cache`
+> table in SQLite, so it survives restarts. Expired rows are kept: if an upstream fetch
+> fails, the stale payload is served instead of an error. That's what keeps Reddit's rate
+> limiting from breaking the app.
 
 **YouTube quality, without an account or ffmpeg.** YouTube's open player clients now
 expose exactly one muxed rendition — 360p. Everything above ships as adaptive DASH, video
@@ -391,8 +449,8 @@ on a short debounce — a flurry of taps is one mutation.
 
 **The Edition never computes on the request path.** A background thread builds one JSON
 payload per day. Model synthesis is capped at six calls per build, time-boxed, and gated
-by a citation validator with a template fallback — unvalidated model output can't reach
-a page, so the paper cannot invent a story.
+by a citation validator with a template fallback, so model output that doesn't cite its
+sources never reaches the page; the story is printed as a plain headline instead.
 
 **Untrusted HTML is never injected.** Comments and descriptions from YouTube, HN and
 AniList are walked with an allow-list into React elements — which is also what lets a
@@ -415,6 +473,7 @@ runtimes (down to the Android/Chaquopy build) boot at all.
 main.py                   updater → init DB → create_app → warm caches → start workers → run
 server/
   config.py               env-driven config, cache TTLs, room ids
+  modules.py              which rooms this copy has (modules.ini, TUBCAL_MODULES)
   db.py                   the one SQLite file: subs, settings, history, tokens, archive, editions
   cache.py                TTL + stale-while-revalidate cache, persisted
   httpc.py                shared sessions, per-host spacing, anonymous (cookie-less) reads
@@ -427,24 +486,33 @@ server/
   editor/                 PTY terminal + stdio JSON-RPC ⇄ WebSocket LSP bridge
 frontend/src/
   lib/rooms.js            canonical room registry — the source of the numbering
+  lib/modules.js          which rooms this build has; lazy imports for a room's parts
   lib/themes.js           the skin registry
   lib/urlState.js         view state lives in the URL, so Back restores it
-  pages/                  one lazy-loaded page per room (+ the chooser, the anime pages)
-  components/layout/      the hub console, command palette, keyboard nav
+  lib/saveable.js         what each saved thing is (kind, channel), for anything that isn't a feed item
+  pages/                  one lazy-loaded page per room (+ home, Saved, Settings, the anime pages)
+  components/home/        the home screen: the TV, the coming-up slip, the channel guides
+  components/channels/    the three channel frames, and the Saved/Settings frame
+  components/pocket/      the Saved & Settings drawer
+  components/layout/      command palette, keyboard nav
   components/player/      the global player, its controls and programme notes
   components/screening/   video tiles, shelves, the Screening Room's index
   components/wire/        the HN reader
-  components/anime/       every view of the Anime channel
+  components/anime/       every view of the Anime
   state.jsx               shared state as a stack of context providers
   styles/                 design tokens + one block per skin
 android/                  the phone app: Gradle project, phone UI (phone/), vendored scrapers
+modules.ini               the rooms an install can leave out, and the files each owns
 install.sh                the Linux installer (any distro; Fedora Asahi included)
 packaging/linux/          what it installs: the `tubcal` launcher, menu entry, user service
 data/tubcal.db            everything local (git-ignored)
 ```
 
-**Adding a room** is three edits kept in sync: an entry in `lib/rooms.js`, a component in
-`pages/`, a route in `App.jsx`.
+**Adding a room** is a few edits kept in sync: an entry in `lib/rooms.js`, a component in
+`pages/`, a route in `App.jsx`, its blueprint in `server/api/__init__.py`, and a section
+in `modules.ini` (copied into `install.sh`) listing the files it owns.
+`tests/test_modules.py` checks that they agree and that nothing outside the room imports
+its files directly.
 
 ## 🧪 Develop
 
@@ -485,11 +553,3 @@ PURPOSE. See the GNU General Public License for more details. A copy is in
 Anime playback builds on other GPL-3.0 projects: ani-cli's method, anipy-api and
 weeb-cli. [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) credits them. A build
 also lists every library bundled into the web app in `legal/third-party-licenses.txt`.
-
----
-
-<div align="center">
-
-*Runs on localhost, for one person, on purpose.*
-
-</div>

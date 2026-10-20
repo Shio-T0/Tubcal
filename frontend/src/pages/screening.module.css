@@ -1092,3 +1092,27 @@
     flex-basis: 100%;
   }
 }
+
+/* a playlist card's bookmark, on its cover */
+.plCard {
+  position: relative;
+}
+.plSave {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+  opacity: 0;
+}
+.plCard:hover .plSave,
+.plSave:focus-visible,
+.plSave[aria-pressed='true'] {
+  opacity: 1;
+}
+
+/* touch screens have no hover: keep the bookmarks in sight */
+@media (hover: none) {
+  .plSave {
+    opacity: 1;
+  }
+}

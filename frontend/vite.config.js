@@ -3,6 +3,7 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
 import legal from './src/build/legal.mjs';
+import modules from './src/build/modules.mjs';
 
 export default defineConfig({
   // Who this build is, for Settings → About (the phone build sets its own).
@@ -12,6 +13,8 @@ export default defineConfig({
     }),
   },
   plugins: [
+    // only the modules this install has (modules.ini; TUBCAL_MODULES from install.sh)
+    modules(),
     react(),
     // dist/legal/: Tubcal's licence, its third-party notices, and the licence of
     // every npm package in the bundle — Settings → About shows them.

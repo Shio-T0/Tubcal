@@ -2,13 +2,14 @@
    Each [data-theme] block re-skins the whole app by (1) overriding the design
    tokens from tokens.css and (2) restyling the global hooks: base.css classes
    (.app-shell, .glass, .kicker, .search-input), element/selection rules, and the
-   structural hooks added in JSX (the hub console: .tc-console, .tc-topline,
-   .tc-wordmark, .tc-nav, .tc-navitem(/-on), .tc-navno; .tc-sectionhead; and the
-   page areas: .tc-main (a room's page, the Hub's or the Anime's), .tc-index (the
-   Anime's file tree), .tc-bar (the Anime's top bar), .tc-strip (a line of chrome
-   on the bare backdrop: Home's date line, its summary and hints), .tc-hero (Home's
-   greeting) and .tc-float (something that floats over whatever is under it — a
-   toast)). Component CSS Modules inherit the
+   structural hooks added in JSX (the channel frames in components/channels/:
+   .tc-console, .tc-topline, .tc-wordmark, .tc-nav, .tc-navitem(/-on), .tc-navno;
+   .tc-sectionhead; and the page areas: .tc-main (a room's page, in any channel),
+   .tc-bar (a bar across the top: the Social channel's section bar, Saved &
+   Settings' bar), .tc-strip (a line of chrome on the bare backdrop: Home's date
+   line, its summary and hints), .tc-hero (Home's greeting) and .tc-float
+   (something that floats over whatever is under it — a toast, the Saved &
+   Settings drawer)). Component CSS Modules inherit the
    palette/fonts/radii for free through var(--token); the hooks carry the layout
    personality the tokens can't express. Backdrop atmospheres live in backdrop.css. */
 
@@ -532,11 +533,12 @@
 }
 
 /* ===================================================================== *
- * THE HUB CONSOLE, per skin.
- * The console (components/layout/HubConsole.jsx) is a column: .tc-console is the
- * panel, .tc-nav the room list (on a phone, a row of chips), .tc-navitem a room,
- * .tc-navitem-on the one you're in, .tc-navno its number key (an icon when the
- * console is folded to a rail).
+ * THE CHANNEL FRAMES' NAVIGATION, per skin.
+ * The Video console (components/channels/VideoFrame.jsx) is a column and the
+ * Coding activity bar (CodingFrame.jsx) a narrow one: .tc-console is the panel.
+ * In every frame — the Social bar's sections too — .tc-nav is the room list (on a
+ * phone, a row), .tc-navitem a room, .tc-navitem-on the one you're in, .tc-navno
+ * its number key (an icon in the Coding bar, or when the console is folded).
  * ===================================================================== */
 
 /* PHOSPHOR TERMINAL — a function-key column: F1 EDITION, F2 SCREENING… */
@@ -711,8 +713,8 @@
 /* ===================================================================== *
  * CUTTING MAT — the desk it runs on. Catppuccin Macchiato windows tiled over a
  * teal self-healing mat, as on a bspwm desktop: each page is a translucent
- * window with the mat showing faintly through, the console and the Anime's
- * index are slim near-black bars, and the type is JetBrains Mono (the system's
+ * window with the mat showing faintly through, the channels' consoles and bars
+ * are slim near-black bars, and the type is JetBrains Mono (the system's
  * own, as in the terminal and the bar). The console's top line is lit like the
  * bench supply's green LCD, and the room you're in is a lualine mode block.
  * Desktop only (lib/themes.js `desktopOnly`).
@@ -821,8 +823,7 @@
 }
 
 /* the bars: near-black, like the one down the screen's edge */
-[data-theme='bench'] .tc-console,
-[data-theme='bench'] .tc-index {
+[data-theme='bench'] .tc-console {
   border-radius: 10px;
   border: 1px solid var(--bench-edge);
   background: var(--bench-bar);

@@ -30,8 +30,35 @@
 
 .actionOn {
   opacity: 1;
-  color: var(--c-youtube);
-  border-color: color-mix(in srgb, var(--c-youtube) 60%, transparent);
+  color: var(--save-c, var(--signal));
+  border-color: color-mix(in srgb, var(--save-c, var(--signal)) 60%, transparent);
+}
+
+/* the pill with words, for headers and toolbars */
+.labelled {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 32px;
+  padding: 0 14px 0 11px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--rule-strong);
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 560;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.labelled:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+.labelled.actionOn {
+  color: var(--save-c, var(--signal));
+  border-color: color-mix(in srgb, var(--save-c, var(--signal)) 55%, transparent);
+  background: color-mix(in srgb, var(--save-c, var(--signal)) 12%, transparent);
 }
 
 /* Inline variant (e.g. broadsheet text cards) sits in normal flow, not pinned. */

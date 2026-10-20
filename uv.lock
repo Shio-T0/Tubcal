@@ -1711,13 +1711,11 @@ name = "tubcal"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
-    { name = "anipy-api" },
     { name = "feedparser" },
     { name = "flask" },
     { name = "python-dotenv" },
     { name = "rapidfuzz" },
     { name = "requests" },
-    { name = "weeb-cli" },
 ]
 
 [package.optional-dependencies]
@@ -1725,31 +1723,41 @@ brain = [
     { name = "faster-whisper" },
     { name = "numpy" },
 ]
+edition = [
+    { name = "numpy" },
+]
 editor = [
     { name = "flask-sock" },
 ]
 
 [package.dev-dependencies]
+anime = [
+    { name = "anipy-api" },
+    { name = "weeb-cli" },
+]
 dev = [
     { name = "pytest" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "anipy-api", specifier = ">=3.8.21" },
     { name = "faster-whisper", marker = "extra == 'brain'", specifier = ">=1.0" },
     { name = "feedparser", specifier = ">=6.0" },
     { name = "flask", specifier = ">=3.0" },
     { name = "flask-sock", marker = "extra == 'editor'", specifier = ">=0.7.0" },
     { name = "numpy", marker = "extra == 'brain'", specifier = ">=1.26" },
+    { name = "numpy", marker = "extra == 'edition'", specifier = ">=1.26" },
     { name = "python-dotenv", specifier = ">=1.0" },
     { name = "rapidfuzz", specifier = ">=3.14.5" },
     { name = "requests", specifier = ">=2.32" },
-    { name = "weeb-cli", specifier = ">=3.0.0" },
 ]
-provides-extras = ["brain", "editor"]
+provides-extras = ["brain", "editor", "edition"]
 
 [package.metadata.requires-dev]
+anime = [
+    { name = "anipy-api", specifier = ">=3.8.21" },
+    { name = "weeb-cli", specifier = ">=3.0.0" },
+]
 dev = [{ name = "pytest", specifier = ">=8.0" }]
 
 [[package]]

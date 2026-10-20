@@ -9,6 +9,7 @@ import RedditPostModal from '../components/modals/RedditPostModal.jsx';
 import { Avatar } from '../components/ui/Avatar.jsx';
 import { Button, EmptyState, IconButton, SegmentedControl } from '../components/ui/index.jsx';
 import { SaveButton } from '../components/ui/ItemActions.jsx';
+import { subredditItem } from '../lib/saveable.js';
 import { compact } from '../lib/format.js';
 import { timeAgo } from '../lib/time.js';
 import { useSettings, useSubscriptions } from '../state.jsx';
@@ -129,12 +130,7 @@ export default function Dispatch() {
 
   return (
     <>
-      <SectionHead
-        kicker="No 03 — The Dispatch"
-        title="Letters from the forums"
-        note="Your subreddits, set like a broadsheet. Open any letter to read the thread."
-        color="var(--c-reddit)"
-      >
+      <SectionHead color="var(--c-reddit)">
         {connected && (
           <SegmentedControl
             options={[
@@ -223,11 +219,14 @@ export function SubredditPage() {
           </span>
           <h1 className={s.subTitle}>{subRow?.display_name || `r/${sub}`}</h1>
         </div>
-        <SegmentedControl
-          options={['hot', 'new', 'top']}
-          value={sort}
-          onChange={(v) => updateSettings({ reddit_sort: v })}
-        />
+        <span className={s.subActs}>
+          <SegmentedControl
+            options={['hot', 'new', 'top']}
+            value={sort}
+            onChange={(v) => updateSettings({ reddit_sort: v })}
+          />
+          <SaveButton label item={subredditItem(sub)} />
+        </span>
       </div>
 
       <SearchBar value={query} onChange={setQuery} placeholder={`search r/${sub}…`} />

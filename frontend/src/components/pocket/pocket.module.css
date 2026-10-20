@@ -1,0 +1,597 @@
+/* The drawer — slides out of the right edge of the cabinet, two index tabs on
+   its lip (Saved, Settings). Solid, not glass: it sits over busy pages. */
+
+.layer {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+}
+.backdrop {
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--backdrop) 55%, transparent);
+  animation: fade 0.2s ease both;
+}
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+}
+
+.drawer {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  bottom: 10px;
+  display: flex;
+  flex-direction: column;
+  width: min(430px, calc(100vw - 20px));
+  border-radius: var(--r-modal);
+  border: 1px solid var(--rule-strong);
+  background:
+    linear-gradient(to bottom, color-mix(in srgb, var(--signal) 6%, transparent), transparent 140px),
+    var(--ink-2);
+  box-shadow: var(--shadow-modal);
+  overflow: hidden;
+  animation: slide 0.34s var(--hand) both;
+}
+@keyframes slide {
+  from {
+    opacity: 0.4;
+    transform: translateX(48px);
+  }
+}
+
+/* ── the lip: tabs, the key, close ───────────────────────────────────────── */
+.head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 10px 0 14px;
+  border-bottom: 1px solid var(--rule);
+}
+.tabs {
+  display: flex;
+  gap: 2px;
+  margin-bottom: -1px;
+}
+.tab,
+.tabOn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 14px 10px;
+  border: 1px solid transparent;
+  border-bottom: 0;
+  border-radius: 10px 10px 0 0;
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--paper-faint);
+}
+.tab:hover {
+  color: var(--text-primary);
+}
+.tabOn {
+  border-color: var(--rule);
+  background: var(--ink-2);
+  color: var(--paper);
+  box-shadow: inset 0 2px 0 var(--signal);
+}
+.tab b,
+.tabOn b {
+  padding: 1px 7px;
+  border-radius: var(--r-pill);
+  background: var(--signal-soft);
+  color: var(--signal);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+}
+.keys {
+  display: inline-flex;
+  gap: 3px;
+  margin-left: auto;
+}
+.keys kbd {
+  padding: 1px 6px;
+  border-radius: 5px;
+  border: 1px solid var(--rule-strong);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--paper-faint);
+}
+.close {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  margin-bottom: 6px;
+  border-radius: 9px;
+  color: var(--paper-faint);
+}
+.close:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 14px 14px 16px;
+  scrollbar-width: thin;
+}
+
+/* ── Saved ───────────────────────────────────────────────────────────────── */
+.page {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 10px 10px 12px;
+  margin-bottom: 12px;
+  border-radius: 12px;
+  border: 1px dashed var(--rule-strong);
+}
+.pageText {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+.pageLabel {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--paper-faint);
+}
+.pageTitle {
+  overflow: hidden;
+  font-size: 13.5px;
+  font-weight: 560;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.pageSave,
+.pageSaveOn {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 12px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--rule-strong);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+.pageSave:hover {
+  color: var(--text-primary);
+  background: var(--surface-hover);
+}
+.pageSaveOn {
+  color: var(--signal);
+  border-color: color-mix(in srgb, var(--signal) 55%, transparent);
+  background: var(--signal-soft);
+}
+
+.find {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.findIcon {
+  position: absolute;
+  left: 11px;
+  color: var(--paper-faint);
+  pointer-events: none;
+}
+.find input {
+  width: 100%;
+  height: 38px;
+  padding: 0 34px 0 33px;
+  border-radius: var(--r-input);
+  border: 1px solid var(--rule);
+  background: var(--surface-input);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 14px;
+  outline: none;
+}
+.find input:focus {
+  border-color: var(--signal);
+}
+.find button {
+  position: absolute;
+  right: 6px;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  color: var(--paper-faint);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin: 10px 0 8px;
+}
+.chip,
+.chipOn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--rule);
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.chip:hover:not(:disabled) {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+.chip:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.chipOn {
+  border-color: color-mix(in srgb, var(--ch-c, var(--signal)) 60%, transparent);
+  background: color-mix(in srgb, var(--ch-c, var(--signal)) 14%, transparent);
+  color: var(--text-primary);
+}
+.chip i,
+.chipOn i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ch-c);
+}
+.chip b,
+.chipOn b {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  color: var(--paper-faint);
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  border-radius: 10px;
+  animation: rowIn 0.32s var(--hand) both;
+  animation-delay: calc(var(--i) * 18ms);
+}
+@keyframes rowIn {
+  from {
+    opacity: 0;
+    transform: translateX(10px);
+  }
+}
+.row:hover,
+.row:focus-within {
+  background: var(--surface-hover);
+}
+.rowOpen {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
+  padding: 8px 6px 8px 8px;
+  border-radius: 10px;
+  text-align: left;
+  outline: none;
+}
+.rowOpen:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--tone);
+}
+.thumb {
+  position: relative;
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 58px;
+  height: 34px;
+  overflow: hidden;
+  border-radius: 6px;
+  background: var(--ink-3);
+  box-shadow: inset 0 0 0 1px var(--rule);
+}
+.thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.thumbTall {
+  width: 34px;
+  height: 48px;
+  margin: 0 12px;
+}
+.thumbIcon {
+  color: var(--tone);
+  background: color-mix(in srgb, var(--tone) 12%, var(--ink-3));
+}
+.rowText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.rowTitle {
+  display: -webkit-box;
+  overflow: hidden;
+  font-size: 13.5px;
+  font-weight: 560;
+  line-height: 1.3;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.rowMeta {
+  overflow: hidden;
+  margin-top: 2px;
+  font-size: 11.5px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--paper-faint);
+}
+.rowMeta::first-letter {
+  text-transform: uppercase;
+}
+.rowNote {
+  overflow: hidden;
+  margin-top: 3px;
+  padding-left: 7px;
+  border-left: 2px solid var(--tone);
+  font-size: 12px;
+  font-style: italic;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--text-secondary);
+}
+.rowDone .rowTitle {
+  color: var(--paper-faint);
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in srgb, var(--paper-faint) 60%, transparent);
+}
+.rowDone .thumb {
+  opacity: 0.5;
+}
+.rowActs {
+  display: flex;
+  gap: 2px;
+  padding-right: 6px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.row:hover .rowActs,
+.row:focus-within .rowActs,
+.rowDone .rowActs {
+  opacity: 1;
+}
+.act,
+.actOn {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  color: var(--paper-faint);
+}
+.act:hover {
+  background: var(--surface);
+  color: var(--text-primary);
+}
+.actOn {
+  color: var(--success);
+}
+
+.empty {
+  margin: 18px 4px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--paper-faint);
+}
+
+.more {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 11px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--rule);
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.more span {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--paper-faint);
+}
+.more svg {
+  margin-left: auto;
+  color: var(--signal);
+  transition: transform 0.2s var(--hand);
+}
+.more:hover {
+  border-color: color-mix(in srgb, var(--signal) 50%, var(--rule));
+  background: var(--surface-hover);
+}
+.more:hover svg {
+  transform: translateX(3px);
+}
+
+/* ── Settings ────────────────────────────────────────────────────────────── */
+.settings {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.label {
+  margin: 0 0 8px 2px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--paper-faint);
+}
+.skins {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+.skin,
+.skinOn {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 9px;
+  border-radius: 10px;
+  border: 1px solid var(--rule);
+  font-size: 12.5px;
+  text-align: left;
+  color: var(--text-secondary);
+}
+.skin:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+.skinOn {
+  border-color: var(--signal);
+  background: var(--signal-soft);
+  color: var(--text-primary);
+}
+.swatch {
+  position: relative;
+  display: flex;
+  flex: none;
+  align-items: flex-end;
+  gap: 3px;
+  width: 30px;
+  height: 22px;
+  padding: 3px;
+  border-radius: 6px;
+  box-shadow: inset 0 0 0 1px rgba(127, 127, 127, 0.35);
+}
+.swatch i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.skinName {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.switches {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-radius: 12px;
+  border: 1px solid var(--rule);
+}
+.switches li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 12px;
+}
+.switches li + li {
+  border-top: 1px solid var(--rule);
+}
+.swText {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  font-size: 13.5px;
+}
+.swText small {
+  font-size: 11.5px;
+  color: var(--paper-faint);
+}
+.switch {
+  position: relative;
+  flex: none;
+  width: 38px;
+  height: 22px;
+  border-radius: var(--r-pill);
+  background: var(--surface-hover);
+  box-shadow: inset 0 0 0 1px var(--rule-strong);
+  transition: background 0.2s ease;
+}
+.switch span {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--paper-dim);
+  transition: transform 0.22s var(--hand), background 0.2s ease;
+}
+.switchOn {
+  background: var(--signal);
+}
+.switchOn span {
+  background: var(--ink);
+  transform: translateX(16px);
+}
+
+.sections {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+}
+.section {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  padding: 9px 10px;
+  border-radius: 9px;
+  font-size: 13px;
+  text-align: left;
+  color: var(--text-secondary);
+}
+.section span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.section svg:first-child {
+  flex: none;
+  color: var(--signal);
+}
+.section:hover,
+.section:focus-visible {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+  outline: none;
+}
+.sectionGo {
+  flex: none;
+  margin-left: auto;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.section:hover .sectionGo,
+.section:focus-visible .sectionGo {
+  opacity: 0.7;
+}

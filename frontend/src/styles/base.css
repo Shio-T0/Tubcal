@@ -259,3 +259,14 @@ html[data-fast] [role='status'][aria-label='Loading'] {
   animation-duration: 0.9s !important;
   animation-iteration-count: infinite !important;
 }
+
+/* The Social channel's bar stays at the top of the window: keep things that
+   scroll into view (h/j/k/l, anchors) from landing underneath it. */
+html:has([data-channel='social']) {
+  scroll-padding-top: 84px;
+}
+@media (max-width: 900px) {
+  html:has([data-channel='social']) {
+    scroll-padding-top: 0;
+  }
+}

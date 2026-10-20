@@ -1,7 +1,7 @@
 // The Screening Room's shared reads, and what "new" means in it.
 //
 // Two things on screen want the same data at once — the room itself and its index
-// in the hub console (channel list, new counts, what's live) — so they read it
+// in the Video console (channel list, new counts, what's live) — so they read it
 // through `useShared` (lib/useShared.js): one request between them.
 //
 // "New" is per channel, like an inbox: an upload is new until you've watched any
@@ -10,6 +10,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
+import { hasModule } from '../../lib/modules.js';
 import { useShared } from '../../lib/useShared.js';
 import { COMPLETE_RATIO, useProgress, useSubscriptions } from '../../state.jsx';
 
@@ -22,8 +23,9 @@ export const LIVE_PATH = '/youtube/live';
 /** The subscription feed (newest first) and what's live across your channels. */
 export function useChannelFeed(source = 'curated') {
   const { subs } = useSubscriptions();
-  const hasSubs = subs.youtube.length > 0;
-  const feed = useShared(FEED_PATH(source), { enabled: source === 'account' || hasSubs });
+  // Home and the player read this too; without the Screening Room there's no feed
+  const hasSubs = hasModule('youtube') && subs.youtube.length > 0;
+  const feed = useShared(FEED_PATH(source), { enabled: hasModule('youtube') && (source === 'account' || hasSubs) });
   const live = useShared(LIVE_PATH, { enabled: hasSubs, maxAge: 120_000 });
   return { feed, live, hasSubs };
 }

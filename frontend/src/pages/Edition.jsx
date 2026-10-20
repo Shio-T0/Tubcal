@@ -18,20 +18,31 @@
 // Keys: u next unread · [ ] the paper before / after · j k (and h l) walk the
 // stories · Enter opens one. Read ticks are per paper, in this browser.
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, CheckCheck, RefreshCw, Settings2 } from 'lucide-react';
 
 import { api, useApi } from '../api/client.js';
 import { ErrorBox } from '../components/layout/Section.jsx';
-import RedditPostModal from '../components/modals/RedditPostModal.jsx';
-import { ReaderSheet } from '../components/wire/HNReader.jsx';
+import { hasModule, moduleLazy, moduleLazyNamed } from '../lib/modules.js';
 import { Briefs, Lede, Story } from '../components/edition/Stories.jsx';
 import { useReadMarks } from '../components/edition/readMarks.js';
 import { isStill, scrollMotion } from '../lib/motion.js';
 import { useParamState } from '../lib/urlState.js';
 import { usePlayer } from '../state.jsx';
 import e from './edition.module.css';
+
+// The readers belong to the Wire and the Dispatch; a story from a room this copy
+// doesn't have opens at its source instead (openOutside).
+const RedditPostModal = moduleLazy('reddit', () => import('../components/modals/RedditPostModal.jsx'));
+const ReaderSheet = moduleLazyNamed('hackernews', () => import('../components/wire/HNReader.jsx'), 'ReaderSheet');
+
+function openOutside(it) {
+  const url = it.platform === 'hackernews'
+    ? `https://news.ycombinator.com/item?id=${it.extra?.hn_id || String(it.id).replace(/^hn:/, '')}`
+    : it.url;
+  if (url) window.open(url, '_blank', 'noopener');
+}
 
 // ── dates ────────────────────────────────────────────────────────────────────
 
@@ -268,17 +279,21 @@ export default function Edition() {
   const paperKey = paper ? `${paper.date}:${paper.generated_at}` : '';
 
   const touched = (it) => mark(it?.id);
+  // A back issue can hold stories from a room removed since; those open at the source.
+  const play = (it) => (hasModule('youtube') ? playVideo(it) : openOutside(it));
+  const showPost = (it) => (hasModule('reddit') ? setPost(it) : openOutside(it));
+  const showThread = (it) => (hasModule('hackernews') ? setThread(it) : openOutside(it));
   const on = {
     touched,
-    play: (it) => { touched(it); playVideo(it); },
-    post: (it) => { touched(it); setPost(it); },
-    discuss: (it) => { touched(it); setThread(it); },
+    play: (it) => { touched(it); play(it); },
+    post: (it) => { touched(it); showPost(it); },
+    discuss: (it) => { touched(it); showThread(it); },
     open: (it) => {
       if (!it) return;
       touched(it);
-      if (it.platform === 'youtube') playVideo(it);
-      else if (it.platform === 'reddit') setPost(it);
-      else setThread(it);
+      if (it.platform === 'youtube') play(it);
+      else if (it.platform === 'reddit') showPost(it);
+      else showThread(it);
     },
   };
 
@@ -452,8 +467,10 @@ export default function Edition() {
         </div>
       )}
 
-      <RedditPostModal item={post} onClose={() => setPost(null)} />
-      {thread && <ReaderSheet item={thread} onClose={() => setThread(null)} onItem={(id) => setThread({ id: `hn:${id}`, platform: 'hackernews', extra: { hn_id: id } })} />}
+      <Suspense fallback={null}>
+        {post && <RedditPostModal item={post} onClose={() => setPost(null)} />}
+        {thread && <ReaderSheet item={thread} onClose={() => setThread(null)} onItem={(id) => setThread({ id: `hn:${id}`, platform: 'hackernews', extra: { hn_id: id } })} />}
+      </Suspense>
     </div>
   );
 }

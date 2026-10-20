@@ -1,4 +1,4 @@
-// The Screening Room's index, hung under the room in the hub console.
+// The Screening Room's index, hung under the room in the Video console.
 //
 // The views (the programme, every upload newest-first, what's on air, the
 // logbook), then your channels — freshest first, each with a count of what's new

@@ -3,7 +3,16 @@ import { Search, X } from 'lucide-react';
 
 import s from './Section.module.css';
 
+/** A room's head: kicker, title and note over its controls — or, given only
+ *  controls, just the control bar (the channel's frame already names the room). */
 export function SectionHead({ kicker, title, note, color, children }) {
+  if (!kicker && !title && !note) {
+    return (
+      <div className={`${s.bar} tc-sectionhead`} style={{ '--signal-local': color }}>
+        {children}
+      </div>
+    );
+  }
   return (
     <div className={`${s.head} tc-sectionhead`} style={{ '--signal-local': color }}>
       <div className={s.headText}>

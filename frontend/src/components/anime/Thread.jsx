@@ -17,6 +17,8 @@ import { api, useApi } from '../../api/client.js';
 import { compact } from '../../lib/format.js';
 import { timeAgo } from '../../lib/time.js';
 import { useToast } from '../../state.jsx';
+import { threadItem } from '../../lib/saveable.js';
+import { SaveButton } from '../ui/ItemActions.jsx';
 import { Receiving } from '../layout/Section.jsx';
 import { MarkdownComposer } from './Composer.jsx';
 import { asPerson, UserLink } from './Person.jsx';
@@ -324,6 +326,7 @@ export function ThreadView({ threadId, variant = 'page', onClose, composerFirst 
         <footer className={t.opActs}>
           <LikeButton id={th.id} type="THREAD" liked={th.liked} likes={th.likes} label />
           {me.data && <SubscribeButton threadId={th.id} initial={th.subscribed} />}
+          <SaveButton label item={threadItem({ ...th, reply_count: total })} />
           {!th.locked && me.data && (
             <a href="#reply" className={t.pill} onClick={(e) => {
               e.preventDefault();

@@ -1,0 +1,259 @@
+/* The Social channel's bar: a broadsheet masthead cut down to one row. The
+   wordmark in the display face beside the dateline, the sections set in the
+   display face too, the one you're reading underlined in its room's ink, and a
+   double rule under the lot. Solid, because the page scrolls beneath it. */
+
+.frame {
+  --chrome-top: 74px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  padding-top: 10px;
+}
+
+.bar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 26px;
+  min-height: 60px;
+  margin: 0 calc(-1 * var(--space-3));
+  padding: 8px var(--space-3) 9px;
+  border-bottom: 3px double var(--rule-strong);
+  background: var(--ink);
+  box-shadow: 0 10px 18px -16px rgba(0, 0, 0, 0.6);
+  animation: drop 0.4s var(--hand) both;
+}
+@keyframes drop {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+
+/* ── the flag: wordmark + dateline ───────────────────────────────────────── */
+.flag {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+.wordmark {
+  font-family: var(--font-display);
+  font-variation-settings: 'opsz' 144, 'SOFT' 40, 'WONK' 1;
+  font-weight: 640;
+  font-size: 30px;
+  line-height: 1;
+  letter-spacing: -0.015em;
+  color: var(--paper);
+  user-select: none;
+}
+.wordmark em {
+  font-style: italic;
+  color: var(--c-social);
+}
+.dateline {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding-left: 14px;
+  border-left: 1px solid var(--rule-strong);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--paper-faint);
+}
+.dateline b {
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  color: var(--c-social);
+}
+
+/* ── the sections ────────────────────────────────────────────────────────── */
+.sections {
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  gap: 4px;
+  min-width: 0;
+}
+.section {
+  position: relative;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 7px;
+  padding: 8px 14px 9px;
+  border-radius: 8px 8px 0 0;
+  white-space: nowrap;
+  color: var(--paper-dim);
+  transition: color 0.15s ease, background 0.15s ease;
+}
+.section::after {
+  content: '';
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: -12px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--room-c);
+  transform: scaleX(0);
+  transition: transform 0.28s var(--hand);
+}
+.section:hover {
+  color: var(--paper);
+  background: var(--surface);
+}
+.no {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--paper-faint);
+}
+.name {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 560;
+  letter-spacing: -0.005em;
+}
+.sectionOn,
+.sectionOn:hover {
+  color: var(--paper);
+  background: none;
+}
+.sectionOn .no {
+  color: var(--room-c);
+}
+.sectionOn .name {
+  font-style: italic;
+}
+.sectionOn::after {
+  transform: none;
+}
+
+/* ── the tools ───────────────────────────────────────────────────────────── */
+.tools {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.search,
+.tool {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 34px;
+  height: 34px;
+  padding: 0 8px;
+  border-radius: 9px;
+  color: var(--paper-dim);
+  transition: color 0.15s ease, background 0.15s ease;
+}
+.search {
+  margin-right: 4px;
+  border: 1px solid var(--rule);
+  background: var(--surface-input);
+}
+.search kbd {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--paper-faint);
+}
+.search:hover,
+.tool:hover {
+  color: var(--paper);
+  background: var(--surface-hover);
+}
+.count {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--signal);
+}
+.knobs {
+  display: flex;
+  gap: 2px;
+  margin-left: 8px;
+  padding: 3px;
+  border-radius: 10px;
+  border: 1px solid var(--rule);
+}
+.knob {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  color: var(--paper-faint);
+  transition: color 0.15s ease, background 0.15s ease;
+}
+.knob b {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+}
+.knob:hover {
+  color: var(--paper);
+  background: var(--surface-hover);
+}
+.knobOn,
+.knobOn:hover {
+  background: var(--ch-c);
+  color: var(--ink);
+}
+
+.main {
+  min-width: 0;
+}
+
+/* ── narrower: drop the dateline, then wrap ───────────────────────────────── */
+@media (max-width: 1180px) {
+  .dateline {
+    display: none;
+  }
+  .bar {
+    gap: 14px;
+  }
+  .name {
+    font-size: 16px;
+  }
+}
+@media (max-width: 900px) {
+  .frame {
+    --chrome-top: 0px;
+    gap: 14px;
+    padding-top: 6px;
+  }
+  .bar {
+    position: static;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 6px 10px;
+    margin: 0;
+    padding: 6px 0 10px;
+    box-shadow: none;
+  }
+  .wordmark {
+    font-size: 26px;
+  }
+  .sections {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .section {
+    padding: 6px 10px 7px;
+  }
+  .section::after {
+    bottom: -4px;
+    left: 10px;
+    right: 10px;
+  }
+  .knobs {
+    display: none;
+  }
+}

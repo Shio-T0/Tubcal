@@ -142,6 +142,35 @@ def test_subscriptions_accepts_github(client):
     # Clean up
     db.delete_subscription(row["id"])
 
+def test_saved_note_and_done(client):
+    item = {"id": "anime:21", "platform": "anime", "title": "One Piece", "extra": {"kind": "anime"}}
+    client.post("/api/saved", json={"item": item})
+
+    r = client.patch("/api/saved/anime:21", json={"note": "  start at Water 7  "}).get_json()
+    assert r["ok"] is True and r["data"]["note"] == "start at Water 7"
+    r = client.patch("/api/saved/anime:21", json={"done": True}).get_json()
+    assert r["data"]["done_at"] > 0 and r["data"]["note"] == "start at Water 7"
+
+    kept = client.get("/api/saved").get_json()["data"]["items"][0]
+    assert kept["note"] == "start at Water 7" and kept["done_at"] > 0
+    r = client.patch("/api/saved/anime:21", json={"done": False}).get_json()
+    assert r["data"]["done_at"] is None
+
+    assert client.patch("/api/saved/anime:21", json={}).status_code == 400
+    assert client.patch("/api/saved/anime:21", json={"done": "yes"}).status_code == 400
+    assert client.patch("/api/saved/nothing:here", json={"done": True}).status_code == 404
+
+
+def test_saved_undo_keeps_the_first_date(client):
+    item = {"id": "file:a.py", "platform": "editor", "title": "a.py", "saved_at": 1_000_000}
+    client.post("/api/saved", json={"item": item})
+    assert client.get("/api/saved").get_json()["data"]["items"][0]["saved_at"] == 1_000_000
+    # a date from the future is not believed
+    client.post("/api/saved", json={"item": {**item, "id": "file:b.py", "saved_at": 10**12}})
+    dates = {i["id"]: i["saved_at"] for i in client.get("/api/saved").get_json()["data"]["items"]}
+    assert dates["file:b.py"] < 10**12
+
+
 def test_retired_rooms_are_dropped_from_saved_settings(client):
     """The Front Page and The Anime stopped being hub rooms; a DB that still lists
     them must come back clean, or they'd count against max_active_rooms."""

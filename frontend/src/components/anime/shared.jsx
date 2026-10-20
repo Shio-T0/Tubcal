@@ -12,6 +12,8 @@ import {
 
 import { api } from '../../api/client.js';
 import { useToast } from '../../state.jsx';
+import { animeItem } from '../../lib/saveable.js';
+import { SaveButton } from '../ui/ItemActions.jsx';
 import { useAnimeCalc } from './WatchCalculator.jsx';
 import s from '../../pages/anime.module.css';
 
@@ -31,7 +33,7 @@ export const SCORE_MAX = { POINT_100: 100, POINT_10_DECIMAL: 10, POINT_10: 10, P
 export const SCORE_STEP = { POINT_10_DECIMAL: 0.5 };
 
 // The URL-state pair (useParamState + latestParams) lives in lib/urlState.js now —
-// the Hub's rooms keep their view in the query string too.
+// every channel's rooms keep their view in the query string too.
 export { latestParams, useParamState } from '../../lib/urlState.js';
 
 // A Set of filter keys <-> a comma-separated param, order-stable so the URL
@@ -199,6 +201,7 @@ export function AnimeCard({ media, corner, scoreFormat }) {
           <div className={s.cardCoverFallback}><Tv size={26} /></div>
         )}
         {corner && <span className={s.cardCorner}>{corner}</span>}
+        <SaveButton item={animeItem(media)} className={s.animeSave} size={14} />
         <CoverRatings media={media} scoreFormat={scoreFormat} className={s.ratingsBL} />
         <NextEpBadge media={media} />
         <CalcCue />

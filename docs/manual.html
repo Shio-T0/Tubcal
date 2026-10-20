@@ -4,12 +4,12 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>The Manual · Tubcal</title>
-  <meta name="description" content="The Tubcal service manual: install, configuration, keyboard, connecting accounts, how it works, and every API route the Flask server answers." />
+  <meta name="description" content="How to install Tubcal, set it up, connect accounts, back up your data and fix common problems." />
   <meta name="theme-color" content="#1c140d" />
   <link rel="icon" type="image/svg+xml" href="assets/icon.svg" />
   <script>
     (function () {
-      var ok = ['dark', 'light', 'terminal', 'aqua', 'bauhaus', 'blueprint', 'space'];
+      var ok = ['dark', 'light', 'terminal', 'aqua', 'bauhaus', 'blueprint', 'space', 'bench'];
       try {
         var t = localStorage.getItem('tubcal.docs.theme');
         if (ok.indexOf(t) < 0) t = window.matchMedia && matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
@@ -27,19 +27,19 @@
   <div class="backdrop" id="backdrop" aria-hidden="true"></div>
 
   <div class="frame" id="frame">
-    <!-- ══ the console ══════════════════════════════════════════════════ -->
+    <!-- ══ the contents panel ═══════════════════════════════════════════ -->
     <aside class="tc-console man-console" id="console" aria-label="Manual contents">
       <div class="con-top">
-        <span>ch 2 · manual</span>
+        <span>the manual</span>
         <span class="onair"><span class="led"></span> on air</span>
       </div>
       <div class="brand-row">
-        <a class="tc-wordmark con-mark" href="./" aria-label="Tubcal — back to the tour">Tubcal<em>.</em></a>
+        <a class="tc-wordmark con-mark" href="./" aria-label="Back to the tour">Tubcal<em>.</em></a>
         <button class="iconbtn con-menu" id="con-menu" aria-expanded="false" aria-controls="man-nav" aria-label="Contents">
           <svg class="ico ico-lg" viewBox="0 0 24 24" aria-hidden="true"><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/></svg>
         </button>
       </div>
-      <nav class="chswitch" aria-label="Channels">
+      <nav class="chswitch" aria-label="Pages">
         <a href="./"><b>1</b> Tour</a>
         <a href="manual.html" aria-current="page"><b>2</b> Manual</a>
       </nav>
@@ -55,464 +55,443 @@
 
     <main class="man-main" id="main">
       <header class="man-hero">
-        <span class="kicker">Channel 2 · the service manual</span>
+        <span class="kicker">User guide</span>
         <h1>The Manual <i lang="ja">説明書</i></h1>
-        <p class="man-dek">Everything about running Tubcal on your own machine — installing it, the rooms, the keys, the settings, how the pieces fit, and every route the server answers.</p>
+        <p class="man-dek">How to install Tubcal, set it up, connect your accounts and fix common problems. You don't need to know how to code, but you will paste a few commands into a terminal.</p>
         <div class="spec">
-          <span><b>Python</b> ≥ 3.12</span><span><b>React</b> 19 + Vite</span><span><b>Flask</b> one port</span><span><b>SQLite</b> one file</span><span><b>binds</b> 127.0.0.1</span><span><b>license</b> GPL-3.0</span>
+          <span><b>runs on</b> Linux</span><span><b>price</b> free</span><span><b>ads</b> none</span><span><b>sign-in</b> only for anime</span><span><b>licence</b> GPL-3.0</span>
         </div>
       </header>
 
-      <!-- ══ 01 Quick start ════════════════════════════════════════════ -->
-      <section class="msec" id="quick-start" data-section>
+      <!-- ══ 01 Install ════════════════════════════════════════════════ -->
+      <section class="msec" id="install" data-section>
         <header class="tc-sectionhead" style="--sec-c: var(--signal)">
-          <span class="plate">01</span><span class="kicker">Install</span><h2>Quick start</h2>
-          <p class="dek">You need <b>Python ≥ 3.12</b>, <b>Node</b>, and <b><code>yt-dlp</code> on your PATH</b>. Everything else is optional.</p>
+          <span class="plate">01</span><span class="kicker">Getting started</span><h2>Install</h2>
+          <p class="dek">You need a Linux computer and an internet connection.</p>
         </header>
         <div class="prose">
           <div class="codeblock">
-            <div class="cb-head"><span>install &amp; run</span><button class="copy"></button></div>
-<pre><span class="k">uv sync</span>                                               <span class="c"># backend</span>
-<span class="k">cd frontend &amp;&amp; npm install &amp;&amp; npm run build &amp;&amp; cd ..</span>  <span class="c"># frontend</span>
-<span class="k">uv run python main.py</span>                                 <span class="c"># → http://127.0.0.1:5000</span></pre>
+            <div class="cb-head"><span>paste into a terminal</span><button class="copy"></button></div>
+<pre><span class="k">curl -fsSL https://raw.githubusercontent.com/Shio-T0/Tubcal/main/install.sh | bash</span></pre>
           </div>
-          <p>That's the whole install. Open the page, pick a channel, add a few YouTube channels and subreddits in <b>Settings</b>, and the rooms fill in.</p>
+          <p>Open a terminal, paste this command and press <kbd>Enter</kbd>. On many desktops <kbd>Ctrl</kbd><kbd>Alt</kbd><kbd>T</kbd> opens a terminal; if not, look for <b>Terminal</b> in your app menu. The installer works on Ubuntu, Fedora, Debian, Linux Mint, Arch, openSUSE and most other distributions.</p>
 
-          <h3>Optional extras</h3>
-          <p>The heavier features are each opt-in:</p>
-          <div class="codeblock">
-            <div class="cb-head"><span>extras</span><button class="copy"></button></div>
-<pre><span class="k">uv sync --extra brain</span>     <span class="c"># The Archive: faster-whisper + numpy (local transcription)</span>
-<span class="k">uv sync --extra editor</span>    <span class="c"># The Composing Room: flask-sock (PTY terminal + LSP bridge)</span></pre>
-          </div>
+          <h3>What the installer does</h3>
+          <ol class="steps">
+            <li>Checks your system and shows a plan of what it will install. Nothing changes until you agree to it.</li>
+            <li>Asks which rooms you want, and a few options (both are in the tables below). A room you leave out isn't downloaded. Press <kbd>Enter</kbd> to accept the suggested choices.</li>
+            <li>Asks for your password if it needs to install packages from your distribution; the plan names them. Everything else, including Tubcal's own copies of the tools it uses, goes into your home folder and doesn't replace anything you already have.</li>
+            <li>Starts Tubcal once to check that it works, and only then reports that it's done.</li>
+          </ol>
+          <p>It usually takes a few minutes, most of it downloading.</p>
+
+          <h3>The rooms</h3>
+          <p>Tubcal is made of nine rooms in three channels, and every room is optional. Tubcal shows only the rooms you install, so leaving some out also makes it smaller. If you leave out all of a channel's rooms, that channel isn't shown.</p>
           <div class="table-wrap">
             <table>
-              <thead><tr><th>Also nice to have</th><th>Unlocks</th></tr></thead>
+              <thead><tr><th>Channel</th><th>Room</th><th>What it gives you</th><th>At first</th></tr></thead>
               <tbody>
-                <tr><td>A running <a href="https://ollama.com">Ollama</a> server</td><td>The Archive's answers and summaries, and the <em>written</em> (rather than “wire”) Edition</td></tr>
-                <tr><td><code>rg</code> (ripgrep)</td><td>Fast project grep in the editor — falls back to <code>os.walk</code></td></tr>
-                <tr><td><code>notify-send</code></td><td>A desktop ping ~10 min before a subscribed stream goes live</td></tr>
-                <tr><td>A language server (<code>rust-analyzer</code>, <code>pyright</code>, …)</td><td>Completion and diagnostics in the editor</td></tr>
+                <tr><td class="nowrap muted">1 · Social</td><td class="nowrap"><b>The Edition</b></td><td>A daily paper made from the rooms you follow.</td><td>on</td></tr>
+                <tr><td></td><td class="nowrap"><b>The Wire</b></td><td>Hacker News.</td><td>on</td></tr>
+                <tr><td></td><td class="nowrap"><b>The Dispatch</b></td><td>Reddit.</td><td>on</td></tr>
+                <tr><td class="nowrap muted">2 · Coding</td><td class="nowrap"><b>The Composing Room</b></td><td>A code editor for the projects in your <code>~/Projects</code> folder, with a terminal.</td><td>on</td></tr>
+                <tr><td></td><td class="nowrap"><b>The Workbench</b></td><td>Talks, podcasts, news and releases for four programming languages.</td><td>on</td></tr>
+                <tr><td></td><td class="nowrap"><b>GitHub</b></td><td>The projects and people you follow on GitHub, and your notifications if you link your account.</td><td>off</td></tr>
+                <tr><td class="nowrap muted">3 · Video</td><td class="nowrap"><b>The Screening Room</b></td><td>YouTube: the channels you follow, search and live streams. About 60 MB.</td><td>on</td></tr>
+                <tr><td></td><td class="nowrap"><b>The Anime</b></td><td>Anime episodes and your AniList list. About 100 MB.</td><td>on</td></tr>
+                <tr><td></td><td class="nowrap"><b>The Archive</b></td><td>Transcribes the videos you watch so you can search what was said. About 300 MB, and most useful with the <a href="#ai">optional AI</a>. It needs the Screening Room, so picking it adds that too.</td><td>off</td></tr>
               </tbody>
             </table>
           </div>
-          <p>Every one of these degrades quietly. Miss them all and the app still boots — the feature just reports itself unavailable.</p>
-        </div>
+          <h3>Options</h3>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Option</th><th>What it gives you</th><th>At first</th></tr></thead>
+              <tbody>
+                <tr><td class="nowrap"><b>App-menu entry</b></td><td>Adds Tubcal to your app menu.</td><td>on</td></tr>
+                <tr><td class="nowrap"><b>Start when I log in</b></td><td>Starts Tubcal in the background when you log in.</td><td>off</td></tr>
+                <tr><td class="nowrap"><b>Distro extras</b></td><td>A desktop notification shortly before a channel you follow goes live (with the Screening Room), and faster search in the code editor (with the Composing Room).</td><td>on</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p>To add a room later, type <code>tubcal add</code> and its name, for example <code>tubcal add anime</code>. <code>tubcal remove</code> takes one out again; what you saved, followed and watched there is kept, and comes back if you add the room again. To change the options, run the install command again: your earlier choices are already selected, and your data isn't touched.</p>
 
-        <div class="machine-check glass">
-          <div class="mc-head">
-            <div><span class="kicker">What do you have?</span><h3>Tick what's on your machine.</h3></div>
-            <p class="dim">The readout shows what each room will do with exactly that — nothing here is required except the three basics above.</p>
-          </div>
-          <div class="mc-grid">
-            <fieldset class="mc-have" id="mc-have"><legend class="sr-only">Installed and connected</legend></fieldset>
-            <div class="mc-out" id="mc-out" aria-live="polite"></div>
-          </div>
+          <h3>Opening Tubcal</h3>
+          <p>Open <b>Tubcal</b> from your app menu, or type <code>tubcal</code> in a terminal. It opens in your web browser at <b>127.0.0.1:5000</b>, an address that only works on the computer Tubcal is installed on. Then go on to <a href="#first-steps">First steps</a>.</p>
+          <div class="callout"><strong>If you already have the code</strong> (from <code>git clone</code>, for example), run <code>./install.sh</code> from inside that folder instead. Tubcal is then set up in that folder, and its data is kept there.</div>
         </div>
       </section>
 
-      <!-- ══ 02 Channels & rooms ══════════════════════════════════════ -->
-      <section class="msec" id="channels" data-section>
+      <!-- ══ 02 First steps ═══════════════════════════════════════════ -->
+      <section class="msec" id="first-steps" data-section>
         <header class="tc-sectionhead" style="--sec-c: var(--c-foryou)">
-          <span class="plate">02</span><span class="kicker">The set</span><h2>Channels &amp; rooms</h2>
-          <p class="dek">The set has two channels, chosen at <code>/</code> — a TV-style chooser. Press <kbd>1</kbd> or <kbd>2</kbd>.</p>
+          <span class="plate">02</span><span class="kicker">Getting started</span><h2>First steps</h2>
+          <p class="dek">Tubcal is empty until you follow something. These steps take about five minutes.</p>
+        </header>
+        <div class="prose">
+          <ol class="steps">
+            <li><b>The home screen</b> shows what to watch next: the video or episode you stopped halfway through, new uploads, who's live and what airs soon. Turn one of its three knobs, or press <kbd>1</kbd>, <kbd>2</kbd> or <kbd>3</kbd>, to go into the Social, Coding or Video channel.</li>
+            <li><b>Add YouTube channels.</b> In the Screening Room, press <b>Add a channel</b> and type the channel's handle (like <code>@name</code>) or paste its link. If you <a href="#accounts">connect your YouTube account</a> instead, all your subscriptions come in at once.</li>
+            <li><b>Add subreddits</b> in <b>Settings → Subscriptions</b>, with <b>Add a subscription</b>. They appear in the Dispatch and in the daily paper.</li>
+            <li><b>For anime</b>, <a href="#accounts">connect a free AniList account</a>. The Anime doesn't work without one.</li>
+            <li><b>If you use GitHub</b>, follow some projects in the GitHub room with <b>Follow a repo or person</b>. Linking your account is optional; see <a href="#accounts">Accounts</a>.</li>
+            <li><b>Pick a skin</b> with the skin button in any channel's bar, and switch off the rooms you won't use in <b>Settings → Rooms</b>.</li>
+          </ol>
+          <p>The Edition makes a new paper every morning from what you follow. To get the first one straight away, press <b>Recompose</b> in <b>Settings → The Edition</b>.</p>
+        </div>
+      </section>
+
+      <!-- ══ 03 Starting & updating ═══════════════════════════════════ -->
+      <section class="msec" id="everyday" data-section>
+        <header class="tc-sectionhead" style="--sec-c: var(--c-hn)">
+          <span class="plate">03</span><span class="kicker">Getting started</span><h2>Starting &amp; updating</h2>
+          <p class="dek">The installer adds a <code>tubcal</code> command. Type these in a terminal.</p>
         </header>
         <div class="prose">
           <div class="table-wrap">
             <table>
-              <thead><tr><th></th><th>Channel</th><th>What's on</th></tr></thead>
+              <thead><tr><th>Command</th><th>What it does</th></tr></thead>
               <tbody>
-                <tr><td class="nowrap"><b>1</b></td><td class="nowrap"><b>The Hub</b></td><td>Today's paper, your videos, the wire, the archive and the workshop — a set of numbered rooms beside a console.</td></tr>
-                <tr><td class="nowrap"><b>2</b></td><td class="nowrap"><b>The Anime</b></td><td>All of AniList — the season, the week's schedule, your list and its ledger, the community — as a section of its own.</td></tr>
+                <tr><td class="nowrap"><code>tubcal</code></td><td>Starts Tubcal if it isn't running, and opens it in your browser.</td></tr>
+                <tr><td class="nowrap"><code>tubcal stop</code></td><td>Stops Tubcal. Closing the browser tab doesn't stop it; it keeps running in the background so it opens quickly next time.</td></tr>
+                <tr><td class="nowrap"><code>tubcal restart</code></td><td>Stops it and starts it again.</td></tr>
+                <tr><td class="nowrap"><code>tubcal status</code></td><td>Tells you whether it's running, and at which address.</td></tr>
+                <tr><td class="nowrap"><code>tubcal update</code></td><td>Installs the newest version and restarts. Your data and settings are kept.</td></tr>
+                <tr><td class="nowrap"><code>tubcal rooms</code></td><td>Lists the rooms, and which ones you have.</td></tr>
+                <tr><td class="nowrap"><code>tubcal add anime</code></td><td>Adds a room you left out (here, the Anime), then restarts. Reload the page to see it.</td></tr>
+                <tr><td class="nowrap"><code>tubcal remove anime</code></td><td>Takes a room out again. What you saved there is kept.</td></tr>
+                <tr><td class="nowrap"><code>tubcal autostart on</code></td><td>Starts Tubcal whenever you log in. <code>tubcal autostart off</code> undoes it.</td></tr>
+                <tr><td class="nowrap"><code>tubcal logs</code></td><td>Shows what Tubcal is doing. Useful when something isn't working.</td></tr>
+                <tr><td class="nowrap"><code>tubcal uninstall</code></td><td>Removes the command, the menu entry and Tubcal's tools. Your data is kept.</td></tr>
               </tbody>
             </table>
           </div>
-          <p>From anywhere, <kbd>Space</kbd><kbd>g</kbd><kbd>h</kbd> goes to the Hub and <kbd>Space</kbd><kbd>g</kbd><kbd>a</kbd> to the Anime.</p>
+          <h3>Removing it completely</h3>
+          <p>If you installed with the curl command, <code>tubcal uninstall --purge</code> also deletes the app and <b>all its data</b>. This can't be undone, so <a href="#privacy">back up</a> anything you want to keep first.</p>
+        </div>
+      </section>
 
-          <h3>The console</h3>
-          <p>There's no masthead. A slim console runs down the left — the wordmark, the channel switch, a search-everything button, your rooms as numbered preset keys, and Saved / Settings / skin — so every room starts at the top of the screen. The room you're in opens its own index under it (the Screening Room lists its views, your channels with their new counts, and what's queued). It folds to an icon rail, becomes a top bar on a phone, and on very wide screens (≥ 1780 px) hangs in the page's empty left margin. This manual's contents panel is the same console.</p>
+      <!-- ══ 04 Channels & rooms ══════════════════════════════════════ -->
+      <section class="msec" id="rooms" data-section>
+        <header class="tc-sectionhead" style="--sec-c: var(--c-foryou)">
+          <span class="plate">04</span><span class="kicker">Using Tubcal</span><h2>Channels &amp; rooms</h2>
+          <p class="dek">Tubcal is organised like an old TV, with three channels. Each channel holds a few rooms, and each room is one part of the app.</p>
+        </header>
+        <div class="prose">
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th></th><th>Channel</th><th>Its rooms</th><th>How it's laid out</th></tr></thead>
+              <tbody>
+                <tr><td class="nowrap"><b>1</b></td><td class="nowrap"><b>Social</b></td><td>The Edition, the Wire (Hacker News) and the Dispatch (Reddit).</td><td>A bar across the top of the page, like the section names in a newspaper. It stays in place while you scroll.</td></tr>
+                <tr><td class="nowrap"><b>2</b></td><td class="nowrap"><b>Coding</b></td><td>The Composing Room (a code editor), the Workbench and GitHub.</td><td>Like a code editor: the rooms are buttons down the left, and a bar across the top shows where you are.</td></tr>
+                <tr><td class="nowrap"><b>3</b></td><td class="nowrap"><b>Video</b></td><td>The Screening Room (YouTube), the Anime and the Archive.</td><td>A wooden panel down the left. The room you're in lists its own places under its button: the Screening Room lists your channels with a count of new videos, and the Anime lists all its views.</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p>Every channel's bar also has a search button, <b>Saved</b>, <b>Settings</b>, the skin button and the three channel buttons. The Video panel folds into a narrow strip of icons if you want more room. On a phone-sized screen, the bars and panels move to the top of the page.</p>
+
+          <h3>Getting from one to another</h3>
+          <ul class="feature-list compact">
+            <li>On the home screen, turn a knob or press <kbd>1</kbd>, <kbd>2</kbd> or <kbd>3</kbd>.</li>
+            <li>From anywhere, press <kbd>Space</kbd>, then <kbd>g</kbd>, then <kbd>s</kbd> for Social, <kbd>c</kbd> for Coding or <kbd>v</kbd> for Video. <kbd>a</kbd> goes straight to the Anime and <kbd>h</kbd> to the home screen.</li>
+            <li>Press <kbd>/</kbd> or <kbd>Ctrl</kbd><kbd>K</kbd> to search. From there you can jump to any room, search YouTube, Reddit and Hacker News together, or find something you saved.</li>
+          </ul>
 
           <h3>The rooms</h3>
-          <p>The numbers aren't hardcoded — they're each room's position in your own running order, so switching one off in <b>Settings → Rooms</b> renumbers the rest. The default set:</p>
+          <p>These are the rooms Tubcal starts with, if you install all of them. Switch any of them on or off in <b>Settings → Rooms</b>, and the rest of that channel is renumbered. The Anime can't be switched off there; leave it out when you install, or remove it with <code>tubcal remove anime</code>.</p>
           <div class="table-wrap">
             <table id="rooms-table">
-              <thead><tr><th>No</th><th>Room</th><th>Route</th><th>What it is</th></tr></thead>
+              <thead><tr><th>No</th><th>Room</th><th>What it is</th></tr></thead>
               <tbody></tbody>
             </table>
           </div>
-          <p>A room's view state — its tab, filters, search — lives in the URL's query string rather than in component state, so opening a detail page and pressing Back restores exactly what you were looking at.</p>
         </div>
       </section>
 
-      <!-- ══ 03 The player ════════════════════════════════════════════ -->
-      <section class="msec" id="player" data-section>
+      <!-- ══ 05 Saving ════════════════════════════════════════════════ -->
+      <section class="msec" id="saved" data-section>
+        <header class="tc-sectionhead" style="--sec-c: var(--c-editor)">
+          <span class="plate">05</span><span class="kicker">Using Tubcal</span><h2>Saving</h2>
+          <p class="dek">Almost everything in Tubcal can be saved, and everything you save goes to one place.</p>
+        </header>
+        <div class="prose">
+          <p>Look for the bookmark button. It's on videos, playlists and YouTube channels, Reddit posts and subreddits, Hacker News stories, anime shows, characters, voice actors and studios, forum threads, GitHub projects and releases, the Workbench's talks, podcasts and posts, and moments in the Archive. In the code editor, <kbd>Space</kbd><kbd>b</kbd> saves the file you have open. To save any other page, open the Saved panel and press <b>Save page</b>.</p>
+
+          <h3>The Saved panel</h3>
+          <p>Press <b>Saved</b> in any channel's bar, or <kbd>Space</kbd> then <kbd>s</kbd>. A panel opens at the side of the screen, over the page you're on. In it you can save the current page, search what you've kept, open something, tick it as done, or remove it. If you remove something by mistake, press <b>Undo</b> in the message that appears.</p>
+
+          <h3>The Saved page</h3>
+          <p>The panel leads to the full Saved page, which has more room:</p>
+          <ul class="feature-list compact">
+            <li>a list down the left sorts what you've saved by channel, then by kind (videos, stories, shows and so on), with a count for each;</li>
+            <li><b>To do</b> and <b>Done</b> split what you've dealt with from what's still waiting;</li>
+            <li>you can add a note to anything, and the search looks through your notes as well as titles;</li>
+            <li>each kind has a layout of its own, or you can switch to a plain list, and sort newest first, oldest first or A to Z;</li>
+            <li><b>Select</b> lets you mark many things done, or remove them, in one go.</li>
+          </ul>
+          <p>Each channel's guide on the home screen also says how much you've saved there, and links to it.</p>
+          <div class="callout">If you remove a room, what you saved from it stays in Saved. It opens on the original website instead, or Tubcal tells you the command that adds the room back.</div>
+        </div>
+      </section>
+
+      <!-- ══ 06 Watching ══════════════════════════════════════════════ -->
+      <section class="msec" id="watching" data-section>
         <header class="tc-sectionhead" style="--sec-c: var(--c-youtube)">
-          <span class="plate">03</span><span class="kicker">One global player</span><h2>The player</h2>
-          <p class="dek">Every video — from any room — plays in one global player, straight from YouTube's own streams: real 1080p, no account, no embed, no third party.</p>
+          <span class="plate">06</span><span class="kicker">Using Tubcal</span><h2>Watching</h2>
+          <p class="dek">Videos from every room play in the same player, with no ads and no sign-in, at up to 1080p.</p>
         </header>
         <div class="prose">
           <ul class="feature-list">
-            <li><b>A theatre, not a pop-up.</b> The room goes dark, the picture's colours glow softly around it, and it's sized to the largest 16:9 that fits. Underneath: the title, the channel's face and subscriber count, Subscribe, Save, and a link that starts at this very second.</li>
-            <li><b>A seek bar that knows the video</b> — YouTube's <em>most replayed</em> as a ridge above it, cut at every chapter, with the chapter's name on hover and beside the clock.</li>
-            <li><b>Programme notes beside it.</b> The description with every timestamp seeking, every link to another video opening in the player and every hashtag searching the room; chapters; comments with faces, creator / verified / member / pinned / hearted marks, replies in place, Top or Newest, loading as you scroll; and The Archive's transcript (it follows the playhead) and summary.</li>
-            <li><b>Keeps playing when you leave.</b> <kbd>Esc</kbd> tucks it into a corner dock that stacks and reorders; an up-next queue rolls into the next video when one ends. One <code>&lt;video&gt;</code> element per open video only changes its styling between expanded and docked, so playback never restarts.</li>
+            <li><b>Layout.</b> The video plays large over a dark background. Below it are the title, the channel with a Subscribe button, Save, and a button that copies a link to the current second.</li>
+            <li><b>Progress bar.</b> It's divided into the video's chapters (hover to see their names), and a line above it rises where people replay most.</li>
+            <li><b>Beside the video.</b> The description, chapters and comments. Timestamps in the description jump to that moment, and links to other videos open in the player. With The Archive you also get a transcript and a summary.</li>
+            <li><b>Corner player.</b> Press <kbd>Esc</kbd> and the video shrinks to a corner and keeps playing while you browse. Videos you add to <b>Up next</b> play one after another.</li>
           </ul>
-          <p>How the 1080p works without an account or ffmpeg is in <a href="#how-it-works">How it works → Streams</a>. The player's keys are in <a href="#keyboard">Keyboard</a>. <a href="./#player">Try the player demo on the tour.</a></p>
+
+          <h3>Subtitles</h3>
+          <p>Tubcal draws subtitles itself, so you can choose their font, size, colour, outline, background and position. The options are in <b>Settings → Subtitles</b> and in the player's subtitle menu, and they apply to every video and episode. You can set a preferred language there too.</p>
+
+          <h3>Sound and speed</h3>
+          <p>In <b>Settings → Playback</b> you can choose whether only the video in front plays sound or every open video does, and set the speed videos start at.</p>
+
+          <h3>Anime episodes</h3>
+          <p>Episodes have their own player, coloured to match the show. It adds:</p>
+          <ul class="feature-list compact">
+            <li>a <b>Sub / Dub</b> switch, remembered for each show;</li>
+            <li><b>Skip opening</b> and <b>Next episode</b> buttons (to skip openings automatically, turn that on in <b>Settings → Anime</b>);</li>
+            <li>an eight-second countdown to the next episode when one ends;</li>
+            <li>AniList updates: once you've watched most of an episode, it's marked as watched on your list.</li>
+          </ul>
+          <p><a href="./#player">Try the player demo on the tour.</a></p>
         </div>
       </section>
 
-      <!-- ══ 04 The Anime ═════════════════════════════════════════════ -->
+      <!-- ══ 07 The Anime ═════════════════════════════════════════════ -->
       <section class="msec" id="anime" data-section>
         <header class="tc-sectionhead" style="--sec-c: var(--accent-strong)">
-          <span class="plate">04</span><span class="kicker">Channel 2</span><h2>The Anime</h2>
-          <p class="dek">A whole section built on AniList — its own top bar, and a file-tree index down the left where every view (and every useful place inside one) is one click away.</p>
+          <span class="plate">07</span><span class="kicker">Using Tubcal</span><h2>The Anime</h2>
+          <p class="dek">The Anime is a room in the Video channel. It works with AniList, a free website for tracking the anime you watch. While you're in it, its views are listed under its button in the panel on the left, with your AniList account at the top.</p>
         </header>
         <div class="prose">
-          <div class="callout callout-warn"><strong>AniList account required.</strong> AniList now refuses unauthenticated queries, so your list, progress sync and the social side all need a connected account — see <a href="#accounts">Connecting accounts</a>.</div>
+          <div class="callout callout-warn"><strong>You need a free AniList account.</strong> AniList no longer lets apps read it without one. Connecting takes a few minutes; see <a href="#accounts">Accounts</a>.</div>
           <div class="table-wrap">
             <table>
               <thead><tr><th>View</th><th>What's there</th></tr></thead>
               <tbody>
-                <tr><td class="nowrap"><b>Browse</b></td><td>Trending, popular, top-rated and more, plus a genre/tag finder with every AniList filter — infinite scroll.</td></tr>
-                <tr><td class="nowrap"><b>Seasons · Schedule</b></td><td>Any season's line-up; the week ahead as an airing grid with countdowns.</td></tr>
-                <tr><td class="nowrap"><b>My List</b></td><td>Your shelves with fast editing, bulk tools, custom lists, export (JSON, CSV, MyAnimeList XML) and the sequel radar — what comes next after everything you've finished. Synced to AniList as you tap.</td></tr>
-                <tr><td class="nowrap"><b>Ledger</b></td><td>Your statistics computed from the list itself: genres, formats, scores, time spent, hot takes.</td></tr>
-                <tr><td class="nowrap"><b>Community</b></td><td>Reviews, people's recommendation pairings (vote on them), today's birthdays and the hall of fame.</td></tr>
-                <tr><td class="nowrap"><b>Channel</b></td><td>Trailers related to what you've watched, played like a station.</td></tr>
-                <tr><td class="nowrap"><b>Social</b></td><td>The forum (threads beside the list), the activity stream, your inbox and people — profile pages, follow, message — with a live preview of every post as others will see it.</td></tr>
-                <tr><td class="nowrap"><b>Title pages</b></td><td>The full dossier: cast with every dub's voice actors, characters, staff, studios, rankings, trends, a franchise watch-order guide, reviews and discussion.</td></tr>
+                <tr><td class="nowrap"><b>Browse</b></td><td>Trending, popular, top-rated and this season's shows, and a finder that filters by any mix of genres and tags. More results load as you scroll.</td></tr>
+                <tr><td class="nowrap"><b>Seasons · Schedule</b></td><td>Any season's shows, and a timetable of the coming week with a countdown to each episode.</td></tr>
+                <tr><td class="nowrap"><b>My List</b></td><td>Your shelves (Watching, Planning, Completed and so on). Changes are saved to AniList straight away. There's also bulk editing, custom lists, export, and the <em>sequel radar</em>, which finds sequels to the shows you've finished.</td></tr>
+                <tr><td class="nowrap"><b>Ledger</b></td><td>Your statistics: favourite genres, how you score, time spent, the shows you rate unlike everyone else, a year in review, and a comparison of your taste with any other user.</td></tr>
+                <tr><td class="nowrap"><b>Community</b></td><td>Reviews, user recommendations, characters whose birthday is today, and the hall of fame.</td></tr>
+                <tr><td class="nowrap"><b>Channel</b></td><td>Trailers related to what you've watched, playing one after another like a TV channel.</td></tr>
+                <tr><td class="nowrap"><b>Social</b></td><td>AniList's forum, what the people you follow are watching, your inbox, and user profiles you can follow and message.</td></tr>
+                <tr><td class="nowrap"><b>Title pages</b></td><td>Everything about one show: the cast with every dub's voice actors, staff, studios, rankings, reviews and discussion, plus a watch-order guide for long series.</td></tr>
               </tbody>
             </table>
           </div>
 
-          <h3>Watching</h3>
-          <p>Episodes play in-app through two independent scrapers — <code>anipy-api</code> (allanime / animekai) first, and <code>weeb-cli</code>'s aniworld provider as the fallback — because two unrelated sites rarely break on the same day. Both return the same <code>{sources, subtitles, headers}</code> shape, so nothing downstream special-cases either. On startup Tubcal upgrades <code>anipy-api</code> from PyPI (the scraper's fixes ship as releases); <code>TUBCAL_AUTO_UPDATE=0</code> turns that off.</p>
-          <p>Finishing an episode advances your AniList progress on its own: once playback passes <code>TUBCAL_ANIME_WATCHED_PERCENT</code> (default 80 %) the episode is marked watched — advance-only, once per episode.</p>
+          <h3>Watching episodes</h3>
+          <p>Episodes stream from public anime sites, the same ones the ani-cli tool uses. If one site fails, Tubcal tries another. These sites change often, which can break playback for a day or two; Tubcal checks for fixes each time it starts.</p>
 
           <h3>The Reckoner</h3>
-          <p>A watch-time calculator docked in the page's margin. Hover any title and tap <kbd>C</kbd>: it tallies the next <em>unwatched</em> episode — capped at what has actually aired — and each further <kbd>C</kbd> extends the run. It sums AniList's per-episode durations (24 min, flagged “estimated”, when AniList has none) into a total and a live “start now, finish at…” clock, and remembers the plan. The <kbd>C</kbd> key stands down for modifiers, text fields, an expanded player or editor, and for one second after <kbd>g</kbd> so the <kbd>g</kbd><kbd>c</kbd> room jump still wins.</p>
+          <p>The Reckoner adds up how long some episodes will take to watch. Point at any show and press <kbd>C</kbd> to add its next unwatched episode (aired ones only), and press again to add the one after. It shows the total time and when you'd finish if you started now. It sits in the page margin. <a href="./#anime">See it on the tour.</a></p>
 
           <h3>The curtain call</h3>
-          <p>When you finish a season, velvet drapes part on the title: score it in your own AniList scale, join the finale's episode discussion (or start it), write the review while it's fresh, and put the next sequels on Planning or Watching — or read <span lang="ja">終</span>, series finished. It appears once per title, only for a season that has finished airing, and waits while the player is expanded.</p>
+          <p>When you finish the last episode of a season, Tubcal opens a screen for wrapping it up. You can score the season on your AniList scale, post in the last episode's discussion thread, write a review, and add the sequel to your list. If there's no sequel, it shows <span lang="ja">終</span> ("the end"). It only opens for seasons that have finished airing, and waits until you close the player. You can also open it yourself with the <b>Curtain call</b> button on a show's page.</p>
 
-          <h3>AniList on a budget</h3>
-          <p>AniList currently allows 30 requests a minute. Every read is cached, relation walks (sequels, watch order) are cached per title, the fan-out walkers check the remaining budget and stop early, and list edits apply locally at once and sync on a short debounce — a flurry of taps is one mutation. On a 429 a cooldown starts during which calls fail fast, so the stale cache is served at once.</p>
+          <h3>Opening themes</h3>
+          <p>A show's page can play its opening song when you open it. Turn this on or off, and set how long and how loud, in <b>Settings → Anime</b>. The song button under the poster plays it whenever you like.</p>
         </div>
       </section>
 
-      <!-- ══ 05 Keyboard ══════════════════════════════════════════════ -->
+      <!-- ══ 08 Optional AI ═══════════════════════════════════════════ -->
+      <section class="msec" id="ai" data-section>
+        <header class="tc-sectionhead" style="--sec-c: var(--c-dev)">
+          <span class="plate">08</span><span class="kicker">Optional</span><h2>Optional AI</h2>
+          <p class="dek">Two features work better with an AI model running on your own computer. Nothing is sent to an online AI service, and the rest of Tubcal works without it.</p>
+        </header>
+        <div class="prose">
+          <ul class="feature-list">
+            <li><b>The Archive</b> transcribes the videos you watch. You can then search what was said, read a short summary of a video, or ask a question and get an answer that links to the moments it came from.</li>
+            <li><b>The Edition</b> can group posts about the same story even when they link to different pages, and write a short article for each top story, citing the posts it was written from. Without the AI it lists the headlines.</li>
+          </ul>
+
+          <h3>Setting it up</h3>
+          <ol class="steps">
+            <li><b>If you want the Archive</b> and didn't install it, add it with <code>tubcal add archive</code>. The Edition doesn't need it.</li>
+            <li><b>Install Ollama</b> from <a href="https://ollama.com">ollama.com</a>. It's a free app that runs AI models on your computer.</li>
+            <li><b>Download the two models Tubcal uses.</b> In a terminal:
+              <div class="codeblock">
+                <div class="cb-head"><span>two downloads, a few GB in total</span><button class="copy"></button></div>
+<pre><span class="k">ollama pull nomic-embed-text</span>   <span class="c"># for search</span>
+<span class="k">ollama pull qwen3.5:9b</span>         <span class="c"># for writing and answers</span></pre>
+              </div>
+            </li>
+            <li><b>Restart Tubcal</b> with <code>tubcal restart</code>. <b>Settings → The Archive</b> and <b>Settings → The Edition</b> show whether they found the models.</li>
+          </ol>
+
+          <h3>Using The Archive</h3>
+          <p>At first The Archive only keeps the videos you choose: open a video and press <b>Add to the Archive</b> in the panel beside it. To keep everything you watch, set <b>What gets archived</b> to <b>Everything</b> in <b>Settings → The Archive</b>. You search and ask questions in The Archive room, in the Video channel. Searching for a word works without the AI; questions and summaries need it.</p>
+          <div class="callout"><strong>Transcribing is slow on older computers.</strong> A long video can take a while, and an NVIDIA graphics card speeds it up a lot. If it's too slow, choose a lower <b>Transcription quality</b> in <b>Settings → The Archive</b>.</div>
+        </div>
+      </section>
+
+      <!-- ══ 09 Keyboard ══════════════════════════════════════════════ -->
       <section class="msec" id="keyboard" data-section>
         <header class="tc-sectionhead" style="--sec-c: var(--c-hn)">
-          <span class="plate">05</span><span class="kicker">Hands on the keys</span><h2>Keyboard</h2>
-          <p class="dek">The global bindings stand down while you're typing, while a video is on the big screen, and while the Composing Room has focus — those own their own keys.</p>
+          <span class="plate">09</span><span class="kicker">Using Tubcal</span><h2>Keyboard</h2>
+          <p class="dek">Everything works with the mouse, so the shortcuts are optional. They're paused while you type in a text box, and the player and the code editor have their own, listed below.</p>
         </header>
         <div class="keyfinder glass">
-          <label for="kf-in"><span class="kicker">Key finder</span></label>
+          <label for="kf-in"><span class="kicker">Find a shortcut</span></label>
           <input id="kf-in" class="kf-in" type="text" placeholder="Press a key, or type what you want to do…" autocomplete="off" spellcheck="false" />
           <span class="kf-count" id="kf-count" aria-live="polite"></span>
-          <div class="kf-scopes" id="kf-scopes" role="group" aria-label="Filter by context"></div>
+          <div class="kf-scopes" id="kf-scopes" role="group" aria-label="Filter by where you are"></div>
         </div>
         <div class="keytables" id="keytables"></div>
       </section>
 
-      <!-- ══ 06 Configuration ═════════════════════════════════════════ -->
-      <section class="msec" id="configuration" data-section>
+      <!-- ══ 10 Settings ══════════════════════════════════════════════ -->
+      <section class="msec" id="settings" data-section>
         <header class="tc-sectionhead" style="--sec-c: var(--c-editor)">
-          <span class="plate">06</span><span class="kicker">.env and Settings</span><h2>Configuration</h2>
-          <p class="dek">Nothing is required. Copy <code>.env.example</code> to <code>.env</code> only to override a default; anything you'd want to change while the app is running lives in <b>Settings</b> instead.</p>
+          <span class="plate">10</span><span class="kicker">Using Tubcal</span><h2>Settings</h2>
+          <p class="dek">Press <b>Settings</b> in any channel's bar, or <kbd>Space</kbd> then <kbd>,</kbd>. A panel opens at the side with the skins, the switches people change most (fast mode, sound, live alerts, skipping anime openings, opening songs) and a link to every section below. The full Settings page shows how each section is set, and <b>Find a setting</b> searches all of them.</p>
         </header>
-        <div class="envbuilder">
-          <div class="eb-form glass" id="eb-form"></div>
-          <div class="eb-out">
-            <div class="codeblock">
-              <div class="cb-head"><span>.env</span><span class="eb-actions"><button class="copy" id="eb-copy"></button><button class="copy" id="eb-dl"></button></span></div>
-              <pre id="eb-pre"></pre>
-            </div>
-            <p class="dim eb-note">Only the values you change are written — a default doesn't need saying. The file stays next to <code>main.py</code> and is git-ignored.</p>
-          </div>
-        </div>
-
-        <div class="prose">
-          <h3>Settings (changed in the app, stored in SQLite)</h3>
-          <p>These live in the <code>settings</code> table of <code>data/tubcal.db</code> and are edited in <b>Settings</b>; the defaults are:</p>
-          <div class="table-wrap">
-            <table>
-              <thead><tr><th>Setting</th><th>Default</th><th>What it does</th></tr></thead>
-              <tbody>
-                <tr><td><code>active_rooms</code></td><td>7 rooms (GitHub off)</td><td>The hub's running order — the room numbers come from it.</td></tr>
-                <tr><td><code>theme</code></td><td><code>dark</code></td><td>The skin (Shōwa Night); injected server-side so the first paint is right.</td></tr>
-                <tr><td><code>brain_auto_index</code></td><td><code>false</code></td><td>Opt-in: transcribe videos into The Archive as you watch them.</td></tr>
-                <tr><td><code>brain_whisper_model</code></td><td><code>base</code></td><td>faster-whisper size (tiny → medium).</td></tr>
-                <tr><td><code>brain_llm_model</code></td><td><code>qwen3.5:9b</code></td><td>Ollama chat model for summaries and answers.</td></tr>
-                <tr><td><code>brain_embed_model</code></td><td><code>nomic-embed-text</code></td><td>Ollama embedding model (Archive search, Edition clustering).</td></tr>
-                <tr><td><code>edition_hour</code></td><td><code>6</code></td><td>Local hour after which today's paper is composed.</td></tr>
-                <tr><td><code>edition_llm_model</code></td><td><em>(blank)</em></td><td>Chat model override for the Edition; blank uses <code>brain_llm_model</code>.</td></tr>
-                <tr><td><code>anime_autosync</code></td><td><code>true</code></td><td>Finishing an episode bumps AniList progress.</td></tr>
-                <tr><td><code>anime_sub_pref</code></td><td><code>sub</code></td><td><code>sub</code> or <code>dub</code>.</td></tr>
-                <tr><td><code>editor_leader</code></td><td><kbd>Space</kbd></td><td>The vim <code>&lt;leader&gt;</code> key in the Composing Room.</td></tr>
-                <tr><td><code>editor_autosave</code></td><td><code>false</code></td><td>Write buffers on blur/idle instead of only on <code>:w</code>.</td></tr>
-                <tr><td><code>notify_live</code></td><td><code>true</code></td><td>Desktop ping 10 min before a subscribed stream goes live.</td></tr>
-                <tr><td><code>solo_audio</code></td><td><code>true</code></td><td>Only the focused video plays sound; others auto-mute.</td></tr>
-              </tbody>
-            </table>
-          </div>
+        <div class="setgrid">
+          <div class="setcard"><h4>Accounts</h4><p>Connect AniList, Reddit, YouTube and GitHub. See <a href="#accounts">Accounts</a>.</p></div>
+          <div class="setcard"><h4>Subscriptions</h4><p>Add and remove the channels, subreddits and GitHub projects you follow.</p></div>
+          <div class="setcard"><h4>Watch history</h4><p>How many videos Tubcal remembers, and a button to clear them. The history is used for suggestions and for resuming videos.</p></div>
+          <div class="setcard"><h4>Appearance</h4><p>The skin, and <b>Fast mode</b>, which turns off all animation.</p></div>
+          <div class="setcard"><h4>Rooms</h4><p>Which rooms each channel shows. It also lists the rooms you didn't install, with the command that adds each one.</p></div>
+          <div class="setcard"><h4>Playback</h4><p>Which videos play sound, and the speed they start at.</p></div>
+          <div class="setcard"><h4>Subtitles</h4><p>How subtitles look in every player, and your preferred language.</p></div>
+          <div class="setcard"><h4>Anime</h4><p>Sub or dub, updating AniList as you watch, skipping openings, and opening songs.</p></div>
+          <div class="setcard"><h4>The Edition</h4><p>Turn the paper on or off, set the hour it's made, choose the AI model that writes it, or make a new one now.</p></div>
+          <div class="setcard"><h4>The Archive</h4><p>Turn it on or off, choose what's archived and the transcription quality, and check the AI models.</p></div>
+          <div class="setcard"><h4>The Composing Room</h4><p>Code-editor options: autosave, line numbers, code helpers and the leader key.</p></div>
+          <div class="setcard"><h4>About</h4><p>Who made Tubcal, its licence, and the open-source projects it uses.</p></div>
         </div>
       </section>
 
-      <!-- ══ 07 Connecting accounts ═══════════════════════════════════ -->
+      <!-- ══ 11 Accounts ══════════════════════════════════════════════ -->
       <section class="msec" id="accounts" data-section>
         <header class="tc-sectionhead" style="--sec-c: var(--c-reddit)">
-          <span class="plate">07</span><span class="kicker">All optional</span><h2>Connecting accounts</h2>
-          <p class="dek">Everything works logged out. <b>Settings → Connections</b> shows the redirect URIs to register if you want more. Credentials are pasted into Settings and stored only in the local database; the flows use plain HTTP requests, no provider SDKs.</p>
+          <span class="plate">11</span><span class="kicker">Setup</span><h2>Accounts</h2>
+          <p class="dek">YouTube, Reddit and GitHub work without signing in. AniList is the exception: the Anime needs it. Your sign-ins are stored only on your computer.</p>
         </header>
-        <div class="acct-port">
-          <label for="acct-port">Your <code>TUBCAL_PORT</code></label>
-          <input id="acct-port" type="number" min="1" max="65535" value="5000" inputmode="numeric" />
-          <span class="dim">— the redirect URIs below follow it.</span>
+
+        <div class="machine-check glass">
+          <div class="mc-head">
+            <div><span class="kicker">What works with what</span><h3>Tick what you have</h3></div>
+            <p class="dim">The list shows what each part of Tubcal can do with the accounts and add-ons you've ticked.</p>
+          </div>
+          <div class="mc-grid">
+            <fieldset class="mc-have" id="mc-have"><legend class="sr-only">Accounts and add-ons</legend></fieldset>
+            <div class="mc-out" id="mc-out" aria-live="polite"></div>
+          </div>
+        </div>
+
+        <div class="prose acct-intro">
+          <h3>Connecting an account</h3>
+          <p>For AniList, Reddit and YouTube, you register a small “app” of your own; it takes a few minutes. The site gives you an ID and a secret to paste into Tubcal. You then sign in on the site itself, so Tubcal never sees your password. While registering, the site asks for a <b>redirect address</b>. Each card below shows the usual one, and <b>Settings → Accounts</b> shows yours with a copy button. GitHub is simpler: you link it with a token, as its card explains.</p>
         </div>
         <div class="accts" id="accts"></div>
       </section>
 
-      <!-- ══ 08 Privacy ═══════════════════════════════════════════════ -->
+      <!-- ══ 12 Privacy & your data ═══════════════════════════════════ -->
       <section class="msec" id="privacy" data-section>
         <header class="tc-sectionhead" style="--sec-c: var(--c-dev)">
-          <span class="plate">08</span><span class="kicker">What leaves the machine</span><h2>Privacy</h2>
-          <p class="dek">Binds to <code>127.0.0.1</code> and nothing else. Self-hosted fonts, no trackers, no analytics.</p>
+          <span class="plate">12</span><span class="kicker">Your data</span><h2>Privacy &amp; your data</h2>
+          <p class="dek">What Tubcal sends over the internet, where it keeps your data, and how to back it up.</p>
         </header>
         <div class="prose">
           <ul class="feature-list">
-            <li><b>One file holds everything.</b> Subscriptions, settings, watch history, playback progress, saved items, OAuth tokens and every byte of Archive data live in one git-ignored SQLite file, <code>data/tubcal.db</code> (with <code>.bak-*</code> snapshots beside it).</li>
-            <li><b>Anonymous YouTube.</b> Every YouTube read goes through an anonymous session whose policy neither stores nor sends cookies, so there's no stable id linking your searches, feeds and playback. The consent cookie is sent as an explicit header; the one deliberate exception is importing your own subscriptions, which carries your OAuth token. A test (<code>tests/test_httpc_anon.py</code>) sweeps <code>youtube.py</code>'s syntax tree and fails if any call site is neither anonymous nor authenticated.</li>
-            <li><b>Local models.</b> The Archive and The Edition talk to Ollama on <code>127.0.0.1:11434</code> over plain HTTP; transcripts and vectors never leave the box.</li>
-            <li><b>Who it talks to.</b> The platforms themselves (YouTube, Reddit, Hacker News + Algolia, GitHub, AniList), public Invidious instances for trending, comments and fallback search, the anime scrapers while you watch, and PyPI for the <code>anipy-api</code> self-update.</li>
+            <li><b>Who can open it.</b> Only the computer it's installed on. Other devices on your Wi-Fi can't.</li>
+            <li><b>YouTube.</b> Tubcal fetches YouTube without signing in and without cookies, so YouTube can't link your searches, feeds and viewing into a profile. The one exception: if you connect your YouTube account, Tubcal uses it to import your subscriptions.</li>
+            <li><b>Which sites it connects to.</b> The ones you use through it: YouTube, Reddit, Hacker News, AniList and GitHub, each only if you have that room. Also public YouTube mirrors for trending and as a search backup, the anime streaming sites while you watch an episode, AnimeThemes for opening songs, the Workbench's podcast and blog feeds, and update checks for its video tools.</li>
+            <li><b>The AI.</b> It runs on your computer, and your transcripts stay there.</li>
           </ul>
-        </div>
-      </section>
 
-      <!-- ══ 09 How it works ══════════════════════════════════════════ -->
-      <section class="msec" id="how-it-works" data-section>
-        <header class="tc-sectionhead" style="--sec-c: var(--c-github)">
-          <span class="plate">09</span><span class="kicker">Under the cabinet</span><h2>How it works</h2>
-          <p class="dek">One Flask backend, one React SPA, one SQLite file. The interesting parts are the decisions that keep a single-person app fast and unbreakable.</p>
-        </header>
-
-        <h3 class="sub" id="flow">The request path</h3>
-        <div class="flow" aria-label="Request flow">
-          <div class="fl-node"><span class="kicker">frontend/src/api/client.js</span><b>React</b><span><code>api()</code> / <code>useApi()</code> unwrap <code>data</code>, or throw on <code>ok === false</code></span></div>
-          <div class="fl-arrow" aria-hidden="true"></div>
-          <div class="fl-node"><span class="kicker">server/api/*</span><b>Flask blueprints</b><span>every response is <code>ok(data)</code> or <code>err(msg)</code>; <code>/api/*</code> is <code>no-store</code></span></div>
-          <div class="fl-arrow" aria-hidden="true"></div>
-          <div class="fl-node lit"><span class="kicker">server/cache.py</span><b>Two-layer cache</b><span>memory over SQLite; stale rows kept for when upstream fails</span></div>
-          <div class="fl-arrow" aria-hidden="true"></div>
-          <div class="fl-node"><span class="kicker">server/sources/*</span><b>Source adapters</b><span>one module per platform's quirks</span></div>
-          <div class="fl-arrow" aria-hidden="true"></div>
-          <div class="fl-node"><span class="kicker">server/httpc.py</span><b>Shared sessions</b><span>per-host spacing, anonymous reads, a large pool for HLS fan-out</span></div>
-          <div class="fl-arrow" aria-hidden="true"></div>
-          <div class="fl-node ext"><span class="kicker">the internet</span><b>The platforms</b><span>YouTube · Reddit · HN · GitHub · AniList</span></div>
-        </div>
-
-        <h3 class="sub" id="boot">Boot sequence</h3>
-        <p class="dim">What <code>main.py</code> does, in order. Step through it:</p>
-        <div class="boot glass">
-          <ol class="boot-steps" id="boot-steps"></ol>
-          <div class="boot-side">
-            <div class="boot-term" id="boot-term" aria-live="polite"></div>
-            <div class="boot-btns"><button class="btn btn-sm btn-lit" id="boot-next">Power on</button><button class="btn btn-sm" id="boot-reset">Reset</button></div>
+          <h3>Where your data is</h3>
+          <p>Everything you follow, watch, save and connect, your saved things and their notes, and The Archive's transcripts, is kept in a folder called <code>data</code>:</p>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>If you installed…</th><th>Your data is in</th></tr></thead>
+              <tbody>
+                <tr><td>with the curl command</td><td><code>~/.local/share/tubcal/app/data</code></td></tr>
+                <tr><td>from code you downloaded</td><td>the <code>data</code> folder inside it</td></tr>
+              </tbody>
+            </table>
           </div>
-        </div>
 
-        <h3 class="sub" id="caching">Caching is the load-bearing wall</h3>
-        <p>Two layers — an in-memory dict over a <code>cache</code> table in SQLite — so caches survive restarts. Expired rows are kept <em>on purpose</em>: if an upstream fetch fails, the stale payload is served instead of an error. That single decision is why Reddit's rate limiting can't take the app down. Play with it — this is <code>cache.cached()</code> with a 10-minute TTL (the YouTube RSS one):</p>
-        <div class="cachesim glass" id="cachesim">
-          <div class="cs-ctl">
-            <button class="btn btn-sm btn-lit" data-cs="req">Request the feed</button>
-            <button class="btn btn-sm" data-cs="tick">Wait 4 minutes</button>
-            <button class="btn btn-sm" data-cs="restart">Restart the server</button>
-            <label class="switch cs-up"><input type="checkbox" id="cs-up" checked /><span class="track"></span><span>Upstream reachable</span></label>
-            <label class="switch cs-swr"><input type="checkbox" id="cs-swr" /><span class="track"></span><span><code>cached_swr()</code></span></label>
-          </div>
-          <div class="cs-board">
-            <div class="cs-clock"><span class="kicker">clock</span><b id="cs-clock">0:00</b></div>
-            <div class="cs-layer" id="cs-mem"></div>
-            <div class="cs-layer" id="cs-db"></div>
-            <div class="cs-resp" id="cs-resp"></div>
-          </div>
-          <ol class="cs-log" id="cs-log" aria-live="polite"></ol>
-        </div>
+          <h3>Backing up</h3>
+          <p>Stop Tubcal (<code>tubcal stop</code>), copy the whole <code>data</code> folder somewhere safe, then start it again. To restore it, or to move to a new computer, install Tubcal, stop it, and put your copy of the folder back in the same place.</p>
 
-        <h3 class="sub" id="rates">Rate limits, respected</h3>
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>Upstream</th><th>How Tubcal stays under it</th></tr></thead>
-            <tbody>
-              <tr><td class="nowrap">Reddit</td><td>One request every 3 s per host (<code>HOST_INTERVALS</code>); listings cached 5 min; stale served on 429.</td></tr>
-              <tr><td class="nowrap">Invidious</td><td>1 s spacing per public instance, so a channel page's burst becomes a gentle stream.</td></tr>
-              <tr><td class="nowrap">AniList</td><td>30 req/min budget tracked from <code>X-RateLimit-Remaining</code>; fan-outs stop early; a 429 starts a fail-fast cooldown.</td></tr>
-              <tr><td class="nowrap">GitHub</td><td>60 req/hr/IP unauthenticated, so everything is cached hard; a classic PAT raises it to 5,000.</td></tr>
-            </tbody>
-          </table>
-        </div>
-
-        <h3 class="sub" id="streams">Streams: real 1080p without an account or ffmpeg</h3>
-        <p>YouTube's open player clients now expose exactly one muxed rendition — 360p. Everything above ships as adaptive DASH, video and audio apart. Tubcal keeps 360p as an instant floor and, for each higher rendition, parses the stream's <code>sidx</code> index into byte-range segments and synthesizes an HLS playlist around them; <code>hls.js</code> muxes the two in the browser, fetching straight from googlevideo through a segment proxy.</p>
-        <div class="ladder-diag" aria-label="Quality ladder">
-          <div class="ld-row"><span class="ld-tag">360p</span><div class="ld-box muxed">one muxed stream (itag 18) — plays instantly</div></div>
-          <div class="ld-row"><span class="ld-tag">480p–1080p</span>
-            <div class="ld-chain">
-              <div class="ld-box">DASH video-only (avc1) + original-language AAC</div>
-              <div class="ld-box">fmp4.py reads each <code>sidx</code> → byte ranges</div>
-              <div class="ld-box">feeds.py serves a master + <code>#EXT-X-BYTERANGE</code> playlists</div>
-              <div class="ld-box lit">hls.js muxes in the browser, native seeking</div>
-            </div>
-          </div>
-          <div class="ld-row"><span class="ld-tag">live</span><div class="ld-box">no DASH — stays on YouTube's own muxed HLS</div></div>
-        </div>
-        <p class="dim">Dubbed and DRC audio tracks are dropped; only the creator's original track is kept. A resolve that only yields the 360p floor is cached briefly, so it heals itself on the next open.</p>
-
-        <h3 class="sub" id="edition-how">The Edition never computes on the request path</h3>
-        <p>A background thread builds one JSON payload per day into the <code>editions</code> table; <code>GET /api/edition/latest</code> is a single row read. Clustering (<code>brain/cluster.py</code>) is pure functions — canonical-URL hard-links, then greedy centroid clustering over unit vectors at a strict cosine threshold (0.80) — and has the deepest test coverage in the repo. Model synthesis is capped at six calls per build, time-boxed, and gated by a citation validator with a template fallback, so unvalidated model output can't reach a page. The lede alone gets a transcript block: if its top video is already in The Archive, the copy desk reads what was actually said.</p>
-        <div class="rungs-m">
-          <div><span class="kicker">nothing installed</span><b>Wire edition</b><span>hard-link clusters, template prose, every story shows its numbers</span></div>
-          <div><span class="kicker">+ numpy + embed model</span><b>Semantic clusters</b><span>the same story found across rooms</span></div>
-          <div><span class="kicker">+ chat model</span><b>Edited</b><span>grounded synthesis with citations</span></div>
-        </div>
-
-        <h3 class="sub" id="archive-how">The Archive answers in two passes</h3>
-        <p>A retrieved chunk is a ~45-second keyhole, and the sentence that answers the question is often just past its edge. So <code>summarize.ask()</code> runs two local LLM calls:</p>
-        <ol class="steps">
-          <li><b>Retrieve.</b> Embed the question; brute-force cosine over every chunk vector in SQLite; keep the top 12.</li>
-          <li><b>Zoom.</b> The model sees the numbered excerpts and names (JSON only, temperature 0) the ≤ 3 worth a closer read (<code>TUBCAL_BRAIN_ASK_EXPAND</code>).</li>
-          <li><b>Re-read.</b> Those come back with two chunks either side (~± 90 s), deduped so no passage is sent twice, each with its provenance — title, channel, timestamps, position in the video, watch date, rewatch count.</li>
-          <li><b>Answer.</b> The model writes the answer with citations; the deep-read ones are ringed in the UI. Anything malformed from the zoom pass falls back to the top-scoring excerpts — validate model output, never trust it.</li>
-        </ol>
-
-        <h3 class="sub" id="safety">Untrusted HTML, the editor sandbox, lazy imports</h3>
-        <p><b>Untrusted HTML is never injected.</b> Comments and descriptions from YouTube, HN and AniList are walked with an allow-list into React elements — which is also what lets a timestamp seek, or a link to another video open in the player.</p>
-        <p><b>The editor is sandboxed.</b> Every client-supplied path resolves against <code>EDITOR_ROOT</code> and is rejected if it escapes — traversal, absolute paths, symlinks out. Writes are atomic (temp file + <code>os.replace</code>) behind an mtime precondition, so a stale buffer gets a conflict instead of clobbering your file; <code>:w!</code> forces. Try the rule:</p>
-        <div class="pathtest glass">
-          <div class="pt-row">
-            <label for="pt-root">EDITOR_ROOT</label><input id="pt-root" type="text" value="/home/you/Projects" spellcheck="false" />
-          </div>
-          <div class="pt-row">
-            <label for="pt-in">client path</label><input id="pt-in" type="text" value="lantern/src/main.rs" spellcheck="false" />
-          </div>
-          <div class="pt-try" id="pt-try"></div>
-          <div class="pt-out" id="pt-out" aria-live="polite"></div>
-          <p class="pt-foot dim">A symlink inside the root that points outside it is caught the same way: <code>resolve()</code> follows it first. That part needs a real filesystem, so it isn't simulated here.</p>
-        </div>
-        <p><b>Heavy dependencies are lazy.</b> anipy, weeb-cli, numpy, faster-whisper, rapidfuzz and flask-sock are imported inside the function that needs them and guarded — which is what lets minimal runtimes, down to the Android/Chaquopy build, boot at all.</p>
-      </section>
-
-      <!-- ══ 10 API reference ═════════════════════════════════════════ -->
-      <section class="msec" id="api" data-section>
-        <header class="tc-sectionhead" style="--sec-c: var(--c-hn)">
-          <span class="plate">10</span><span class="kicker">server/api/*</span><h2>API reference</h2>
-          <p class="dek">Every route the Flask app registers, read straight out of the blueprints. The API is for the app's own UI — it binds to <code>127.0.0.1</code> and has no auth of its own — but it's plain JSON, so it's easy to script against locally.</p>
-        </header>
-        <div class="prose">
-          <div class="envelope">
-            <div class="codeblock"><div class="cb-head"><span>success</span></div><pre>{ <span class="k">"ok"</span>: true,  <span class="k">"data"</span>: { … } }</pre></div>
-            <div class="codeblock"><div class="cb-head"><span>failure</span></div><pre>{ <span class="k">"ok"</span>: false, <span class="k">"error"</span>: <span class="s">"message"</span> }</pre></div>
-          </div>
-          <p class="dim">Paths use Flask's converters — <code>&lt;int:id&gt;</code>, <code>&lt;path:item_id&gt;</code>. <b>query</b> lists the parameters a handler reads from <code>request.args</code>; <b>body</b> the JSON keys a write reads. The list is generated by <code>docs/tools/extract_routes.py</code>.</p>
-        </div>
-        <div class="api-ctl glass">
-          <div class="api-search"><span data-icon="search"></span><input id="api-q" type="search" placeholder="Filter by path, handler or description…" autocomplete="off" spellcheck="false" aria-label="Filter routes" /></div>
-          <div class="api-chips" id="api-methods" role="group" aria-label="Methods"></div>
-          <div class="api-chips" id="api-bps" role="group" aria-label="Blueprints"></div>
-          <span class="api-count" id="api-count" aria-live="polite"></span>
-        </div>
-        <div class="api-list" id="api-list"></div>
-      </section>
-
-      <!-- ══ 11 Project layout ════════════════════════════════════════ -->
-      <section class="msec" id="layout" data-section>
-        <header class="tc-sectionhead" style="--sec-c: var(--c-editor)">
-          <span class="plate">11</span><span class="kicker">Where everything lives</span><h2>Project layout</h2>
-          <p class="dek">Open a folder, pick a file — the note on the right says what it's for, with a link to the source.</p>
-        </header>
-        <div class="tree-wrap">
-          <div class="ftree glass" id="ftree" role="tree" aria-label="Repository"></div>
-          <div class="fnote glass" id="fnote" aria-live="polite"></div>
-        </div>
-        <div class="prose">
-          <h3>Adding a room</h3>
-          <p>Three edits kept in sync: an entry in <code>frontend/src/lib/rooms.js</code>, a component in <code>pages/</code>, and a route in <code>App.jsx</code> — plus the id in <code>config.ROOM_IDS</code> so the backend agrees.</p>
-          <h3>Adding a source</h3>
-          <p><code>server/sources/hackernews.py</code> is the reference pattern: <code>normalize(item)</code>, <code>get_feed()</code>, <code>search()</code>, <code>get_item()</code>, each wrapped in <code>cache.cached()</code>. New external fetches go through <code>httpc.py</code>, with a TTL constant added to <code>config.py</code>.</p>
-        </div>
-      </section>
-
-      <!-- ══ 12 Develop ═══════════════════════════════════════════════ -->
-      <section class="msec" id="develop" data-section>
-        <header class="tc-sectionhead" style="--sec-c: var(--c-dev)">
-          <span class="plate">12</span><span class="kicker">Hacking on it</span><h2>Develop</h2>
-          <p class="dek">Two servers in dev; one port in production mode, where Flask serves <code>frontend/dist</code>.</p>
-        </header>
-        <div class="prose">
-          <div class="codeblock">
-            <div class="cb-head"><span>dev mode</span><button class="copy"></button></div>
-<pre><span class="k">uv run python main.py</span>        <span class="c"># API on :5000</span>
-<span class="k">cd frontend &amp;&amp; npm run dev</span>   <span class="c"># UI on :5173, /api proxied</span>
-
-<span class="k">uv run pytest</span>                <span class="c"># backend tests</span>
-<span class="k">uv run pytest tests/test_api.py::test_name -q</span>   <span class="c"># a single test</span></pre>
-          </div>
-          <p>In production mode a UI change needs <code>npm run build</code> and a hard refresh, and a backend change needs a restart. There is no linter or formatter configured, and no frontend tests. The deepest test coverage sits where a bug would be silent: edition clustering, editor path containment, the fMP4 index parser, anonymous YouTube reads, and the pure AniList helpers. Tests point the app at a throwaway database through the <code>client</code> fixture — they never touch <code>data/tubcal.db</code>.</p>
-          <h3>Conventions</h3>
-          <ul class="feature-list compact">
-            <li>API endpoints return <code>ok(data)</code> / <code>err(msg, status)</code> — never a bare <code>jsonify</code>.</li>
-            <li>New external fetches go through <code>server/httpc.py</code> and are wrapped in <code>server/cache.py</code> with a TTL constant in <code>server/config.py</code>.</li>
-            <li>Anonymous reads use <code>anonymous=True</code>; every YouTube call site is either anonymous or authenticated.</li>
-            <li>Configuration is env-driven through <code>config.py</code>; runtime settings live in the DB and are read with <code>db.get_setting()</code>. All DB access goes through <code>db.py</code> — there is no ORM.</li>
-            <li>Heavy or native dependencies are imported lazily inside the function that needs them, never at module top level.</li>
-            <li>A room's view state belongs in the query string (<code>useParamState</code> in <code>lib/urlState.js</code>), not in <code>useState</code>.</li>
-            <li>Component CSS reads the design tokens through <code>var(--token)</code> — that's how every skin restyles it for free, down to the editor buffer.</li>
-          </ul>
-          <h3>These docs</h3>
-          <p>This site is plain HTML, CSS and JavaScript in <code>docs/</code> — no build step, no dependencies, fonts self-hosted. GitHub Pages serves it from the <code>/docs</code> folder of <code>main</code>. When the API changes, regenerate the reference with <code>python docs/tools/extract_routes.py</code>.</p>
+          <h3>Clearing your history</h3>
+          <p><b>Settings → Watch history</b> shows how many videos Tubcal remembers and can clear them. The history is only used for suggestions and for resuming videos, and it stays on your computer.</p>
         </div>
       </section>
 
       <!-- ══ 13 Troubleshooting ═══════════════════════════════════════ -->
       <section class="msec" id="troubleshooting" data-section>
         <header class="tc-sectionhead" style="--sec-c: var(--danger)">
-          <span class="plate">13</span><span class="kicker">When a room goes quiet</span><h2>Troubleshooting</h2>
-          <p class="dek">Most “broken” rooms are a missing optional piece reporting itself unavailable, by design.</p>
+          <span class="plate">13</span><span class="kicker">Help</span><h2>Troubleshooting</h2>
+          <p class="dek">Most problems go away after <code>tubcal restart</code> or <code>tubcal update</code>. These are the common ones.</p>
         </header>
         <div class="faq">
-          <details><summary>A UI change doesn't show up.</summary><p>In production mode Flask serves the built <code>frontend/dist</code>. Run <code>cd frontend &amp;&amp; npm run build</code> and hard-refresh. Backend changes need a server restart. In dev, run the Vite server on :5173 instead.</p></details>
-          <details><summary>The Anime channel says to connect AniList.</summary><p>AniList refuses unauthenticated queries, so the whole channel needs a connected account. Register an API client on AniList with the redirect URI shown in <b>Settings → Connections</b> (see <a href="#accounts">Connecting accounts</a>). AniList tokens last about a year and have no refresh flow — when one expires, reconnect.</p></details>
-          <details><summary>An episode won't play.</summary><p>The scrapers break when their sites change; the fix usually ships as an <code>anipy-api</code> release, which Tubcal installs on startup — restart the app. If you set <code>TUBCAL_AUTO_UPDATE=0</code>, update it yourself. If the first scraper can't resolve, the second one is tried automatically; you can prefer one with <code>TUBCAL_ANIME_PROVIDER</code>.</p></details>
-          <details><summary>The Dispatch has no scores and flat comments.</summary><p>That's Reddit logged out: it only serves RSS to anonymous clients. Create an OAuth <em>web app</em> at reddit.com/prefs/apps and connect it in Settings for full data.</p></details>
-          <details><summary>Videos only play at 360p.</summary><p>360p is the instant floor; higher renditions come from YouTube's DASH streams. A resolve that only produced the floor is cached briefly and heals on the next open. Make sure <code>yt-dlp</code> is on your PATH and reasonably current.</p></details>
-          <details><summary>The Archive or the written Edition says models are unavailable.</summary><p>Install the extra (<code>uv sync --extra brain</code>), start Ollama, and pull the models named in Settings (by default <code>nomic-embed-text</code> and <code>qwen3.5:9b</code>). Without them the Edition still prints a wire edition. If ML wheels fail to install, use Python 3.12 rather than a newer system Python.</p></details>
-          <details><summary>The Composing Room has no terminal or completion.</summary><p>The terminal and the LSP bridge need <code>uv sync --extra editor</code>; completion needs a language server on your PATH. Without them it's still a full editor. It can only reach <code>TUBCAL_EDITOR_ROOT</code> (default <code>~/Projects</code>).</p></details>
-          <details><summary>The GitHub room stops loading.</summary><p>Unauthenticated GitHub allows 60 requests an hour per IP. Paste a classic personal access token into Settings, or set <code>TUBCAL_GITHUB_TOKEN</code>, for 5,000.</p></details>
-          <details><summary>Search says every Invidious instance failed.</summary><p>Search goes to YouTube's own InnerTube endpoint first; Invidious is only the fallback. If you need the fallback to work, point <code>TUBCAL_INVIDIOUS</code> at instances you trust.</p></details>
+          <details><summary>The terminal says <code>tubcal: command not found</code>.</summary><p>Open a new terminal window, or log out and back in. If it's still not found, use the full path: <code>~/.local/bin/tubcal</code>.</p></details>
+          <details><summary>The page won't open.</summary><p>Run <code>tubcal status</code> to see whether Tubcal is running, then <code>tubcal restart</code>. If it still doesn't open, <code>tubcal logs</code> shows what went wrong.</p></details>
+          <details><summary>A video won't play, or is stuck at low quality.</summary><p>Close it and open it again. Tubcal gets a fresh stream each time, and a video stuck at 360p usually plays in full quality on the second try. If many videos fail at once, run <code>tubcal update</code>.</p></details>
+          <details><summary>An episode won't play.</summary><p>Anime sites change often. Try the other audio (Sub or Dub), then restart Tubcal, which checks for fixes when it starts. The player shows what each site answered. If nothing works, try again in a day or two; fixes usually come quickly.</p></details>
+          <details><summary>The Anime asks me to connect AniList.</summary><p>The Anime needs an AniList account; see <a href="#accounts">Accounts</a>. If you connected before, the connection may have expired (they last about a year), so connect again.</p></details>
+          <details><summary>Reddit shows no scores, and comments aren't threaded.</summary><p>That's how Reddit looks without signing in. <a href="#accounts">Connect your Reddit account</a> to get scores and threaded comments.</p></details>
+          <details><summary>The Edition only shows headlines.</summary><p>Without the AI, that's all it shows. For written stories, set up the <a href="#ai">optional AI</a>. A new paper is made each morning after the hour set in <b>Settings → The Edition</b>; press <b>Recompose</b> there to make one now.</p></details>
+          <details><summary>The Archive says it isn't available.</summary><p>It needs the Archive room (<code>tubcal add archive</code>), plus Ollama and its two models; see <a href="#ai">Optional AI</a>. <b>Settings → The Archive</b> shows which piece is missing.</p></details>
+          <details><summary>The GitHub room stops loading.</summary><p>GitHub answers only 60 requests an hour from someone who isn't signed in, and the room shows how many are left. Wait for the count to refill, or <a href="#accounts">link your GitHub account</a>, which raises the limit to 5,000 an hour.</p></details>
+          <details><summary>A room or a whole channel is missing.</summary><p>Run <code>tubcal rooms</code> to see which rooms you installed. Add a missing one with <code>tubcal add</code> and its name, for example <code>tubcal add reddit</code>, then reload the page. If it's installed but hidden, switch it on in <b>Settings → Rooms</b>.</p></details>
+          <details><summary>Searching YouTube fails.</summary><p>Check your internet connection and try again in a minute. YouTube sometimes refuses searches for a short while, and the backup mirrors are often busy, so a second try usually works.</p></details>
+          <details><summary>The installer stopped with an error.</summary><p>Run it again. If it keeps failing, its logs are in <code>~/.local/state/tubcal/</code>; please include them if you report the problem.</p></details>
+          <details><summary>None of these help.</summary><p>Open an issue on <a href="https://github.com/Shio-T0/Tubcal/issues">GitHub</a>. Say what you did and what happened, and paste the output of <code>tubcal status</code>.</p></details>
         </div>
       </section>
 
-      <!-- ══ 14 License ═══════════════════════════════════════════════ -->
+      <!-- ══ 14 Questions ═════════════════════════════════════════════ -->
+      <section class="msec" id="faq" data-section>
+        <header class="tc-sectionhead" style="--sec-c: var(--c-github)">
+          <span class="plate">14</span><span class="kicker">Help</span><h2>Questions</h2>
+        </header>
+        <div class="faq faq-q">
+          <details><summary>Is it free?</summary><p>Yes. There's no paid version and no subscription. It's free software, so you can also share it and change it.</p></details>
+          <details><summary>Does it run on Windows or macOS?</summary><p>No, only on Linux for now. Apple Silicon Macs running Fedora Asahi Remix work, since that's Linux.</p></details>
+          <details><summary>Is there a phone app?</summary><p>There's an Android version with its own phone layout, and it runs entirely on the phone. It isn't in any app store yet, so you'd have to build it from the source code.</p></details>
+          <details><summary>Do I need a YouTube account?</summary><p>No. You can follow channels by name or link. Connecting an account only imports the subscriptions you already have.</p></details>
+          <details><summary>Can YouTube see what I watch?</summary><p>The videos still come from YouTube's servers, so YouTube sees your internet connection requesting them. But Tubcal never signs in or keeps cookies, so nothing goes into an account history and your viewing isn't tied together into a profile.</p></details>
+          <details><summary>Can I install only the parts I want?</summary><p>Yes. The installer asks which rooms you want, and a room you leave out isn't downloaded. You can add or remove rooms later with <code>tubcal add</code> and <code>tubcal remove</code>; see <a href="#everyday">Starting &amp; updating</a>.</p></details>
+          <details><summary>Can other people in my home use it?</summary><p>Tubcal is made for one person on one computer. Other devices can't open it, and there are no user accounts to share.</p></details>
+          <details><summary>Does it work offline?</summary><p>It needs the internet to get new videos and posts. When a site can't be reached, Tubcal shows what it fetched last time instead of an error, and The Archive's transcripts are always available.</p></details>
+          <details><summary>How do I move it to a new computer?</summary><p>Install Tubcal on the new computer, stop it, and copy your <code>data</code> folder across. See <a href="#privacy">Backing up</a>.</p></details>
+        </div>
+      </section>
+
+      <!-- ══ 15 License ═══════════════════════════════════════════════ -->
       <section class="msec" id="license" data-section>
         <header class="tc-sectionhead" style="--sec-c: var(--paper-faint)">
-          <span class="plate">14</span><span class="kicker">The fine print</span><h2>License</h2>
+          <span class="plate">15</span><span class="kicker">Legal</span><h2>License</h2>
         </header>
         <div class="prose">
-          <p>Tubcal is free software under the GNU General Public License, version 3 or (at your option) any later version. It comes with no warranty. See <a href="https://github.com/Shio-T0/Tubcal/blob/main/LICENSE">LICENSE</a>. Anime playback builds on other GPL-3.0 projects (ani-cli's method, anipy-api, weeb-cli), credited in <a href="https://github.com/Shio-T0/Tubcal/blob/main/THIRD_PARTY_NOTICES.md">THIRD_PARTY_NOTICES.md</a>. The fonts on this site (Fraunces, Schibsted Grotesk, IBM Plex Mono, VT323, Archivo, Space Grotesk, Inter) are under the SIL Open Font License and are served from this repository.</p>
+          <p>Tubcal is free software under the GNU General Public License, version 3 or (at your option) any later version. You can use it, share it and change it, and if you share a changed version, you must share its source code too. It comes with no warranty. See the <a href="https://github.com/Shio-T0/Tubcal/blob/main/LICENSE">licence</a>.</p>
+          <p>Anime playback builds on other free projects (ani-cli, anipy-api and weeb-cli), credited in <a href="https://github.com/Shio-T0/Tubcal/blob/main/THIRD_PARTY_NOTICES.md">THIRD_PARTY_NOTICES.md</a>. <b>Settings → About</b> lists the licence and every library Tubcal uses.</p>
         </div>
       </section>
 
       <footer class="sitefoot man-foot">
         <div class="tc-wordmark">Tubcal<em>.</em></div>
-        <p><em>Runs on localhost, for one person, on purpose.</em></p>
-        <p><a href="./">The tour</a> · <a href="https://github.com/Shio-T0/Tubcal">github.com/Shio-T0/Tubcal</a></p>
+        <p><a href="./">The tour</a> · <a href="https://github.com/Shio-T0/Tubcal">github.com/Shio-T0/Tubcal</a> · Technical details are in the <a href="https://github.com/Shio-T0/Tubcal#readme">README</a>.</p>
       </footer>
     </main>
   </div>
 
   <script src="assets/js/data.js"></script>
-  <script src="assets/js/routes.js"></script>
   <script src="assets/js/site.js"></script>
   <script src="assets/js/manual.js"></script>
 </body>

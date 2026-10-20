@@ -16,6 +16,8 @@ import { SegmentedControl } from '../components/ui/index.jsx';
 import {
   AnimeCard, FavToggle, InfiniteSentinel, useInfinite, useParamState,
 } from '../components/anime/shared.jsx';
+import { SaveButton } from '../components/ui/ItemActions.jsx';
+import { anilistEntityItem } from '../lib/saveable.js';
 import s from './studio.module.css';
 
 export default function AnimeStudio() {
@@ -69,6 +71,10 @@ export default function AnimeStudio() {
               </div>
               <div className={s.actions}>
                 {me.data && <FavToggle kind="studio" id={st.id} initial={st.is_favourite} count={st.favourites} />}
+                <SaveButton
+                  label
+                  item={anilistEntityItem('studio', { id: st.id, name: st.name, sub: st.animation ? 'Animation studio' : 'Studio' })}
+                />
                 {st.site_url && <a className={s.source} href={st.site_url} target="_blank" rel="noreferrer">AniList <ExternalLink size={11} /></a>}
               </div>
             </div>

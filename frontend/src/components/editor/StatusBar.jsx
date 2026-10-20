@@ -3,7 +3,7 @@
 
 import { GitBranch } from 'lucide-react';
 
-import { languageName } from './cm/languages.js';
+import { languageName } from '../../lib/languages.js';
 import s from './editor.module.css';
 
 const MODE_CLASS = {

@@ -6,7 +6,7 @@
 .room {
   display: flex;
   flex-direction: column;
-  height: max(520px, calc(100vh - 190px));
+  height: max(520px, calc(100vh - 96px));
   border: 1px solid var(--rule);
   border-radius: var(--r-card);
   background: color-mix(in srgb, var(--ink-2) 72%, transparent);
@@ -634,4 +634,26 @@
 @media (max-width: 900px) {
   .whichKeyGrid { grid-template-columns: repeat(2, auto); }
   .sidebar { position: absolute; z-index: 5; height: 100%; background: var(--ink-2); }
+}
+
+/* the active file's bookmark, at the end of its pane's tab strip */
+.tabStrip .tabSave {
+  position: sticky;
+  right: 0;
+  flex: none;
+  align-self: center;
+  width: 28px;
+  height: 26px;
+  margin-left: auto;
+  border: 0;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--ink-2) 90%, transparent);
+  backdrop-filter: none;
+  color: var(--paper-faint);
+  opacity: 1;
+}
+.tabStrip .tabSave:hover {
+  color: var(--paper);
+  background: var(--surface-hover);
+  transform: none;
 }

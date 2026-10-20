@@ -2,16 +2,19 @@ import { useEffect, useRef, useState } from 'react';
 import { Check } from 'lucide-react';
 
 import { api } from '../../api/client.js';
+import { hasModule } from '../../lib/modules.js';
 import { useSubscriptions, useToast } from '../../state.jsx';
 import { Button, SegmentedControl, Spinner } from '../ui/index.jsx';
 import Modal from './Modal.jsx';
 import s from './Modal.module.css';
 
+// The platforms whose room this copy has (lib/modules.js): each one resolves what
+// you type through its own module.
 const PLATFORMS = [
   { value: 'youtube', label: 'YouTube' },
   { value: 'reddit', label: 'Reddit' },
   { value: 'github', label: 'GitHub' },
-];
+].filter((pl) => hasModule(pl.value));
 
 const PLACEHOLDERS = {
   youtube: '@handle, channel URL, or UC… id',
@@ -25,7 +28,7 @@ export default function AddSubscriptionModal({
   initialPlatform = 'youtube',
   initialInput = null,
 }) {
-  const [platform, setPlatform] = useState(initialPlatform);
+  const [platform, setPlatform] = useState(hasModule(initialPlatform) ? initialPlatform : PLATFORMS[0]?.value);
   const [input, setInput] = useState('');
   const [preview, setPreview] = useState(null);
   const [resolving, setResolving] = useState(false);

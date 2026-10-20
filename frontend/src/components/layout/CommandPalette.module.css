@@ -152,3 +152,17 @@
   color: var(--text-muted);
   flex: none;
 }
+
+/* a channel's number, set like the channel keys */
+.chNo {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  background: var(--ch-c);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+}

@@ -1,12 +1,18 @@
 // Saved — everything you bookmarked, filterable by room. Videos are rows you can
-// play (or Play all); posts, stories and repos open their reading pages. Swipe a
-// row left — or long-press it — to unsave.
+// play (or Play all); posts, stories and repos open their reading pages; anime
+// titles, people, playlists, channels and subreddits open their own pages (the
+// desktop saves those too, and a data sync brings them here). Swipe a row left —
+// or long-press it — to unsave.
 
-import { useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Bookmark, BookmarkX, Play } from 'lucide-react';
 
+import { KINDS, kindOf } from '@pc/lib/saveable.js';
 import { ago } from '@pc/lib/time.js';
 import { useSaved } from '@pc/state.jsx';
+
+import { openExternal } from '../lib/bridge.js';
 
 import { ActionSheet, AppBar, Chips, Empty, useLongPress } from '../shell/Shell.jsx';
 import { useOpener } from './discuss.jsx';
@@ -17,10 +23,17 @@ import s from './saved.module.css';
 const ROOMS = [
   { key: 'all', label: 'Everything' },
   { key: 'youtube', label: 'Videos' },
+  { key: 'anime', label: 'Anime' },
   { key: 'hackernews', label: 'Hacker News' },
   { key: 'reddit', label: 'Reddit' },
   { key: 'github', label: 'GitHub' },
+  { key: 'dev', label: 'Workbench' },
+  { key: 'page', label: 'Pages' },
 ];
+// Kinds that only make sense on the desktop (the editor isn't on the phone).
+const DESKTOP_ONLY = new Set(['file']);
+// Kinds that open in a reader rather than at an address.
+const READERS = new Set(['video', 'post', 'story', 'repo', 'release', 'event', 'podcast', 'article', 'doc', 'link']);
 const TAG = { youtube: 'Screening Room', reddit: 'The Dispatch', hackernews: 'The Wire', github: 'GitHub' };
 
 function Swipe({ onRemove, children }) {
@@ -54,7 +67,7 @@ function TextCard({ item, onOpen, onMenu }) {
   const lp = useLongPress(() => onMenu(item));
   return (
     <button type="button" className={s.card} onClick={() => onOpen(item)} {...lp} data-platform={item.platform} data-reveal>
-      <span className={s.tag}>{TAG[item.platform] || item.platform}</span>
+      <span className={s.tag}>{(READERS.has(kindOf(item)) && TAG[item.platform]) || KINDS[kindOf(item)].label}</span>
       <b>{item.title}</b>
       <span className={s.meta}>{[item.source, item.author, item.published_at ? ago(item.published_at) : null].filter(Boolean).join(' · ')}</span>
     </button>
@@ -65,12 +78,22 @@ export default function Saved() {
   const { saved, toggleSaved } = useSaved();
   const [room, setRoom] = useState('all');
   const [menu, setMenu] = useState(null);
-  const [open, pages] = useOpener();
+  const [openReader, pages] = useOpener();
+  const navigate = useNavigate();
+  const open = useCallback((item) => {
+    const kind = kindOf(item);
+    if (kind === 'moment') openReader(item.extra?.video);
+    else if (READERS.has(kind)) openReader(item);
+    else if (item.url?.startsWith('/')) navigate(item.url);
+    // GitHub issues, pull requests, commits and people have their pages on the
+    // desktop only; here they open on github.com.
+    else if (item.url) openExternal(item.url);
+  }, [openReader, navigate]);
   const playAll = usePlayAll();
-  const items = Object.values(saved).reverse();
+  const items = Object.values(saved).filter((i) => !DESKTOP_ONLY.has(kindOf(i))).reverse();
   const counts = items.reduce((m, i) => ({ ...m, [i.platform]: (m[i.platform] || 0) + 1 }), {});
   const shown = room === 'all' ? items : items.filter((i) => i.platform === room);
-  const videos = shown.filter((i) => i.platform === 'youtube');
+  const videos = shown.filter((i) => kindOf(i) === 'video');
 
   return (
     <div>
@@ -85,7 +108,7 @@ export default function Saved() {
       )}
       {shown.map((item) => (
         <Swipe key={item.id} onRemove={() => toggleSaved(item)}>
-          {item.platform === 'youtube'
+          {kindOf(item) === 'video'
             ? <VideoRow item={item} />
             : <TextCard item={item} onOpen={open} onMenu={setMenu} />}
         </Swipe>

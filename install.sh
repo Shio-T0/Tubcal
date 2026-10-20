@@ -7,10 +7,17 @@
 #   curl -fsSL https://raw.githubusercontent.com/Shio-T0/Tubcal/main/install.sh | bash
 #                       from anywhere: clones into ~/.local/share/tubcal/app
 #
+# You pick the rooms to install (modules.ini lists them); a room left out is
+# never downloaded: the clone is sparse and partial, so its files, its Python
+# packages and its pages stay off this machine. `tubcal add <room>` and
+# `tubcal remove <room>` change the choice later.
+#
 # In order: distro packages (listed and asked about first; sudo is used for
-# nothing else) → uv → Node.js → Python + the backend (uv sync) → the frontend
-# build → a private, self-updating yt-dlp → the `tubcal` launcher, app-menu
-# entry and optional login autostart → a self-test against a throwaway database.
+# nothing else) → Tubcal itself (only the rooms you picked) → uv → Node.js →
+# Python + the backend (uv sync) → the frontend build → a private,
+# self-updating yt-dlp (with the Screening Room) → the `tubcal` launcher,
+# app-menu entry and optional login autostart → a self-test against a
+# throwaway database.
 #
 # Fedora (Fedora Asahi Remix on Apple Silicon included), RHEL/Alma/Rocky,
 # Debian/Ubuntu/Mint/Pop!_OS, Arch/Manjaro/EndeavourOS/CachyOS, openSUSE,
@@ -51,8 +58,9 @@ CONF=$TUBCAL_HOME/install.conf
 
 # ── arguments ────────────────────────────────────────────────────────────────
 
-MODE=install YES=0 NO_SUDO=0 PURGE=0 ANIM=1 NOCOLOR_FLAG=0 CLONE_DIR=""
+MODE=install YES=0 NO_SUDO=0 PURGE=0 ANIM=1 NOCOLOR_FLAG=0 CLONE_DIR="" EXACT=""
 declare -A FORCE=()
+CHANGE_ADD=() CHANGE_REMOVE=() # --add / --remove: rooms, as typed
 
 usage() {
   cat <<'EOF'
@@ -63,25 +71,39 @@ Tubcal installer
 
 Options
   -y, --yes            no questions: the defaults, or what you chose last time
-      --with LIST      switch on, comma-separated: editor,archive,desktop,autostart,extras
+      --rooms LIST     install exactly these rooms, comma-separated (see below)
+      --with LIST      switch on rooms or options, comma-separated
       --without LIST   switch off any of the same
       --dir DIR        where to clone Tubcal when not run from a checkout
                        (default ~/.local/share/tubcal/app)
       --no-sudo        never ask for root: user-space installs only
       --update         re-sync, rebuild and restart with the saved choices
                        (what `tubcal update` runs after pulling)
+      --add LIST       add rooms to an installed Tubcal (`tubcal add`)
+      --remove LIST    take rooms out of it (`tubcal remove`)
+      --list           the rooms, and which are installed (`tubcal rooms`)
       --uninstall      remove the launcher, menu entry, service and private tools
       --purge          with --uninstall: also delete a cloned app and its data
       --no-anim        skip the tuning-in animation
       --no-color       plain output (NO_COLOR is honoured too)
   -h, --help           this
 
-Components
-  editor     The Composing Room's terminal and LSP bridge (flask-sock)
-  archive    The Archive: local transcription with faster-whisper (~300 MB)
+Rooms (a room you leave out isn't downloaded)
+  edition     The Edition: a daily paper from the rooms you follow
+  hackernews  The Wire: Hacker News (also: wire, hn)
+  reddit      The Dispatch: Reddit (also: dispatch)
+  editor      The Composing Room: a code editor with a terminal
+  dev         The Workbench: one manual per programming language (also: workbench)
+  github      GitHub: repos, releases, your inbox
+  youtube     The Screening Room: YouTube (also: screening)
+  anime       The Anime: anime and your AniList list
+  archive     The Archive: local transcription (~300 MB; needs youtube)
+
+Options
   desktop    an app-menu entry and icon
   autostart  start the server when you log in
-  extras     notify-send pings before streams go live, ripgrep for the editor
+  extras     distro packages the rooms use: notify-send (live-stream pings),
+             ripgrep (the editor's search)
 
 Environment
   TUBCAL_REPO, TUBCAL_BRANCH   what to clone (default: GitHub, main)
@@ -97,14 +119,23 @@ parse_args() {
     case $1 in
       -y|--yes) YES=1 ;;
       --with|--without)
+        # checked against the rooms once the manifest is read (apply_force)
         [[ $# -ge 2 ]] || { echo "$1 needs a list" >&2; exit 2; }
         local IFS=,
         for c in $2; do
-          case $c in editor|archive|desktop|autostart|extras) ;; *) echo "unknown component: $c" >&2; exit 2 ;; esac
+          [[ -n $c ]] || continue
           [[ $1 == --with ]] && FORCE[$c]=1 || FORCE[$c]=0
         done
         shift ;;
-      --with=*|--without=*) set -- "${1%%=*}" "${1#*=}" "${@:2}"; continue ;;
+      --rooms|--modules) [[ $# -ge 2 ]] || { echo "$1 needs a list" >&2; exit 2; }; EXACT=${2//,/ }; [[ -n $EXACT ]] || EXACT=" "; shift ;;
+      --add|--remove)
+        [[ $# -ge 2 ]] || { echo "$1 needs a list of rooms" >&2; exit 2; }
+        MODE=change
+        local IFS=,
+        for c in $2; do [[ $1 == --add ]] && CHANGE_ADD+=("$c") || CHANGE_REMOVE+=("$c"); done
+        shift ;;
+      --with=*|--without=*|--rooms=*|--modules=*|--add=*|--remove=*) set -- "${1%%=*}" "${1#*=}" "${@:2}"; continue ;;
+      --list) MODE=list ;;
       --dir) [[ $# -ge 2 ]] || { echo "--dir needs a path" >&2; exit 2; }; CLONE_DIR=$2; shift ;;
       --dir=*) CLONE_DIR=${1#*=} ;;
       --no-sudo) NO_SUDO=1 ;;
@@ -465,126 +496,361 @@ locate_app() {
   fi
 }
 
-# ── choices ──────────────────────────────────────────────────────────────────
+# ── rooms ────────────────────────────────────────────────────────────────────
+#
+# The rooms an install can leave out (modules.ini at the repo root), each with
+# the files, Python packages, private tools and distro packages that are its
+# alone. Piped from curl there's no checkout to read yet, so until there is one
+# the menu reads embedded_manifest (at the end of this file): modules.ini
+# without the paths. tests/test_modules.py keeps the two equal.
 
-IDS=(core editor archive desktop autostart extras)
+declare -A MAN=() # "<id>.<key>" → value; list values are space-separated
+MOD_IDS=()        # the rooms, in the manifest's order
+MANIFEST_FROM=""
+
+read_manifest() { # read_manifest FILE
+  local line sec="" key="" val
+  local skip='^[[:space:]]*([#;]|$)' head='^\[([A-Za-z0-9_-]+)\][[:space:]]*$'
+  local more='^[[:space:]]+([^[:space:]].*)$' pair='^([a-z_]+)[[:space:]]*=[[:space:]]*(.*)$'
+  MAN=() MOD_IDS=()
+  while IFS= read -r line || [[ -n $line ]]; do
+    line=${line%$'\r'}
+    [[ $line =~ $skip ]] && continue
+    if [[ $line =~ $head ]]; then sec=${BASH_REMATCH[1]} key=""; continue; fi
+    [[ -n $sec ]] || continue
+    if [[ $line =~ $more ]]; then # the next line of a value
+      [[ -n $key ]] && MAN[$sec.$key]+="${MAN[$sec.$key]:+ }${BASH_REMATCH[1]}"
+      continue
+    fi
+    [[ $line =~ $pair ]] || continue
+    key=${BASH_REMATCH[1]} val=${BASH_REMATCH[2]}
+    MAN[$sec.$key]=${val%%+([[:space:]])}
+    [[ $key == name ]] && MOD_IDS+=("$sec")
+  done <"$1"
+  ((${#MOD_IDS[@]}))
+}
+
+load_manifest() {
+  if [[ -r $APP_DIR/modules.ini ]] && read_manifest "$APP_DIR/modules.ini"; then
+    MANIFEST_FROM=checkout
+  else
+    read_manifest <(embedded_manifest)
+    MANIFEST_FROM=embedded
+  fi
+}
+
+module_id() { # module_id WORD → REPLY: the room it names (its id, an alias or its name)
+  local w=${1,,} id a name
+  w=${w#the } w=${w// /}
+  for id in "${MOD_IDS[@]}"; do
+    name=${MAN[$id.name],,} name=${name#the } name=${name// /}
+    if [[ $w == "$id" || $w == "$name" ]]; then REPLY=$id; return 0; fi
+    for a in ${MAN[$id.aliases]:-}; do [[ $w == "$a" ]] && { REPLY=$id; return 0; }; done
+  done
+  return 1
+}
+
+bad_room() {
+  echo "unknown room: $1" >&2
+  echo "rooms: ${MOD_IDS[*]}  (\`tubcal rooms\` lists them)" >&2
+  exit 2
+}
+
+# What a room needs comes with it, and goes when it goes.
+mod_on() { local n; ON[$1]=1; for n in ${MAN[$1.needs]:-}; do ((ON[$n])) || mod_on "$n"; done; }
+mod_off() {
+  local m; ON[$1]=0
+  for m in "${MOD_IDS[@]}"; do
+    ((ON[$m])) && [[ " ${MAN[$m.needs]:-} " == *" $1 "* ]] && mod_off "$m"
+  done
+  return 0
+}
+rooms_on() { # → REPLY: the chosen rooms' ids, space-separated; false when none
+  local id out=()
+  for id in "${MOD_IDS[@]}"; do ((ON[$id])) && out+=("$id"); done
+  REPLY="${out[*]}"
+  ((${#out[@]}))
+}
+room_names() { # room_names ID… → REPLY: "The Wire, The Anime"
+  local id out=""
+  for id in "$@"; do out+="${out:+, }${MAN[$id.name]:-$id}"; done
+  REPLY=$out
+}
+room_list() { # room_list KEY → REPLY: the KEY values (extras, groups, tools, packages) of the chosen rooms
+  local id v out=" "
+  for id in "${MOD_IDS[@]}"; do
+    ((ON[$id])) || continue
+    for v in ${MAN[$id.$1]:-}; do [[ $out == *" $v "* ]] || out+="$v "; done
+  done
+  out=${out# } REPLY=${out% }
+}
+wants_tool() { room_list tools; [[ " $REPLY " == *" $1 "* ]]; }
+
+OPTS=(desktop autostart extras)
 PREV_CLONED=""
 declare -A ON=() LOCKED=()
 PREV_LOADED=0
-
 PREV_PKGS=""
+PREV_ROOMS="" # what the install record says is installed now (for --add / --remove)
 
 load_previous() {
   [[ -r $CONF ]] || return 0
-  local here=$APP_DIR
+  local here=$APP_DIR id
   local EDITOR_X="" ARCHIVE="" DESKTOP="" AUTOSTART="" EXTRAS="" APP_DIR="" CLONED=0
+  local MODULES="" KNOWN_MODULES="" HAS_ROOMS=0
   local UV="" NODE_BIN="" BIN_DIR="" SYSTEMD="" PKGS_ADDED="" INSTALLED_AT=""
   # shellcheck source=/dev/null
   . "$CONF" 2>/dev/null || return 0
   PREV_LOADED=1 PREV_PKGS=$PKGS_ADDED
   # Re-running from inside a clone the installer made: still that clone.
   [[ $APP_DIR == "$here" ]] && PREV_CLONED=$CLONED
-  [[ -n $EDITOR_X ]] && ON[editor]=$EDITOR_X
-  [[ -n $ARCHIVE ]] && ON[archive]=$ARCHIVE
+  grep -q '^MODULES=' "$CONF" && HAS_ROOMS=1
+  for id in "${MOD_IDS[@]}"; do
+    if ((HAS_ROOMS)); then
+      if [[ " $MODULES " == *" $id "* ]]; then ON[$id]=1
+      elif [[ " $KNOWN_MODULES " == *" $id "* ]]; then ON[$id]=0
+      fi # a room newer than the record: its default (default_choices)
+    else
+      ON[$id]=1 # a record from before rooms could be left out: it had them all,
+    fi
+  done
+  ((HAS_ROOMS)) || { [[ -n $ARCHIVE ]] && ON[archive]=$ARCHIVE; } # but The Archive was a choice
   [[ -n $DESKTOP ]] && ON[desktop]=$DESKTOP
   [[ -n $AUTOSTART ]] && ON[autostart]=$AUTOSTART
   [[ -n $EXTRAS ]] && ON[extras]=$EXTRAS
+  rooms_on; PREV_ROOMS=$REPLY
   return 0
 }
 
 default_choices() {
   local id
-  for id in "${IDS[@]}"; do LOCKED[$id]=0; done
-  ON[core]=1 LOCKED[core]=1
-  : "${ON[editor]:=1}"
-  if [[ -z ${ON[archive]:-} ]]; then
-    ON[archive]=0
-    compgen -G "$APP_DIR/.venv/lib/python*/site-packages/faster_whisper" >/dev/null && ON[archive]=1
-  fi
+  for id in "${MOD_IDS[@]}" "${OPTS[@]}"; do LOCKED[$id]=0; done
+  for id in "${MOD_IDS[@]}"; do
+    [[ -n ${ON[$id]:-} ]] && continue
+    case $id in
+      archive) # on by default only where it's already set up
+        ON[archive]=0
+        compgen -G "$APP_DIR/.venv/lib/python*/site-packages/faster_whisper" >/dev/null && ON[archive]=1 ;;
+      # As in Settings → Rooms, where it starts switched off. A checkout you made
+      # yourself already holds every room, so there it starts on, like the rest.
+      github) ON[github]=$((CLONED ? 0 : 1)) ;;
+      *) ON[$id]=1 ;;
+    esac
+  done
   : "${ON[desktop]:=1}"
   : "${ON[autostart]:=0}"
-  if [[ -z ${ON[extras]:-} ]]; then ON[extras]=$CAN_PKG; fi
-  for id in "${!FORCE[@]}"; do ON[$id]=${FORCE[$id]}; done
-  if ((!CAN_PKG)) && ! { has notify-send && has rg; }; then ON[extras]=0 LOCKED[extras]=1; fi
+  : "${ON[extras]:=$CAN_PKG}"
+  apply_force
+  for id in "${MOD_IDS[@]}"; do ((ON[$id])) && mod_on "$id"; done
+  extras_lock
+}
+
+apply_force() { # --rooms, --with and --without
+  local w
+  if [[ -n $EXACT ]]; then
+    for w in "${MOD_IDS[@]}"; do ON[$w]=0; done
+    for w in $EXACT; do module_id "$w" || bad_room "$w"; mod_on "$REPLY"; done
+  fi
+  for w in "${!FORCE[@]}"; do
+    case $w in
+      desktop|autostart|extras) ON[$w]=${FORCE[$w]} ;;
+      *)
+        module_id "$w" || bad_room "$w"
+        if ((FORCE[$w])); then mod_on "$REPLY"; else mod_off "$REPLY"; fi ;;
+    esac
+  done
+}
+
+pkg_bin() { case $1 in notify) REPLY=notify-send ;; ripgrep) REPLY=rg ;; *) REPLY=$1 ;; esac; }
+
+# "extras" are the distro packages the chosen rooms use. Nothing to offer when
+# none of those rooms is chosen, or when there's no package manager to use and
+# they aren't here already.
+extras_lock() {
+  local p missing=0
+  LOCKED[extras]=0
+  room_list packages
+  if [[ -z $REPLY ]]; then LOCKED[extras]=1; return; fi
+  for p in $REPLY; do pkg_bin "$p"; has "$REPLY" || missing=1; done
+  if ((!CAN_PKG && missing)); then ON[extras]=0 LOCKED[extras]=1; fi
 }
 
 declare -A LABEL=(
-  [core]="Tubcal itself"
-  [editor]="Composing Room terminal & LSP"
-  [archive]="The Archive: local transcription"
   [desktop]="App-menu entry & icon"
   [autostart]="Start when I log in"
-  [extras]="Live-stream pings & fast grep"
+  [extras]="Distro extras for the rooms"
 )
 declare -A DESC=(
-  [core]="The backend, the built frontend, and a self-updating yt-dlp."
-  [editor]="A real shell and language servers in the code-editor room."
-  [archive]="Whisper transcribes what you watch, here. Pairs with Ollama."
   [desktop]="Launch Tubcal from your app menu like any other app."
-  [autostart]="The server waits in the background; the app opens instantly."
-  [extras]="A ping before a followed stream goes live; ripgrep for search."
+  [autostart]="The server waits in the background, so the app opens at once."
 )
-side_note() {
+
+extras_desc() { # → REPLY: what the extras would bring, for the rooms chosen
+  local out=() p
+  room_list packages
+  for p in $REPLY; do
+    case $p in
+      notify) out+=("notify-send pings you before a followed stream goes live") ;;
+      ripgrep) out+=("ripgrep speeds up the editor's search") ;;
+    esac
+  done
+  if ((${#out[@]} == 0)); then REPLY="Nothing to add for the rooms you picked."
+  else local IFS=';'; REPLY="${out[*]}"; REPLY="${REPLY//;/; }."; REPLY="${REPLY^}"; fi
+}
+
+side_note() { # side_note ROW → REPLY: the menu's right-hand column
   case $1 in
-    core) REPLY="required" ;;
-    editor) REPLY="flask-sock" ;;
-    archive) REPLY="~300 MB" ;;
     desktop) REPLY="" ;;
     autostart) ((SYSTEMD)) && REPLY="systemd --user" || REPLY="XDG autostart" ;;
     extras)
-      if ((LOCKED[extras] == 1)); then REPLY="needs distro packages"
-      else REPLY="notify-send, rg"; fi ;;
+      if ((LOCKED[extras] == 1)); then
+        room_list packages
+        [[ -n $REPLY ]] && REPLY="needs distro packages" || REPLY="none needed"
+      else
+        local p out=()
+        room_list packages
+        for p in $REPLY; do pkg_bin "$p"; out+=("$REPLY"); done
+        local IFS=,; REPLY="${out[*]}"; REPLY=${REPLY//,/, }
+      fi ;;
+    *) REPLY=${MAN[$1.size]:-} ;;
   esac
 }
 
+menu_rows() { # → ROWS: "h:TITLE" headers, room ids and options, in menu order
+  local ch id
+  ROWS=()
+  for ch in social coding video; do
+    ROWS+=("h:${ch^^}")
+    for id in "${MOD_IDS[@]}"; do [[ ${MAN[$id.channel]} == "$ch" ]] && ROWS+=("$id"); done
+  done
+  ROWS+=("h:ON THIS MACHINE" "${OPTS[@]}")
+}
+
+row_label() { if [[ -n ${LABEL[$1]:-} ]]; then REPLY=${LABEL[$1]}; else REPLY=${MAN[$1.name]}; fi; }
+
+row_desc() { # row_desc ROW → REPLY: the line under the menu for the row the cursor is on
+  case $1 in
+    extras) extras_desc ;;
+    desktop|autostart) REPLY=${DESC[$1]} ;;
+    *)
+      local about=${MAN[$1.about]:-}
+      if [[ -n ${MAN[$1.needs]:-} ]]; then room_names ${MAN[$1.needs]}; about+=" Comes with $REPLY."; fi
+      REPLY=$about ;;
+  esac
+}
+
+wrap2() { # wrap2 TEXT WIDTH → R1 R2: the text on two lines at most
+  local words w l1="" l2="" over=0
+  read -ra words <<<"$1"
+  for w in "${words[@]}"; do
+    if ((!over)) && ((${#l1} + ${#w} + 1 <= $2)); then l1+="${l1:+ }$w"
+    else over=1
+      if ((${#l2} + ${#w} + 1 <= $2)); then l2+="${l2:+ }$w"; else l2="${l2:0:$2-1}…"; break; fi
+    fi
+  done
+  R1=$l1 R2=$l2
+}
+
 _menu_draw() {
-  local i id box lab ptr side pad
-  for i in "${!IDS[@]}"; do
-    id=${IDS[i]}
-    if ((ON[$id])); then box="$GOOD$G_ON$RST"; else box="$DIM$G_OFF$RST"; fi
-    ((LOCKED[$id] == 1)) && box="$DIM$( ((ON[$id])) && printf %s "$G_ON" || printf %s "$G_OFF")$RST"
-    if ((i == CUR)); then ptr="$AMBER$G_PTR$RST" lab="$BOLD${LABEL[$id]}$RST"; else ptr=" " lab=${LABEL[$id]}; fi
-    side_note "$id"; side=$REPLY
-    pad=$((W - 9 - ${#LABEL[$id]} - ${#side}))
+  local i row box lab ptr side pad on
+  for i in "${!ROWS[@]}"; do
+    row=${ROWS[i]}
+    if [[ $row == h:* ]]; then
+      printf '\r\e[K     %s%s%s\n' "$DIM" "${row#h:}" "$RST"
+      continue
+    fi
+    on=${ON[$row]:-0}
+    if ((on)); then box="$GOOD$G_ON$RST"; else box="$DIM$G_OFF$RST"; fi
+    ((LOCKED[$row] == 1)) && box="$DIM$( ((on)) && printf %s "$G_ON" || printf %s "$G_OFF")$RST"
+    row_label "$row"
+    if ((i == CUR)); then ptr="$AMBER$G_PTR$RST" lab="$BOLD$REPLY$RST"; else ptr=" " lab=$REPLY; fi
+    local raw=$REPLY
+    side_note "$row"; side=$REPLY
+    pad=$((W - 9 - ${#raw} - ${#side}))
     ((pad < 1)) && pad=1
     printf '\r\e[K   %s %s  %s%*s%s%s%s\n' "$ptr" "$box" "$lab" "$pad" '' "$DIM" "$side" "$RST"
   done
-  local d=${DESC[${IDS[CUR]}]}
-  ((${#d} > W - 6)) && d="${d:0:W-7}…"
-  printf '\r\e[K\n\r\e[K     %s%s%s\n' "$DIM" "$d" "$RST"
-  printf '\r\e[K     %s↑↓ move   space toggle   enter continue   q quit%s\n' "$DIM" "$RST"
+  if [[ -n ${MSG:-} ]]; then R1=$MSG R2=""; else row_desc "${ROWS[CUR]}"; wrap2 "$REPLY" $((W - 6)); fi
+  printf '\r\e[K\n\r\e[K     %s%s%s\n\r\e[K     %s%s%s\n' "$DIM" "$R1" "$RST" "$DIM" "$R2" "$RST"
+  printf '\r\e[K     %s↑↓ move   space toggle   a all rooms   enter continue   q quit%s\n' "$DIM" "$RST"
 }
 
 _menu_static() {
-  local id
-  for id in "${IDS[@]}"; do
-    if ((ON[$id])); then printf '     %s%s%s  %s\n' "$GOOD" "$G_ON" "$RST" "${LABEL[$id]}"
-    else printf '     %s%s  %s%s\n' "$DIM" "$G_OFF" "${LABEL[$id]}" "$RST"; fi
+  local id on=() off=() also=()
+  for id in "${MOD_IDS[@]}"; do
+    if ((ON[$id])); then on+=("$id"); else off+=("$id"); fi
   done
+  for id in "${OPTS[@]}"; do ((ON[$id])) && also+=("${LABEL[$id],}"); done
+  room_names "${on[@]}"; kv "Rooms" "$REPLY"
+  if ((${#off[@]})); then room_names "${off[@]}"; kv "Left out" "$REPLY"; fi
+  if ((${#also[@]})); then local IFS=';'; REPLY="${also[*]}"; kv "Also" "${REPLY//;/, }"; fi
+}
+
+_menu_step() { # _menu_step +1|-1: the next row that isn't a heading
+  local n=${#ROWS[@]} i=$CUR
+  while :; do
+    i=$(((i + $1 + n) % n))
+    [[ ${ROWS[i]} != h:* ]] && break
+  done
+  CUR=$i
+}
+
+_menu_toggle() {
+  local row=$1 before after
+  ((LOCKED[$row] == 1)) && return
+  case $row in
+    desktop|autostart|extras) ON[$row]=$((1 - ON[$row])) ;;
+    *)
+      rooms_on; before=$REPLY
+      if ((ON[$row])); then mod_off "$row"; else mod_on "$row"; fi
+      rooms_on; after=$REPLY
+      # say what came or went with it
+      local id moved=()
+      for id in "${MOD_IDS[@]}"; do
+        [[ $id == "$row" ]] && continue
+        if [[ " $before " == *" $id "* && " $after " != *" $id "* ]] || [[ " $before " != *" $id "* && " $after " == *" $id "* ]]; then
+          moved+=("$id")
+        fi
+      done
+      if ((${#moved[@]})); then
+        room_names "${moved[@]}"
+        if ((ON[$row])); then MSG="$REPLY comes with it."; else MSG="$REPLY goes with it: it needs ${MAN[$row.name]}."; fi
+      fi
+      extras_lock ;;
+  esac
+}
+
+_menu_all() { # a: every room on, or (when they all are) every room off
+  local id all=1
+  for id in "${MOD_IDS[@]}"; do ((ON[$id])) || all=0; done
+  for id in "${MOD_IDS[@]}"; do ON[$id]=$((1 - all)); done
+  extras_lock
 }
 
 choose_components() {
   rule "PROGRAMME"
+  menu_rows
   if ((!CAN_ASK)); then
     _menu_static
-    ((YES)) || note "No terminal to ask on, so these are the defaults (--with/--without change them)."
+    ((YES)) || note "No terminal to ask on, so these are the defaults (--rooms, --with and --without change them)."
     return
   fi
-  note "Pick what to tune in."
+  note "Pick the rooms to install. One you leave out isn't downloaded."
   printf '\n'
-  CUR=0
-  local n=$((${#IDS[@]} + 3))
+  CUR=0 MSG=""
+  _menu_step 1
+  local n=$((${#ROWS[@]} + 4))
   hide_cursor
   _menu_draw
   while :; do
     read_key
+    MSG=""
     case $KEY in
-      up) CUR=$(((CUR - 1 + ${#IDS[@]}) % ${#IDS[@]})) ;;
-      down) CUR=$(((CUR + 1) % ${#IDS[@]})) ;;
-      space)
-        local id=${IDS[CUR]}
-        ((LOCKED[$id] == 1)) || ON[$id]=$((1 - ON[$id])) ;;
-      enter) break ;;
+      up) _menu_step -1 ;;
+      down) _menu_step 1 ;;
+      space) _menu_toggle "${ROWS[CUR]}" ;;
+      all) _menu_all ;;
+      enter) rooms_on && break; MSG="Pick at least one room." ;;
       quit) show_cursor; printf '\n'; say "Off air. Nothing was installed."; exit 0 ;;
     esac
     printf '\e[%dA' "$n"
@@ -606,6 +872,7 @@ read_key() {
       case $rest in '[A'|'OA') KEY=up ;; '[B'|'OB') KEY=down ;; *) KEY=other ;; esac ;;
     '') KEY=enter ;;
     ' '|x|X) KEY=space ;;
+    a|A) KEY=all ;;
     k|K) KEY=up ;;
     j|J) KEY=down ;;
     q|Q) KEY=quit ;;
@@ -646,6 +913,7 @@ step_line() { # step_line SYMBOL LABEL RIGHT: a one-column symbol; RIGHT may car
   local right=$3 label=$2 pad rlen
   vlen "$right"; rlen=$REPLY
   local max=$((W - 11 - rlen))
+  ((max < 8)) && max=8 # a narrow terminal and a long note
   ((${#label} > max)) && label="${label:0:max-1}…"
   pad=$((W - 9 - ${#label} - rlen))
   ((pad < 1)) && pad=1
@@ -780,6 +1048,7 @@ PKGS=() PKGS_ADDED="" WARN_FILE=""
 want() { local p; p=$(pkgname "$1"); [[ -n $p ]] && PKGS+=("$p"); return 0; }
 
 plan_packages() {
+  local p
   PKGS=()
   has git || want git
   has curl || want curl
@@ -794,8 +1063,8 @@ plan_packages() {
     want python
   fi
   if ((ON[extras])); then
-    has notify-send || want notify
-    has rg || want ripgrep
+    room_list packages
+    for p in $REPLY; do pkg_bin "$p"; has "$REPLY" || want "$p"; done
   fi
   ((CAN_PKG)) || PKGS=()
   return 0
@@ -870,9 +1139,91 @@ fetch_source() {
       return 1
     fi
     mkdir -p "$(dirname "$APP_DIR")"
-    git clone --depth 1 --branch "$TUBCAL_BRANCH" "$TUBCAL_REPO" "$APP_DIR"
+    # Commits and folders now; a file's contents only once it's checked out, and
+    # nothing is until the rooms are chosen (apply_rooms), so a room left out
+    # never comes down at all.
+    if ! git clone --filter=blob:none --no-checkout --depth 1 --branch "$TUBCAL_BRANCH" "$TUBCAL_REPO" "$APP_DIR"; then
+      rm -rf "$APP_DIR"
+      echo "the server refused a partial clone; cloning in full"
+      git clone --no-checkout --depth 1 --branch "$TUBCAL_BRANCH" "$TUBCAL_REPO" "$APP_DIR" || return 1
+    fi
   fi
   note_out "$(git -C "$APP_DIR" rev-parse --short HEAD)"
+}
+
+# A clone made with --no-checkout has no modules.ini on disk yet: read the
+# rooms' files from the commit itself. (Runs in this shell, not as a step: the
+# steps run in subshells, and the manifest has to outlive them.)
+reload_manifest() {
+  local tmp id before=" ${MOD_IDS[*]} "
+  if [[ -r $APP_DIR/modules.ini ]]; then
+    read_manifest "$APP_DIR/modules.ini" || return 1
+  else
+    tmp=$(mktemp) && git -C "$APP_DIR" show HEAD:modules.ini >"$tmp" 2>/dev/null && read_manifest "$tmp" || { rm -f "$tmp"; return 1; }
+    rm -f "$tmp"
+  fi
+  MANIFEST_FROM=checkout
+  # a room this installer's own copy didn't know: its default
+  for id in "${MOD_IDS[@]}"; do [[ $before == *" $id "* ]] || { [[ $id == archive ]] && ON[$id]=0 || ON[$id]=1; }; done
+  return 0
+}
+
+# ── the rooms' files ─────────────────────────────────────────────────────────
+#
+# The checkout holds only the chosen rooms' files: every path a left-out room
+# owns is excluded with git's sparse checkout (and in a clone made here, the
+# parts a desktop install never uses: the Android app and the website). Adding a
+# room back re-includes its paths, and git fetches what it doesn't have yet.
+
+sparse_patterns() { # → stdout: non-cone patterns, everything but what's left out
+  local id p
+  echo "/*"
+  for id in "${MOD_IDS[@]}"; do
+    ((ON[$id])) && continue
+    for p in ${MAN[$id.paths]:-}; do echo "!/$p"; done
+  done
+  if ((CLONED)); then for p in ${MAN[elsewhere.paths]:-}; do echo "!/$p"; done; fi
+}
+
+git_has_sparse() { # git sparse-checkout reapply: git 2.27
+  local v
+  v=$(git --version 2>/dev/null) || return 1
+  v=${v#git version } v=${v%% *}
+  ver_ge "$v" 2.27.0
+}
+
+apply_rooms() {
+  cd "$APP_DIR" || return 1
+  local pats file was fresh=0
+  pats=$(sparse_patterns)
+  file="$(git rev-parse --absolute-git-dir)/info/sparse-checkout" || return 1
+  was=$(git config --bool core.sparseCheckout 2>/dev/null) || was=false
+  [[ -z $(git ls-files | head -n 1) ]] && fresh=1 # a --no-checkout clone: nothing on disk yet
+
+  if [[ $pats == "/*" && $was != true ]]; then
+    ((fresh)) && { git read-tree -mu HEAD || return 1; }
+    note_out "every room"
+    return 0
+  fi
+  if ((!fresh)) && ! git_has_sparse; then
+    echo "git $(git --version | cut -d' ' -f3) can't leave files out of an existing checkout (2.27+ can)"
+    return 1
+  fi
+  mkdir -p "$(dirname "$file")"
+  printf '%s\n' "$pats" >"$file"
+  git config core.sparseCheckout true
+  git config core.sparseCheckoutCone false
+  if ((fresh)); then
+    git read-tree -mu HEAD || return 1
+  elif [[ $pats == "/*" ]]; then
+    git sparse-checkout disable || return 1 # every room again: the whole checkout
+  else
+    # changes only what's on disk; files with local changes stay, with a warning
+    git sparse-checkout reapply || return 1
+  fi
+  local out=0 id
+  for id in "${MOD_IDS[@]}"; do ((ON[$id])) || out=$((out + 1)); done
+  if ((out)); then note_out "$out room$( ((out == 1)) || echo s) left out"; else note_out "every room"; fi
 }
 
 install_uv() {
@@ -911,12 +1262,14 @@ install_node() {
   note_out "$("$TUBCAL_HOME/node/bin/node" --version) $SEP sha256 ok"
 }
 
-sync_backend() { # sync_backend WITH_ARCHIVE
+sync_backend() { # sync_backend [EXTRA…]: the chosen rooms' packages, without the EXTRAs named
   cd "$APP_DIR" || return 1
-  local args=(sync --locked --no-progress)
-  [[ -x .venv/bin/pytest ]] || args+=(--no-dev) # keep a developer's test deps
-  ((ON[editor])) && args+=(--extra editor)
-  (($1)) && args+=(--extra brain)
+  local args=(sync --locked --no-progress --no-default-groups) x skip=" $* "
+  [[ -x .venv/bin/pytest ]] && args+=(--group dev) # keep a developer's test deps
+  room_list extras
+  for x in $REPLY; do [[ $skip == *" $x "* ]] || args+=(--extra "$x"); done
+  room_list groups
+  for x in $REPLY; do args+=(--group "$x"); done
   NO_COLOR=1 "$UV" "${args[@]}" || return 1
   note_out "Python $(.venv/bin/python -c 'import platform; print(platform.python_version())')"
 }
@@ -939,7 +1292,9 @@ build_frontend() {
     "$NPM_BIN" ci --loglevel=error || return 1
     echo "$sum" >node_modules/.tubcal-lock
   fi
-  "$NPM_BIN" run build || return 1
+  # only the chosen rooms' pages (frontend/src/build/modules.mjs)
+  rooms_on
+  TUBCAL_MODULES=${REPLY// /,} "$NPM_BIN" run build || return 1
   [[ -f dist/index.html ]] || { echo "the build produced no dist/index.html"; return 1; }
   note_out "$(du -sh dist 2>/dev/null | cut -f1)"
 }
@@ -959,6 +1314,12 @@ install_ytdlp() {
   note_out "$("$UV_TOOL_BIN_DIR/yt-dlp" --version)"
 }
 
+remove_ytdlp() { # the Screening Room was removed: its yt-dlp goes too
+  UV_TOOL_DIR="$TUBCAL_HOME/tools" UV_TOOL_BIN_DIR="$TUBCAL_HOME/bin" NO_COLOR=1 \
+    "$UV" tool uninstall yt-dlp || rm -rf "$TUBCAL_HOME/tools/yt-dlp" "$TUBCAL_HOME/bin/yt-dlp"
+  rm -f "$STATE_DIR/yt-dlp.checked"
+}
+
 render() { # render TEMPLATE → stdout, with @TOKENS@ filled
   local t
   t=$(<"$1")
@@ -970,13 +1331,15 @@ render() { # render TEMPLATE → stdout, with @TOKENS@ filled
 
 write_conf() {
   mkdir -p "$TUBCAL_HOME"
-  local EDITOR_X=${ON[editor]} ARCHIVE=${ON[archive]} DESKTOP=${ON[desktop]}
+  local MODULES KNOWN_MODULES="${MOD_IDS[*]}" DESKTOP=${ON[desktop]}
   local AUTOSTART=${ON[autostart]} EXTRAS=${ON[extras]} INSTALLED_AT k
+  rooms_on; MODULES=$REPLY
   INSTALLED_AT=$(date '+%Y-%m-%d %H:%M')
   {
     echo "# Tubcal's install record: written by install.sh, read by \`tubcal\`."
-    echo "# Re-run install.sh (or \`tubcal update\`) rather than editing this."
-    for k in APP_DIR CLONED UV NODE_BIN BIN_DIR EDITOR_X ARCHIVE DESKTOP AUTOSTART EXTRAS SYSTEMD PKGS_ADDED INSTALLED_AT; do
+    echo "# Re-run install.sh (or \`tubcal update\`, \`tubcal add\`) rather than editing this."
+    echo "# MODULES: the rooms installed; KNOWN_MODULES: every room there was to pick."
+    for k in APP_DIR CLONED UV NODE_BIN BIN_DIR MODULES KNOWN_MODULES DESKTOP AUTOSTART EXTRAS SYSTEMD PKGS_ADDED INSTALLED_AT; do
       printf '%s=%q\n' "$k" "${!k}"
     done
   } >"$CONF.new" && mv "$CONF.new" "$CONF"
@@ -1011,7 +1374,8 @@ install_launcher() {
 # fuzzy search), which is where an unusual platform would trip.
 self_test() {
   cd "$APP_DIR" || return 1
-  TUBCAL_AUTO_UPDATE=0 .venv/bin/python - "$WARN_FILE" <<'PY' || return 1
+  rooms_on
+  TUBCAL_AUTO_UPDATE=0 TUBCAL_MODULES=${REPLY// /,} .venv/bin/python - "$WARN_FILE" "$REPLY" <<'PY' || return 1
 import importlib, pathlib, shutil, sys, tempfile
 
 from server import config
@@ -1025,13 +1389,17 @@ try:
     client = create_app().test_client()
     health = client.get("/api/health")
     assert health.status_code == 200 and health.get_json()["ok"], health.data[:200]
+    rooms, chosen = health.get_json()["data"].get("modules"), sys.argv[2].split()
+    assert rooms == chosen, f"the server has rooms {rooms}, not the ones chosen ({chosen})"
     page = client.get("/")
     assert page.status_code == 200 and b'id="root"' in page.data, "the built frontend isn't being served"
 finally:
     shutil.rmtree(tmp, ignore_errors=True)
 
-late = {"rapidfuzz": "fuzzy search", "anipy_api.provider": "anime playback",
-        "curl_cffi": "the backup anime source", "lxml": "the backup anime source"}
+late = {"rapidfuzz": "fuzzy search"}
+if "anime" in sys.argv[2].split():
+    late.update({"anipy_api.provider": "anime playback",
+                 "curl_cffi": "the backup anime source", "lxml": "the backup anime source"})
 with open(sys.argv[1], "w") as out:
     for mod, feature in late.items():
         try:
@@ -1040,7 +1408,7 @@ with open(sys.argv[1], "w") as out:
             out.write(f"{feature} may not work: {mod} won't load ({type(exc).__name__}: {exc})\n"[:300])
 print("ok")
 PY
-  "$TUBCAL_HOME/bin/yt-dlp" --version >/dev/null || { echo "yt-dlp doesn't run"; return 1; }
+  if wants_tool yt-dlp; then "$TUBCAL_HOME/bin/yt-dlp" --version >/dev/null || { echo "yt-dlp doesn't run"; return 1; }; fi
   note_out "page + API answer"
 }
 
@@ -1086,10 +1454,14 @@ running_order() {
   local joined="" b
   for b in "${bits[@]}"; do joined+="${joined:+ $SEP }$b"; done
   kv "Tools" "$joined"
-  local x="backend"
-  ((ON[editor])) && x+=" + editor"
-  ((ON[archive])) && x+=" + archive"
-  kv "Build" "$x $SEP frontend $SEP yt-dlp ${DIM}(private, refreshed daily)${RST}"
+  files_plan
+  local x="backend" bits2=()
+  room_list extras; bits2+=($REPLY)
+  room_list groups; bits2+=($REPLY)
+  ((${#bits2[@]})) && x+=" + ${bits2[*]}"
+  x+=" $SEP frontend"
+  wants_tool yt-dlp && x+=" $SEP yt-dlp ${DIM}(private, refreshed daily)${RST}"
+  kv "Build" "$x"
   tilde "$BIN_DIR"; local b=$REPLY
   local l="tubcal in $b"
   ((ON[desktop])) && l+=" $SEP app menu"
@@ -1097,6 +1469,23 @@ running_order() {
   kv "Launcher" "$l"
   if ((ON[extras])) && ((!CAN_PKG)); then
     note "notify-send/ripgrep are only used if already installed."
+  fi
+}
+
+# What happens to the files, in words: the clone is partial; your own checkout
+# loses the left-out rooms' files only when it's a git checkout.
+files_plan() {
+  local id out=()
+  for id in "${MOD_IDS[@]}"; do ((ON[$id])) || out+=("$id"); done
+  if ((CLONED)); then
+    kv "Files" "a partial clone with only these rooms' files"
+  elif ((${#out[@]} == 0)); then
+    kv "Files" "this checkout as it is"
+  elif [[ -d $APP_DIR/.git ]]; then
+    room_names "${out[@]}"
+    kv "Files" "leaves $REPLY out of this checkout ${DIM}(git sparse-checkout; files you've changed stay)${RST}"
+  else
+    kv "Files" "left as they are ${DIM}(not a git checkout); the rooms left out aren't built or served${RST}"
   fi
 }
 
@@ -1113,7 +1502,7 @@ on_air() {
   [[ ":$PATH:" == *":$BIN_DIR:"* ]] || { tilde "$BIN_DIR/tubcal"; cmd=$REPLY; }
   local tl tr bl br v hz
   if ((UTF)); then tl="╭" tr="╮" bl="╰" br="╯" v="│" hz="─"; else tl="+" tr="+" bl="+" br="+" v="|" hz="-"; fi
-  local inner=$((W - 4)) lines=() l cw=$((${#cmd} + 12))
+  local inner=$((W - 4)) lines=() l cw=$((${#cmd} + 14))
   lines+=("")
   lines+=("$KAKI$G_ON$RST ${BOLD}ON AIR${RST}   Tubcal is installed.")
   lines+=("")
@@ -1121,6 +1510,7 @@ on_air() {
   lines+=("$(printf '%-*s' "$cw" "$cmd stop")${DIM}stop the server${RST}")
   lines+=("$(printf '%-*s' "$cw" "$cmd status")${DIM}what's on, where, which versions${RST}")
   lines+=("$(printf '%-*s' "$cw" "$cmd update")${DIM}pull, rebuild, restart${RST}")
+  lines+=("$(printf '%-*s' "$cw" "$cmd add ROOM")${DIM}add a room you left out${RST}")
   lines+=("$(printf '%-*s' "$cw" "$cmd uninstall")${DIM}take it all down again${RST}")
   lines+=("")
   local tailline="$AMBER$url$RST"
@@ -1138,7 +1528,12 @@ on_air() {
 
   local notes=()
   [[ ":$PATH:" == *":$BIN_DIR:"* ]] || { tilde "$BIN_DIR"; notes+=("$REPLY isn't on your PATH yet; add it to use plain \`tubcal\`."); }
-  has ollama || notes+=("No Ollama yet: The Archive and The Edition write with it (ollama.com).")
+  if ((ON[archive] || ON[edition])) && ! has ollama; then
+    local writers=()
+    for l in edition archive; do ((ON[$l])) && writers+=("$l"); done
+    room_names "${writers[@]}"
+    notes+=("No Ollama yet: ${REPLY/, / and } $( ((${#writers[@]} == 1)) && echo writes || echo write) with it (ollama.com).")
+  fi
   if ((${#WARNINGS[@]} + ${#notes[@]})); then
     printf '\n'
     for l in "${WARNINGS[@]}"; do printf '  %s%s%s %s\n' "$AMBER" "$G_WARN" "$RST" "$l"; done
@@ -1159,10 +1554,12 @@ do_install() {
   fi
   detect_system
   locate_app
+  load_manifest
   load_previous
   [[ -n $PREV_CLONED ]] && CLONED=$PREV_CLONED
   PKGS_ADDED=$PREV_PKGS
   default_choices
+  [[ $MODE == change ]] && apply_change
   if [[ $MODE == install ]]; then
     logo
     ((EUID == 0)) && warn "Running as root: Tubcal will be installed for root only."
@@ -1174,7 +1571,7 @@ do_install() {
     if ! ask "Roll tape?" Y; then printf '\n'; say "Off air. Nothing was installed."; printf '\n'; exit 0; fi
   else
     [[ -r $CONF ]] || die "No install record at $CONF." "Run install.sh first."
-    printf '\n  %sTubcal%s %s updating %s\n' "$BOLD$AMBER" "$RST" "$DIM" "$RST"
+    [[ $MODE == update ]] && printf '\n  %sTubcal%s %s updating %s\n' "$BOLD$AMBER" "$RST" "$DIM" "$RST"
     plan_packages
     PKGS=() # an update never asks for root; missing tools take the user-space path
     preflight
@@ -1204,9 +1601,17 @@ do_install() {
     fi
   fi
 
-  if ((CLONED)); then
+  if ((CLONED)) && [[ $MODE != change ]]; then
     has git || die "git is needed to fetch Tubcal." "Install git, then run this again."
     run "Fetching Tubcal" fetch_source || die "Couldn't fetch $TUBCAL_REPO."
+  fi
+  if [[ -d $APP_DIR/.git ]]; then
+    reload_manifest || die "$APP_DIR has no modules.ini." "Is it an older Tubcal? Run \`tubcal update\` first."
+    if ((CLONED)); then
+      run "The rooms' files" apply_rooms || die "Couldn't check out the rooms you picked."
+    elif ! run --soft "The rooms' files" apply_rooms; then
+      warn "The left-out rooms' files stay in this checkout; those rooms still aren't built or served."
+    fi
   fi
   is_tubcal_dir "$APP_DIR" || die "$APP_DIR doesn't look like Tubcal."
 
@@ -1224,19 +1629,37 @@ do_install() {
     find_node || die "Node.js installed but doesn't run here."
   fi
 
+  # The Archive's speech models and the Edition's numpy are the heavy, native
+  # part: when they can't install here, the rest goes in without them.
+  local synced=0
   if ((ON[archive])); then
-    if ! run --soft "Python & backend, with The Archive" sync_backend 1 ||
-      ! run --soft "The Archive's speech models load" check_archive; then
+    if run --soft "Python & backend, with The Archive" sync_backend &&
+      run --soft "The Archive's speech models load" check_archive; then
+      synced=1
+    else
       warn "The Archive can't run on this machine, so it's left out (the rest is unaffected)."
-      ON[archive]=0
+      mod_off archive
+      if [[ -d $APP_DIR/.git ]]; then run --soft "The rooms' files" apply_rooms || true; fi
     fi
   fi
-  if ((!ON[archive])); then
-    run "Python & backend" sync_backend 0 || die "uv sync failed."
+  if ((!synced)); then
+    room_list extras
+    if [[ " $REPLY " == *" edition "* ]]; then
+      if ! run --soft "Python & backend" sync_backend; then
+        warn "numpy didn't install, so The Edition won't group stories by topic."
+        run "Python & backend, without numpy" sync_backend edition || die "uv sync failed."
+      fi
+    else
+      run "Python & backend" sync_backend || die "uv sync failed."
+    fi
   fi
 
   run "Building the frontend" build_frontend || die "The frontend build failed."
-  run "yt-dlp (private, self-updating)" install_ytdlp || die "Couldn't install yt-dlp."
+  if wants_tool yt-dlp; then
+    run "yt-dlp (private, self-updating)" install_ytdlp || die "Couldn't install yt-dlp."
+  elif [[ -e $TUBCAL_HOME/bin/yt-dlp ]]; then
+    run --soft "yt-dlp (the Screening Room's) removed" remove_ytdlp || true
+  fi
   run "Launcher & app-menu entry" install_launcher || die "Couldn't install the launcher."
   : >"$WARN_FILE"
   run "Test transmission" self_test || die "The self-test failed." "Tubcal is installed but didn't answer correctly; the log above says why."
@@ -1253,7 +1676,85 @@ do_install() {
     printf '\n  %s%s%s Updated.\n\n' "$GOOD" "$G_OK" "$RST"
     return
   fi
+  if [[ $MODE == change ]]; then
+    changed_done
+    return
+  fi
   on_air
+}
+
+# ── tubcal add / remove / rooms ──────────────────────────────────────────────
+
+CH_ADDED=() CH_REMOVED=()
+
+# --add / --remove: change the record's rooms, with what each needs, and say so.
+apply_change() {
+  [[ -r $CONF ]] || die "No install record at $CONF." "Run install.sh first."
+  local w id asked=" " before after implied=()
+  for w in "${CHANGE_ADD[@]}"; do module_id "$w" || bad_room "$w"; mod_on "$REPLY"; asked+="$REPLY "; done
+  for w in "${CHANGE_REMOVE[@]}"; do module_id "$w" || bad_room "$w"; mod_off "$REPLY"; asked+="$REPLY "; done
+  before=" $PREV_ROOMS "
+  rooms_on || die "That would leave no rooms at all." "Keep one, or take Tubcal off with \`tubcal uninstall\`."
+  after=" $REPLY "
+  for id in "${MOD_IDS[@]}"; do
+    if [[ $before != *" $id "* && $after == *" $id "* ]]; then CH_ADDED+=("$id")
+    elif [[ $before == *" $id "* && $after != *" $id "* ]]; then CH_REMOVED+=("$id")
+    else continue; fi
+    [[ $asked == *" $id "* ]] || implied+=("$id")
+  done
+  printf '\n'
+  if ((${#CH_ADDED[@]} + ${#CH_REMOVED[@]} == 0)); then
+    for w in "${CHANGE_ADD[@]}"; do module_id "$w"; room_names "$REPLY"; say "$REPLY is already installed."; done
+    for w in "${CHANGE_REMOVE[@]}"; do module_id "$w"; room_names "$REPLY"; say "$REPLY isn't installed."; done
+    printf '\n'
+    exit 0
+  fi
+  if ((${#CH_ADDED[@]})); then room_names "${CH_ADDED[@]}"; kv "Adding" "$REPLY"; fi
+  if ((${#CH_REMOVED[@]})); then
+    room_names "${CH_REMOVED[@]}"; kv "Removing" "$REPLY"
+    note "Their files, packages and pages go. What you saved, followed and watched"
+    note "stays in your database and comes back if you add them again."
+  fi
+  if ((${#implied[@]})); then
+    room_names "${implied[@]}"
+    note "$REPLY $( ((${#implied[@]} == 1)) && echo goes || echo go) along: a room comes and goes with the rooms it needs."
+    if ((CAN_ASK)) && ! ask "Go ahead?" Y; then printf '\n'; exit 0; fi
+  fi
+}
+
+changed_done() {
+  local bits=()
+  if ((${#CH_ADDED[@]})); then room_names "${CH_ADDED[@]}"; bits+=("Added $REPLY."); fi
+  if ((${#CH_REMOVED[@]})); then room_names "${CH_REMOVED[@]}"; bits+=("Removed $REPLY."); fi
+  printf '\n  %s%s%s %s\n' "$GOOD" "$G_OK" "$RST" "${bits[*]}"
+  note "Reload Tubcal in your browser to see the change."
+  printf '\n'
+}
+
+# --list: every room, by channel, and which are installed.
+do_list() {
+  locate_app
+  load_manifest
+  local rec=0 id ch box alias
+  if [[ -r $CONF ]]; then load_previous; rec=1; fi
+  printf '\n'
+  for ch in social coding video; do
+    printf '  %s%s%s\n' "$DIM" "${ch^^}" "$RST"
+    for id in "${MOD_IDS[@]}"; do
+      [[ ${MAN[$id.channel]} == "$ch" ]] || continue
+      if ((!rec)); then box=" "; elif ((ON[$id])); then box="$GOOD$G_ON$RST"; else box="$DIM$G_OFF$RST"; fi
+      alias=${MAN[$id.aliases]:-}
+      printf '   %s  %-20s %-11s %s%s%s\n' "$box" "${MAN[$id.name]}" "$id" "$DIM" "${alias:+also: ${alias// /, }}" "$RST"
+    done
+  done
+  printf '\n'
+  if ((rec)); then
+    note "$G_ON installed   $G_OFF left out"
+    note "tubcal add ROOM   tubcal remove ROOM   (its id or any of its names)"
+  else
+    note "Nothing installed yet: install.sh offers these as a menu."
+  fi
+  printf '\n'
 }
 
 do_uninstall() {
@@ -1306,9 +1807,125 @@ main() {
   ls -1t "$STATE_DIR"/install-*.log 2>/dev/null | tail -n +6 | while IFS= read -r f; do rm -f "$f"; done
   case $MODE in
     uninstall) do_uninstall ;;
+    list) do_list ;;
     *) do_install ;;
   esac
   rm -f "$WARN_FILE"
+}
+
+# modules.ini without the paths: what the menu shows before there's a checkout
+# to read (an install piped from curl). tests/test_modules.py keeps it equal to
+# modules.ini; copy any change there over here.
+embedded_manifest() {
+  cat <<'MODULES_INI'
+[edition]
+name = The Edition
+channel = social
+about = A daily paper composed from the rooms you follow; Ollama writes it up.
+aliases = paper
+size = 20 MB
+needs =
+extras = edition
+groups =
+tools =
+packages =
+
+[hackernews]
+name = The Wire
+channel = social
+about = Hacker News: the six lists, search, and threads that mark what's new.
+aliases = wire hn
+size = under 1 MB
+needs =
+extras =
+groups =
+tools =
+packages =
+
+[reddit]
+name = The Dispatch
+channel = social
+about = Reddit: your subreddits and their threads, with or without an account.
+aliases = dispatch
+size = under 1 MB
+needs =
+extras =
+groups =
+tools =
+packages =
+
+[editor]
+name = The Composing Room
+channel = coding
+about = A vim code editor over ~/Projects, with a terminal and language servers.
+aliases = composing composer
+size = 2 MB
+needs =
+extras = editor
+groups =
+tools =
+packages = ripgrep
+
+[dev]
+name = The Workbench
+channel = coding
+about = One manual per programming language: docs, talks, podcasts, releases.
+aliases = workbench bench
+size = under 1 MB
+needs =
+extras =
+groups =
+tools =
+packages =
+
+[github]
+name = GitHub
+channel = coding
+about = Repos, releases, trending and your inbox; clones into ~/Projects.
+aliases = gh
+size = 1 MB
+needs =
+extras =
+groups =
+tools =
+packages =
+
+[youtube]
+name = The Screening Room
+channel = video
+about = YouTube without an account: your channels, search, live streams.
+aliases = screening yt
+size = 60 MB
+needs =
+extras =
+groups =
+tools = yt-dlp
+packages = notify
+
+[anime]
+name = The Anime
+channel = video
+about = Anime with your AniList list: seasons, schedule, episodes, the forum.
+aliases = anilist
+size = 100 MB
+needs =
+extras =
+groups = anime
+tools =
+packages =
+
+[archive]
+name = The Archive
+channel = video
+about = Transcribes what you watch, on this machine, so you can search and ask it.
+aliases = brain
+size = 300 MB
+needs = youtube
+extras = brain
+groups =
+tools =
+packages =
+MODULES_INI
 }
 
 main "$@"

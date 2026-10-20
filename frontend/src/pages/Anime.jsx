@@ -39,6 +39,8 @@ import {
   RankRibbons, ReviewsBlock, useExtras,
 } from '../components/anime/DetailExtras.jsx';
 import { useHorizontalWheel } from '../lib/useHorizontalWheel.js';
+import { animeItem } from '../lib/saveable.js';
+import { SaveButton } from '../components/ui/ItemActions.jsx';
 import { compact } from '../lib/format.js';
 import { useAnimeSync, usePlayer, useToast } from '../state.jsx';
 import { useAnimeCalc } from '../components/anime/WatchCalculator.jsx';
@@ -256,6 +258,7 @@ function BrowseCard({ media, rank, index = 0, scoreFormat }) {
         )}
         <span className={s.pcardVeil} />
         {rank != null && <span className={s.pcardRank}>{rank}</span>}
+        <SaveButton item={animeItem(media)} className={s.animeSave} size={14} />
         <CoverRatings media={media} scoreFormat={scoreFormat} className={s.ratingsTR} />
         <NextEpBadge media={media} />
         <CalcCue />
@@ -1532,6 +1535,7 @@ function DetailDossier({ m, trailer, onTrailer, scoreFormat, connected, rankings
             nextEp={m.list_entry ? (m.list_entry.progress || 0) + 1 : null}
           />
           {connected && <FavToggle kind="anime" id={m.id} initial={m.is_favourite} count={m.favourites} />}
+          <SaveButton item={animeItem(m)} label className={s.dossierSave} />
           {/* Explicit, keyboard-reachable twin of the hover+C gesture. */}
           <button className={s.dossierTally} onClick={() => add(m)} title="Add the next unwatched episode to the Reckoner">
             <Plus size={14} /> Tally next episode <kbd className={s.tallyKey}>C</kbd>

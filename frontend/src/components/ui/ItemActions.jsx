@@ -3,21 +3,32 @@ import { Bookmark, BookmarkCheck, Check, ListChecks, ListPlus } from 'lucide-rea
 import { COMPLETE_RATIO, usePlayer, useProgress, useSaved } from '../../state.jsx';
 import s from './itemActions.module.css';
 
-// Save / un-save any item (video, post, story) for later.
-export function SaveButton({ item, className }) {
+// Save / un-save anything (a video, a post, a title, a file, a page…) for later.
+// Works inside a link or a clickable tile: the click stays with the button. Taking
+// something off the list offers an Undo. `label` draws it as a pill with words,
+// for headers and toolbars.
+export function SaveButton({ item, className, label = false, size = 15 }) {
   const { saved, toggleSaved } = useSaved();
+  if (!item?.id) return null;
   const on = !!saved[item.id];
+  const words = on ? 'Remove from Saved' : 'Save for later';
   return (
     <button
-      className={`${s.action} ${on ? s.actionOn : ''} ${className || ''}`}
-      title={on ? 'Remove from Saved' : 'Save for later'}
-      aria-label={on ? 'Remove from Saved' : 'Save for later'}
+      type="button"
+      className={`${label ? s.labelled : s.action} ${on ? s.actionOn : ''} ${className || ''}`}
+      title={words}
+      aria-label={label ? undefined : words}
+      aria-pressed={on}
       onClick={(e) => {
+        e.preventDefault();
         e.stopPropagation();
-        toggleSaved(item);
+        toggleSaved(item, { undo: true });
       }}
+      // Enter/Space press this button, not the tile around it
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.stopPropagation(); }}
     >
-      {on ? <BookmarkCheck size={15} /> : <Bookmark size={15} />}
+      {on ? <BookmarkCheck size={size} /> : <Bookmark size={size} />}
+      {label && <span>{on ? 'Saved' : 'Save'}</span>}
     </button>
   );
 }

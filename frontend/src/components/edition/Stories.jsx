@@ -14,8 +14,7 @@ import {
 } from 'lucide-react';
 
 import { SaveButton } from '../ui/ItemActions.jsx';
-import { splitKind } from '../wire/HNReader.jsx';
-import { compact } from '../../lib/format.js';
+import { compact, splitKind } from '../../lib/format.js';
 import { timeAgo } from '../../lib/time.js';
 import { usePlayer } from '../../state.jsx';
 import e from '../../pages/edition.module.css';

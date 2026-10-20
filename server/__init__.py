@@ -1,6 +1,8 @@
+import json
+
 from flask import Flask, request, send_from_directory
 
-from . import config
+from . import config, modules
 
 
 def create_app():
@@ -10,8 +12,9 @@ def create_app():
     register_blueprints(app)
 
     # The Composing Room's terminal + LSP sockets (no-op without flask-sock).
-    from .editor import sockets as editor_sockets
-    editor_sockets.register(app)
+    if modules.has("editor"):
+        from .editor import sockets as editor_sockets
+        editor_sockets.register(app)
 
     @app.after_request
     def cache_policy(resp):
@@ -36,11 +39,21 @@ def create_app():
         # already still (styles/base.css holds the rule).
         if db.get_setting("fast_mode", False) is True:
             html = html.replace("<html ", '<html data-fast="" ', 1)
+        # The modules this server has, before the bundle runs: the page leaves out
+        # a room the build has but the server doesn't (frontend/src/lib/modules.js).
+        if modules.known():
+            stamp = json.dumps(modules.installed())
+            html = html.replace("</head>", f"<script>window.__TUBCAL_MODULES__={stamp}</script></head>", 1)
         return html, 200, {"Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store"}
 
     @app.route("/", defaults={"path": ""})
     @app.route("/<path:path>")
     def spa(path):
+        # An API address nothing answers (a typo, or a module this copy left
+        # out) is a JSON 404, never the page.
+        if path == "api" or path.startswith("api/"):
+            from .api import err
+            return err(f"no such endpoint: /{path}", 404)
         dist = config.FRONTEND_DIST
         if path and (dist / path).is_file():
             return send_from_directory(dist, path)

@@ -264,7 +264,8 @@ def lede_items(client):
 
 def test_lede_prompt_carries_the_transcript(lede_items, monkeypatch):
     from server.brain import edition
-    monkeypatch.setattr(edition.search, "rank_doc_chunks", lambda *a, **kw: [
+    search = pytest.importorskip("server.brain.search")  # the Archive holds transcripts
+    monkeypatch.setattr(search, "rank_doc_chunks", lambda *a, **kw: [
         {"idx": 7, "t_start": 450.0, "t_end": 495.0,
          "text": "the deal closed at forty million", "score": 0.9},
     ])
@@ -278,7 +279,8 @@ def test_lede_prompt_carries_the_transcript(lede_items, monkeypatch):
 
 def test_transcript_falls_back_to_the_opening_without_vectors(lede_items, monkeypatch):
     from server.brain import edition
-    monkeypatch.setattr(edition.search, "rank_doc_chunks", lambda *a, **kw: [])
+    search = pytest.importorskip("server.brain.search")  # the Archive holds transcripts
+    monkeypatch.setattr(search, "rank_doc_chunks", lambda *a, **kw: [])
     block, n = edition._transcript_block(edition._rank_items(lede_items), "q", "embed")
     assert "opening words and then much more…" in block and n == 1
 
@@ -311,6 +313,7 @@ def test_synthesis_only_reads_transcripts_for_the_lede(lede_items, monkeypatch):
     import json
 
     from server.brain import edition
+    search = pytest.importorskip("server.brain.search")  # the Archive holds transcripts
     seen = []
 
     def fake_chat(system, prompt, model, **kw):
@@ -319,7 +322,7 @@ def test_synthesis_only_reads_transcripts_for_the_lede(lede_items, monkeypatch):
                            "body": " ".join(["word"] * 60), "cited": [1]})
 
     monkeypatch.setattr(edition.llm, "chat", fake_chat)
-    monkeypatch.setattr(edition.search, "rank_doc_chunks", lambda *a, **kw: [
+    monkeypatch.setattr(search, "rank_doc_chunks", lambda *a, **kw: [
         {"idx": 7, "t_start": 450.0, "t_end": 495.0, "text": "the deal closed", "score": 0.9},
     ])
 
@@ -333,8 +336,9 @@ def test_synthesis_only_reads_transcripts_for_the_lede(lede_items, monkeypatch):
 def test_transcript_block_is_capped(lede_items, monkeypatch):
     from server import config, db
     from server.brain import edition
+    search = pytest.importorskip("server.brain.search")  # the Archive holds transcripts
     db.brain_save_transcript("yt:vid", "en", "verbose " * 5000, 900.0)
-    monkeypatch.setattr(edition.search, "rank_doc_chunks", lambda *a, **kw: [])
+    monkeypatch.setattr(search, "rank_doc_chunks", lambda *a, **kw: [])
     block, _ = edition._transcript_block(edition._rank_items(lede_items), "q", "embed")
     assert len(block) <= config.EDITION_TRANSCRIPT_CHARS + 200  # + the header line
 

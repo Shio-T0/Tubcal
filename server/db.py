@@ -266,6 +266,10 @@ def init_db():
                 DROP TABLE subscriptions;
                 ALTER TABLE subscriptions_new RENAME TO subscriptions;
             """)
+        # A brand-new database starts with no modules seen, so note_modules
+        # switches on every room this install chose (GitHub included).
+        if con.execute("SELECT COUNT(*) FROM settings").fetchone()[0] == 0:
+            con.execute("INSERT INTO settings (key, value) VALUES ('_modules_seen', '[]')")
         for key, value in DEFAULT_SETTINGS.items():
             con.execute(
                 "INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)",
@@ -355,6 +359,31 @@ def prune_old_data(history_cap=2000, cache_max_age=7 * 86400):
 
 
 # ---- settings ----
+
+def note_modules(installed, chosen=False):
+    """Switch on (Settings → Rooms) the room of a module that's new since the last
+    start: you added it with `tubcal add`. On a brand-new database, every room
+    the installer was told to install (`chosen`: TUBCAL_MODULES is set) starts
+    on, GitHub included; without that choice the defaults stand. An existing
+    database meeting this for the first time only records what's there, so the
+    rooms you had switched off stay off. A removed module's room keeps its place
+    in active_rooms; the page hides what isn't installed."""
+    if not installed:
+        return []
+    seen = get_setting("_modules_seen")
+    if seen == [] and not chosen:
+        seen = None  # a new database without an installer's choice: the defaults
+    added = [] if seen is None else [m for m in installed if m not in seen and m in config.ROOM_IDS]
+    if added:
+        rooms = get_setting("active_rooms") or []
+        rooms += [m for m in added if m not in rooms]
+        set_setting("active_rooms", rooms)
+        if (get_setting("max_active_rooms") or 0) < len(rooms):
+            set_setting("max_active_rooms", len(rooms))
+    if seen is None or sorted(seen) != sorted(installed):
+        set_setting("_modules_seen", list(installed))
+    return added
+
 
 def get_settings():
     con = connect()
@@ -536,14 +565,43 @@ def get_continue_watching(limit=30, ratio=0.95):
 # ---- saved (watch-later / bookmarks, cross-platform) ----
 
 def add_saved(item):
+    now = int(time.time())
+    # An undo puts an entry back with the date it was first kept; anything else
+    # (missing, nonsense, or in the future) is kept as of now.
+    try:
+        at = int(item.get("saved_at") or 0)
+    except (TypeError, ValueError):
+        at = 0
+    if not 0 < at <= now:
+        at = now
     con = connect()
     with con:
         con.execute(
             "INSERT INTO saved (platform, item_id, payload, saved_at) VALUES (?, ?, ?, ?) "
             "ON CONFLICT(item_id) DO UPDATE SET payload=excluded.payload",
-            (item.get("platform"), item.get("id"), json.dumps(item), int(time.time())),
+            (item.get("platform"), item.get("id"), json.dumps(item), at),
         )
     con.close()
+
+
+def update_saved(item_id, note=None, done=None):
+    """Change a kept entry's note and/or done mark. Returns the entry, or None
+    when nothing is saved under `item_id`."""
+    con = connect()
+    try:
+        with con:
+            row = con.execute("SELECT payload, saved_at FROM saved WHERE item_id=?", (item_id,)).fetchone()
+            if not row:
+                return None
+            item = json.loads(row["payload"])
+            if note is not None:
+                item["note"] = note
+            if done is not None:
+                item["done_at"] = int(time.time()) if done else None
+            con.execute("UPDATE saved SET payload=? WHERE item_id=?", (json.dumps(item), item_id))
+    finally:
+        con.close()
+    return {**item, "saved_at": row["saved_at"]}
 
 
 def remove_saved(item_id):
@@ -986,6 +1044,21 @@ def set_oauth_tokens(provider, access_token, refresh_token, expires_at, scopes=N
                 "UPDATE oauth SET access_token=?, expires_at=? WHERE provider=?",
                 (access_token, expires_at, provider),
             )
+    con.close()
+
+
+def set_oauth_token(provider, access_token, scopes=None):
+    """Store a ready-made access token with no OAuth client behind it — a GitHub
+    personal access token, or the GitHub CLI's own sign-in. Replaces any row."""
+    con = connect()
+    with con:
+        con.execute(
+            "INSERT INTO oauth (provider, client_id, client_secret, access_token, scopes) "
+            "VALUES (?, '', '', ?, ?) ON CONFLICT(provider) DO UPDATE SET client_id='', "
+            "client_secret='', access_token=excluded.access_token, refresh_token=NULL, "
+            "expires_at=NULL, scopes=excluded.scopes",
+            (provider, access_token, scopes),
+        )
     con.close()
 
 

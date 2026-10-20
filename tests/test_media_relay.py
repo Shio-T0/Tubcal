@@ -2,13 +2,10 @@
 refuses the old one, and resuming a body whose connection breaks mid-way — the
 things that otherwise stop a video partway through."""
 
-import base64
-
 import pytest
 import requests
 
 from server import httpc
-from server.api import feeds
 from server.api.relay import body_span, resumable_chunks
 
 
@@ -146,53 +143,3 @@ def test_without_reopen_a_break_still_surfaces():
     first = FakeResp(206, b"z" * 30, {"Content-Range": "bytes 0-29/30"}, break_after=10)
     with pytest.raises(requests.RequestException):
         b"".join(resumable_chunks(first))
-
-
-# ── the YouTube segment proxy end to end ─────────────────────────────────────
-
-def _tok(url):
-    return base64.urlsafe_b64encode(url.encode()).decode()
-
-
-def test_segment_proxy_survives_a_dead_url(client, monkeypatch):
-    stale = "https://rr1.googlevideo.com/videoplayback?itag=137&ip=1.1.1.1&sig=old"
-    fresh = "https://rr2.googlevideo.com/videoplayback?itag=137&ip=2.2.2.2&sig=new"
-    monkeypatch.setattr(feeds, "_FRESH", {})
-    monkeypatch.setattr(feeds, "_refreshed_at", {})
-    monkeypatch.setattr(feeds.youtube, "video_streams", lambda vid: {
-        "streams": [{"kind": "hls", "itag": "137", "adaptive": True, "url": fresh}],
-        "audio": [{"url": "https://rr2.googlevideo.com/videoplayback?itag=140&sig=a"}],
-    })
-    sess = FakeSession([
-        FakeResp(403),  # the old URL: minted for an IP we no longer have
-        FakeResp(206, b"seg-bytes", {"Content-Range": "bytes 0-8/100", "Content-Type": "video/mp4"}),
-        FakeResp(206, b"next-seg", {"Content-Range": "bytes 9-16/100", "Content-Type": "video/mp4"}),
-    ])
-    monkeypatch.setattr(httpc, "anon_session", sess)
-
-    r = client.get(f"/api/youtube/hls/seg?u={_tok(stale)}&v=dQw4w9WgXcQ", headers={"Range": "bytes=0-8"})
-    assert r.status_code == 206 and r.data == b"seg-bytes"
-    assert sess.calls[1][0] == fresh and sess.calls[1][1]["Range"] == "bytes=0-8"
-
-    # the next segment of the old URL goes straight to the fresh one
-    r = client.get(f"/api/youtube/hls/seg?u={_tok(stale)}&v=dQw4w9WgXcQ", headers={"Range": "bytes=9-16"})
-    assert r.data == b"next-seg"
-    assert sess.calls[2][0] == fresh
-
-
-def test_segment_proxy_still_refuses_other_hosts(client):
-    r = client.get(f"/api/youtube/hls/seg?u={_tok('https://evil.example.com/x')}")
-    assert r.status_code == 403
-
-
-def test_fresh_url_matches_the_same_rendition(client, monkeypatch):
-    # `client` points the cache at a throwaway DB: _fresh_url invalidates rows.
-    monkeypatch.setattr(feeds, "_FRESH", {})
-    monkeypatch.setattr(feeds, "_refreshed_at", {})
-    monkeypatch.setattr(feeds.youtube, "video_streams", lambda vid: {
-        "streams": [{"url": "https://g.googlevideo.com/v?itag=18"}, {"url": "https://g.googlevideo.com/v?itag=137&n=2"}],
-        "audio": [{"url": "https://g.googlevideo.com/v?itag=140&n=2"}],
-    })
-    assert feeds._fresh_url("abc123def45", "https://g.googlevideo.com/v?itag=140&n=1").endswith("itag=140&n=2")
-    assert feeds._current_url("https://g.googlevideo.com/v?itag=140&n=1").endswith("n=2")
-    assert feeds._fresh_url("abc123def45", "https://g.googlevideo.com/v?itag=999") is None

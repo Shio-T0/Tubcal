@@ -10,6 +10,8 @@ import {
 } from 'lucide-react';
 
 import { usePlayer } from '../../../state.jsx';
+import { animeItem } from '../../../lib/saveable.js';
+import { SaveButton } from '../../ui/ItemActions.jsx';
 import a from './anime.module.css';
 
 const AUDIO_LABEL = { sub: 'Sub', dub: 'Dub' };
@@ -71,6 +73,7 @@ export default function AnimeStrip({ item, show, audio, audioOptions, onAudio, s
 
       <div className={a.side}>
         <div className={a.window}>
+          {m?.id && <SaveButton item={animeItem(m)} className={a.winBtn} size={15} />}
           {rail.available && (
             <button
               type="button"

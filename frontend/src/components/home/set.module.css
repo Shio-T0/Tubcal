@@ -620,18 +620,20 @@
   color: color-mix(in srgb, var(--signal) 55%, var(--paper-faint));
 }
 
-/* the channel knobs */
+/* the channel knobs: three dials in a row, the name under each */
 .knobs {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
 }
 .knob {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 10px;
+  gap: 7px;
   min-width: 0;
-  padding: 8px 10px 8px 8px;
+  padding: 10px 6px 8px;
+  text-align: center;
   border-radius: 16px;
   border: 1px solid var(--rule);
   background: color-mix(in srgb, var(--ink) 35%, transparent);
@@ -682,18 +684,21 @@
 .knobText {
   display: flex;
   flex-direction: column;
+  align-items: center;
+  max-width: 100%;
   min-width: 0;
 }
 .knobLabel {
   font-family: var(--font-display);
-  font-size: 17px;
+  font-size: 16px;
   font-weight: 620;
   line-height: 1.15;
   color: var(--text-primary);
 }
 .knobSub {
+  max-width: 100%;
   overflow: hidden;
-  font-size: 11px;
+  font-size: 10.5px;
   white-space: nowrap;
   text-overflow: ellipsis;
   color: var(--paper-faint);

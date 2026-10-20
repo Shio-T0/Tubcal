@@ -3161,3 +3161,33 @@ a.castAlsoName:focus-visible {
   font-style: normal;
   cursor: text;
 }
+
+/* a title's bookmark on its cover: shows on hover, stays once saved */
+.animeSave {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  z-index: 3;
+  opacity: 0;
+  --save-c: var(--cover-c, var(--signal));
+}
+.pcardRank ~ .animeSave {
+  top: 40px;
+}
+.card:hover .animeSave,
+.pcard:hover .animeSave,
+.animeSave:focus-visible,
+.animeSave[aria-pressed='true'] {
+  opacity: 1;
+}
+.dossierSave {
+  align-self: stretch;
+  justify-content: center;
+}
+
+/* touch screens have no hover: keep the bookmarks in sight */
+@media (hover: none) {
+  .animeSave {
+    opacity: 1;
+  }
+}

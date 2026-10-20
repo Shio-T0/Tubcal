@@ -5,18 +5,20 @@
 // just come in from your channels. The presets along the foot of the screen are
 // the rest of that queue: hover or focus one and the set tunes to it, press it and
 // it plays. The side panel is the cabinet's control strip: a clock in a glowing
-// window, the two channel knobs (1 the Hub, 2 the Anime), a slip of what's coming
-// up — streams live now, premieres, your shows' next episodes — and the speaker
-// grille with the maker's plate.
+// window, the three channel knobs (1 Social, 2 Coding, 3 Video), a slip of what's
+// coming up — streams live now, premieres, your shows' next episodes — and the
+// speaker grille with the maker's plate.
 
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { CalendarClock, Loader2, Play, Radio, RotateCcw, Tv } from 'lucide-react';
 
 import { usePlayer } from '../../state.jsx';
+import { hasModule } from '../../lib/modules.js';
 import { ago, clock } from '../../lib/time.js';
-import { ANIME_HOME, HUB_HOME } from '../../lib/rooms.js';
-import { usePlayEpisode } from '../anime/watching.js';
+import { CHANNELS } from '../../lib/rooms.js';
+import { usePlayEpisode } from '../player/anime/watching.js';
+import { useChannelHomes } from '../channels/common.jsx';
 import { slotLabel } from './lineup.js';
 import s from './set.module.css';
 
@@ -153,7 +155,11 @@ function TestCard() {
       </div>
       <div className={s.testLine}>
         <strong>Nothing on just now</strong>
-        <span>Half-watched videos and your shows' next episodes queue up here. Turn a knob to start.</span>
+        <span>
+          {hasModule('youtube') || hasModule('anime')
+            ? "Half-watched videos and your shows' next episodes queue up here. Turn a knob to start."
+            : 'This screen plays from the Screening Room and the Anime, and neither is installed. Add one with tubcal add youtube or tubcal add anime.'}
+        </span>
       </div>
     </div>
   );
@@ -327,15 +333,17 @@ function ComingUp({ rows, now, ready }) {
   );
 }
 
-export default function TheSet({ pickUp, comingUp, comingReady, now, hubSub, animeSub }) {
+export default function TheSet({ pickUp, comingUp, comingReady, now, subs }) {
+  const homes = useChannelHomes();
   return (
     <section className={s.set} aria-label="Pick up where you left off">
       <Screen items={pickUp.items} loading={pickUp.loading} />
       <aside className={s.panel} aria-label="Clock, channels and what's coming up">
         <Clock now={now} />
         <div className={s.knobs}>
-          <Knob n={1} label="Hub" sub={hubSub} to={HUB_HOME} tone="var(--signal)" />
-          <Knob n={2} label="Anime" sub={animeSub} to={ANIME_HOME} tone="var(--accent-strong)" />
+          {CHANNELS.map((ch) => (
+            <Knob key={ch.id} n={ch.n} label={ch.label} sub={subs[ch.id]} to={homes[ch.id]} tone={ch.color} />
+          ))}
         </div>
         <ComingUp rows={comingUp} now={now} ready={comingReady} />
         <div className={s.grille} aria-hidden="true">
