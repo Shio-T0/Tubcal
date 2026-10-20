@@ -46,31 +46,44 @@
   addEventListener('scroll', spy, { passive: true });
   spy();
 
-  /* ── channels & rooms: the rooms table ────────────────────────────────── */
-  let n = 0;
-  $('#rooms-table tbody').innerHTML = T.rooms
-    .map((r) => `<tr><td class="nowrap"><b style="color:${r.color}">${r.on ? pad2(++n) : '—'}</b></td><td class="nowrap"><b>${esc(r.label)}</b>${r.on ? '' : '<br><small class="muted">off at first</small>'}</td><td><b>${esc(r.line)}</b> ${esc(r.body)}</td></tr>`)
+  /* ── channels & rooms: the rooms table, numbered inside each channel ───── */
+  $('#rooms-table tbody').innerHTML = T.channels
+    .map((ch) => {
+      let n = 0;
+      return `<tr class="grp"><th colspan="3">${ch.n} · ${esc(ch.label)}</th></tr>${T.rooms
+        .filter((r) => r.channel === ch.id)
+        .map((r) => `<tr><td class="nowrap"><b style="color:${r.color}">${r.on ? pad2(++n) : '—'}</b></td><td class="nowrap"><b>${esc(r.label)}</b>${r.on ? '' : '<br><small class="muted">off at first</small>'}${r.fixed ? '<br><small class="muted">always on</small>' : ''}</td><td><b>${esc(r.line)}</b> ${esc(r.body)}</td></tr>`)
+        .join('')}`;
+    })
     .join('');
 
   /* ── keyboard: the key finder ─────────────────────────────────────────── */
   const KEYS = [
-    { scope: 'global', title: 'Everywhere', sub: 'the Hub & the Anime', rows: [
-      [['Space', 'g', 'h'], 'Go to the Hub, from anywhere'],
-      [['Space', 'g', 'a'], 'Go to the Anime, from anywhere'],
-      [['g', 'h'], 'Home screen'],
+    { scope: 'global', title: 'Everywhere', sub: 'every channel', note: 'Space then g opens a small menu of where you can go, so you don’t have to remember the letters.', rows: [
+      [['Space', 'g', 's'], 'Go to the Social channel'],
+      [['Space', 'g', 'c'], 'Go to the Coding channel'],
+      [['Space', 'g', 'v'], 'Go to the Video channel'],
+      [['Space', 'g', 'a'], 'Go to the Anime'],
+      [['Space', 'g', 'h'], 'Go to the home screen'],
+      [['Space', 's'], 'Open the Saved panel'],
+      [['Space', ','], 'Open the Settings panel'],
       [['g', 'e'], 'The Edition'],
-      [['g', 'y'], 'The Screening Room'],
-      [['g', 'r'], 'The Dispatch'],
       [['g', 'n'], 'The Wire'],
+      [['g', 'r'], 'The Dispatch'],
       [['g', 'c'], 'The Composing Room'],
-      [['g', 's'], 'Saved'],
+      [['g', 'd'], 'The Workbench'],
+      [['g', 'y'], 'The Screening Room'],
+      [['g', 'a'], 'The Anime'],
+      [['g', 's'], 'The Saved page'],
+      [['g', 'h'], 'Home screen'],
       [['h', 'j', 'k', 'l'], 'Move between tiles: left, down, up, right (the arrow keys work too)'],
       [['g', 'g', '·', 'G'], 'First · last tile on the page'],
-      [['/', 'or', 'Ctrl', 'K'], 'Search: jump to any room, or search YouTube, Reddit and Hacker News'],
+      [['/', 'or', 'Ctrl', 'K'], 'Search: jump to any room, search YouTube, Reddit and Hacker News, or find something you saved'],
     ] },
     { scope: 'home', title: 'The home screen', sub: 'the TV', rows: [
-      [['1'], 'Channel 1, the Hub'],
-      [['2'], 'Channel 2, the Anime'],
+      [['1'], 'Channel 1, Social'],
+      [['2'], 'Channel 2, Coding'],
+      [['3'], 'Channel 3, Video'],
     ] },
     { scope: 'player', title: 'In the player', sub: 'while it’s on the big screen', rows: [
       [['Space', '/', 'K'], 'Play · pause'],
@@ -99,6 +112,7 @@
       [['leader', 'o'], 'Switch to the other side'],
       [['leader', 'r'], 'Run the file'],
       [['leader', 'g'], 'Refresh git status'],
+      [['leader', 'b'], 'Save the file to Saved'],
       [[':w!'], 'Save over a file that changed on disk'],
     ] },
   ];
@@ -164,9 +178,10 @@
       ['anilist', 'An AniList account', 'free, at anilist.co'],
       ['reddit', 'A Reddit sign-in', 'your own Reddit account'],
       ['google', 'A YouTube sign-in', 'through your Google account'],
+      ['github', 'A linked GitHub account', 'with the GitHub CLI or a token'],
     ]],
     ['Add-ons', [
-      ['archive', 'The Archive option', 'ticked in the installer'],
+      ['archive', 'The Archive room', 'picked in the installer'],
       ['ai', 'A local AI (Ollama)', 'with its two models'],
       ['notify', 'Desktop notifications', 'offered by the installer'],
     ]],
@@ -188,15 +203,18 @@
     out.push(h('anilist')
       ? ['on', 'The Anime', 'everything', 'Your list, automatic progress updates, reviews and the social pages.']
       : ['off', 'The Anime', 'needs AniList', 'AniList no longer allows reading it without an account.']);
-    if (h('ai')) out.push(['on', 'The Edition', 'written', h('archive') ? 'Short articles for the top stories, and related posts grouped even when they link to different pages.' : 'Short articles for the top stories. Grouping related posts also needs the Archive option.']);
+    if (h('ai')) out.push(['on', 'The Edition', 'written', 'Short articles for the top stories, and related posts grouped even when they link to different pages.']);
     else out.push(['part', 'The Edition', 'headlines', 'Headlines with points and comment counts. Posts that link to the same page are grouped.']);
     if (h('archive') && h('ai')) out.push(['on', 'The Archive', 'everything', 'Transcribes videos; you can search them, read summaries and ask questions.']);
     else if (h('archive')) out.push(['part', 'The Archive', 'transcripts', 'Transcribes videos. Search, summaries and questions also need the local AI.']);
-    else out.push(['off', 'The Archive', 'not installed', 'Run the installer again and tick The Archive to add it.']);
+    else out.push(['off', 'The Archive', 'not installed', 'Add it with tubcal add archive.']);
     out.push(h('notify')
       ? ['on', 'Live alerts', 'on', 'A desktop notification about ten minutes before a channel you follow goes live.']
       : ['off', 'Live alerts', 'off', 'Live streams still appear in the Screening Room, but you won’t get a notification.']);
-    out.push(['on', 'The Wire · The Workbench · the player', 'always', 'Work without any accounts or add-ons.']);
+    out.push(h('github')
+      ? ['on', 'GitHub', 'your account', 'Your notifications, your open issues and pull requests, your stars, and 5,000 requests an hour.']
+      : ['part', 'GitHub', 'public', 'The projects and people you follow, and what’s trending. GitHub allows 60 requests an hour without an account.']);
+    out.push(['on', 'The Wire · The Workbench · the player · Saved', 'always', 'Work without any accounts or add-ons.']);
     return out;
   }
   let lastFeat = [];
@@ -219,7 +237,7 @@
   // shows the exact one for this install, with a copy button.
   const ACCTS = [
     { id: 'anilist', name: 'AniList', c: 'var(--accent-strong)', tag: 'needed for the Anime',
-      unlocks: 'The whole Anime channel: your list, progress updates as you watch, reviews and the social pages.',
+      unlocks: 'The whole Anime room: your list, progress updates as you watch, reviews and the social pages.',
       steps: [
         'Make a free account at <b>anilist.co</b> if you don’t have one.',
         'On AniList, open <b>Settings → Developer</b> and create a new client. Give it any name, and paste the address below as its <b>Redirect URL</b>.',
@@ -242,6 +260,14 @@
         'Copy its <b>ID</b> and <b>secret</b> into <b>Settings → Accounts → Google · YouTube</b>, then press <b>Connect</b>.',
       ],
       note: 'Google will warn that the app isn’t verified. You can continue past the warning: the app is yours and only you use it.' },
+    { id: 'github', name: 'GitHub', c: 'var(--c-github)', tag: 'optional', uri: false,
+      unlocks: 'Your notifications, your open issues and pull requests, your stars, starring and commenting, and a much higher request limit. Following projects works without it.',
+      steps: [
+        '<b>If you use the GitHub CLI</b> (the <code>gh</code> command) and have signed in with <code>gh auth login</code>, open <b>Settings → Accounts → GitHub</b> and press <b>Link</b>. Tubcal uses the same sign-in.',
+        '<b>Otherwise</b>, on GitHub create a <b>personal access token (classic)</b> with the <b>repo</b>, <b>notifications</b> and <b>user:follow</b> boxes ticked. The link in Settings opens that page with them already ticked.',
+        'Paste the token into <b>Settings → Accounts → GitHub</b> and press <b>Link token</b>. Tubcal checks it with GitHub before keeping it.',
+      ],
+      note: 'The same panel is in the GitHub room. The token stays on your computer.' },
   ];
   $('#accts').innerHTML = ACCTS.map((a) => {
     const uri = `http://127.0.0.1:5000/api/oauth/${a.id}/callback`;
@@ -249,7 +275,7 @@
       <h4>${esc(a.name)}<small>${esc(a.tag)}</small></h4>
       <p class="acct-unlocks">${a.unlocks}</p>
       <ol class="acct-steps">${a.steps.map((s) => `<li>${s}</li>`).join('')}</ol>
-      <div class="uri" title="Redirect address"><code>${uri}</code><button class="copy" data-uri="${uri}" aria-label="Copy the redirect address">${icon('copy')}</button></div>
+      ${a.uri === false ? '' : `<div class="uri" title="Redirect address"><code>${uri}</code><button class="copy" data-uri="${uri}" aria-label="Copy the redirect address">${icon('copy')}</button></div>`}
       ${a.note ? `<p class="acct-note">${a.note}</p>` : ''}
     </article>`;
   }).join('');

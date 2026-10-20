@@ -194,10 +194,8 @@
         pn: '▸',
         where: page === 'tour' ? 'here' : 'tour',
         run: () => {
-          if (page === 'tour') {
-            goSection('hub');
-            document.dispatchEvent(new CustomEvent('tubcal:room', { detail: r.id }));
-          } else location.href = `${TOUR_URL}#hub`;
+          if (page === 'tour') document.dispatchEvent(new CustomEvent('tubcal:room', { detail: r.id }));
+          else location.href = `${TOUR_URL}#${r.id === 'anime' ? 'anime' : r.channel}`;
         },
       }),
     );
@@ -407,7 +405,7 @@
     if (k === 't') { e.preventDefault(); nextSkin(); return; }
     if (k === 'j') { e.preventDefault(); stepSection(1); return; }
     if (k === 'k') { e.preventDefault(); stepSection(-1); return; }
-    if (k === '1') { e.preventDefault(); page === 'tour' ? goSection('hub') : (location.href = TOUR_URL); return; }
+    if (k === '1') { e.preventDefault(); page === 'tour' ? goSection('home') : (location.href = TOUR_URL); return; }
     if (k === '2') { e.preventDefault(); page === 'manual' ? window.scrollTo({ top: 0, behavior: 'smooth' }) : (location.href = MANUAL_URL); return; }
   });
 

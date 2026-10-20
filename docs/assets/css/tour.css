@@ -51,7 +51,7 @@
 }
 .bar-stops a {
   flex: none;
-  padding: 5px 10px;
+  padding: 5px 8px;
   border-radius: 8px;
   font-size: 13px;
   color: var(--paper-faint);
@@ -357,29 +357,11 @@
     display: none;
   }
 }
-.hg-line {
-  margin-bottom: 10px;
-  font-size: 13px;
-  color: var(--paper-dim);
-}
-.hg-views {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-.hg-views a {
-  padding: 5px 12px;
-  border-radius: var(--r-pill);
-  border: 1px solid color-mix(in srgb, var(--accent-strong) 35%, var(--rule));
-  font-size: 13px;
-  color: var(--paper);
-  transition: background 0.15s ease, border-color 0.15s ease;
-}
-.hg-views a:hover,
-.hg-views a:focus-visible {
-  background: color-mix(in srgb, var(--accent-strong) 18%, transparent);
-  border-color: var(--accent-strong);
-  outline: none;
+.hg-channels {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  gap: var(--space-4);
 }
 
 /* the short facts under both columns */
@@ -454,11 +436,82 @@
   font-size: 24px;
 }
 
+/* a demo or a note inside a stop, under its screenshots */
+.tour-sub {
+  margin-top: var(--space-8);
+  scroll-margin-top: 70px;
+}
+.tour-subhead {
+  margin-bottom: var(--space-5);
+}
+.tour-subhead h3 {
+  margin: 6px 0 8px;
+  font-size: 26px;
+}
+.tour-subhead p {
+  max-width: 64ch;
+  font-size: 15px;
+}
+.tour-note {
+  max-width: 76ch;
+  margin-top: var(--space-4);
+  font-size: 14px;
+}
+
 /* ===================================================================== *
- * 01 · THE HUB — screenshots (styled with the Anime's, below) + Settings → Rooms
+ * 01 · HOME — the three channels' layouts (screenshots are styled below)
  * ===================================================================== */
-.shots-hub {
-  margin-bottom: var(--space-6);
+.presses.presses-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+@media (max-width: 900px) {
+  .presses.presses-3 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.presses.presses-3 li {
+  border-top-color: var(--press-c, var(--signal));
+  font-size: 13.5px;
+}
+.presses.presses-3 li .kicker {
+  color: var(--press-c, var(--signal));
+  text-transform: uppercase;
+}
+.presses.presses-3 li span + span {
+  margin-top: 2px;
+}
+
+/* ===================================================================== *
+ * 06 · SAVED & SETTINGS — Settings → Rooms, a group per channel
+ * ===================================================================== */
+.sr-chans {
+  display: grid;
+  gap: var(--space-4);
+}
+.sr-chans .sr-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+@media (max-width: 760px) {
+  .sr-chans .sr-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.sr-chname {
+  margin-bottom: 8px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ch-c, var(--paper-faint));
+}
+.sr-fixed {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--paper-faint);
+  white-space: nowrap;
 }
 .settings-rooms {
   margin-top: var(--space-5);
@@ -514,7 +567,7 @@
 }
 
 /* ===================================================================== *
- * 02 · THE EDITION — the degradation ladder + the paper
+ * 02 · SOCIAL — the Edition demo: the degradation ladder + the paper
  * ===================================================================== */
 .ladder {
   display: grid;
@@ -878,7 +931,7 @@
 }
 
 /* ===================================================================== *
- * 03 · THE PLAYER — theatre, seek ridge, programme notes, dock
+ * 04 · VIDEO — the player demo: theatre, seek ridge, programme notes, dock
  * ===================================================================== */
 .theatre {
   display: grid;
@@ -1371,7 +1424,7 @@
 }
 
 /* ===================================================================== *
- * 04 · THE ANIME — screenshots of the real app, one view at a time (the Hub's too)
+ * SCREENSHOTS of the real app, one at a time (every stop uses these)
  * ===================================================================== */
 .shots {
   display: grid;
@@ -1381,6 +1434,9 @@
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+}
+.shots-tabs[hidden] {
+  display: none;
 }
 .shots-tab {
   display: inline-flex;
@@ -1515,7 +1571,7 @@
 }
 
 /* ===================================================================== *
- * 05 · THE LOOK — each card wears its own skin
+ * 07 · THE LOOK — each card wears its own skin
  * ===================================================================== */
 .skins {
   display: grid;
@@ -1644,7 +1700,7 @@
 }
 
 /* ===================================================================== *
- * 06 · PRIVACY — the wiring
+ * 08 · PRIVACY — the wiring
  * ===================================================================== */
 .wiring {
   display: grid;
@@ -1813,7 +1869,7 @@
 }
 
 /* ===================================================================== *
- * 07 · TUNE IN
+ * 09 · TUNE IN
  * ===================================================================== */
 .tune-grid {
   display: grid;

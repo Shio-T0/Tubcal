@@ -3,11 +3,11 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Tubcal: YouTube, Reddit, Hacker News and anime on your own computer</title>
-  <meta name="description" content="Tubcal is a free Linux app that puts the YouTube channels, subreddits, Hacker News and anime you follow in one place. It runs on your own computer and has no ads." />
+  <title>Tubcal: YouTube, Reddit, Hacker News, GitHub and anime on your own computer</title>
+  <meta name="description" content="Tubcal is a free Linux app that puts the YouTube channels, subreddits, Hacker News, GitHub projects and anime you follow in one place. It runs on your own computer and has no ads." />
   <meta name="theme-color" content="#1c140d" />
   <meta property="og:title" content="Tubcal" />
-  <meta property="og:description" content="The YouTube channels, subreddits, Hacker News and anime you follow, in one app on your own computer. Free, for Linux." />
+  <meta property="og:description" content="The YouTube channels, subreddits, Hacker News, GitHub projects and anime you follow, in one app on your own computer. Free, for Linux." />
   <meta property="og:type" content="website" />
   <link rel="icon" type="image/svg+xml" href="assets/icon.svg" />
   <script>
@@ -27,14 +27,14 @@
   <link rel="stylesheet" href="assets/css/tour.css" />
 </head>
 <body data-page="tour">
-  <a class="skip" href="#hub">Skip to the tour</a>
+  <a class="skip" href="#home">Skip to the tour</a>
   <div class="backdrop" id="backdrop" aria-hidden="true"></div>
 
   <!-- the slim bar that drops in once you've scrolled past the top -->
   <header class="bar" id="bar">
     <div class="bar-in">
       <a class="tc-wordmark bar-mark" href="#top" aria-label="Back to the top">Tubcal<em>.</em></a>
-      <nav class="chswitch" aria-label="Channels">
+      <nav class="chswitch" aria-label="Pages">
         <a href="./" aria-current="page"><b>1</b> Tour</a>
         <a href="manual.html"><b>2</b> Manual</a>
       </nav>
@@ -61,10 +61,10 @@
         <div class="hero-main">
           <h1 class="tc-wordmark hero-mark">Tubcal<em>.</em></h1>
           <div class="hero-body">
-            <p class="hero-tag">One place for YouTube, Reddit, Hacker News and anime.</p>
+            <p class="hero-tag">One place for YouTube, Reddit, Hacker News, GitHub and anime.</p>
             <p class="hero-sub">
-              Tubcal puts the YouTube channels, subreddits and anime you follow on one screen, with no ads. It runs on your
-              own computer, and you use it in your web browser.
+              Tubcal brings the YouTube channels, subreddits, news, code projects and anime you follow into one app, with
+              no ads. It runs on your own computer, and you use it in your web browser.
             </p>
 
             <div class="hero-install">
@@ -73,13 +73,13 @@
 <pre><span class="k">curl -fsSL https://raw.githubusercontent.com/<wbr><span class="nobr">Shio-T0</span>/Tubcal/main/<wbr>install.sh | bash</span></pre>
               </div>
               <p class="hero-note">
-                It shows what it will install and asks before starting. Afterwards, open Tubcal from your app menu. The
-                manual has <a href="manual.html#install">step-by-step instructions</a>.
+                It asks which parts you want, shows what it will install, and waits for you to agree. Afterwards, open
+                Tubcal from your app menu. The manual has <a href="manual.html#install">step-by-step instructions</a>.
               </p>
             </div>
 
             <div class="hero-actions">
-              <a class="btn btn-lit" href="#hub"><span data-icon="tv"></span>Take the tour</a>
+              <a class="btn btn-lit" href="#home"><span data-icon="tv"></span>Take the tour</a>
               <a class="btn" href="manual.html"><span data-icon="book"></span>Read the manual</a>
             </div>
           </div>
@@ -89,22 +89,14 @@
           <div class="screen">
             <span class="scan" aria-hidden="true"></span>
             <div class="hg-head"><span class="kicker" id="hg-title">What's in Tubcal</span><span class="hg-hint">click a line to see it</span></div>
-            <div class="hg-ch">
-              <div class="hg-chhead"><b>Channel 1 · The Hub</b><span id="hg-hub-count"></span></div>
-              <ol class="hg-rooms" id="hg-rooms"></ol>
-            </div>
-            <div class="hg-ch">
-              <div class="hg-chhead"><b>Channel 2 · The Anime</b><span id="hg-anime-count"></span></div>
-              <p class="hg-line">Your AniList, with seasons, schedules, your list and episodes. Pick a view to see a screenshot:</p>
-              <div class="hg-views" id="hg-views"></div>
-            </div>
+            <div class="hg-channels" id="hg-channels"></div>
           </div>
         </aside>
 
         <dl class="hero-facts">
           <div><dt>Runs on</dt><dd>Linux: Ubuntu, Fedora, Debian, Arch, openSUSE and most others.</dd></div>
           <div><dt>Price</dt><dd>Free. It's open-source software (<span class="nobr">GPL-3.0</span>).</dd></div>
-          <div><dt>Accounts</dt><dd>None for YouTube or Reddit. The anime part needs a free AniList account.</dd></div>
+          <div><dt>Accounts</dt><dd>None for YouTube, Reddit or GitHub. The anime part needs a free AniList account.</dd></div>
           <div><dt>Your data</dt><dd>Stays on your computer. There's no Tubcal server.</dd></div>
         </dl>
       </div>
@@ -112,26 +104,267 @@
       <p class="hint"><kbd>Ctrl</kbd><kbd>K</kbd> search this site · <kbd>t</kbd> change skin · <kbd>?</kbd> all shortcuts</p>
     </section>
 
-    <!-- ══ 01 · The Hub ═════════════════════════════════════════════════ -->
-    <section id="hub" class="tour-sec" data-section>
+    <!-- ══ 01 · Home ════════════════════════════════════════════════════ -->
+    <section id="home" class="tour-sec" data-section>
       <div class="shell">
         <header class="tc-sectionhead reveal" style="--sec-c: var(--signal)">
           <span class="plate">01</span>
-          <span class="kicker">Channel 1</span>
-          <h2>The Hub</h2>
+          <span class="kicker">Where Tubcal opens</span>
+          <h2>Home and the three channels</h2>
           <p class="dek">
-            Tubcal has two channels. The first, the Hub, is split into rooms: one for YouTube, one for Reddit, one for
-            Hacker News, a daily paper and a few more. These screenshots come from a test setup that follows some popular
-            public channels and subreddits. Choose a screen with the tabs, and click the picture to see it full size.
+            Tubcal opens on a home screen that shows what to watch or read next. From there you go into one of three
+            channels: Social, Coding or Video. Each channel holds a few rooms, and each has a layout of its own. The
+            screenshots on this page come from a test setup that follows some popular public channels and subreddits.
+            Click a picture to see it full size.
           </p>
         </header>
 
-        <div class="shots shots-hub reveal" id="hub-shots">
-          <div class="shots-tabs" role="tablist" aria-label="Hub screens"></div>
-          <figure class="shots-stage" role="tabpanel" id="hub-panel">
+        <div class="shots shots-single reveal" id="home-shots">
+          <div class="shots-tabs" role="tablist" aria-label="Home screen"></div>
+          <figure class="shots-stage" role="tabpanel" id="home-panel">
             <button class="shots-frame" aria-label="Open this screenshot full size">
-              <img src="assets/shots/hub-home-dark.webp" width="1800" height="1125" loading="lazy" decoding="async"
-                alt="The home screen: a greeting, a TV showing a half-watched video to resume, a row of what’s next beneath it, a clock and a coming-up list beside it, and the two channels below." />
+              <img src="assets/shots/app-home-dark.webp" width="1800" height="1125" loading="lazy" decoding="async" alt="" />
+              <span class="shots-zoom" aria-hidden="true">Full size</span>
+            </button>
+            <figcaption class="shots-cap" aria-live="polite"></figcaption>
+          </figure>
+        </div>
+
+        <ol class="presses presses-3 reveal" id="channel-cards"></ol>
+        <p class="tour-note dim reveal">
+          To change channel, turn a knob on the home screen or press <kbd>1</kbd>, <kbd>2</kbd> or <kbd>3</kbd> there.
+          Every channel also has the three channel buttons in its bar. From anywhere, press <kbd>Space</kbd>, then
+          <kbd>g</kbd>, then <kbd>s</kbd>, <kbd>c</kbd> or <kbd>v</kbd>.
+        </p>
+      </div>
+    </section>
+
+    <!-- ══ 02 · Social ══════════════════════════════════════════════════ -->
+    <section id="social" class="tour-sec" data-section>
+      <div class="shell">
+        <header class="tc-sectionhead reveal" style="--sec-c: var(--c-foryou)">
+          <span class="plate">02</span>
+          <span class="kicker">Channel 1</span>
+          <h2>Social</h2>
+          <p class="dek">
+            The news and discussion you follow: a daily paper made from all of it, Hacker News, and Reddit. The rooms
+            are listed in a bar across the top of the page, like the sections of a newspaper. Choose a room with the
+            tabs.
+          </p>
+        </header>
+
+        <div class="shots reveal" id="social-shots">
+          <div class="shots-tabs" role="tablist" aria-label="Social rooms"></div>
+          <figure class="shots-stage" role="tabpanel" id="social-panel">
+            <button class="shots-frame" aria-label="Open this screenshot full size">
+              <img src="assets/shots/app-edition-dark.webp" width="1800" height="1125" loading="lazy" decoding="async" alt="" />
+              <span class="shots-zoom" aria-hidden="true">Full size</span>
+            </button>
+            <figcaption class="shots-cap" aria-live="polite"></figcaption>
+          </figure>
+        </div>
+
+        <div class="tour-sub" id="edition">
+          <header class="tour-subhead reveal">
+            <span class="kicker">Try it</span>
+            <h3>The Edition, with and without AI</h3>
+            <p class="dim">
+              Each morning Tubcal makes a front page from the channels, subreddits and Hacker News stories you follow.
+              On its own it lists the headlines. With a local AI (one that runs on your computer) it can also group
+              related posts and write a short article for each top story. Use the two switches to see what each one
+              adds.
+            </p>
+          </header>
+
+          <div class="ladder reveal">
+            <div class="ladder-ctl glass">
+              <span class="kicker">Optional · needs a local AI</span>
+              <label class="switch"><input type="checkbox" id="lad-embed" /><span class="track"></span><span><b>Topic matching</b><small>groups posts about the same story, even when they link to different pages</small></span></label>
+              <label class="switch"><input type="checkbox" id="lad-chat" /><span class="track"></span><span><b>Writing</b><small>writes a short article for each top story</small></span></label>
+              <ol class="rungs" id="rungs">
+                <li data-rung="0"><span>Headlines</span>titles and numbers</li>
+                <li data-rung="1"><span>Matched</span>related posts grouped</li>
+                <li data-rung="2"><span>Written</span>short articles with sources</li>
+              </ol>
+              <p class="ladder-note" id="ladder-note"></p>
+            </div>
+            <div class="paper" id="paper" aria-live="polite"></div>
+          </div>
+
+          <ol class="presses reveal">
+            <li><b>Made in advance</b><span>Tubcal builds the paper in the background, so it's ready when you open it.</span></li>
+            <li><b>Back issues</b><span>Every paper is kept, and you can go back to any earlier day.</span></li>
+            <li><b>Read marks</b><span>Stories you open are ticked off, and a ring at the top shows how much is left.</span></li>
+            <li><b>Sources checked</b><span>A written story has to cite the posts it came from. If the AI's draft doesn't, the paper shows the plain headline instead.</span></li>
+          </ol>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══ 03 · Coding ══════════════════════════════════════════════════ -->
+    <section id="coding" class="tour-sec" data-section>
+      <div class="shell">
+        <header class="tc-sectionhead reveal" style="--sec-c: var(--c-editor)">
+          <span class="plate">03</span>
+          <span class="kicker">Channel 2</span>
+          <h2>Coding</h2>
+          <p class="dek">
+            A code editor, news about four programming languages, and GitHub. The rooms are buttons down the left, as in
+            a code editor, and a bar across the top shows where you are. If you don't write code, you can leave this
+            channel out when you install.
+          </p>
+        </header>
+
+        <div class="shots reveal" id="coding-shots">
+          <div class="shots-tabs" role="tablist" aria-label="Coding rooms"></div>
+          <figure class="shots-stage" role="tabpanel" id="coding-panel">
+            <button class="shots-frame" aria-label="Open this screenshot full size">
+              <img src="assets/shots/app-editor-dark.webp" width="1800" height="1125" loading="lazy" decoding="async" alt="" />
+              <span class="shots-zoom" aria-hidden="true">Full size</span>
+            </button>
+            <figcaption class="shots-cap" aria-live="polite"></figcaption>
+          </figure>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══ 04 · Video ═══════════════════════════════════════════════════ -->
+    <section id="video" class="tour-sec" data-section>
+      <div class="shell">
+        <header class="tc-sectionhead reveal" style="--sec-c: var(--c-youtube)">
+          <span class="plate">04</span>
+          <span class="kicker">Channel 3</span>
+          <h2>Video</h2>
+          <p class="dek">
+            YouTube, anime, and a searchable archive of what you've watched. The rooms are on a wooden panel down the
+            left, and the room you're in lists its own places under its button. The Anime has a section of its own
+            <a href="#anime">further down</a>.
+          </p>
+        </header>
+
+        <div class="shots reveal" id="video-shots">
+          <div class="shots-tabs" role="tablist" aria-label="Video rooms"></div>
+          <figure class="shots-stage" role="tabpanel" id="video-panel">
+            <button class="shots-frame" aria-label="Open this screenshot full size">
+              <img src="assets/shots/app-youtube-dark.webp" width="1800" height="1125" loading="lazy" decoding="async" alt="" />
+              <span class="shots-zoom" aria-hidden="true">Full size</span>
+            </button>
+            <figcaption class="shots-cap" aria-live="polite"></figcaption>
+          </figure>
+        </div>
+
+        <div class="tour-sub" id="player">
+          <header class="tour-subhead reveal">
+            <span class="kicker">Try it</span>
+            <h3>The player</h3>
+            <p class="dim">
+              Videos from every room open in the same player, with no ads, at up to 1080p. The progress bar is split into
+              the video's chapters, and the line above it rises where people replay most. Click the demo to start it,
+              then try the keyboard shortcuts (the Keys tab lists them).
+            </p>
+          </header>
+
+          <div class="theatre reveal" id="theatre" tabindex="0" data-owns-keys aria-label="Player demo. Focus it and use Space, J, L, the arrows, 0 to 9, Control-arrows for chapters, and Escape.">
+            <div class="th-stage" id="th-stage">
+              <div class="th-card" id="th-card">
+                <div class="th-glow" id="th-glow" aria-hidden="true"></div>
+                <div class="th-picture" id="th-picture">
+                  <div class="th-scene" id="th-scene"></div>
+                  <span class="th-beam" aria-hidden="true"></span>
+                  <span class="scan" aria-hidden="true"></span>
+                  <div class="th-osd" id="th-osd" aria-hidden="true"></div>
+                  <button class="th-bigplay" id="th-bigplay" aria-label="Play">▶</button>
+                </div>
+                <div class="th-controls">
+                  <button class="iconbtn th-play" id="th-play" aria-label="Play"></button>
+                  <span class="th-time" id="th-time">0:00 / 18:40</span>
+                  <span class="th-chap" id="th-chap"></span>
+                  <div class="th-seek" id="th-seek" role="slider" tabindex="-1" aria-label="Seek" aria-valuemin="0" aria-valuemax="1120" aria-valuenow="0">
+                    <svg class="th-ridge" id="th-ridge" viewBox="0 0 1000 40" preserveAspectRatio="none" aria-hidden="true"></svg>
+                    <div class="th-bar" id="th-bar"></div>
+                    <div class="th-tip" id="th-tip" aria-hidden="true"></div>
+                  </div>
+                  <button class="iconbtn th-dockbtn" id="th-dockbtn" aria-label="Keep playing in the corner (Esc)" title="Keep playing in the corner (Esc)">⤡</button>
+                </div>
+                <div class="th-info">
+                  <div class="th-title">How a picture tube paints a picture</div>
+                  <div class="th-meta">
+                    <span class="th-face" aria-hidden="true">PL</span>
+                    <span><b>The Phosphor Lab</b><small>182K subscribers</small></span>
+                    <button class="btn btn-sm th-sub" id="th-sub">Subscribe</button>
+                    <button class="btn btn-sm" id="th-save">Save</button>
+                    <button class="btn btn-sm" id="th-link">Copy link at <span id="th-at">0:00</span></button>
+                  </div>
+                </div>
+              </div>
+              <div class="th-dockhint" id="th-dockhint">Still playing in the corner. Press <kbd>Esc</kbd> or click it to bring it back.</div>
+            </div>
+
+            <aside class="th-notes">
+              <div class="th-tabs" role="tablist" aria-label="Beside the video">
+                <button role="tab" aria-selected="true" data-tab="chapters">Chapters</button>
+                <button role="tab" aria-selected="false" data-tab="transcript">Transcript</button>
+                <button role="tab" aria-selected="false" data-tab="keys">Keys</button>
+              </div>
+              <div class="th-pane" id="th-pane-chapters"></div>
+              <div class="th-pane" id="th-pane-transcript" hidden></div>
+              <div class="th-pane" id="th-pane-keys" hidden></div>
+            </aside>
+          </div>
+          <p class="th-caption dim reveal">
+            The Transcript tab follows the video as it plays. In the app, that needs The Archive to have transcribed the
+            video first. Press <kbd>Esc</kbd> and the video moves to a corner and keeps playing while you browse.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══ 05 · The Anime ══════════════════════════════════════════════ -->
+    <section id="anime" class="tour-sec" data-section>
+      <div class="shell">
+        <header class="tc-sectionhead reveal" style="--sec-c: var(--accent-strong)">
+          <span class="plate">05</span>
+          <span class="kicker">Channel 3 · Video</span>
+          <h2>The Anime <i lang="ja" class="jp">アニメ</i></h2>
+          <p class="dek">
+            The Anime works with AniList, a free website for tracking what you watch. You can browse each season, keep
+            your list up to date, watch episodes and read the forums. In the app, its views are listed under its button
+            in the panel on the left, with your AniList account at the top. Here, choose one with the tabs.
+          </p>
+        </header>
+
+        <div class="shots reveal" id="anime-shots">
+          <div class="shots-tabs" role="tablist" aria-label="Anime views"></div>
+          <figure class="shots-stage" role="tabpanel" id="anime-panel">
+            <button class="shots-frame" aria-label="Open this screenshot full size">
+              <img src="assets/shots/anime-browse-dark.webp" width="1800" height="1125" loading="lazy" decoding="async" alt="" />
+              <span class="shots-zoom" aria-hidden="true">Full size</span>
+            </button>
+            <figcaption class="shots-cap" aria-live="polite"></figcaption>
+          </figure>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══ 06 · Saved & Settings ═══════════════════════════════════════ -->
+    <section id="saved" class="tour-sec" data-section>
+      <div class="shell">
+        <header class="tc-sectionhead reveal" style="--sec-c: var(--c-editor)">
+          <span class="plate">06</span>
+          <span class="kicker">From any page</span>
+          <h2>Saved and Settings</h2>
+          <p class="dek">
+            Almost everything in Tubcal has a bookmark button: videos, posts, stories, anime, characters, GitHub
+            projects, even files in the code editor. Whatever you save goes to one place. Saved and Settings open in a
+            panel at the side of the screen, so you don't lose the page you were on.
+          </p>
+        </header>
+
+        <div class="shots reveal" id="saved-shots">
+          <div class="shots-tabs" role="tablist" aria-label="Saved and Settings"></div>
+          <figure class="shots-stage" role="tabpanel" id="saved-panel">
+            <button class="shots-frame" aria-label="Open this screenshot full size">
+              <img src="assets/shots/app-drawer-dark.webp" width="1800" height="1125" loading="lazy" decoding="async" alt="" />
               <span class="shots-zoom" aria-hidden="true">Full size</span>
             </button>
             <figcaption class="shots-cap" aria-live="polite"></figcaption>
@@ -144,169 +377,35 @@
               <span class="kicker">Settings → Rooms</span>
               <h3>Choose which rooms you see</h3>
             </div>
-            <p class="dim">Turn off the rooms you don't need and the others are renumbered. GitHub starts switched off; the rest start on. Try the switches.</p>
+            <p class="dim">Switch off the rooms you don't use, and the rest of the channel is renumbered. GitHub starts switched off, and the Anime is always on. Try the switches.</p>
           </div>
-          <div class="sr-grid" id="sr-grid"></div>
+          <div class="sr-chans" id="sr-grid"></div>
         </div>
       </div>
     </section>
 
-    <!-- ══ 02 · The Edition ════════════════════════════════════════════ -->
-    <section id="edition" class="tour-sec" data-section>
-      <div class="shell">
-        <header class="tc-sectionhead reveal" style="--sec-c: var(--c-foryou)">
-          <span class="plate">02</span>
-          <span class="kicker">Room 01</span>
-          <h2>The Edition</h2>
-          <p class="dek">
-            Each morning Tubcal makes a front page from the channels, subreddits and Hacker News stories you follow. On its
-            own it lists the headlines. With a local AI (one that runs on your computer) it can also group related posts and
-            write a short article for each top story. Use the two switches to see what each one adds.
-          </p>
-        </header>
-
-        <div class="ladder reveal">
-          <div class="ladder-ctl glass">
-            <span class="kicker">Optional · needs a local AI</span>
-            <label class="switch"><input type="checkbox" id="lad-embed" /><span class="track"></span><span><b>Topic matching</b><small>groups posts about the same story, even when they link to different pages</small></span></label>
-            <label class="switch"><input type="checkbox" id="lad-chat" /><span class="track"></span><span><b>Writing</b><small>writes a short article for each top story</small></span></label>
-            <ol class="rungs" id="rungs">
-              <li data-rung="0"><span>Headlines</span>titles and numbers</li>
-              <li data-rung="1"><span>Matched</span>related posts grouped</li>
-              <li data-rung="2"><span>Written</span>short articles with sources</li>
-            </ol>
-            <p class="ladder-note" id="ladder-note"></p>
-          </div>
-          <div class="paper" id="paper" aria-live="polite"></div>
-        </div>
-
-        <ol class="presses reveal">
-          <li><b>Made in advance</b><span>Tubcal builds the paper in the background, so it's ready when you open it.</span></li>
-          <li><b>Back issues</b><span>Every paper is kept, and you can go back to any earlier day.</span></li>
-          <li><b>Read marks</b><span>Stories you open are ticked off, and a ring at the top shows how much is left.</span></li>
-          <li><b>Sources checked</b><span>A written story has to cite the posts it came from. If the AI's draft doesn't, the paper shows the plain headline instead.</span></li>
-        </ol>
-      </div>
-    </section>
-
-    <!-- ══ 03 · The player ═════════════════════════════════════════════ -->
-    <section id="player" class="tour-sec" data-section>
-      <div class="shell">
-        <header class="tc-sectionhead reveal" style="--sec-c: var(--c-youtube)">
-          <span class="plate">03</span>
-          <span class="kicker">Every room</span>
-          <h2>The player</h2>
-          <p class="dek">
-            Videos from every room open in the same player, with no ads, at up to 1080p. The progress bar is split into the
-            video's chapters, and the line above it rises where people replay most. Click the demo to start it, then try the
-            keyboard shortcuts (the Keys tab lists them).
-          </p>
-        </header>
-
-        <div class="theatre reveal" id="theatre" tabindex="0" data-owns-keys aria-label="Player demo. Focus it and use Space, J, L, the arrows, 0 to 9, Control-arrows for chapters, and Escape.">
-          <div class="th-stage" id="th-stage">
-            <div class="th-card" id="th-card">
-              <div class="th-glow" id="th-glow" aria-hidden="true"></div>
-              <div class="th-picture" id="th-picture">
-                <div class="th-scene" id="th-scene"></div>
-                <span class="th-beam" aria-hidden="true"></span>
-                <span class="scan" aria-hidden="true"></span>
-                <div class="th-osd" id="th-osd" aria-hidden="true"></div>
-                <button class="th-bigplay" id="th-bigplay" aria-label="Play">▶</button>
-              </div>
-              <div class="th-controls">
-                <button class="iconbtn th-play" id="th-play" aria-label="Play"></button>
-                <span class="th-time" id="th-time">0:00 / 18:40</span>
-                <span class="th-chap" id="th-chap"></span>
-                <div class="th-seek" id="th-seek" role="slider" tabindex="-1" aria-label="Seek" aria-valuemin="0" aria-valuemax="1120" aria-valuenow="0">
-                  <svg class="th-ridge" id="th-ridge" viewBox="0 0 1000 40" preserveAspectRatio="none" aria-hidden="true"></svg>
-                  <div class="th-bar" id="th-bar"></div>
-                  <div class="th-tip" id="th-tip" aria-hidden="true"></div>
-                </div>
-                <button class="iconbtn th-dockbtn" id="th-dockbtn" aria-label="Keep playing in the corner (Esc)" title="Keep playing in the corner (Esc)">⤡</button>
-              </div>
-              <div class="th-info">
-                <div class="th-title">How a picture tube paints a picture</div>
-                <div class="th-meta">
-                  <span class="th-face" aria-hidden="true">PL</span>
-                  <span><b>The Phosphor Lab</b><small>182K subscribers</small></span>
-                  <button class="btn btn-sm th-sub" id="th-sub">Subscribe</button>
-                  <button class="btn btn-sm" id="th-save">Save</button>
-                  <button class="btn btn-sm" id="th-link">Copy link at <span id="th-at">0:00</span></button>
-                </div>
-              </div>
-            </div>
-            <div class="th-dockhint" id="th-dockhint">Still playing in the corner. Press <kbd>Esc</kbd> or click it to bring it back.</div>
-          </div>
-
-          <aside class="th-notes">
-            <div class="th-tabs" role="tablist" aria-label="Beside the video">
-              <button role="tab" aria-selected="true" data-tab="chapters">Chapters</button>
-              <button role="tab" aria-selected="false" data-tab="transcript">Transcript</button>
-              <button role="tab" aria-selected="false" data-tab="keys">Keys</button>
-            </div>
-            <div class="th-pane" id="th-pane-chapters"></div>
-            <div class="th-pane" id="th-pane-transcript" hidden></div>
-            <div class="th-pane" id="th-pane-keys" hidden></div>
-          </aside>
-        </div>
-        <p class="th-caption dim reveal">
-          The Transcript tab follows the video as it plays. In the app, that needs The Archive to have transcribed the video
-          first. Press <kbd>Esc</kbd> and the video moves to a corner and keeps playing while you browse.
-        </p>
-      </div>
-    </section>
-
-    <!-- ══ 04 · The Anime ══════════════════════════════════════════════ -->
-    <section id="anime" class="tour-sec" data-section>
-      <div class="shell">
-        <header class="tc-sectionhead reveal" style="--sec-c: var(--accent-strong)">
-          <span class="plate">04</span>
-          <span class="kicker">Channel 2</span>
-          <h2>The Anime <i lang="ja" class="jp">アニメ</i></h2>
-          <p class="dek">
-            The second channel is for anime. It works with AniList, a free website for tracking what you watch, and lets you
-            browse each season, update your list, watch episodes and read the forums. Below are screenshots of the app in
-            the skin you've picked for this page. Choose a view with the tabs, and click the picture to see it full size.
-          </p>
-        </header>
-
-        <div class="shots reveal" id="anime-shots">
-          <div class="shots-tabs" role="tablist" aria-label="Anime views"></div>
-          <figure class="shots-stage" role="tabpanel" id="anime-panel">
-            <button class="shots-frame" aria-label="Open this screenshot full size">
-              <img src="assets/shots/anime-browse-dark.webp" width="1800" height="1125" loading="lazy" decoding="async"
-                alt="The Browse view: the index down the left, the top trending show in a large card, and a row of posters below." />
-              <span class="shots-zoom" aria-hidden="true">Full size</span>
-            </button>
-            <figcaption class="shots-cap" aria-live="polite"></figcaption>
-          </figure>
-        </div>
-      </div>
-    </section>
-
-    <!-- ══ 05 · The look ═══════════════════════════════════════════════ -->
+    <!-- ══ 07 · The look ═══════════════════════════════════════════════ -->
     <section id="look" class="tour-sec" data-section>
       <div class="shell">
         <header class="tc-sectionhead reveal" style="--sec-c: var(--rail-3)">
-          <span class="plate">05</span>
+          <span class="plate">07</span>
           <span class="kicker">Appearance</span>
           <h2>Skins</h2>
           <p class="dek">
             Tubcal has eight skins, from an old wooden TV set to a green-on-black terminal. Each card below is drawn in its
-            skin. Click one and this page switches to it too.
+            skin. Click one and this page switches to it too, along with the screenshots above.
           </p>
         </header>
         <div class="skins reveal" id="skins"></div>
-        <p class="skins-foot dim reveal">In Tubcal, change the skin with the button at the bottom of the side panel, or in <b>Settings → Appearance</b>. <b>Fast mode</b> is there too; it turns off all animation. The Android app doesn't have Cutting Mat, because it's designed for a desktop screen.</p>
+        <p class="skins-foot dim reveal">In Tubcal, change the skin with the skin button in any channel's bar, or in the Settings panel. <b>Fast mode</b> is there too; it turns off all animation. The Android app doesn't have Cutting Mat, because it's designed for a desktop screen.</p>
       </div>
     </section>
 
-    <!-- ══ 06 · Privacy ═════════════════════════════════════════════════ -->
+    <!-- ══ 08 · Privacy ═════════════════════════════════════════════════ -->
     <section id="privacy" class="tour-sec" data-section>
       <div class="shell">
         <header class="tc-sectionhead reveal" style="--sec-c: var(--c-dev)">
-          <span class="plate">06</span>
+          <span class="plate">08</span>
           <span class="kicker">Privacy</span>
           <h2>Where your data goes</h2>
           <p class="dek">
@@ -329,24 +428,25 @@
             <li style="--l: var(--c-youtube)"><b>YouTube</b><span>videos and channel feeds, fetched without signing in and without cookies, so YouTube can't link your viewing together</span></li>
             <li style="--l: var(--c-reddit)"><b>Reddit</b><span>your subreddits, and your account only if you connect it</span></li>
             <li style="--l: var(--c-hn)"><b>Hacker News</b><span>stories, comments and search</span></li>
-            <li style="--l: var(--c-github)"><b>GitHub</b><span>only if you turn on the GitHub room</span></li>
+            <li style="--l: var(--c-github)"><b>GitHub</b><span>the projects and people you follow, and your account only if you link it</span></li>
             <li style="--l: var(--accent-strong)"><b>AniList</b><span>your anime list, through your own account</span></li>
-            <li style="--l: var(--paper-faint)"><b>Helpers</b><span>public YouTube mirrors (for trending, and as a search backup), the anime streaming sites while you watch, and update checks for Tubcal's video tools</span></li>
+            <li style="--l: var(--paper-faint)"><b>Helpers</b><span>public YouTube mirrors (for trending, and as a search backup), the anime streaming sites while you watch, AnimeThemes for opening songs, the Workbench's podcast and blog feeds, and update checks for Tubcal's video tools</span></li>
             <li class="cut"><b>Nothing else</b><span>no ad networks, analytics or trackers</span></li>
           </ol>
         </div>
       </div>
     </section>
 
-    <!-- ══ 07 · Get it ══════════════════════════════════════════════════ -->
+    <!-- ══ 09 · Get it ══════════════════════════════════════════════════ -->
     <section id="get" class="tour-sec tune" data-section>
       <div class="shell">
         <header class="tc-sectionhead reveal" style="--sec-c: var(--signal)">
-          <span class="plate">07</span>
+          <span class="plate">09</span>
           <span class="kicker">Free · Linux</span>
           <h2>Install</h2>
           <p class="dek">
-            Paste this into a terminal and press Enter. The installer checks your system and asks before it changes anything.
+            Paste this into a terminal and press Enter. The installer checks your system, asks which rooms you want, and
+            asks before it changes anything.
           </p>
         </header>
         <div class="tune-grid reveal">
@@ -357,11 +457,12 @@
             </div>
             <div class="codeblock tune-then">
               <div class="cb-head"><span>then, any time</span><button class="copy"></button></div>
-<pre><span class="k">tubcal</span>      <span class="c"># opens Tubcal in your browser</span></pre>
+<pre><span class="k">tubcal</span>             <span class="c"># opens Tubcal in your browser</span>
+<span class="k">tubcal add github</span>  <span class="c"># adds a room you left out</span></pre>
             </div>
           </div>
           <div class="tune-cta">
-            <p>When it's finished, open Tubcal from your app menu. The rooms are empty at first: add some YouTube channels and subreddits in <b>Settings</b> to fill them.</p>
+            <p>When it's finished, open Tubcal from your app menu. The rooms are empty at first: add some YouTube channels and subreddits in <b>Settings</b> to fill them. A room you didn't pick isn't downloaded, and you can add it later.</p>
             <div class="tune-btns">
               <a class="btn btn-lit" href="manual.html#install"><span data-icon="book"></span>Read the manual</a>
               <a class="btn" href="https://github.com/Shio-T0/Tubcal"><span data-icon="github"></span>View on GitHub</a>

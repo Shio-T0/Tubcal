@@ -1,5 +1,6 @@
-/* The Manual — channel 2 of the docs. The hub console (HubConsole.jsx) as the
-   table of contents, then a plain-language guide with a few instruments. */
+/* The Manual — page 2 of the docs. A TV-cabinet console (like the Video
+   channel's) as the table of contents, then a plain-language guide with a few
+   instruments. */
 
 .frame {
   position: relative;
@@ -749,4 +750,11 @@
 .man-foot {
   margin-top: var(--space-7);
   border-top: 3px double var(--rule-strong);
+}
+
+/* ── channels & rooms: a heading row per channel in the rooms table ─────── */
+tr.grp th {
+  padding-top: 14px;
+  color: var(--paper);
+  background: transparent;
 }

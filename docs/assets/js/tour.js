@@ -1,8 +1,8 @@
-/* The Tour — the guide at the top, then the demos. Most demos are small,
-   faithful models of how the app behaves (rooms renumbering, the Edition with
-   and without AI, the player's keys and corner dock), drawn with invented
-   sample content. The Anime is shown as screenshots of the real app instead
-   (assets/shots/). */
+/* The Tour — the guide at the top, then one stop per channel. Each channel's
+   rooms are shown as screenshots of the real app (assets/shots/). The demos
+   are small, faithful models of how the app behaves (the Edition with and
+   without AI, the player's keys and corner dock, rooms renumbering), drawn
+   with invented sample content. */
 
 (function () {
   'use strict';
@@ -19,23 +19,31 @@
   /* ════════════════════════════════════════════════════════════════════ *
    * The bar, and the guide at the top
    * ════════════════════════════════════════════════════════════════════ */
-  const STOP_C = { hub: 'var(--signal)', edition: 'var(--c-foryou)', player: 'var(--c-youtube)', anime: 'var(--accent-strong)', look: 'var(--rail-3)', privacy: 'var(--c-dev)', get: 'var(--signal)' };
-  const stops = T.tour.filter((s) => s.id !== 'top');
+  const STOP_C = { home: 'var(--signal)', social: 'var(--c-foryou)', coding: 'var(--c-editor)', video: 'var(--c-youtube)', anime: 'var(--accent-strong)', saved: 'var(--c-editor)', look: 'var(--rail-3)', privacy: 'var(--c-dev)', get: 'var(--signal)' };
+  const stops = T.tour.filter((s) => s.id !== 'top' && s.stop !== false);
+  const pad2 = (n) => String(n).padStart(2, '0');
+  const roomsOf = (ch) => T.rooms.filter((r) => r.channel === ch);
 
-  $('#bar-stops').innerHTML = stops.map((s) => `<a href="#${s.id}" data-stop="${s.id}" style="--stop-c:${STOP_C[s.id]}">${esc(s.title.replace('Channel 1 · ', '').replace('Channel 2 · ', ''))}</a>`).join('');
+  $('#bar-stops').innerHTML = stops.map((s) => `<a href="#${s.id}" data-stop="${s.id}" style="--stop-c:${STOP_C[s.id]}">${esc(s.title.replace(' & Settings', '').replace(/^The /, ''))}</a>`).join('');
 
-  // the guide's Hub lines: one per room, numbered as the app numbers them
-  let roomNo = 0;
-  $('#hg-hub-count').textContent = `${T.rooms.length} rooms`;
-  $('#hg-rooms').innerHTML = T.rooms
-    .map((r) => `<li><a href="#hub" data-guide-room="${r.id}" style="--room-c:${r.color}">
-        <span class="hg-no">${r.on ? String(++roomNo).padStart(2, '0') : '—'}</span><span class="hg-name">${esc(r.label)}</span>
-        <span class="hg-what">${esc(r.line)}${r.on ? '' : '<small>off at first</small>'}</span></a></li>`)
+  // the guide: each channel and its rooms, numbered as the app numbers them
+  $('#hg-channels').innerHTML = T.channels
+    .map((ch) => {
+      let no = 0;
+      const rooms = roomsOf(ch.id);
+      return `<div class="hg-ch">
+        <div class="hg-chhead"><b>${ch.n} · ${esc(ch.label)}</b><span>${esc(ch.line)}</span></div>
+        <ol class="hg-rooms">${rooms
+          .map((r) => `<li><a href="#${ch.id}" data-guide-room="${r.id}" style="--room-c:${r.color}">
+            <span class="hg-no">${r.on ? pad2(++no) : '—'}</span><span class="hg-name">${esc(r.label)}</span>
+            <span class="hg-what">${esc(r.line)}${r.on ? '' : '<small>off at first</small>'}</span></a></li>`)
+          .join('')}</ol>
+      </div>`;
+    })
     .join('');
   $$('[data-guide-room]').forEach((a) => a.addEventListener('click', (e) => {
     e.preventDefault();
     document.dispatchEvent(new CustomEvent('tubcal:room', { detail: a.dataset.guideRoom }));
-    window.TC.goSection('hub');
   }));
 
   const bar = $('#bar');
@@ -50,38 +58,70 @@
       if (el && el.getBoundingClientRect().top < window.innerHeight * 0.4) cur = s.id;
     });
     stopLinks.forEach((a) => a.classList.toggle('on', a.dataset.stop === cur));
+    // keep the current stop in sight when the bar is too narrow for them all
+    const on = stopLinks.find((a) => a.dataset.stop === cur);
+    const strip = $('#bar-stops');
+    if (on && cur !== lastStop) {
+      lastStop = cur;
+      if (on.offsetLeft < strip.scrollLeft) strip.scrollLeft = on.offsetLeft - 8;
+      else if (on.offsetLeft + on.offsetWidth > strip.scrollLeft + strip.clientWidth) strip.scrollLeft = on.offsetLeft + on.offsetWidth - strip.clientWidth + 8;
+    }
   }
+  let lastStop = null;
   addEventListener('scroll', onScroll, { passive: true });
   onScroll();
 
   /* ════════════════════════════════════════════════════════════════════ *
-   * 01 · The Hub — Settings → Rooms (the screenshots are with the Anime's, below)
+   * 01 · Home — how each channel is laid out
+   * ════════════════════════════════════════════════════════════════════ */
+  const LAYOUT = {
+    social: 'A bar across the top of the page, like the section names in a newspaper. It stays in place while you read.',
+    coding: 'Laid out like a code editor: the rooms are buttons down the left, and a bar across the top shows where you are.',
+    video: 'A wooden panel down the left, like the side of an old TV. The room you’re in lists its own places under its button.',
+  };
+  $('#channel-cards').innerHTML = T.channels
+    .map((ch) => `<li style="--press-c:${ch.color}"><span class="kicker">Channel ${ch.n}</span><b>${esc(ch.label)}</b>
+      <span>${roomsOf(ch.id).map((r) => esc(r.label)).join(', ')}.</span><span>${esc(LAYOUT[ch.id])}</span></li>`)
+    .join('');
+
+  /* ════════════════════════════════════════════════════════════════════ *
+   * 06 · Saved & Settings — Settings → Rooms, numbered inside each channel
    * ════════════════════════════════════════════════════════════════════ */
   const today = new Date();
   const active = new Set(T.rooms.filter((r) => r.on).map((r) => r.id));
 
   function renderToggles() {
-    const order = T.rooms.filter((r) => active.has(r.id)).map((r) => r.id);
-    $('#sr-grid').innerHTML = T.rooms
-      .map((r) => {
-        const on = active.has(r.id);
-        const n = on ? String(order.indexOf(r.id) + 1).padStart(2, '0') : '—';
-        return `<label class="sr-item${on ? '' : ' off'}"><span class="sr-no">${n}</span><span class="sr-name">${esc(r.label)}</span>
-          <span class="switch" style="--sw-c:${r.color}"><input type="checkbox" data-toggle="${r.id}" ${on ? 'checked' : ''} aria-label="${esc(r.label)}"><span class="track"></span></span></label>`;
+    $('#sr-grid').innerHTML = T.channels
+      .map((ch) => {
+        let no = 0;
+        return `<div class="sr-ch"><h4 class="sr-chname" style="--ch-c:${ch.color}">${ch.n} · ${esc(ch.label)}</h4><div class="sr-grid">${roomsOf(ch.id)
+          .map((r) => {
+            const on = r.fixed || active.has(r.id);
+            const n = on ? pad2(++no) : '—';
+            const control = r.fixed
+              ? '<span class="sr-fixed">always on</span>'
+              : `<span class="switch" style="--sw-c:${r.color}"><input type="checkbox" data-toggle="${r.id}" ${on ? 'checked' : ''} aria-label="${esc(r.label)}"><span class="track"></span></span>`;
+            return `<label class="sr-item${on ? '' : ' off'}"><span class="sr-no">${n}</span><span class="sr-name">${esc(r.label)}</span>${control}</label>`;
+          })
+          .join('')}</div></div>`;
       })
       .join('');
     $$('[data-toggle]').forEach((cb) =>
       cb.addEventListener('change', () => {
         cb.checked ? active.add(cb.dataset.toggle) : active.delete(cb.dataset.toggle);
         renderToggles();
-        toast(`${T.rooms.find((r) => r.id === cb.dataset.toggle).label} ${cb.checked ? 'on' : 'off'} · ${active.size} rooms`);
+        const r = T.rooms.find((x) => x.id === cb.dataset.toggle);
+        const ch = T.channels.find((c) => c.id === r.channel);
+        const left = roomsOf(ch.id).filter((x) => x.fixed || active.has(x.id)).length;
+        toast(`${r.label} ${cb.checked ? 'on' : 'off'} · ${ch.label} has ${left} room${left === 1 ? '' : 's'}`);
+        $(`[data-toggle="${r.id}"]`)?.focus({ preventScroll: true });
       }),
     );
   }
   renderToggles();
 
   /* ════════════════════════════════════════════════════════════════════ *
-   * 02 · The Edition — with and without AI
+   * 02 · Social — the Edition, with and without AI
    * ════════════════════════════════════════════════════════════════════ */
   const SRC = {
     wire: { name: 'The Wire', c: 'var(--c-hn)' },
@@ -173,7 +213,7 @@
   renderPaper(false);
 
   /* ════════════════════════════════════════════════════════════════════ *
-   * 03 · The player
+   * 04 · Video — the player
    * ════════════════════════════════════════════════════════════════════ */
   const DUR = 1120;
   const CHAPTERS = [
@@ -433,22 +473,46 @@
   addEventListener('resize', paint);
 
   /* ════════════════════════════════════════════════════════════════════ *
-   * Screenshots of the real app: the Hub's screens, then the Anime's views
+   * Screenshots of the real app, one viewer per stop
    * ════════════════════════════════════════════════════════════════════ */
-  // The Hub is shot on a demo profile that follows public channels and
-  // subreddits, so none of it is anyone's own feed.
-  const HUB = [
-    { id: 'home', label: 'Home screen', tab: 'Home', c: 'var(--signal)', alt: 'The home screen: a greeting, a TV showing a half-watched video to resume, a row of what’s next beneath it, a clock and a coming-up list beside it, and the two channels below.', text: 'Where Tubcal opens. The TV is tuned to the video you were last watching, with a button to resume it, and the row under it holds what’s next: other half-watched videos and new uploads. Beside it are a clock, the two channel knobs and what’s coming up, such as scheduled live streams.' },
-    { id: 'edition', label: 'The Edition', tab: 'Edition', c: 'var(--c-foryou)', alt: 'The Edition: a front page whose lead story is about new images of Polaris from r/space, with two Hacker News stories below it.', text: 'This morning’s paper, made from the test setup’s subreddits, channels and Hacker News. The stories were written by a local AI, and each one links to the post it came from. The ring at the top counts how many you’ve read.' },
-    { id: 'youtube', label: 'Screening Room', c: 'var(--c-youtube)', alt: 'The Screening Room: the newest upload large on the left, a list of other new uploads beside it, and the half-watched videos below.', text: 'The newest upload from your channels is on the big screen, with the rest of what just came in beside it and the next live stream under that. Below are the videos you didn’t finish, and further down each channel has its own shelf. The panel on the left lists your channels with a count of new videos.' },
-    { id: 'reddit', label: 'The Dispatch', tab: 'Dispatch', c: 'var(--c-reddit)', alt: 'The Dispatch: subreddit chips across the top, then posts laid out like a newspaper, led by a photo of the Milky Way over the Dolomites.', text: 'Your subreddits laid out like a newspaper, with pictures shown large. This is Reddit without signing in. Open a post to read its comments.' },
-    { id: 'hackernews', label: 'The Wire', tab: 'Wire', c: 'var(--c-hn)', alt: 'The Wire: Hacker News’s top stories as a numbered list, each with its site, points, a heat bar and a comment count.', text: 'Hacker News’s top stories as a numbered list. The bar beside each one shows how fast it’s gaining points. The tabs switch to Best, New, Ask, Show and Jobs, and the search box looks through every story ever posted.' },
-    { id: 'archive', label: 'The Archive', tab: 'Archive', c: 'var(--signal)', alt: 'The Archive: a box for questions, and a transcript search for the word “water” with results from two videos, each at a timestamp.', text: 'Videos you’ve watched, transcribed on your own computer. Here a search for “water” finds the moments it was said in two videos, and clicking one plays the video from there. With the optional AI set up, you can also ask questions and read a digest of what you watched.' },
-    { id: 'editor', label: 'The Composing Room', tab: 'Composing Room', c: 'var(--c-editor)', alt: 'The Composing Room: a file tree of Tubcal’s source code on the left, a Python file open in a tab, and the vim mode, file path and git branch in the bar at the bottom.', text: 'A code editor with vim keys, shown here with Tubcal’s own source code. The file tree is on the left, open files are tabs, and the bar at the bottom shows the vim mode, the file and the git branch.' },
-    { id: 'dev', label: 'The Workbench', tab: 'Workbench', c: 'var(--c-dev)', alt: 'The Workbench: a shelf of four languages on the left, Rust open with its facts and current version, and a row of Rust videos below.', text: 'A page for each of four programming languages, picked from the shelf on the left. Here it’s Rust: its main facts and current version, then talks, podcasts you can play on the page, news from the core team and popular projects further down.' },
+  // Everything but the Anime is shot on a demo profile that follows public
+  // channels, subreddits and projects, so none of it is anyone's own feed.
+  const HOME = [
+    { id: 'home', label: 'The home screen', alt: 'The home screen: a greeting, a TV showing a half-watched video, a row of what’s next under it, a clock, three channel knobs and a coming-up list beside it, and a guide for each channel below.',
+      text: 'The TV is tuned to the video or episode you were last watching, with a button to carry on, and the row under it holds what’s next. Beside it are a clock, the three channel knobs and what’s coming up, such as live streams. Below the TV, a guide for each channel shows what’s in it: today’s paper, the files you had open, new uploads and your anime list.' },
+  ];
+  const SOCIAL = [
+    { id: 'edition', room: 'edition', label: 'The Edition', tab: 'Edition', c: 'var(--c-foryou)', alt: 'The Edition: a newspaper front page led by a photo of a nebula from r/astrophotography with a short written article, two Hacker News stories beside it and more columns below.',
+      text: 'This morning’s paper, made from the test setup’s subreddits, channels and Hacker News. The stories were written by a local AI, and each one links to the posts it came from. The ring at the top counts how many you’ve read.' },
+    { id: 'hackernews', room: 'hackernews', label: 'The Wire', tab: 'Wire', c: 'var(--c-hn)', alt: 'The Wire: Hacker News’s top stories as a numbered list, each with its site, points, a heat bar and a comment count.',
+      text: 'Hacker News’s top stories as a numbered list. The bar beside each one shows how fast it’s gaining points. The tabs switch to Best, New, Ask, Show and Jobs, and the search box looks through every story ever posted. Open a story and its comments appear beside the list.' },
+    { id: 'reddit', room: 'reddit', label: 'The Dispatch', tab: 'Dispatch', c: 'var(--c-reddit)', alt: 'The Dispatch: subreddit chips across the top, then posts laid out like a newspaper.',
+      text: 'Your subreddits laid out like a newspaper, with pictures shown large. This is Reddit without signing in. Open a post to read its comments.' },
+  ];
+  const CODING = [
+    { id: 'editor', room: 'editor', label: 'The Composing Room', tab: 'Composing Room', c: 'var(--c-editor)', alt: 'The Composing Room: a file tree on the left, a source file open in a tab, and the vim mode, file and git branch in the bar at the bottom.',
+      text: 'A code editor with vim keys, shown here with Tubcal’s own source code. The file tree is on the left, open files are tabs, and the bar at the bottom shows the vim mode, the file and the git branch. The bar at the top shows the folder it works in and the tools it found, such as git and a terminal.' },
+    { id: 'dev', room: 'dev', label: 'The Workbench', tab: 'Workbench', c: 'var(--c-dev)', alt: 'The Workbench: a shelf of four languages, Rust open with its facts and current version, and a row of Rust talks below.',
+      text: 'A page for each of four programming languages, picked from the shelf on the left. Here it’s Rust: its main facts and current version, then talks, podcasts you can play on the page, news from the core team and popular projects further down.' },
+    { id: 'github', room: 'github', label: 'GitHub', c: 'var(--c-github)', alt: 'The GitHub room: a list of views on the left, today’s pull requests and issues from followed projects in the middle, and the latest releases and trending projects on the right.',
+      text: 'What the projects you follow have been doing, day by day and project by project: commits, pull requests, issues and releases. Beside it are the latest releases and what’s trending today. The list on the left switches to releases, trending, who you follow and your local copies, and shows how many GitHub requests are left this hour. Open a project to read its files, issues and pull requests.' },
+  ];
+  const VIDEO = [
+    { id: 'youtube', room: 'youtube', label: 'Screening Room', c: 'var(--c-youtube)', alt: 'The Screening Room: the newest upload large, a list of other new uploads beside it, and the half-watched videos below.',
+      text: 'The newest upload from your channels is on the big screen, with the rest of what just came in beside it. Below are the videos you didn’t finish, and further down each channel has its own shelf. The panel on the left lists your channels with a count of new videos.' },
+    { id: 'archive', room: 'archive', label: 'The Archive', tab: 'Archive', c: 'var(--signal)', alt: 'The Archive: a box for questions, and a transcript search for the word “proof” with results from two videos, each at a timestamp.',
+      text: 'Videos you’ve watched, transcribed on your own computer. A search finds the moments a word was said, and clicking one plays the video from there. With the optional AI set up, you can also ask questions and read a digest of what you watched.' },
+  ];
+  const SAVED = [
+    { id: 'drawer', label: 'The Saved panel', tab: 'Saved panel', c: 'var(--c-editor)', alt: 'The Saved panel open at the right of a page, with a Save page button, a search box and a list of saved things.',
+      text: 'Press Saved in any bar, or Space then s. The panel slides over the page you’re on. It can save that page itself, find anything you’ve kept, and open it, tick it done or remove it.' },
+    { id: 'saved', label: 'The Saved page', tab: 'Saved page', c: 'var(--c-editor)', alt: 'The Saved page: a catalogue by channel and kind on the left, and saved videos, stories and projects laid out on shelves.',
+      text: 'Everything you’ve saved, sorted by channel and then by kind, with a count for each. Each kind has its own layout, or you can switch to a plain list. You can add a note to anything, mark it done, search your notes and titles, and remove many at once.' },
+    { id: 'settings', label: 'The Settings panel', tab: 'Settings panel', c: 'var(--signal)', alt: 'The Settings panel open at the right of a page: the skins, a few switches, and a list of every settings section.',
+      text: 'Press Settings in any bar, or Space then comma. The skins and the switches people change most are right there, and every other section is one click away.' },
   ];
   const ANIME = [
-    { id: 'browse', label: 'Browse', alt: 'The Browse view: the index down the left, the top trending show in a large card, and a row of posters below.',
+    { id: 'browse', label: 'Browse', alt: 'The Browse view: the Video panel on the left with the Anime’s views under it, the top trending show in a large card, and a row of posters below.',
       text: 'Trending, popular and top-rated shows, with the top one shown large. The finder filters by any mix of genres and tags, and more results load as you scroll.' },
     { id: 'seasons', label: 'Seasons', alt: 'The Seasons view: this season’s line-up as a programme guide, each show with its next airing time, synopsis and trailer button.',
       text: 'A season’s shows laid out like a TV guide: when each episode airs, how far along the show is, its trailer and where to stream it. Tick “only my list” to see just the shows you follow.' },
@@ -492,7 +556,9 @@
     const cap = $('.shots-cap', root);
     let at = 0;
 
+    const single = list.length === 1;
     tabs.innerHTML = list.map((s, i) => `<button class="shots-tab" role="tab" id="${prefix}-tab-${s.id}" aria-controls="${panel.id}" aria-selected="${i === 0}" tabindex="${i === 0 ? 0 : -1}" data-i="${i}"${s.c ? ` style="--tab-c:${s.c}"` : ''}><small>${String(i + 1).padStart(2, '0')}</small>${esc(s.tab || s.label)}</button>`).join('');
+    tabs.hidden = single;
     const tabEls = $$('.shots-tab', tabs);
 
     function show(i, focus) {
@@ -502,9 +568,9 @@
       panel.setAttribute('aria-labelledby', `${prefix}-tab-${s.id}`);
       img.src = src(s.id);
       img.alt = s.alt;
-      cap.innerHTML = `<span class="kicker">${String(at + 1).padStart(2, '0')} / ${String(list.length).padStart(2, '0')} · screenshot</span>
+      cap.innerHTML = `<span class="kicker">${single ? 'screenshot' : `${String(at + 1).padStart(2, '0')} / ${String(list.length).padStart(2, '0')} · screenshot`}</span>
         <h3>${esc(s.label)}</h3><p>${esc(s.text)}</p>
-        <div class="shots-nav"><button class="chip" data-step="-1" aria-label="Previous">‹ Previous</button><button class="chip" data-step="1" aria-label="Next">Next ›</button></div>`;
+        ${single ? '' : '<div class="shots-nav"><button class="chip" data-step="-1" aria-label="Previous">‹ Previous</button><button class="chip" data-step="1" aria-label="Next">Next ›</button></div>'}`;
       $$('[data-step]', cap).forEach((b) => b.addEventListener('click', () => show(at + +b.dataset.step)));
       if (focus) tabEls[at].focus({ preventScroll: true });
     }
@@ -521,28 +587,32 @@
     document.addEventListener('tubcal:skin', () => { img.src = src(list[at].id); });
     frame.addEventListener('click', () => openBox(img));
     show(0);
-    return { show, index: (id) => list.findIndex((s) => s.id === id) };
+    return { show, index: (room) => list.findIndex((s) => s.room === room) };
   }
 
-  const hubShots = shotViewer($('#hub-shots'), 'hub', HUB);
-  const animeShots = shotViewer($('#anime-shots'), 'anime', ANIME);
+  shotViewer($('#home-shots'), 'app', HOME);
+  shotViewer($('#saved-shots'), 'app', SAVED);
+  shotViewer($('#anime-shots'), 'anime', ANIME);
+  const channelShots = {
+    social: shotViewer($('#social-shots'), 'app', SOCIAL),
+    coding: shotViewer($('#coding-shots'), 'app', CODING),
+    video: shotViewer($('#video-shots'), 'app', VIDEO),
+  };
 
-  // a room picked in the guide at the top, or in the search palette
+  // a room picked in the guide at the top, or in the search palette: its
+  // channel's stop, with its screenshot showing (the Anime has a stop of its own)
   document.addEventListener('tubcal:room', (e) => {
-    const i = hubShots.index(e.detail);
-    if (i >= 0) hubShots.show(i);
+    const room = T.rooms.find((r) => r.id === e.detail);
+    if (!room) return;
+    if (room.id === 'anime') { window.TC.goSection('anime'); return; }
+    const viewer = channelShots[room.channel];
+    const i = viewer.index(room.id);
+    if (i >= 0) viewer.show(i);
+    window.TC.goSection(room.channel);
   });
 
-  $('#hg-anime-count').textContent = `${ANIME.length} views`;
-  $('#hg-views').innerHTML = ANIME.map((v, i) => `<a href="#anime" data-guide-shot="${i}">${esc(v.label)}</a>`).join('');
-  $$('[data-guide-shot]').forEach((a) => a.addEventListener('click', (e) => {
-    e.preventDefault();
-    animeShots.show(+a.dataset.guideShot);
-    window.TC.goSection('anime');
-  }));
-
   /* ════════════════════════════════════════════════════════════════════ *
-   * 05 · The look — every card in its own skin
+   * 07 · The look — every card in its own skin
    * ════════════════════════════════════════════════════════════════════ */
   const BG = {
     dark: ['backdrop__lamp', 'backdrop__scan', 'backdrop__vignette'],
@@ -558,9 +628,9 @@
   skinsEl.innerHTML = T.skins.map((s) => `
     <button class="skincard" data-theme="${s.value}" data-skin="${s.value}" aria-pressed="false">
       <div class="backdrop sk-bg" aria-hidden="true">${BG[s.value].map((c) => `<div class="${c}"></div>`).join('')}</div>
-      <div class="sk-top"><span>ch 1 · hub</span><span class="sk-on"><i></i>on air</span></div>
+      <div class="sk-top"><span>ch 3 · video</span><span class="sk-on"><i></i>on air</span></div>
       <div class="tc-wordmark">Tubcal<em>.</em></div>
-      <div class="sk-keys"><span class="on">01</span><span>02</span><span>03</span><span>04</span></div>
+      <div class="sk-keys"><span>1</span><span>2</span><span class="on">3</span></div>
       <div class="sk-name">${esc(s.label)}</div>
       <div class="sk-blurb">${esc(s.blurb)}</div>
     </button>`).join('');
