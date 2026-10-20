@@ -1,10 +1,23 @@
+"""What Tubcal follows for you: YouTube channels, subreddits, GitHub repos and
+people. The list is core; adding to it needs that platform's module, whose
+source resolves what you typed."""
+
+import importlib
+
 from flask import Blueprint, request
 
 from . import err, ok
-from .. import db
-from ..sources import reddit, youtube, github
+from .. import db, modules
 
 subs_bp = Blueprint("subscriptions", __name__, url_prefix="/api")
+
+PLATFORMS = ("youtube", "reddit", "github")
+
+
+def _source(platform):
+    if not modules.has(platform):
+        raise LookupError(f"{platform} isn't installed here (tubcal add {platform})")
+    return importlib.import_module(f"server.sources.{platform}")
 
 
 @subs_bp.get("/subscriptions")
@@ -20,18 +33,21 @@ def add_sub():
     body = request.get_json(force=True, silent=True) or {}
     platform = body.get("platform")
     raw = (body.get("input") or "").strip()
-    if platform not in ("youtube", "reddit", "github") or not raw:
+    if platform not in PLATFORMS or not raw:
         return err("platform ('youtube'|'reddit'|'github') and input are required")
+    if not modules.has(platform):
+        return err(f"{platform} isn't installed here (tubcal add {platform})", 404)
     try:
+        src = _source(platform)
         if platform == "youtube":
-            info = youtube.resolve_channel(raw)
+            info = src.resolve_channel(raw)
             source_id, name, thumb = info["channel_id"], info["title"], info["thumbnail"]
         elif platform == "reddit":
-            info = reddit.validate_subreddit(raw)
+            info = src.validate_subreddit(raw)
             source_id, name, thumb = info["name"], info["title"], info["icon"]
         else:
             # GitHub: raw is "owner/repo" or a username — validate against the API
-            info = github.resolve(raw)
+            info = src.resolve(raw)
             source_id, name, thumb = info["source_id"], info["name"], info["icon"]
     except LookupError as e:
         return err(str(e), 404)
@@ -57,7 +73,7 @@ def resolve_youtube():
     if not raw:
         return err("input required")
     try:
-        return ok(youtube.resolve_channel(raw))
+        return ok(_source("youtube").resolve_channel(raw))
     except LookupError as e:
         return err(str(e), 404)
     except Exception as e:
@@ -70,7 +86,7 @@ def resolve_reddit():
     if not raw:
         return err("input required")
     try:
-        return ok(reddit.validate_subreddit(raw))
+        return ok(_source("reddit").validate_subreddit(raw))
     except LookupError as e:
         return err(str(e), 404)
     except Exception as e:
@@ -83,7 +99,7 @@ def resolve_github():
     if not raw:
         return err("input required")
     try:
-        return ok(github.resolve(raw))
+        return ok(_source("github").resolve(raw))
     except LookupError as e:
         return err(str(e), 404)
     except Exception as e:

@@ -3,8 +3,8 @@
 // and the command palette.
 
 import {
-  Activity, BookOpen, Building2, Clapperboard, Code2, FileText, GitBranch, Hash, Link2, ListVideo, MessagesSquare,
-  Mic, Podcast, Quote, Radio, SquareUser, Tag, Tv, UserRound,
+  Activity, BookOpen, Building2, CircleDot, Clapperboard, Code2, FileText, GitBranch, GitCommitHorizontal,
+  GitPullRequest, Hash, Link2, ListVideo, MessagesSquare, Mic, Podcast, Quote, Radio, SquareUser, Tag, Tv, UserRound,
 } from 'lucide-react';
 
 import { KINDS, kindOf } from '../../lib/saveable.js';
@@ -25,6 +25,10 @@ export const KIND_ICON = {
   subreddit: Radio,
   repo: GitBranch,
   release: Tag,
+  pull: GitPullRequest,
+  issue: CircleDot,
+  commit: GitCommitHorizontal,
+  ghuser: UserRound,
   event: Activity,
   file: Code2,
   article: FileText,

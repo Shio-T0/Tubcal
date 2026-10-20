@@ -19,10 +19,10 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { ArrowRight, Bookmark, BookmarkCheck, Check, ChevronRight, Search, X } from 'lucide-react';
 
 import { useSaved, useSettings } from '../../state.jsx';
-import { CHANNELS } from '../../lib/rooms.js';
+import { savedChannels } from '../../lib/rooms.js';
 import { THEMES } from '../../lib/themes.js';
 import { channelOfItem, kindOf, pageItem, pageTitle, toneOf } from '../../lib/saveable.js';
-import { SETTINGS_GROUPS, SETTINGS_SECTIONS } from '../../pages/settingsSections.js';
+import { SETTINGS_SECTIONS, settingsSectionIds } from '../../pages/settingsSections.js';
 import { KindIcon, keptAgo, kindLine } from '../saved/kinds.jsx';
 import { useOpenSaved } from '../saved/useOpenSaved.jsx';
 import p from './pocket.module.css';
@@ -119,7 +119,7 @@ function SavedTab({ onDone, openItem }) {
         <button type="button" className={ch === 'all' ? p.chipOn : p.chip} onClick={() => setCh('all')} aria-pressed={ch === 'all'}>
           All <b>{counts.all || 0}</b>
         </button>
-        {CHANNELS.map((c) => (
+        {savedChannels((id) => counts[id]).map((c) => (
           <button
             key={c.id}
             type="button"
@@ -249,7 +249,7 @@ function SettingsTab({ onDone }) {
       <section>
         <h3 className={p.label}>Everything else</h3>
         <div className={p.sections}>
-          {SETTINGS_GROUPS.flatMap((g) => g.ids).map((id) => {
+          {settingsSectionIds().map((id) => {
             const sec = SETTINGS_SECTIONS[id];
             const Icon = sec.icon;
             return (

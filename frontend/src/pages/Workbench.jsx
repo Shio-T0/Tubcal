@@ -12,6 +12,7 @@ import {
   Star,
 } from 'lucide-react';
 
+import { hasModule } from '../lib/modules.js';
 import { useApi } from '../api/client.js';
 import { ErrorBox, Receiving } from '../components/layout/Section.jsx';
 import { SaveButton } from '../components/ui/ItemActions.jsx';
@@ -162,7 +163,7 @@ function Dossier({ lang }) {
 
 /* ----------------------------------------------------- SEC 01 — pictures */
 
-function VideoShelf({ langId }) {
+function VideoShelf({ langId, n }) {
   const { data, loading, error } = useApi(`/dev/${langId}/videos`);
   const { open: playVideo } = usePlayer();
   const rowRef = useHorizontalWheel();
@@ -170,7 +171,7 @@ function VideoShelf({ langId }) {
 
   return (
     <section className={s.panel}>
-      <SecTab n="01" label="moving pictures" note="talks & tutorials — plays right here" />
+      <SecTab n={n} label="moving pictures" note="talks & tutorials — plays right here" />
       {error && <ErrorBox message={error} />}
       {loading && !data && <Receiving label="threading the projector" />}
       {!loading && items.length === 0 && !error && (
@@ -278,7 +279,7 @@ function BenchRadio({ episode, playing, onToggle, audioRef }) {
   );
 }
 
-function PodcastSection({ langId, radio }) {
+function PodcastSection({ langId, radio, n }) {
   const { data, loading, error } = useApi(`/dev/${langId}/podcasts`);
   const episodes = data?.episodes || [];
   const shows = [...new Set(episodes.map((e) => e.show))];
@@ -286,7 +287,7 @@ function PodcastSection({ langId, radio }) {
   return (
     <section className={s.panel}>
       <SecTab
-        n="02"
+        n={n}
         label="on the air"
         note={shows.length ? `tuned to ${shows.join(' · ')}` : 'the language on the radio'}
       />
@@ -339,7 +340,7 @@ function PodcastSection({ langId, radio }) {
 
 /* ---------------------------------------------------- SEC 03 — change log */
 
-function Updates({ langId }) {
+function Updates({ langId, n }) {
   const { data, loading, error } = useApi(`/dev/${langId}/updates`);
   const items = data?.items || [];
   const releases = items.filter((i) => i.type === 'release').slice(0, 6);
@@ -347,7 +348,7 @@ function Updates({ langId }) {
 
   return (
     <section className={s.panel}>
-      <SecTab n="03" label="change log" note="releases & dispatches from the core team" />
+      <SecTab n={n} label="change log" note="releases & dispatches from the core team" />
       {error && <ErrorBox message={error} />}
       {loading && !data && <Receiving label="pulling the wire" />}
       {!loading && items.length === 0 && !error && (
@@ -404,10 +405,10 @@ function Updates({ langId }) {
 
 const KIND_LABEL = { book: 'bound', reference: 'lookup', practice: 'hands-on', tool: 'bench tool' };
 
-function ReferenceShelf({ lang }) {
+function ReferenceShelf({ lang, n }) {
   return (
     <section className={s.panel}>
-      <SecTab n="04" label="reference shelf" note="the manuals worth keeping in reach" />
+      <SecTab n={n} label="reference shelf" note="the manuals worth keeping in reach" />
       <div className={s.docGrid}>
         {lang.docs.map((d) => (
           <a
@@ -431,13 +432,13 @@ function ReferenceShelf({ lang }) {
 
 /* --------------------------------------------------- SEC 05 — the floor */
 
-function FloorSection({ langId }) {
+function FloorSection({ langId, n }) {
   const { data, loading, error } = useApi(`/dev/${langId}/repos`);
   const items = (data?.items || []).slice(0, 10);
 
   return (
     <section className={s.panel}>
-      <SecTab n="05" label="the floor" note="what's being built this week, in this language" />
+      <SecTab n={n} label="the floor" note="what's being built this week, in this language" />
       {error && <ErrorBox message={error} />}
       {loading && !data && <Receiving label="walking the floor" />}
       {!loading && items.length === 0 && !error && (
@@ -480,6 +481,17 @@ function FloorSection({ langId }) {
 }
 
 /* -------------------------------------------------------------- the room */
+
+// The manual's sections in order. Talks play through the Screening Room's player
+// and the floor's repos come from GitHub, so those two need their modules.
+const SECTIONS = [
+  { id: 'videos', Section: VideoShelf, module: 'youtube' },
+  { id: 'podcasts', Section: PodcastSection },
+  { id: 'updates', Section: Updates },
+  { id: 'reference', Section: ReferenceShelf },
+  { id: 'floor', Section: FloorSection, module: 'github' },
+];
+const sections = SECTIONS.filter((x) => !x.module || hasModule(x.module));
 
 export default function Workbench() {
   const [langId, setLangId] = useLangParam('rust');
@@ -557,11 +569,9 @@ export default function Workbench() {
           {lang && (
             <>
               <Dossier lang={lang} />
-              <VideoShelf langId={langId} />
-              <PodcastSection langId={langId} radio={radio} />
-              <Updates langId={langId} />
-              <ReferenceShelf lang={lang} />
-              <FloorSection langId={langId} />
+              {sections.map(({ id, Section }, i) => (
+                <Section key={id} n={String(i + 1).padStart(2, '0')} langId={langId} lang={lang} radio={radio} />
+              ))}
             </>
           )}
         </div>

@@ -87,17 +87,27 @@ def _note_rate_limit(host, resp):
     if remaining is not None and reset is not None:
         try:
             if float(remaining) <= 0:
+                # Reddit sends seconds to wait; GitHub sends the epoch second the
+                # window reopens. Read a big number as a clock time, or a GitHub
+                # reset would block the host for half a century.
+                wait = float(reset)
+                if wait > 1e9:
+                    wait = max(0.0, wait - now)
                 with _registry_lock:
-                    _host_blocked_until[host] = now + float(reset)
+                    _host_blocked_until[host] = now + wait
         except ValueError:
             pass
 
 
-def get(url, *, ua=config.BROWSER_UA, headers=None, timeout=15, anonymous=False, **kwargs):
+def get(url, *, ua=config.BROWSER_UA, headers=None, timeout=15, anonymous=False, host_limits=True, **kwargs):
     """GET via the shared session. `anonymous=True` routes through a jar that
     neither sends nor stores cookies — see `anon_session`. An explicit `Cookie`
     header still goes out (the YouTube consent cookie relies on that); what's
-    suppressed is the *ambient* jar, in both directions."""
+    suppressed is the *ambient* jar, in both directions.
+
+    `host_limits=False` is for a caller that keeps its own rate-limit books
+    (GitHub, whose budgets are per bucket — core, search, graphql — not per
+    host): its responses never block the host here."""
     hdrs = dict(headers or {})
     hdrs.setdefault("User-Agent", ua)
     sess = anon_session if anonymous else session
@@ -106,7 +116,7 @@ def get(url, *, ua=config.BROWSER_UA, headers=None, timeout=15, anonymous=False,
 
     # Short-circuit instantly if we already know this host is out of budget —
     # don't burn the request (or a thread) finding that out again.
-    blocked_until = _host_blocked_until.get(host)
+    blocked_until = _host_blocked_until.get(host) if host_limits else None
     if blocked_until and time.time() < blocked_until:
         raise RateLimited(host, blocked_until - time.time())
 
@@ -123,12 +133,24 @@ def get(url, *, ua=config.BROWSER_UA, headers=None, timeout=15, anonymous=False,
     else:
         resp = sess.get(url, headers=hdrs, timeout=timeout, **kwargs)
 
-    _note_rate_limit(host, resp)
+    if host_limits:
+        _note_rate_limit(host, resp)
+        if resp.status_code == 429:
+            blocked_until = _host_blocked_until.get(host, time.time() + 30)
+            raise RateLimited(host, blocked_until - time.time())
 
-    if resp.status_code == 429:
-        blocked_until = _host_blocked_until.get(host, time.time() + 30)
-        raise RateLimited(host, blocked_until - time.time())
+    resp.raise_for_status()
+    return resp
 
+
+def request(method, url, *, ua=config.BROWSER_UA, headers=None, timeout=15, anonymous=False, **kwargs):
+    """Any other verb (PUT, PATCH, DELETE) via the shared session, for the writes
+    a linked account makes. Same cookie rule as `get`; no host spacing, since a
+    write is one deliberate click, not a crawl."""
+    hdrs = dict(headers or {})
+    hdrs.setdefault("User-Agent", ua)
+    sess = anon_session if anonymous else session
+    resp = sess.request(method, url, headers=hdrs, timeout=timeout, **kwargs)
     resp.raise_for_status()
     return resp
 

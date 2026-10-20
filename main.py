@@ -1,4 +1,4 @@
-from server import brain, cache, config, db, notifier, updater
+from server import brain, cache, config, db, modules
 from server import create_app
 
 
@@ -37,14 +37,18 @@ def main():
     # Pull the latest anime-scraper fixes before anything imports it: allanime
     # changes its crypto every so often and the fix ships as an anipy-api
     # release. Best-effort — never blocks a normal (already-current) start.
-    updater.check_and_update()
+    if modules.has("anime"):
+        from server import updater
+        updater.check_and_update()
     db.init_db()
+    db.note_modules(modules.installed(), chosen=modules.chosen_explicitly())
     app = create_app()
-    _warm_caches()
-    _backfill_avatars()
-    notifier.start()
+    if modules.has("youtube"):
+        from server import notifier
+        _warm_caches()
+        _backfill_avatars()
+        notifier.start()
     brain.start()
-    brain.edition.start()
     print(f"\n  Tubcal — private social hub")
     print(f"  http://{config.HOST}:{config.PORT}\n")
     app.run(host=config.HOST, port=config.PORT, debug=False, threaded=True)

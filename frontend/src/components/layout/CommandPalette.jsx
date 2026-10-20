@@ -8,8 +8,10 @@ import {
 
 import { api } from '../../api/client.js';
 import { CHANNELS, channelHome, getRoomById } from '../../lib/rooms.js';
+import { hasModule } from '../../lib/modules.js';
 import { usePlayer, useSaved, useSettings } from '../../state.jsx';
 import { openPocket } from '../channels/common.jsx';
+import { repoPath } from '../../lib/gh.js';
 import { KindIcon, kindLine } from '../saved/kinds.jsx';
 import { useOpenSaved } from '../saved/useOpenSaved.jsx';
 import s from './CommandPalette.module.css';
@@ -26,8 +28,10 @@ const ROOM_NAV = CHANNELS.flatMap((ch) => ch.rooms.map(getRoomById).filter(Boole
   return { id: `nav:${r.route}`, label: r.label, sub: ch.label, icon: <Icon size={15} />, to: r.route };
 }));
 const PLACE_NAV = [
-  { id: 'nav:/youtube/history', label: 'Screening Room — watch history', icon: <History size={15} />, to: '/youtube/history' },
-  { id: 'nav:/youtube?v=latest', label: 'Screening Room — latest uploads', icon: <Clapperboard size={15} />, to: '/youtube?v=latest' },
+  ...(hasModule('youtube') ? [
+    { id: 'nav:/youtube/history', label: 'Screening Room — watch history', icon: <History size={15} />, to: '/youtube/history' },
+    { id: 'nav:/youtube?v=latest', label: 'Screening Room — latest uploads', icon: <Clapperboard size={15} />, to: '/youtube?v=latest' },
+  ] : []),
   { id: 'nav:/', label: 'Home', sub: 'Choose a channel', icon: <House size={15} />, to: '/' },
   { id: 'pocket:saved', label: 'Saved', sub: 'Open the drawer · Space s', icon: <Bookmark size={15} />, pocket: 'saved' },
   { id: 'nav:/saved', label: 'Saved page', sub: 'Everything you kept', icon: <Bookmark size={15} />, to: '/saved' },
@@ -122,6 +126,16 @@ export default function CommandPalette() {
         icon: item.platform === 'reddit' ? <Radio size={14} /> : <Hash size={14} />,
         hint: 'Open',
         run: () => window.open(item.url, '_blank', 'noopener'),
+      }),
+    );
+    (results.github || []).forEach((item) =>
+      out.push({
+        key: item.id,
+        label: item.source || item.title,
+        sub: item.extra?.description || 'GitHub repository',
+        icon: <GitBranch size={14} />,
+        hint: 'Open',
+        run: () => navigate(repoPath(item.source)),
       }),
     );
     return out;

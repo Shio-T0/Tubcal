@@ -59,23 +59,28 @@ Or without cloning first (it clones into `~/.local/share/tubcal/app`):
 curl -fsSL https://raw.githubusercontent.com/Shio-T0/Tubcal/main/install.sh | bash
 ```
 
-It opens on a test card that reads your system, lets you pick the optional parts,
-and shows its running order (including the exact distro command, if one is needed)
-before anything runs. Then:
+It opens on a test card that reads your system, lets you pick the rooms you want and
+a few options, and shows its running order (including the exact distro command, if
+one is needed) before anything runs. Then:
 
 1. **Distro packages:** only what's missing, with sudo asked for once and used for
    nothing else.
-2. **uv, Node.js and Python 3.13:** the distro's own when it has recent enough ones.
+2. **Tubcal itself, with only the rooms you picked.** A curl install makes a partial
+   clone and checks out just those rooms' files, so a room you leave out is never
+   downloaded. Run from your own git checkout, it leaves the other rooms' files out of
+   that checkout (files you've changed stay).
+3. **uv, Node.js and Python 3.13:** the distro's own when it has recent enough ones.
    Otherwise a private uv, a checksum-verified Node 24 LTS and a uv-managed Python,
    all under your home.
-3. **The backend and the frontend:** `uv sync` with your extras, then a production
-   build of the frontend.
-4. **A private yt-dlp:** Tubcal's own copy, refreshed at most once a day, set up to solve
-   YouTube's JS challenges with Node. Your own yt-dlp, if you have one, is untouched.
-5. **The `tubcal` command, an app-menu entry, and a user service** (systemd, where
+4. **The backend and the frontend:** `uv sync` with the Python packages your rooms
+   use, then a production build of the frontend with only their pages.
+5. **A private yt-dlp,** if you picked the Screening Room: Tubcal's own copy, refreshed
+   at most once a day, set up to solve YouTube's JS challenges with Node. Your own
+   yt-dlp, if you have one, is untouched.
+6. **The `tubcal` command, an app-menu entry, and a user service** (systemd, where
    there is one).
-6. **A self-test:** the app is booted against a throwaway database and has to serve
-   the page and answer its API.
+7. **A self-test:** the app is booted against a throwaway database and has to serve
+   the page, answer its API, and have the rooms you picked.
 
 Run it again at any time: it repairs, and it remembers what you chose. Your data
 (`data/tubcal.db`) is never touched.
@@ -102,18 +107,39 @@ leaves that feature out and says why. Tested in containers on Fedora 44 (x86-64,
 arm64 posing as Fedora Asahi Remix), AlmaLinux 9, Debian 12, Ubuntu 24.04, Arch,
 openSUSE Tumbleweed and Alpine 3.24.
 
-### Choices
+### Rooms
 
-| Component | Flag | What it is |
+Every room is optional. A room you leave out has no files, Python packages or pages on
+your machine, and Tubcal's channels, home screen and settings show only the rooms you
+have. A channel with none of its rooms installed isn't shown.
+
+| Room | Name | What it adds |
 |---|---|---|
-| Composing Room terminal & LSP | `editor` | flask-sock: a real shell and language servers in the editor room *(on by default)* |
-| The Archive | `archive` | faster-whisper transcription of what you watch, about 300 MB *(off by default)* |
+| The Edition | `edition` | the daily paper; numpy, about 20 MB |
+| The Wire | `hackernews` (or `wire`) | Hacker News |
+| The Dispatch | `reddit` (or `dispatch`) | Reddit |
+| The Composing Room | `editor` | the code editor, with flask-sock for its terminal and language servers |
+| The Workbench | `dev` (or `workbench`) | the programming-language manuals |
+| GitHub | `github` | the GitHub room *(off by default in a curl install)* |
+| The Screening Room | `youtube` (or `screening`) | YouTube, and the private yt-dlp, about 60 MB |
+| The Anime | `anime` | the Anime and its scrapers, about 100 MB |
+| The Archive | `archive` | faster-whisper transcription, about 300 MB; needs the Screening Room *(off by default)* |
+
+Some rooms use others when they're there: the Edition reads the Wire, the Dispatch and
+the Screening Room; the Workbench's talks need the Screening Room and its trending repos
+need GitHub. Without them those parts don't appear.
+
+### Options
+
+| Option | Flag | What it is |
+|---|---|---|
 | App-menu entry & icon | `desktop` | launch Tubcal like any other app *(on)* |
 | Start when I log in | `autostart` | a systemd user service, or XDG autostart *(off)* |
-| Live-stream pings & fast grep | `extras` | `notify-send` and `ripgrep` from your distro *(on when there's root)* |
+| Distro extras | `extras` | `notify-send` for live-stream pings (Screening Room) and `ripgrep` for the editor's search (Composing Room) *(on when there's root)* |
 
 ```bash
 ./install.sh --yes                                # no questions: defaults, or your last choices
+./install.sh --rooms wire,dispatch,anime          # exactly these rooms
 ./install.sh --with archive,autostart --without extras
 ./install.sh --no-sudo                            # never ask for root; everything in your home
 curl -fsSL …/install.sh | bash -s -- --yes        # flags work through curl too
@@ -131,6 +157,9 @@ curl -fsSL …/install.sh | bash -s -- --yes        # flags work through curl to
 | `tubcal status` | on air or not, the URL, and the Python / yt-dlp / Node versions |
 | `tubcal logs` | follow the server log (journald, or `~/.local/state/tubcal/tubcal.log`) |
 | `tubcal update` | `git pull`, re-sync, rebuild and restart, with your saved choices |
+| `tubcal rooms` | every room, and which ones are installed |
+| `tubcal add ROOM…` | add rooms you left out: downloads their files and packages, rebuilds, restarts |
+| `tubcal remove ROOM…` | take rooms out again; what you saved, followed and watched stays in your database |
 | `tubcal autostart on\|off` | start at login, or don't |
 | `tubcal uninstall` | remove the launcher, menu entry, service and the private tools |
 
@@ -169,7 +198,9 @@ uv sync --extra brain     # The Archive: faster-whisper + numpy (local transcrip
 uv sync --extra editor    # The Composing Room: flask-sock (PTY terminal + LSP bridge)
 ```
 
-The installer offers both as checkboxes (or `--with archive,editor`).
+The installer installs each with its room (`--with archive,editor`, or `tubcal add`
+later). A plain `uv sync` also installs the Anime's scrapers (the `anime` dependency
+group); `--no-group anime` leaves them out.
 
 | Also nice to have | Unlocks |
 |---|---|
@@ -415,6 +446,7 @@ runtimes (down to the Android/Chaquopy build) boot at all.
 main.py                   updater → init DB → create_app → warm caches → start workers → run
 server/
   config.py               env-driven config, cache TTLs, room ids
+  modules.py              which rooms this copy has (modules.ini, TUBCAL_MODULES)
   db.py                   the one SQLite file: subs, settings, history, tokens, archive, editions
   cache.py                TTL + stale-while-revalidate cache, persisted
   httpc.py                shared sessions, per-host spacing, anonymous (cookie-less) reads
@@ -427,6 +459,7 @@ server/
   editor/                 PTY terminal + stdio JSON-RPC ⇄ WebSocket LSP bridge
 frontend/src/
   lib/rooms.js            canonical room registry — the source of the numbering
+  lib/modules.js          which rooms this build has; lazy imports for a room's parts
   lib/themes.js           the skin registry
   lib/urlState.js         view state lives in the URL, so Back restores it
   pages/                  one lazy-loaded page per room (+ the chooser, the anime pages)
@@ -438,13 +471,17 @@ frontend/src/
   state.jsx               shared state as a stack of context providers
   styles/                 design tokens + one block per skin
 android/                  the phone app: Gradle project, phone UI (phone/), vendored scrapers
+modules.ini               the rooms an install can leave out, and the files each owns
 install.sh                the Linux installer (any distro; Fedora Asahi included)
 packaging/linux/          what it installs: the `tubcal` launcher, menu entry, user service
 data/tubcal.db            everything local (git-ignored)
 ```
 
-**Adding a room** is three edits kept in sync: an entry in `lib/rooms.js`, a component in
-`pages/`, a route in `App.jsx`.
+**Adding a room** is a few edits kept in sync: an entry in `lib/rooms.js`, a component in
+`pages/`, a route in `App.jsx`, its blueprint in `server/api/__init__.py`, and a section
+in `modules.ini` (copied into `install.sh`) listing the files it owns.
+`tests/test_modules.py` checks that they agree and that nothing outside the room imports
+its files directly.
 
 ## 🧪 Develop
 

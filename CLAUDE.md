@@ -32,8 +32,48 @@ color token, route, `default_enabled` — the rooms Settings → Rooms can switc
 rooms each holds, in order). Room numbers are computed from position inside the
 channel, never hardcoded; `channelRooms`/`channelHome`/`roomOfPath`/`channelOfPath`
 are the helpers. Adding a room = an entry in `ROOMS` + its id in a channel + a page in
-`pages/` + a route under that channel's layout in `App.jsx` (+ `config.ROOM_IDS`).
-GitHub ships off by default. `db.init_db` strips retired ids from `active_rooms`.
+`pages/` + a route under that channel's layout in `App.jsx` (+ `config.ROOM_IDS`) + its
+module (see "Modules" below). GitHub ships off by default. `db.init_db` strips retired
+ids from `active_rooms`.
+
+**Modules.** Every room is a module an install can leave out; `modules.ini` (repo root)
+lists them with the files each owns (`paths`), the rooms it `needs` (the Archive needs
+the Screening Room), its pyproject `extras`/`groups`, private `tools` (yt-dlp) and distro
+`packages`. Everything not listed under some module's `paths` is the core. A left-out
+module's files aren't on disk (install.sh's sparse checkout), so:
+- Server: `server/modules.py` — `modules.has(id)`, `installed()`. A module is here when
+  chosen (`TUBCAL_MODULES`, set by the launcher from the install record; unset = all),
+  its `server/` paths exist and its needs are here. `api/__init__.py`'s
+  `MODULE_BLUEPRINTS` registers only installed modules' blueprints; an unknown `/api/`
+  path is a JSON 404. Core code imports a module's files only inside a function,
+  behind `modules.has()` (`feeds._source`, `subscriptions._source`, `brain.start()`,
+  `feed_index.collect_items`, `dev.videos/repos/release`, main.py's YouTube warmers,
+  notifier and the anime updater). `/api/health` lists the modules, and `serve_index`
+  stamps `window.__TUBCAL_MODULES__` into the page.
+- Frontend: `frontend/src/build/modules.mjs` (Vite plugin) builds only chosen+present
+  modules (same rules, `TUBCAL_MODULES` from install.sh), defines `__TUBCAL_MODULES__`,
+  and resolves any import of a left-out module's file to an empty stand-in.
+  `lib/modules.js`: `hasModule(id)` (build ∩ server), `moduleLazy`/`moduleLazyNamed`
+  (React.lazy that renders nothing without the module), `missingModules()`. The core
+  reaches a module only through `import()`: App.jsx's routes (gated by `has()`), the
+  Video console's `PLACES`, the Anime's layout (`components/anime/AnimeSection.jsx`)
+  and curtain-call host, Settings' GitHub link panel, the HN/Reddit readers in the
+  Edition and `useOpenSaved`. `lib/rooms.js` filters `ROOMS`/`FIXED`/`CHANNELS` by
+  module (`ALL_*` keep the full lists) and renumbers the channels, so frames, Home, the
+  palette and keys rearrange themselves; a channel with no rooms disappears. Saved
+  items from a left-out room stay listed (`savedChannels`) and open on the web or say
+  `tubcal add <id>`. Settings → Rooms lists what isn't installed.
+- Shared pieces that look like a room's live in the core so others can use them:
+  `components/screening/{feed.js,tiles.jsx,SubscribeButton.jsx}`, `components/player/anime/`
+  (incl. `watching.js`, `episodeList.js`), `lib/gh.js`, `lib/languages.js`,
+  `splitKind` in `lib/format.js`, `components/modals/{AddSubscriptionModal,SafeHtml}.jsx`.
+- `db.note_modules` (main.py) switches on, in `active_rooms`, a room whose module was
+  added since the last start (and on a new DB with an explicit `TUBCAL_MODULES`, every
+  chosen room); an existing DB's first run only records.
+- `tests/test_modules.py` keeps it honest: manifest paths exist and don't overlap, rooms
+  = modules = blueprints, the installer's embedded copy equals `modules.ini`, and no
+  static/module-level import crosses into a module from outside (frontend and server).
+- The phone build (no plugin, no `modules.ini` in its Python) always has every module.
 Saved and Settings belong to no channel: `DeskFrame` (a bar with "Back to <the room
 you came from>", remembered per tab in sessionStorage by `useRememberPlace`).
 Every frame shares `components/channels/common.jsx`: `ChannelKnobs` (1 2 3),
@@ -122,7 +162,9 @@ from curl it clones into `~/.local/share/tubcal/app`. It is one bash script that
 re-execs itself from `sh`, and it keeps its own state in `$TUBCAL_HOME`
 (`~/.local/share/tubcal`):
 - `install.conf` is the install record. The installer writes it and the launcher
-  sources it.
+  sources it. `MODULES` is the rooms installed, `KNOWN_MODULES` every room there was
+  to pick (a room newer than the record gets its default). A record without `MODULES`
+  predates modules: every room, the Archive per `ARCHIVE`.
 - `bin/` + `tools/` hold the private yt-dlp, installed with `uv tool`. A
   `yt-dlp.conf` beside its package adds `--js-runtimes node:<abs path>`, so YouTube's
   JS challenges solve without Deno. Tubcal finds this copy first because the
@@ -130,6 +172,24 @@ re-execs itself from `sh`, and it keeps its own state in `$TUBCAL_HOME`
 - `node/` is a private Node, only when the distro's is missing or below 20. It is
   checksum-verified against nodejs.org's SHASUMS256.
 - `bin/uv` is a private uv, only when no uv ≥ 0.8 exists.
+
+The menu lists the rooms by channel (from `modules.ini`; piped from curl, from the
+copy in `embedded_manifest` at the end of install.sh, which must match) and the
+options `desktop`/`autostart`/`extras`. Picking a room brings what it needs; dropping
+one drops what needs it. Defaults: every room but the Archive, and GitHub is off in a
+clone (on in your own checkout). Flags: `--rooms LIST` (exact), `--with`/`--without`
+(rooms or options), `--add`/`--remove` (what `tubcal add/remove` run), `--list`. The
+files:
+- A clone is `git clone --filter=blob:none --no-checkout --depth 1`, then
+  `apply_rooms` writes non-cone sparse patterns (`/*` minus each left-out room's
+  paths, minus `[elsewhere]` = android/ and docs/) and checks out. Adding a room
+  re-includes its paths; git fetches the missing blobs.
+- Your own git checkout gets the same patterns via `git sparse-checkout reapply`
+  (2.27+; changed files stay, untracked files are never touched) or `disable` when
+  every room is back. A non-git folder keeps its files; the build and server still
+  leave the rooms out.
+- `uv sync --no-default-groups` + each room's `--extra`/`--group`; `npm run build` with
+  `TUBCAL_MODULES`; yt-dlp only with the Screening Room (removed with it).
 
 Distro packages come first when there is root, and the plan shows them before
 anything runs. Fedora (and so Fedora Asahi Remix, aarch64 with 16K pages) gets
@@ -140,7 +200,8 @@ self-test: the Flask test client against a temp `DATA_DIR`, as in
 `tests/conftest.py`.
 
 `packaging/linux/` holds the templates it renders (`@TUBCAL_HOME@`, `@BIN@`):
-- `tubcal` is the launcher: open/start/stop/status/logs/update/autostart/uninstall/run.
+- `tubcal` is the launcher: open/start/stop/status/logs/update/rooms/add/remove/
+  autostart/uninstall/run. It exports `TUBCAL_MODULES` from the record for the server.
   It uses systemd `--user` when available (`TUBCAL_SYSTEMD=0` opts out), else a
   pidfile plus `setsid`. It identifies a running Tubcal by `/api/health`.
 - `tubcal.desktop` and `tubcal.service` are the menu entry and the user unit.
@@ -153,7 +214,7 @@ self-test: the Flask test client against a temp `DATA_DIR`, as in
 
 ```bash
 # one-time / after dependency changes
-uv sync                                   # backend deps (Python >= 3.12)
+uv sync                                   # backend deps (Python >= 3.12) + the Anime's group
 uv sync --extra brain                     # + The Archive (faster-whisper, numpy)
 uv sync --extra editor                    # + Composing Room terminal/LSP (flask-sock)
 cd frontend && npm install                # frontend deps
@@ -184,9 +245,11 @@ response is wrapped `{ok, data}` / `{ok, error}` by `server/api/__init__.py`'s
 `ok()`/`err()` helpers, and the client unwraps `data` or throws on `ok === false`.
 `/api/*` responses are forced `Cache-Control: no-store`; everything else is the SPA.
 
-**Entrypoint (`main.py`):** `updater.check_and_update()` → `db.init_db()` →
-`create_app()` → warm the "picked for you" cache and backfill channel avatars in
-background threads → start the notifier and brain/edition workers → `app.run()`.
+**Entrypoint (`main.py`):** `updater.check_and_update()` (with the Anime) →
+`db.init_db()` → `db.note_modules()` → `create_app()` → with the Screening Room, warm
+the "picked for you" cache, backfill channel avatars and start the notifier →
+`brain.start()` (the Archive's worker and the Edition's press, each if installed) →
+`app.run()`.
 Background warming exists so slow shelves are ready before first request.
 `server/updater.py` upgrades `anipy-api` in place from PyPI on startup (allanime
 rotates its site crypto and the fix ships as a release); it must run *before*
@@ -238,7 +301,7 @@ no ORM.
   *adaptive* DASH (separate avc1 video-only + AAC audio). So `_collect_streams`
   keeps 360p as an instant floor and, for each avc1 height above it, emits an
   `adaptive` HLS entry pointing at a *synthesized* master playlist. `server/sources/fmp4.py`
-  parses each rendition's `sidx` into byte-range segments and `server/api/feeds.py`
+  parses each rendition's `sidx` into byte-range segments and `server/api/youtube.py`
   serves a master (one video variant + the original audio as an alternate group)
   plus per-track `#EXT-X-BYTERANGE` media playlists; hls.js muxes video+audio in
   the browser, fetching straight from googlevideo through the existing segment
@@ -249,7 +312,7 @@ no ORM.
   **Playback resilience.** A googlevideo URL is IP-bound and expires, and the
   playlist freezes it in at open time. So:
   - Adaptive segment proxy URLs carry `&v=<video_id>`. When googlevideo refuses
-    one (403/404/410), `feeds._fresh_url` re-resolves the video, at most once per
+    one (403/404/410), `api/youtube._fresh_url` re-resolves the video, at most once per
     ~20s, and takes the same itag (same file, so the byte range still lines up).
     `_FRESH` remembers the swap for later segments.
   - `httpc.stream_get` retries drops, timeouts and 5xx/429.
@@ -269,10 +332,46 @@ no ORM.
 - `hackernews.py` — Firebase API + Algolia search. It is the reference pattern for
   a source adapter: `normalize(item)` / `get_feed()` / `search()` / `get_item()`,
   each wrapped in `cache.cached()`.
-- `github.py` — public REST API (repos, releases, activity), following the
-  hackernews shape. Unauthenticated GitHub allows only 60 req/hr/IP, so cache
-  hard; a classic PAT in the `github_token` setting (or `TUBCAL_GITHUB_TOKEN`)
-  raises it to 5000. There is no OAuth flow for GitHub — the token is pasted in.
+- `github.py` — GitHub, through two front doors:
+  - The REST API: 60 requests/hr/IP without a token, 5,000 with one, counted per
+    bucket (core, search, graphql, code_search). `_api` keeps those books from the
+    response headers (`budget()`, shown as the room's gauge), fails fast while a
+    bucket is empty, and raises `GitHubError(message, status, kind)` with a
+    sentence fit to show. `_cached` revalidates with the stored ETag (a 304 is
+    free with a token). API calls go through `httpc.get(..., host_limits=False)`
+    / `httpc.request` (GitHub's reset header is an epoch, not seconds), always
+    `anonymous=True`.
+  - github.com itself, which costs no budget: `/trending` (+ `/developers`,
+    `parse_trending` reads the stars gained; falls back to a created-recently
+    search), `/users/<login>/contributions` (`parse_contributions`), and each
+    repo's `commits.atom` / `releases.atom` (`parse_atom`).
+  - GitHub trimmed its Events API in 2025: a PushEvent has no commits and a
+    PullRequestEvent no title. So a followed *repo*'s feed is the two Atom feeds
+    plus one issues call (issues + PRs with titles); only a followed *person*
+    still reads events (`_event_text` copes with both payload shapes).
+  - Ids: repos are `github:repo:<owner/name lowercased>` and releases
+    `github:release:<repo>@<tag>`, so the same thing saved from trending, Atom
+    or the API is one saved entry. Issues/PRs `github:issue|pull:<repo>#<n>`,
+    commits `github:commit:<repo>@<sha>`, people `github:user:<login>`.
+  - The account: a token in the `oauth` table, provider "github"
+    (`db.set_oauth_token`), linked by taking the GitHub CLI's sign-in
+    (`gh auth token`) or by pasting a PAT (`link_token` checks it against
+    `/user`). The legacy `github_token` setting / `TUBCAL_GITHUB_TOKEN` still
+    count. `account()` reports login + `capabilities(scopes)`: notifications need
+    `notifications` or `repo` (never a fine-grained token), star/comment
+    `public_repo`/`repo`, following `user:follow`. The token never reaches the
+    page. Account-only calls (`notifications`, `work` = four `@me` searches,
+    `stars`, `received`, star/follow/comment) cache under `github:my:<login>:`.
+  - API: `server/api/github.py` (`/api/github/*`); `/feed/github` stays in
+    its own blueprint in `api/github.py` (`github_feed_bp`). Tests:
+    `tests/test_github.py`, `tests/test_github_normalize.py`.
+- `github_local.py` — the GitHub checkouts in `EDITOR_ROOT` (one or two levels
+  down): branch, changed files, ahead/behind from `git status --porcelain -b`
+  (with `GIT_OPTIONAL_LOCKS=0`), and with a token whether upstream moved since
+  the last fetch. `start_clone` runs `git clone --filter=blob:none` in a thread
+  (progress parsed from git's stderr; private repos over ssh); `fetch` runs
+  `git fetch --prune` (never touches the working tree). Without git (the phone)
+  `available()` is False and the room hides it.
 - `anilist.py` — GraphQL; reads cached, user writes (progress sync) uncached.
   AniList now 403s *unauthenticated* reads, so `_post` falls back to the connected
   account's OAuth token when a caller passes none. `media()` carries the cast
@@ -531,7 +630,7 @@ An **anime episode** gets its own player, built from `components/player/anime/`:
   auto-skip as setting `anime_auto_skip`; those timings also become chapters.
 - `NextUp` is an 8s countdown into the next episode when one ends.
 - `useAnimeShow` reads the same `/anime/media` + `/anime/episodes` the title page
-  does, through `useShared`, and `components/anime/episodeList.js` builds the list
+  does, through `useShared`, and `components/player/anime/episodeList.js` builds the list
   and player items for both.
 - Switching episodes is `close()` + `open()`. A Sub/Dub choice sticks per show for
   the session (`rememberAudio`; the key's `l` field is rewritten by `keyWithAudio`).
@@ -607,6 +706,34 @@ walks through them (`components/wire/seen.js`, localStorage `tubcal.wire.seen`).
 HN HTML goes through `HnHtml.jsx` (allow-list walk, ">" paragraphs drawn as quotes,
 HN item links opened in the reader). Tests: `tests/test_wire.py`.
 
+The GitHub room (`pages/Github.jsx`, `/github`) borrows git's own visual language:
+lanes and nodes, release tags cut like luggage tags (`TagLabel`), short hashes,
++/− diffstat blocks. Its pieces are in `components/github/` (and `lib/gh.js`: paths,
+`ghRoute` for github.com links, linguist colours, `useGhAccount`):
+- Down the left, a list of refs (the views, the current one starred like `git
+  branch`), the account card with the last 16 weeks of contributions, and the
+  API budget. Views are `?v=`: activity (`Graph.jsx` — each day a trunk, each repo
+  a branch in its language colour; busy days fold, squash commits fold into their
+  PR; or the linked account's GitHub feed), releases (a rack of tags by week),
+  trending (`?p=`, `?lang=`, `?tk=devs`), following (cards), clones, and with an
+  account inbox / work / stars. Search (`?q=`, `?in=` repos|users|issues|code)
+  sits over every view; a pasted github.com link or owner/repo opens it here.
+- `/github/r/:owner/:repo` (`pages/GithubRepo.jsx`): the name plate (owner / name,
+  the slash in the language's colour), tabs `?t=` readme|code|commits|issues|
+  pulls|releases|people, facts down the side (52-week ridge, the local clone or
+  a Clone button). Code is `?path=&ref=`; files are highlighted by `Code.jsx`
+  with the editor's own grammars (`languageFor`) and `@lezer/highlight`'s
+  `classHighlighter`, lines marked by `#L12-L20`; "Edit locally" opens the clone's
+  copy in the Composing Room. Threads `/issues/:n`, `/pull/:n` (`?tab=files`)
+  draw the conversation on a lane and can comment with a token; `/commit/:sha`;
+  `/github/u/:login` (`pages/GithubUser.jsx`) has the contribution calendar
+  (`Calendar.jsx`). `Diff.jsx` renders patches; `GhHtml.jsx` renders GitHub's HTML
+  and routes its links in-app (relative README links open the file).
+- The Coding frame's title bar carries the path into the repo, and the GitHub key
+  shows unread notifications. Saved GitHub things (repo, release, issue, pull,
+  commit, ghuser) open their page here (`itemPath`); the phone opens them on
+  github.com. Settings → Accounts has the same link panel (`LinkAccount.jsx`).
+
 The Anime's views (Browse, Seasons, Schedule, My List, Ledger, Community, Channel,
 Social) have no header or tab strip: they're chosen from the index, a file tree
 built in `components/anime/AnimeTree.jsx` that the Video console shows under "The
@@ -626,7 +753,7 @@ load on `useInView` to save AniList budget. My List's titles are `components/ani
   airing.
 - `usePlayEpisode` plays an episode from the list through `/anime/episodes`
   (warmed on hover), with the same `episodeItem` as the title page.
-- Both live in `components/anime/watching.js` (re-exported by WatchList.jsx), with no
+- Both live in `components/player/anime/watching.js` (re-exported by WatchList.jsx), with no
   CSS attached, so the eager home screen can use them.
 - What a title offers follows its shelf: next episode and +1 while watching,
   Start for Planning, the score for Completed, and a countdown when you've caught
@@ -753,6 +880,10 @@ floats/rails otherwise.
   try/except, so minimal runtimes — including the Android/Chaquopy build — still boot
   with the feature simply reporting itself unavailable. Never import them at module
   top level.
+- **Module seams.** Outside a module (modules.ini), never import its files at module
+  level (server) or statically (frontend): check `modules.has()` / `hasModule()` and
+  import inside the function / through `moduleLazy`. A new file in a module's folder is
+  that module's; a file the core needs goes in the core. `tests/test_modules.py`.
 ## Important
 Maintain ~/Projects/papercuts.md, a global log shared by all my Claude sessions of anything that slowed down development. When you lose time to one mid-session, append date · symptom · fix · project. Check this file first when tooling fails mysteriously. *IGNORE THIS IF THE FILE DOES NOT EXIST OR DOES NOT HAVE THE PURPOSE MENTIONED*
 

@@ -3,7 +3,8 @@
 // Every saved entry is a feed-item-shaped object (`id`, `platform`, `title`, `url`,
 // `thumbnail`, `source`, `extra`) kept whole in the `saved` table, so the Saved page
 // can draw it without asking anyone again. The platform rooms (YouTube, Reddit, HN,
-// GitHub) already hand out items in that shape; everything else is built here:
+// GitHub — repos, releases, issues, pull requests, commits, people) already hand
+// out items in that shape; everything else is built here:
 // anime titles, characters, people, studios and threads, a moment in an archived
 // video, Workbench podcasts, posts and manuals, editor files, YouTube playlists and
 // channels, subreddits — and any page at all (`pageItem`).
@@ -29,6 +30,10 @@ export const KINDS = {
   subreddit: { label: 'Subreddits', one: 'subreddit', channel: 'social' },
   repo:      { label: 'Repositories', one: 'repo', channel: 'coding' },
   release:   { label: 'Releases', one: 'release', channel: 'coding' },
+  pull:      { label: 'Pull requests', one: 'pull request', channel: 'coding' },
+  issue:     { label: 'Issues', one: 'issue', channel: 'coding' },
+  commit:    { label: 'Commits', one: 'commit', channel: 'coding' },
+  ghuser:    { label: 'GitHub people', one: 'person', channel: 'coding' },
   event:     { label: 'GitHub activity', one: 'event', channel: 'coding' },
   file:      { label: 'Files', one: 'file', channel: 'coding' },
   article:   { label: 'Posts & articles', one: 'article', channel: 'coding' },
@@ -50,6 +55,8 @@ export function kindOf(item) {
     case 'github':
       if (item.extra?.type === 'release') return 'release';
       if (item.extra?.type === 'event') return 'event';
+      if (item.extra?.type === 'user') return 'ghuser';
+      if (item.extra?.type === 'pull' || item.extra?.type === 'issue' || item.extra?.type === 'commit') return item.extra.type;
       return 'repo';
     default: return 'link';
   }
@@ -69,7 +76,7 @@ export function toneOf(item) {
     case 'anime': case 'character': case 'staff': case 'studio': case 'thread': return 'var(--c-anime)';
     case 'story': return 'var(--c-hn)';
     case 'post': case 'subreddit': return 'var(--c-reddit)';
-    case 'repo': case 'release': case 'event': return 'var(--c-github)';
+    case 'repo': case 'release': case 'event': case 'pull': case 'issue': case 'commit': case 'ghuser': return 'var(--c-github)';
     case 'file': return 'var(--c-editor)';
     case 'article': case 'podcast': case 'doc': return 'var(--c-dev)';
     case 'page': return roomOfPath(String(item.url || '').split('?')[0])?.color || 'var(--signal)';

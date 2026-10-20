@@ -14,9 +14,10 @@ import { Link } from 'react-router-dom';
 import { CalendarClock, Loader2, Play, Radio, RotateCcw, Tv } from 'lucide-react';
 
 import { usePlayer } from '../../state.jsx';
+import { hasModule } from '../../lib/modules.js';
 import { ago, clock } from '../../lib/time.js';
 import { CHANNELS } from '../../lib/rooms.js';
-import { usePlayEpisode } from '../anime/watching.js';
+import { usePlayEpisode } from '../player/anime/watching.js';
 import { useChannelHomes } from '../channels/common.jsx';
 import { slotLabel } from './lineup.js';
 import s from './set.module.css';
@@ -154,7 +155,11 @@ function TestCard() {
       </div>
       <div className={s.testLine}>
         <strong>Nothing on just now</strong>
-        <span>Half-watched videos and your shows' next episodes queue up here. Turn a knob to start.</span>
+        <span>
+          {hasModule('youtube') || hasModule('anime')
+            ? "Half-watched videos and your shows' next episodes queue up here. Turn a knob to start."
+            : 'This screen plays from the Screening Room and the Anime, and neither is installed. Add one with tubcal add youtube or tubcal add anime.'}
+        </span>
       </div>
     </div>
   );

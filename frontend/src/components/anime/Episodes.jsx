@@ -21,7 +21,7 @@ import { Receiving } from '../layout/Section.jsx';
 import { clock } from '../../lib/time.js';
 import { applyOverlay, COMPLETE_RATIO, useAnimeSync, usePlayer, useProgress } from '../../state.jsx';
 import { airingDateLabel, fmtCountdown, useCountdownTick, useParamState } from './shared.jsx';
-import { buildEpisodeList, episodeItem } from './episodeList.js';
+import { buildEpisodeList, episodeItem } from '../player/anime/episodeList.js';
 import s from '../../pages/anime.module.css';
 import k from './episodes.module.css';
 

@@ -12,6 +12,8 @@ import { KINDS, kindOf } from '@pc/lib/saveable.js';
 import { ago } from '@pc/lib/time.js';
 import { useSaved } from '@pc/state.jsx';
 
+import { openExternal } from '../lib/bridge.js';
+
 import { ActionSheet, AppBar, Chips, Empty, useLongPress } from '../shell/Shell.jsx';
 import { useOpener } from './discuss.jsx';
 import { usePlayAll, VideoRow } from './video.jsx';
@@ -83,6 +85,9 @@ export default function Saved() {
     if (kind === 'moment') openReader(item.extra?.video);
     else if (READERS.has(kind)) openReader(item);
     else if (item.url?.startsWith('/')) navigate(item.url);
+    // GitHub issues, pull requests, commits and people have their pages on the
+    // desktop only; here they open on github.com.
+    else if (item.url) openExternal(item.url);
   }, [openReader, navigate]);
   const playAll = usePlayAll();
   const items = Object.values(saved).filter((i) => !DESKTOP_ONLY.has(kindOf(i))).reverse();

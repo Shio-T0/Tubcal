@@ -11,7 +11,7 @@ import { Frown, Meh, Smile, Star, Tv } from 'lucide-react';
 import { api } from '@pc/api/client.js';
 import { fetchShared } from '@pc/lib/useShared.js';
 import { CoverRatings, metaLine, NextEpBadge, SCORE_MAX, SCORE_STEP } from '@pc/components/anime/shared.jsx';
-import { episodeItem as pcEpisodeItem } from '@pc/components/anime/episodeList.js';
+import { episodeItem as pcEpisodeItem } from '@pc/components/player/anime/episodeList.js';
 import { audioFor } from '@pc/components/player/anime/useAnimeShow.js';
 
 import k from './animekit.module.css';

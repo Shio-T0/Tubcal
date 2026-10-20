@@ -1,7 +1,8 @@
-/* The Tour — the demos. Everything here is a small, faithful model of how the
-   app behaves (numbering by running order, the Edition's ladder, the player's
-   keys and dock, the Reckoner's aired-so-far cap), drawn with invented sample
-   content. */
+/* The Tour — the guide at the top, then the demos. Most demos are small,
+   faithful models of how the app behaves (rooms renumbering, the Edition with
+   and without AI, the player's keys and corner dock), drawn with invented
+   sample content. The Anime is shown as screenshots of the real app instead
+   (assets/shots/). */
 
 (function () {
   'use strict';
@@ -16,29 +17,32 @@
   };
 
   /* ════════════════════════════════════════════════════════════════════ *
-   * The bar, the chooser's programme guide, the route wall
+   * The bar, and the guide at the top
    * ════════════════════════════════════════════════════════════════════ */
-  const STOP_C = { hub: 'var(--signal)', edition: 'var(--c-foryou)', player: 'var(--c-youtube)', anime: 'var(--accent-strong)', look: 'var(--rail-3)', privacy: 'var(--c-dev)', 'tune-in': 'var(--signal)' };
+  const STOP_C = { hub: 'var(--signal)', edition: 'var(--c-foryou)', player: 'var(--c-youtube)', anime: 'var(--accent-strong)', look: 'var(--rail-3)', privacy: 'var(--c-dev)', get: 'var(--signal)' };
   const stops = T.tour.filter((s) => s.id !== 'top');
 
   $('#bar-stops').innerHTML = stops.map((s) => `<a href="#${s.id}" data-stop="${s.id}" style="--stop-c:${STOP_C[s.id]}">${esc(s.title.replace('Channel 1 · ', '').replace('Channel 2 · ', ''))}</a>`).join('');
-  $('#guide').innerHTML = stops
-    .map((s, i) => `<a class="gitem" href="#${s.id}" style="--room-c:${STOP_C[s.id]};--i:${i}"><small>No ${String(i + 1).padStart(2, '0')}</small><b>${esc(s.title.replace('Channel 1 · ', '').replace('Channel 2 · ', ''))}</b></a>`)
-    .join('');
 
-  const routes = window.TUBCAL_ROUTES || [];
-  if (routes.length) {
-    const http = routes.filter((r) => r.m !== 'WS').length;
-    $('#route-count').textContent = `${http} routes + 2 sockets documented`;
-    const pick = routes.slice().sort(() => 0.5 - Math.random()).slice(0, 64);
-    $('#routewall').innerHTML = pick.map((r) => `<span><b>${r.m}</b>${esc(r.p)}</span>`).join('');
-  }
+  // the guide's Hub lines: one per room, numbered as the app numbers them
+  let roomNo = 0;
+  $('#hg-hub-count').textContent = `${T.rooms.length} rooms`;
+  $('#hg-rooms').innerHTML = T.rooms
+    .map((r) => `<li><a href="#hub" data-guide-room="${r.id}" style="--room-c:${r.color}">
+        <span class="hg-no">${r.on ? String(++roomNo).padStart(2, '0') : '—'}</span><span class="hg-name">${esc(r.label)}</span>
+        <span class="hg-what">${esc(r.line)}${r.on ? '' : '<small>off at first</small>'}</span></a></li>`)
+    .join('');
+  $$('[data-guide-room]').forEach((a) => a.addEventListener('click', (e) => {
+    e.preventDefault();
+    document.dispatchEvent(new CustomEvent('tubcal:room', { detail: a.dataset.guideRoom }));
+    window.TC.goSection('hub');
+  }));
 
   const bar = $('#bar');
-  const chooser = $('#top');
+  const top = $('#top');
   const stopLinks = $$('#bar-stops a');
   function onScroll() {
-    const past = chooser.getBoundingClientRect().bottom < 80;
+    const past = top.getBoundingClientRect().bottom < 80;
     bar.classList.toggle('show', past);
     let cur = null;
     stops.forEach((s) => {
@@ -51,178 +55,13 @@
   onScroll();
 
   /* ════════════════════════════════════════════════════════════════════ *
-   * 01 · The Hub — console, room screens, Settings → Rooms
+   * 01 · The Hub — Settings → Rooms (the screenshots are with the Anime's, below)
    * ════════════════════════════════════════════════════════════════════ */
   const today = new Date();
-  const shortDate = today.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
-  const hue = (d) => ` style="filter:hue-rotate(${d}deg)"`;
-  const L = (w) => `<span class="ln ${w}"></span>`;
-
-  const MOCKS = {
-    edition: () => `
-      <div class="mock">
-        <div class="mk-ed-plate"><span>No 214 · edited</span><b>The Edition</b><span>${esc(shortDate)}</span></div>
-        <div class="mk-ed-grid">
-          <div class="mk-ed-lede"><div class="pic"></div><span class="mk-k">The Wire · kestrel.dev</span>
-            <h5>Kestrel 2.0 lands with offline sync</h5>${L('f')}${L('f')}${L('m')}</div>
-          <div class="mk-ed-rail"><span class="mk-k">Screening Room</span><h6>Every CRT test pattern, drawn by hand</h6>${L('f')}${L('s')}
-            <span class="mk-k">The Dispatch</span><h6>A wood-cabinet set, found on the curb, still glows</h6>${L('m')}</div>
-        </div>
-        <div class="mk-ed-brief">
-          <div><span class="mk-k">In brief · Wire</span>${L('f')}${L('m')}</div>
-          <div><span class="mk-k">Screening Room</span>${L('f')}${L('s')}</div>
-          <div><span class="mk-k">The Dispatch</span>${L('m')}${L('f')}</div>
-        </div>
-      </div>`,
-    youtube: () => `
-      <div class="mock">
-        <div class="mk-yt-top">
-          <div class="pic mk-yt-big"><span class="mk-yt-live">NEW · 2h</span></div>
-          <div><span class="mk-k">Just in</span>
-            ${[20, 60, 140, 220].map((h) => `<div class="mk-yt-row"><div class="pic"${hue(h)}></div><div>${L('f')}${L('s')}</div></div>`).join('')}
-          </div>
-        </div>
-        <div class="mk-yt-shelf"><span class="mk-k">The Projection · from your history</span>
-          <div class="mk-yt-tiles">${[0, 40, 90, 180, 260].map((h) => `<div class="pic"${hue(h)}></div>`).join('')}</div></div>
-        <div class="mk-yt-shelf"><span class="mk-k">The Phosphor Lab <span class="mk-new">3 new</span></span>
-          <div class="mk-yt-tiles">${[300, 330, 20, 70, 120].map((h) => `<div class="pic"${hue(h)}></div>`).join('')}</div></div>
-      </div>`,
-    reddit: () => `
-      <div class="mock">
-        <div class="mk-rd-head"><b>The Dispatch</b><span class="mk-meta">r/selfhosted · r/rust · r/crtgaming</span></div>
-        <div class="mk-rd-cols">
-          <div><span class="mk-k">r/selfhosted</span><h5>I replaced four apps with one localhost page — a year in</h5>
-            <span class="mk-meta">1.2k points · 214 comments · 5h</span>${L('f')}${L('f')}${L('m')}${L('f')}${L('s')}</div>
-          <div><span class="mk-k">r/rust</span><h6>Arena allocators, explained with index cards</h6><span class="mk-meta">412 · 88 comments</span>${L('f')}${L('s')}${L('m')}</div>
-          <div><span class="mk-k">r/crtgaming</span><h6>Found a wood-cabinet set on the curb. It still glows.</h6><span class="mk-meta">2.4k · 131</span>${L('m')}${L('f')}</div>
-        </div>
-      </div>`,
-    hackernews: () => {
-      const rows = [
-        ['Kestrel 2.0: offline sync is finally here', 'kestrel.dev', 92, '188', '+14', ''],
-        ['Show HN: A teletype-style reader for the terminal', 'github.com', 71, '64', '+3', ''],
-        ['Ask HN: What’s your most-used shell alias?', '', 58, '301', '+22', ''],
-        ['Why one file beats a database server for personal apps', 'example.org', 64, '142', '', 'read'],
-        ['How phosphor persistence shaped early interface design', 'example.com', 38, '57', '', 'read'],
-        ['A field guide to rate limits you didn’t know you had', 'example.net', 47, '96', '+5', ''],
-      ];
-      return `<div class="mock">
-        <div class="mk-hn-tabs"><span>Top</span><span>Best</span><span>New</span><span>Ask</span><span>Show</span><span>Jobs</span></div>
-        ${rows.map((r, i) => `<div class="mk-hn-row ${r[5]}"><span class="rk">${i + 1}.</span><span class="hl">${esc(r[0])}${r[1] ? `<i>${r[1]}</i>` : ''}</span><span class="mk-heat" style="--h:${r[2]}%"></span><span class="cm">${r[3]}${r[4] ? ` <b>${r[4]}</b>` : ''}</span></div>`).join('')}
-      </div>`;
-    },
-    archive: () => `
-      <div class="mock">
-        <div class="mk-ar-q">What did that talk say about arena allocators?</div>
-        <div class="mk-ar-ans"><span class="mk-k">Answer · local model · 2 passes</span>${L('f')}${L('f')}${L('m')}${L('f')}${L('s')}
-          <div class="mk-cites"><span class="x">[1] Arenas in practice · 12:40</span><span class="x">[2] · 31:05</span><span>[3] · 4:18</span><span>[4] · 22:51</span></div></div>
-        <div class="mk-ar-stat"><span><b>142</b> videos transcribed</span><span><b>6,120</b> chunks</span><span><b>0</b> bytes sent anywhere</span></div>
-      </div>`,
-    editor: () => `
-      <div class="mock mk-ed2">
-        <div class="mk-tabs"><span class="on">main.rs</span><span>lib.rs</span><span>Cargo.toml</span></div>
-        <div class="mk-tree">▾ src<br>&nbsp;&nbsp;<span class="on">main.rs</span><br>&nbsp;&nbsp;lib.rs<br>▸ tests<br>Cargo.toml<br>README.md</div>
-        <div class="mk-buf"><span class="n">1</span><span class="kw">use</span> lantern::Tide;
-<span class="n">2</span>
-<span class="n">3</span><span class="kw">fn</span> main() {
-<span class="n">4</span><span class="gg"></span>    <span class="kw">let</span> tide = Tide::new(<span class="st">"low"</span>);
-<span class="n">5</span><span class="gg"></span>    tide.<span class="cu">l</span>ight();
-<span class="n">6</span>}
-          <div class="mk-wk"><b>leader</b> f find file<br><b>leader</b> s search project<br><b>leader</b> t toggle terminal<br><b>leader</b> w write buffer</div></div>
-        <div class="mk-status"><b>NORMAL</b><span>⎇ main</span><span>src/main.rs</span><span style="margin-left:auto">5:10</span></div>
-        <div class="mk-term"><b>~/Projects/lantern $</b> cargo test · 14 passed</div>
-      </div>`,
-    github: () => `
-      <div class="mock">
-        <span class="mk-k">Followed · releases &amp; activity</span>
-        ${[['lantern-org/lantern', 'v0.9.0', 'released 2h ago'], ['quiet/tide-cli', 'v2.3.1', 'released yesterday'], ['you/dotfiles', '12 commits', 'this week'], ['phosphor/testcard', 'v1.0.0', 'released 3d ago'], ['kestrel/kestrel', 'v2.0.0', 'released 6h ago']]
-          .map((r) => `<div class="mk-gh-row"><span class="av"></span><span><b>${r[0]}</b><br><span class="mk-meta">${r[2]}</span></span><span class="mk-tag">${r[1]}</span></div>`).join('')}
-      </div>`,
-    dev: () => `
-      <div class="mock">
-        <div class="mk-wb-tabs"><span class="on">Rust</span><span>Python</span><span>Go</span><span>TypeScript</span></div>
-        <div class="mk-wb-sheet">
-          <span class="mk-wb-stamp">current stable · checked live</span>
-          <span class="mk-k">Service manual No 1</span><h5>Rust</h5>
-          <div class="mk-wb-grid">
-            <div><span class="mk-k">Bench radio</span><div class="mk-radio">▶<i></i></div>${L('f')}${L('s')}</div>
-            <div><span class="mk-k">Trending repos</span>
-              <div class="mk-repo"><span>tide-rs</span><b>★ 1.2k</b></div><div class="mk-repo"><span>lantern</span><b>★ 840</b></div><div class="mk-repo"><span>arena-kit</span><b>★ 512</b></div></div>
-          </div>
-          <span class="mk-k" style="display:block;margin-top:8px">Core-team updates</span>${L('f')}${L('m')}
-        </div>
-      </div>`,
-  };
-
   const active = new Set(T.rooms.filter((r) => r.on).map((r) => r.id));
-  let current = 'edition';
-  const nav = $('#con-nav');
-  const screen = $('#roomscreen');
-
-  function runningOrder() {
-    return T.rooms.filter((r) => active.has(r.id));
-  }
-  function renderNav() {
-    const list = runningOrder();
-    if (!list.find((r) => r.id === current) && list.length) current = list[0].id;
-    nav.innerHTML = list
-      .map((r, i) => `<button class="tc-navitem${r.id === current ? ' tc-navitem-on' : ''}" role="tab" aria-selected="${r.id === current}" data-room="${r.id}" style="--room-c:${r.color};animation-delay:${i * 30}ms" tabindex="${r.id === current ? 0 : -1}">
-          <span class="tc-navno">${String(i + 1).padStart(2, '0')}</span><span class="nm">${esc(r.label)}</span></button>`)
-      .join('') || '<p class="muted" style="padding:6px 8px;font-size:13px">Every room is switched off. The console waits.</p>';
-    $$('.tc-navitem', nav).forEach((b) => {
-      b.addEventListener('click', () => selectRoom(b.dataset.room, true));
-    });
-  }
-  function renderScreen(tune) {
-    const list = runningOrder();
-    const idx = list.findIndex((r) => r.id === current);
-    const r = T.rooms.find((x) => x.id === current);
-    if (!r || idx < 0) {
-      screen.innerHTML = '<div class="rs-copy"><h3>Nothing on air.</h3><p class="dim">Switch a room back on below.</p></div>';
-      return;
-    }
-    screen.style.setProperty('--room-c', r.color);
-    screen.innerHTML = `
-      <div class="rs-glass"><div class="rs-tube${tune && !reduce ? ' tuning' : ''}">${MOCKS[r.id]()}<span class="scan" aria-hidden="true"></span></div></div>
-      <div class="rs-copy">
-        <div class="rs-kicker"><span class="rs-no">No ${String(idx + 1).padStart(2, '0')}</span><span>${esc(r.route)}</span>${r.chord ? `<span>in the app: <kbd>g</kbd><kbd>${r.chord}</kbd></span>` : ''}</div>
-        <h3>${esc(r.label)}</h3>
-        <p class="rs-line">${esc(r.line)}</p>
-        <p>${esc(r.body)}</p>
-        <ul class="rs-tags">${r.tags.map((t) => `<li>${esc(t)}</li>`).join('')}</ul>
-      </div>`;
-    fitMock();
-  }
-  // the mocks are drawn at 440×304 and scaled to whatever tube they sit in
-  function fitMock() {
-    const tube = $('.rs-tube', screen);
-    const mock = tube && $('.mock', tube);
-    if (!mock) return;
-    const s = tube.clientWidth / 440;
-    mock.style.setProperty('--mk-s', s.toFixed(4));
-    mock.style.height = `${tube.clientHeight / s}px`;
-  }
-  addEventListener('resize', fitMock);
-  function selectRoom(id, focus) {
-    current = id;
-    renderNav();
-    renderScreen(true);
-    if (focus) { const b = $(`.tc-navitem[data-room="${id}"]`, nav); if (b) b.focus({ preventScroll: true }); }
-  }
-  nav.addEventListener('keydown', (e) => {
-    const keys = { ArrowDown: 1, ArrowRight: 1, j: 1, ArrowUp: -1, ArrowLeft: -1, k: -1 };
-    if (!(e.key in keys)) return;
-    e.preventDefault();
-    e.stopPropagation();
-    const list = runningOrder();
-    const i = list.findIndex((r) => r.id === current);
-    selectRoom(list[(i + keys[e.key] + list.length) % list.length].id, true);
-  });
-  // j/k inside the console should move the rooms, not the page
-  nav.setAttribute('data-owns-keys', '');
 
   function renderToggles() {
-    const order = runningOrder().map((r) => r.id);
+    const order = T.rooms.filter((r) => active.has(r.id)).map((r) => r.id);
     $('#sr-grid').innerHTML = T.rooms
       .map((r) => {
         const on = active.has(r.id);
@@ -234,25 +73,15 @@
     $$('[data-toggle]').forEach((cb) =>
       cb.addEventListener('change', () => {
         cb.checked ? active.add(cb.dataset.toggle) : active.delete(cb.dataset.toggle);
-        if (cb.checked) current = cb.dataset.toggle;
         renderToggles();
-        renderNav();
-        renderScreen(true);
-        const n = runningOrder().length;
-        toast(cb.checked ? `${T.rooms.find((r) => r.id === cb.dataset.toggle).label} on · ${n} rooms` : `Renumbered · ${n} rooms`);
+        toast(`${T.rooms.find((r) => r.id === cb.dataset.toggle).label} ${cb.checked ? 'on' : 'off'} · ${active.size} rooms`);
       }),
     );
   }
-  document.addEventListener('tubcal:room', (e) => {
-    if (!active.has(e.detail)) { active.add(e.detail); renderToggles(); }
-    selectRoom(e.detail, false);
-  });
-  renderNav();
-  renderScreen(false);
   renderToggles();
 
   /* ════════════════════════════════════════════════════════════════════ *
-   * 02 · The Edition — the ladder
+   * 02 · The Edition — with and without AI
    * ════════════════════════════════════════════════════════════════════ */
   const SRC = {
     wire: { name: 'The Wire', c: 'var(--c-hn)' },
@@ -304,17 +133,17 @@
     const joinedNow = e && lastLedeSize < 3;
     lastLedeSize = lede.length;
     const W = c ? (e ? WRITTEN.lede3 : WRITTEN.lede2) : null;
-    const status = c ? 'edited' : 'wire';
+    const status = c ? 'written' : e ? 'matched' : 'headlines';
 
     $$('#rungs li').forEach((li) => {
       const r = +li.dataset.rung;
       li.classList.toggle('lit', r === 0 || (r === 1 && e) || (r === 2 && c));
     });
     $('#ladder-note').innerHTML = c
-      ? `Status <b>edited</b>. At most six stories get the copy desk per build; anything unvalidated falls back to the template.`
+      ? `<b>Written.</b> Each top story is now a short article. The small numbers say which post each part came from.`
       : e
-        ? `Status <b>wire</b> — but the embed model found the video about the same story and pulled it into the lede.`
-        : `Status <b>wire</b>. No ML at all: stories cluster only when they link the same canonical URL, and every story shows its numbers.`;
+        ? `<b>Matched.</b> The video about Kestrel 2.0 is now part of the top story. It links to a different page, so without matching it was listed on its own.`
+        : `<b>Headlines only</b>, no AI. Posts that link to the same page are grouped into one story, with their points and comment counts.`;
 
     paper.classList.toggle('setting', !!animate && !reduce);
     paper.innerHTML = `
@@ -337,7 +166,7 @@
         </div>
       </div>
       <div class="np-brief">${BRIEFS.map((b) => `<div><h6>In brief · ${b[0]}</h6><p>${esc(b[1])}</p><p>${esc(b[2])}</p></div>`).join('')}</div>
-      ${c ? `<span class="np-stamp">✓ citations checked · ${lede.length}/${lede.length}</span>` : ''}`;
+      ${c ? `<span class="np-stamp">✓ sources checked · ${lede.length}/${lede.length}</span>` : ''}`;
   }
   emb.addEventListener('change', () => renderPaper(true));
   chat.addEventListener('change', () => renderPaper(true));
@@ -358,13 +187,13 @@
   const LINES = [
     [5, 'A cathode-ray tube is a vacuum bottle with a gun at the narrow end and a screen at the wide one.'],
     [112, 'The gun boils electrons off a heated cathode and accelerates them toward the screen.'],
-    [190, 'Coils around the neck of the tube steer the beam — that’s the deflection yoke.'],
+    [190, 'Coils around the neck of the tube steer the beam. That’s the deflection yoke.'],
     [272, 'Wherever the beam lands, a phosphor coating glows for a moment.'],
     [365, 'The glow fades quickly, so the beam has to come back many times a second.'],
     [462, 'The beam sweeps left to right, line by line, top to bottom: the raster.'],
     [570, 'Each trip back to the left is blanked, so you never see the retrace.'],
     [682, 'Interlacing draws the odd lines, then the even ones, to halve the flicker.'],
-    [820, 'Two fields make one frame — a bandwidth trick that lasted for decades.'],
+    [820, 'Two fields make one frame, a bandwidth trick that lasted for decades.'],
     [902, 'Colour tubes fire three beams through a shadow mask onto red, green and blue dots.'],
     [1030, 'Stand back far enough, and the dots blend into a picture.'],
   ];
@@ -535,10 +364,10 @@
   th.card.addEventListener('click', (e) => { if (th.docked && !e.target.closest('.th-controls')) setDocked(false); });
   $$('.th-chapter, .th-line').forEach((b) => b.addEventListener('click', () => { seekTo(+b.dataset.t, fmt(+b.dataset.t)); }));
   $('#th-sub').addEventListener('click', (e) => { const on = e.currentTarget.classList.toggle('on'); e.currentTarget.textContent = on ? 'Subscribed' : 'Subscribe'; toast(on ? 'Subscribed · The Phosphor Lab' : 'Unsubscribed'); });
-  $('#th-save').addEventListener('click', () => toast('Saved · kept in data/tubcal.db'));
+  $('#th-save').addEventListener('click', () => toast('Saved · find it under Saved'));
   $('#th-link').addEventListener('click', async () => {
     const ok = await copyText(`https://www.youtube.com/watch?v=EXAMPLE&t=${Math.floor(th.t)}s`);
-    toast(ok ? `Link copied — starts at ${fmt(th.t)}` : 'Copy failed');
+    toast(ok ? `Link copied · starts at ${fmt(th.t)}` : 'Copy failed');
   });
 
   // seek bar: hover tip with chapter name, click/drag to seek
@@ -604,230 +433,113 @@
   addEventListener('resize', paint);
 
   /* ════════════════════════════════════════════════════════════════════ *
-   * 04 · The Anime — the index tree
+   * Screenshots of the real app: the Hub's screens, then the Anime's views
    * ════════════════════════════════════════════════════════════════════ */
-  const SEASONS = ['winter', 'spring', 'summer', 'fall'];
-  const seasonAt = (off) => {
-    let idx = Math.floor(today.getMonth() / 3) + off, y = today.getFullYear();
-    while (idx < 0) { idx += 4; y--; }
-    while (idx > 3) { idx -= 4; y++; }
-    return { s: SEASONS[idx], y };
-  };
-  const cap1 = (s) => s[0].toUpperCase() + s.slice(1);
-  const sN = seasonAt(0), sX = seasonAt(1), sL = seasonAt(-1);
-  const TREE = [
-    { id: 'browse', label: 'Browse', desc: 'Trending, popular, top-rated and more, plus a genre/tag finder with every AniList filter — any mix of genres and tags, a sort dial and a text query. Infinite scroll.', tags: ['genre + tag finder', 'sort dial', 'infinite scroll'],
-      files: [['Trending', 'kind=trending'], ['Popular', 'kind=popular'], ['This season', 'kind=seasonal'], ['Top rated', 'kind=top'], ['|search in'], ['Characters', 'in=characters'], ['Voices & staff', 'in=staff'], ['Studios', 'in=studios'], ['Users', 'in=users']] },
-    { id: 'seasons', label: 'Seasons', desc: 'Any season’s line-up, laid out as a chart — this one, the next, the last, or any other.', tags: ['season chart', 'only my list'],
-      files: [[`${cap1(sN.s)} ${sN.y}`, '', 'now'], [`${cap1(sX.s)} ${sX.y}`, `season=${sX.s}&year=${sX.y}`, 'next'], [`${cap1(sL.s)} ${sL.y}`, `season=${sL.s}&year=${sL.y}`, 'last'], ['Only my list', 'smine=1']] },
-    { id: 'schedule', label: 'Schedule', desc: 'The week ahead as an airing grid, with a countdown to every episode.', tags: ['airing grid', 'countdowns', 'only my shows'],
-      files: [['This week', ''], ['Next week', 'wk=1'], ['Last week', 'wk=-1'], ['Only my shows', 'tmine=1']] },
-    { id: 'list', label: 'My List', desc: 'Your shelves with fast editing, bulk tools, custom lists, export (JSON, CSV, MyAnimeList XML) and the sequel radar — what comes next after everything you’ve finished. Synced to AniList as you tap: edits apply at once and sync on a short debounce, so a flurry of taps is one mutation.', tags: ['bulk tools', 'custom lists', 'export', 'sequel radar'],
-      files: [['All', 'shelf=all', '148'], ['Watching', 'shelf=watching', '6'], ['Planning', 'shelf=planning', '41'], ['Completed', 'shelf=completed', '93'], ['Paused', 'shelf=paused', '5'], ['Dropped', 'shelf=dropped', '3'], ['|tools'], ['Pick for me', 'tool=pick'], ['Sequel radar', 'tool=radar']] },
-    { id: 'ledger', label: 'Ledger', desc: 'Your statistics computed from the list itself — genres, formats, scores, time spent, hot takes — and a comparison of tastes with anyone (affinity is the Pearson correlation of shared scores).', tags: ['computed locally', 'hot takes', 'year in review', 'compare tastes'],
-      files: [['Overview', ''], ['Hot takes', '#takes'], ['Year in review', '#wrapped'], ['Compare tastes', '#compare']] },
-    { id: 'community', label: 'Community', desc: 'Reviews, people’s recommendation pairings (vote on them), today’s birthdays and the hall of fame.', tags: ['reviews', 'pairings', 'birthdays', 'hall of fame'],
-      files: [['Reviews', 'c=reviews'], ['Pairings', 'c=recs'], ['Birthdays', 'c=birthdays'], ['Hall of fame', 'c=fame']] },
-    { id: 'channel', label: 'Channel', desc: 'The Anime Channel — trailers related to what you’ve watched, played back to back like a station.', tags: ['trailers', 'play the channel'], files: [] },
-    { id: 'discuss', label: 'Social', desc: 'The forum (threads beside the list), the activity stream, your inbox and people — profile pages, follow, message — with a live preview of every post as others will see it.', tags: ['forum', 'activity', 'inbox', 'live preview'],
-      files: [['Forum', 'd=forum'], ['Everyone', 'd=activity'], ['Following', 'd=following'], ['Inbox', 'd=inbox', '3'], ['Your people', 'd=people']] },
+  // The Hub is shot on a demo profile that follows public channels and
+  // subreddits, so none of it is anyone's own feed.
+  const HUB = [
+    { id: 'home', label: 'Home screen', tab: 'Home', c: 'var(--signal)', alt: 'The home screen: a greeting, a TV showing a half-watched video to resume, a row of what’s next beneath it, a clock and a coming-up list beside it, and the two channels below.', text: 'Where Tubcal opens. The TV is tuned to the video you were last watching, with a button to resume it, and the row under it holds what’s next: other half-watched videos and new uploads. Beside it are a clock, the two channel knobs and what’s coming up, such as scheduled live streams.' },
+    { id: 'edition', label: 'The Edition', tab: 'Edition', c: 'var(--c-foryou)', alt: 'The Edition: a front page whose lead story is about new images of Polaris from r/space, with two Hacker News stories below it.', text: 'This morning’s paper, made from the test setup’s subreddits, channels and Hacker News. The stories were written by a local AI, and each one links to the post it came from. The ring at the top counts how many you’ve read.' },
+    { id: 'youtube', label: 'Screening Room', c: 'var(--c-youtube)', alt: 'The Screening Room: the newest upload large on the left, a list of other new uploads beside it, and the half-watched videos below.', text: 'The newest upload from your channels is on the big screen, with the rest of what just came in beside it and the next live stream under that. Below are the videos you didn’t finish, and further down each channel has its own shelf. The panel on the left lists your channels with a count of new videos.' },
+    { id: 'reddit', label: 'The Dispatch', tab: 'Dispatch', c: 'var(--c-reddit)', alt: 'The Dispatch: subreddit chips across the top, then posts laid out like a newspaper, led by a photo of the Milky Way over the Dolomites.', text: 'Your subreddits laid out like a newspaper, with pictures shown large. This is Reddit without signing in. Open a post to read its comments.' },
+    { id: 'hackernews', label: 'The Wire', tab: 'Wire', c: 'var(--c-hn)', alt: 'The Wire: Hacker News’s top stories as a numbered list, each with its site, points, a heat bar and a comment count.', text: 'Hacker News’s top stories as a numbered list. The bar beside each one shows how fast it’s gaining points. The tabs switch to Best, New, Ask, Show and Jobs, and the search box looks through every story ever posted.' },
+    { id: 'archive', label: 'The Archive', tab: 'Archive', c: 'var(--signal)', alt: 'The Archive: a box for questions, and a transcript search for the word “water” with results from two videos, each at a timestamp.', text: 'Videos you’ve watched, transcribed on your own computer. Here a search for “water” finds the moments it was said in two videos, and clicking one plays the video from there. With the optional AI set up, you can also ask questions and read a digest of what you watched.' },
+    { id: 'editor', label: 'The Composing Room', tab: 'Composing Room', c: 'var(--c-editor)', alt: 'The Composing Room: a file tree of Tubcal’s source code on the left, a Python file open in a tab, and the vim mode, file path and git branch in the bar at the bottom.', text: 'A code editor with vim keys, shown here with Tubcal’s own source code. The file tree is on the left, open files are tabs, and the bar at the bottom shows the vim mode, the file and the git branch.' },
+    { id: 'dev', label: 'The Workbench', tab: 'Workbench', c: 'var(--c-dev)', alt: 'The Workbench: a shelf of four languages on the left, Rust open with its facts and current version, and a row of Rust videos below.', text: 'A page for each of four programming languages, picked from the shelf on the left. Here it’s Rust: its main facts and current version, then talks, podcasts you can play on the page, news from the core team and popular projects further down.' },
   ];
-  const atree = $('#atree');
-  const aview = $('#aview');
-  let aSel = { f: 'browse', i: 0 };
-  function hrefAnime(folder, q) {
-    const p = new URLSearchParams();
-    if (folder.id !== 'browse') p.set('tab', folder.id);
-    if (q && q[0] === '#') return `/anime${p.toString() ? `?${p}` : ''}${q}`;
-    if (q) new URLSearchParams(q).forEach((v, k) => p.set(k, v));
-    const s = p.toString();
-    return `/anime${s ? `?${s}` : ''}`;
+  const ANIME = [
+    { id: 'browse', label: 'Browse', alt: 'The Browse view: the index down the left, the top trending show in a large card, and a row of posters below.',
+      text: 'Trending, popular and top-rated shows, with the top one shown large. The finder filters by any mix of genres and tags, and more results load as you scroll.' },
+    { id: 'seasons', label: 'Seasons', alt: 'The Seasons view: this season’s line-up as a programme guide, each show with its next airing time, synopsis and trailer button.',
+      text: 'A season’s shows laid out like a TV guide: when each episode airs, how far along the show is, its trailer and where to stream it. Tick “only my list” to see just the shows you follow.' },
+    { id: 'schedule', label: 'Schedule', alt: 'The Schedule view: a week laid out in seven columns, each listing the episodes airing that day with their times.',
+      text: 'Every episode airing this week, as a timetable. Shows on your list are marked, with a total of how long they’ll take to watch. You can add the schedule to your calendar.' },
+    { id: 'list', label: 'My List', alt: 'My List: shelves of posters, each with how far you are, how many episodes are left and a button to play the next one.',
+      text: 'Your shelves, as posters or as rows. Each show says how far you are and what’s new, with a button that plays the next episode. “Gathering dust” lists shows you’ve stopped watching, and Pick for me and Sequel radar suggest what to watch next.' },
+    { id: 'ledger', label: 'Ledger', alt: 'The Ledger: days of anime watched in large type, your mean score, a bar chart of your scores and how your list breaks down by shelf.',
+      text: 'Statistics worked out from your list: days watched, how you score, how the list breaks down, favourite genres, the shows you rate unlike everyone else, and a year in review.' },
+    { id: 'title', label: 'Title page', alt: 'A title page: the poster, the title and its details, rankings, the trailer and opening-song buttons, and your own list entry below.',
+      text: 'Everything about one show: trailer, opening song, rankings, studios, and the cast with every dub’s voice actors. Below that is your own entry: where you are, your score and your notes.' },
+    { id: 'reckoner', label: 'The Reckoner', alt: 'My List with the Reckoner open in the right margin, totalling ten episodes across four shows and the time you would finish.',
+      text: 'Point at a show and press C. The Reckoner, in the margin, adds that show’s next unwatched episode (aired ones only), keeps a running total of the time, and tells you when you’d finish if you started now.' },
+    { id: 'curtain', label: 'Curtain call', alt: 'The curtain call after finishing a season: a verdict of Masterpiece on a one-to-ten row, category scores, and a review form with a live preview.',
+      text: 'This opens when you finish a season. Score it on your AniList scale (by category too, if you use that), join the discussion of the last episode, or write a review and see how it will look on AniList.' },
+  ];
+
+  // Each view is shot in every skin, so the screenshots wear whichever skin
+  // this page has on.
+  const SHOT_SKINS = T.skins.map((s) => s.value);
+  const shotSkin = () => (SHOT_SKINS.includes(document.documentElement.dataset.theme) ? document.documentElement.dataset.theme : 'dark');
+
+  // full size, in a lightbox
+  const box = $('#shotbox');
+  const boxImg = $('#shotbox-img');
+  $('#shotbox-x').innerHTML = icon('x', 'ico-lg');
+  $('#shotbox-x').addEventListener('click', () => box.close());
+  box.addEventListener('click', (e) => { if (e.target === box || e.target === boxImg) box.close(); });
+  function openBox(img) {
+    boxImg.src = img.src;
+    boxImg.alt = img.alt;
+    if (box.showModal) box.showModal(); else window.open(img.src, '_blank', 'noopener');
   }
-  const openFolders = new Set(matchMedia('(max-width: 820px)').matches ? [] : ['browse']);
-  function renderTree() {
-    atree.innerHTML = TREE.map((f) => `
-      <details ${openFolders.has(f.id) ? 'open' : ''}>
-        <summary data-f="${f.id}" class="${aSel.f === f.id && aSel.i < 0 ? 'on' : ''}">${esc(f.label)}</summary>
-        ${f.files.length ? `<div class="files">${f.files.map((x, i) => (x[0][0] === '|'
-          ? `<span class="sep">${esc(x[0].slice(1))}</span>`
-          : `<button class="file${aSel.f === f.id && aSel.i === i ? ' on' : ''}" data-f="${f.id}" data-i="${i}"><span>${esc(x[0])}</span>${x[2] ? `<small>${esc(x[2])}</small>` : ''}</button>`)).join('')}</div>` : ''}
-      </details>`).join('');
-    $$('.file', atree).forEach((b) => b.addEventListener('click', () => { aSel = { f: b.dataset.f, i: +b.dataset.i }; renderTree(); renderView(); }));
-    $$('summary', atree).forEach((s) => s.addEventListener('click', (e) => {
-      e.preventDefault();
-      const id = s.dataset.f;
-      if (aSel.f === id && openFolders.has(id)) openFolders.delete(id);
-      else openFolders.add(id);
-      aSel = { f: id, i: -1 };
-      renderTree();
-      renderView();
-      const again = $(`summary[data-f="${id}"]`, atree);
-      if (again) again.focus({ preventScroll: true });
-    }));
-  }
-  function preview(id) {
-    const covers = (n, h0) => `<div class="apv-covers">${Array.from({ length: n }, (_, i) => `<i style="--h:${(h0 + i * 47) % 360}"></i>`).join('')}</div>`;
-    const ln = (w) => `<span class="ln" style="width:${w}%"></span>`;
-    switch (id) {
-      case 'browse': return covers(6, 20);
-      case 'seasons': return covers(6, 190);
-      case 'schedule': {
-        const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-        const slots = [[1, 0], [2, 1], [1, 0], [3, 0], [1, 0], [2, 0], [2, 0]];
-        return `<div class="apv-week">${days.map((d, i) => `<div>${d}${Array.from({ length: slots[i][0] }, (_, k) => `<span class="${i === 1 && k === 0 ? 'soon' : ''}">${i === 1 && k === 0 ? 'in 2h' : `${18 + k * 2}:${k ? '30' : '00'}`}</span>`).join('')}</div>`).join('')}</div>`;
-      }
-      case 'list': return `<div class="apv-rows">${[['Lanterns of the Low Tide', 33, '4/12', 30], ['Orbit Café', 42, '10/24', 200], ['The Ninth Signal', 0, '0/13', 90], ['Paper Moon Radio', 75, '9/12', 320]]
-        .map((r) => `<div class="apv-row"><i style="--h:${r[3]}"></i><span>${esc(r[0])}</span><em style="--p:${r[1]}%"></em><b>${r[2]}</b></div>`).join('')}</div>`;
-      case 'ledger': return `<div class="apv-bars">${[['Slice of life', 82, 41], ['Sci-fi', 64, 32], ['Mystery', 48, 24], ['Comedy', 40, 20], ['Drama', 30, 15]]
-        .map((r) => `<div class="apv-bar"><span>${r[0]}</span><em style="--p:${r[1]}%"></em><b>${r[2]}</b></div>`).join('')}</div>`;
-      case 'community': return `<div class="apv-forum"><div>${['Review · 9/10', 'Review · 7/10', 'Pairing · +41'].map((t, i) => `<div class="apv-thread${i ? '' : ' on'}"><small>${t}</small>${ln(90)}${ln(60)}</div>`).join('')}</div><div>${ln(100)}${ln(94)}${ln(98)}${ln(70)}${ln(88)}${ln(40)}</div></div>`;
-      case 'channel': return '<div class="apv-screen" aria-hidden="true"></div>';
-      default: return `<div class="apv-forum"><div>${['Episode 12 discussion', 'Season wrap-up', 'Your favourite OP?'].map((t, i) => `<div class="apv-thread${i ? '' : ' on'}"><small>${24 - i * 7} replies</small>${esc(t)}</div>`).join('')}</div><div>${ln(96)}${ln(88)}${ln(100)}${ln(54)}${ln(80)}${ln(66)}</div></div>`;
+
+  function shotViewer(root, prefix, list) {
+    const src = (id) => `assets/shots/${prefix}-${id}-${shotSkin()}.webp`;
+    const tabs = $('.shots-tabs', root);
+    const panel = $('.shots-stage', root);
+    const frame = $('.shots-frame', root);
+    const img = $('img', frame);
+    const cap = $('.shots-cap', root);
+    let at = 0;
+
+    tabs.innerHTML = list.map((s, i) => `<button class="shots-tab" role="tab" id="${prefix}-tab-${s.id}" aria-controls="${panel.id}" aria-selected="${i === 0}" tabindex="${i === 0 ? 0 : -1}" data-i="${i}"${s.c ? ` style="--tab-c:${s.c}"` : ''}><small>${String(i + 1).padStart(2, '0')}</small>${esc(s.tab || s.label)}</button>`).join('');
+    const tabEls = $$('.shots-tab', tabs);
+
+    function show(i, focus) {
+      at = (i + list.length) % list.length;
+      const s = list[at];
+      tabEls.forEach((b, k) => { b.setAttribute('aria-selected', k === at); b.tabIndex = k === at ? 0 : -1; });
+      panel.setAttribute('aria-labelledby', `${prefix}-tab-${s.id}`);
+      img.src = src(s.id);
+      img.alt = s.alt;
+      cap.innerHTML = `<span class="kicker">${String(at + 1).padStart(2, '0')} / ${String(list.length).padStart(2, '0')} · screenshot</span>
+        <h3>${esc(s.label)}</h3><p>${esc(s.text)}</p>
+        <div class="shots-nav"><button class="chip" data-step="-1" aria-label="Previous">‹ Previous</button><button class="chip" data-step="1" aria-label="Next">Next ›</button></div>`;
+      $$('[data-step]', cap).forEach((b) => b.addEventListener('click', () => show(at + +b.dataset.step)));
+      if (focus) tabEls[at].focus({ preventScroll: true });
     }
-  }
-  function renderView() {
-    const f = TREE.find((x) => x.id === aSel.f);
-    const file = aSel.i >= 0 ? f.files[aSel.i] : null;
-    aview.innerHTML = `
-      <div class="path">anime › <b>${esc(f.label.toLowerCase())}</b>${file ? ` › ${esc(file[0].toLowerCase())}` : ''}</div>
-      <h3>${esc(file ? file[0] : f.label)}</h3>
-      <p>${esc(f.desc)}</p>
-      <div class="tags">${f.tags.map((t) => `<span>${esc(t)}</span>`).join('')}</div>
-      <div class="apv" aria-hidden="true">${preview(f.id)}</div>
-      <code class="url">${esc(hrefAnime(f, file ? file[1] : ''))}</code>`;
-  }
-  renderTree();
-  renderView();
-
-  /* ════════════════════════════════════════════════════════════════════ *
-   * 04 · The Reckoner
-   * ════════════════════════════════════════════════════════════════════ */
-  const SHOWS = [
-    { id: 'lan', title: 'Lanterns of the Low Tide', glyph: '灯', eps: 12, aired: 12, dur: 24, progress: 4, cv: 'linear-gradient(160deg,#e7a857,#b0553a 55%,#3e5e8a)' },
-    { id: 'orb', title: 'Orbit Café', glyph: '星', eps: 24, aired: 14, dur: 23, progress: 10, cv: 'linear-gradient(160deg,#6fc3d8,#3b4fa0 60%,#1b1e3c)', next: '3 days' },
-    { id: 'nin', title: 'The Ninth Signal', glyph: '九', eps: 13, aired: 13, dur: null, progress: 0, cv: 'linear-gradient(160deg,#a9c46a,#2f4a3a 60%,#101a14)' },
-  ];
-  const RK_STORE = 'tubcal.docs.reckoner';
-  let plan = [];
-  try { plan = JSON.parse(localStorage.getItem(RK_STORE) || '[]').filter((p) => SHOWS.find((s) => s.id === p.id)); } catch (e) { plan = []; }
-  const save = () => { try { localStorage.setItem(RK_STORE, JSON.stringify(plan)); } catch (e) { /* ignore */ } };
-  let armed = null;
-  let rkNote = '';
-  const shelf = $('#rk-shelf');
-  const dock = $('#rk-dock');
-  const tallied = (id) => plan.filter((p) => p.id === id).length;
-
-  function renderShelf() {
-    shelf.innerHTML = SHOWS.map((s) => {
-      const t = tallied(s.id);
-      return `<div class="rk-card${armed === s.id ? ' armed' : ''}" data-show="${s.id}" tabindex="0" aria-label="${esc(s.title)}, episode ${s.progress} of ${s.eps}. Press C to tally the next episode.">
-        <div class="rk-cover" style="--cv:${s.cv}"><span class="armed-tag">C ›</span><span class="glyph" lang="ja">${s.glyph}</span><span class="ttl">${esc(s.title)}</span></div>
-        <div class="rk-meta">ep ${s.progress}/${s.eps}${s.aired < s.eps ? ` · ${s.aired} aired` : ''} · ${s.dur ? `${s.dur} min` : '? min'}</div>
-        <div class="rk-prog"><i style="width:${(s.progress / s.eps) * 100}%"></i><i style="width:${((s.progress + t) / s.eps) * 100}%"></i></div>
-        <button class="chip rk-add" data-add="${s.id}">+ 1 ep</button>
-      </div>`;
-    }).join('');
-    $$('.rk-card', shelf).forEach((c) => {
-      c.addEventListener('mouseenter', () => arm(c.dataset.show));
-      c.addEventListener('focus', () => arm(c.dataset.show));
+    tabEls.forEach((b) => {
+      b.addEventListener('click', () => show(+b.dataset.i));
+      // warm the next image while the pointer is on its way
+      b.addEventListener('pointerenter', () => { new Image().src = src(list[+b.dataset.i].id); }, { once: true });
     });
-    $$('[data-add]', shelf).forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); arm(b.dataset.add); tally(b.dataset.add); }));
+    tabs.addEventListener('keydown', (e) => {
+      const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
+      if (step) { e.preventDefault(); show(at + step, true); }
+      else if (e.key === 'Home' || e.key === 'End') { e.preventDefault(); show(e.key === 'Home' ? 0 : list.length - 1, true); }
+    });
+    document.addEventListener('tubcal:skin', () => { img.src = src(list[at].id); });
+    frame.addEventListener('click', () => openBox(img));
+    show(0);
+    return { show, index: (id) => list.findIndex((s) => s.id === id) };
   }
-  function arm(id) {
-    if (armed === id) return;
-    armed = id;
-    $$('.rk-card', shelf).forEach((c) => c.classList.toggle('armed', c.dataset.show === id));
-  }
-  function tally(id) {
-    const s = SHOWS.find((x) => x.id === id);
-    const next = s.progress + tallied(id) + 1;
-    if (next > s.aired) {
-      rkNote = next > s.eps ? `${s.title}: that was the finale.` : `${s.title}: caught up — episode ${next} airs in ${s.next}.`;
-      renderDock();
-      return;
-    }
-    rkNote = '';
-    plan.push({ id, ep: next });
-    save();
-    renderShelf();
-    renderDock();
-  }
-  function renderDock() {
-    const total = plan.reduce((m, p) => m + (SHOWS.find((s) => s.id === p.id).dur || 24), 0);
-    const est = plan.some((p) => !SHOWS.find((s) => s.id === p.id).dur);
-    const fin = new Date(Date.now() + total * 60000);
-    const finStr = fin.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    const dayDiff = Math.round((new Date(fin.toDateString()) - new Date(new Date().toDateString())) / 86400000);
-    dock.innerHTML = `
-      <div><span class="kicker">The Reckoner</span><h4>${plan.length ? `${plan.length} episode${plan.length > 1 ? 's' : ''} queued` : 'Nothing tallied yet'}</h4></div>
-      ${plan.length ? `<ol class="rk-rows">${plan.map((p) => { const s = SHOWS.find((x) => x.id === p.id); return `<li class="${s.dur ? '' : 'est'}"><span>${esc(s.title)} · ep ${p.ep}</span><span>${s.dur ? `${s.dur}m` : '24m est.'}</span></li>`; }).join('')}</ol>`
-        : '<p class="rk-empty">Hover a cover and tap <kbd>C</kbd> — or press <b>+ 1 ep</b>.</p>'}
-      ${plan.length ? `<div class="rk-total"><div class="big">${Math.floor(total / 60) ? `${Math.floor(total / 60)} h ` : ''}${total % 60} m</div>
-        <div class="fin">Start now, finish at <b>${finStr}</b>${dayDiff > 0 ? ` <small>(+${dayDiff} day${dayDiff > 1 ? 's' : ''})</small>` : ''}</div>
-        ${est ? '<div class="rk-note">Includes an estimate — AniList had no duration, so 24 min is assumed.</div>' : ''}</div>` : ''}
-      ${rkNote ? `<p class="rk-note" style="color:var(--accent-strong)">${esc(rkNote)}</p>` : ''}
-      ${plan.length ? '<button class="chip" id="rk-clear" style="align-self:flex-start">Clear the tally</button>' : ''}`;
-    const clr = $('#rk-clear');
-    if (clr) clr.addEventListener('click', () => { plan = []; rkNote = ''; save(); renderShelf(); renderDock(); });
-  }
-  let lastG = 0;
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'g') lastG = Date.now();
-    if ((e.key !== 'c' && e.key !== 'C') || e.ctrlKey || e.metaKey || e.altKey) return;
-    const t = e.target;
-    if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
-    if (t && t.closest && t.closest('#theatre')) return;
-    if (Date.now() - lastG < 1000) return; // g c is a room jump in the app; let it win
-    if (!armed) return;
-    const r = $('#rk').getBoundingClientRect();
-    if (r.bottom < 0 || r.top > innerHeight) return;
+
+  const hubShots = shotViewer($('#hub-shots'), 'hub', HUB);
+  const animeShots = shotViewer($('#anime-shots'), 'anime', ANIME);
+
+  // a room picked in the guide at the top, or in the search palette
+  document.addEventListener('tubcal:room', (e) => {
+    const i = hubShots.index(e.detail);
+    if (i >= 0) hubShots.show(i);
+  });
+
+  $('#hg-anime-count').textContent = `${ANIME.length} views`;
+  $('#hg-views').innerHTML = ANIME.map((v, i) => `<a href="#anime" data-guide-shot="${i}">${esc(v.label)}</a>`).join('');
+  $$('[data-guide-shot]').forEach((a) => a.addEventListener('click', (e) => {
     e.preventDefault();
-    tally(armed);
-  });
-  renderShelf();
-  renderDock();
-  setInterval(() => { if (plan.length) renderDock(); }, 30000);
-
-  /* ════════════════════════════════════════════════════════════════════ *
-   * 04 · The curtain call
-   * ════════════════════════════════════════════════════════════════════ */
-  const WORDS = ['', 'Appalling', 'Horrible', 'Very bad', 'Bad', 'Average', 'Fine', 'Good', 'Very good', 'Great', 'Masterpiece'];
-  const curtain = $('#curtain');
-  const rate = $('#cc-rate');
-  let ccLast;
-  rate.innerHTML = Array.from({ length: 10 }, (_, i) => `<button role="radio" aria-checked="false" data-v="${i + 1}" style="--v:${i + 1}" aria-label="${i + 1} — ${WORDS[i + 1]}">${i + 1}</button>`).join('');
-  $$('button', rate).forEach((b) => {
-    b.addEventListener('mouseenter', () => { $('#cc-word').textContent = WORDS[+b.dataset.v]; });
-    b.addEventListener('click', () => {
-      $$('button', rate).forEach((x) => x.setAttribute('aria-checked', x === b));
-      $('#cc-word').textContent = `${WORDS[+b.dataset.v]} · ${b.dataset.v}/10`;
-      toast(`Scored ${b.dataset.v}/10 — synced to AniList`);
-    });
-  });
-  rate.addEventListener('mouseleave', () => {
-    const on = $('button[aria-checked="true"]', rate);
-    $('#cc-word').textContent = on ? `${WORDS[+on.dataset.v]} · ${on.dataset.v}/10` : 'How was it?';
-  });
-  $$('[data-plan]', curtain).forEach((b) => b.addEventListener('click', () => {
-    $$('[data-plan]', curtain).forEach((x) => x.classList.toggle('on', x === b));
-    toast(`Lanterns of the Low Tide II → ${b.dataset.plan}`);
+    animeShots.show(+a.dataset.guideShot);
+    window.TC.goSection('anime');
   }));
-  function openCurtain() {
-    ccLast = document.activeElement;
-    curtain.hidden = false;
-    document.body.style.overflow = 'hidden';
-    requestAnimationFrame(() => requestAnimationFrame(() => curtain.classList.add('open')));
-    setTimeout(() => $('#curtain-x').focus(), reduce ? 0 : 700);
-  }
-  function closeCurtain() {
-    curtain.classList.remove('open');
-    document.body.style.overflow = '';
-    setTimeout(() => { curtain.hidden = true; if (ccLast) ccLast.focus(); }, reduce ? 0 : 900);
-  }
-  $('#curtain-x').innerHTML = icon('x', 'ico-lg');
-  $('#curtain-open').addEventListener('click', openCurtain);
-  $('#curtain-x').addEventListener('click', closeCurtain);
-  curtain.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.stopPropagation(); closeCurtain(); } });
 
   /* ════════════════════════════════════════════════════════════════════ *
    * 05 · The look — every card in its own skin
@@ -840,6 +552,7 @@
     bauhaus: ['bd-bau__circle', 'bd-bau__bar', 'bd-bau__tri'],
     blueprint: ['bd-bp__grid', 'bd-bp__vignette'],
     space: ['bd-space__nebula', 'bd-space__stars'],
+    bench: ['bd-bench__mat', 'bd-bench__grid', 'bd-bench__light'],
   };
   const skinsEl = $('#skins');
   skinsEl.innerHTML = T.skins.map((s) => `

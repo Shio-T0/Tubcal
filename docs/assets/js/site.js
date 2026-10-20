@@ -51,6 +51,7 @@
     bauhaus: ['bd-bau__circle', 'bd-bau__bar', 'bd-bau__tri'],
     blueprint: ['bd-bp__grid', 'bd-bp__grid bd-bp__grid--fine', 'bd-bp__vignette'],
     space: ['bd-space__nebula', 'bd-space__stars', 'bd-space__stars bd-space__stars--far'],
+    bench: ['bd-bench__mat', 'bd-bench__grid', 'bd-bench__light'],
   };
   LAYERS.light = LAYERS.dark;
 
@@ -179,11 +180,11 @@
         }),
       );
     if (page === 'manual') {
-      add('The Manual · channel 2', T.manual, 'manual');
-      add('The Tour · channel 1', T.tour, 'tour');
+      add('The Manual', T.manual, 'manual');
+      add('The Tour', T.tour, 'tour');
     } else {
-      add('The Tour · channel 1', T.tour, 'tour');
-      add('The Manual · channel 2', T.manual, 'manual');
+      add('The Tour', T.tour, 'tour');
+      add('The Manual', T.manual, 'manual');
     }
     T.rooms.forEach((r) =>
       out.push({
@@ -204,17 +205,13 @@
       out.push({ group: 'Skins', title: s.label, sub: s.blurb, pn: '◐', where: 'skin', run: () => setSkin(s.value, true) }),
     );
     out.push(
-      { group: 'Actions', title: 'Cycle the skin', sub: 'press t', pn: 't', where: 'action', run: nextSkin },
+      { group: 'Actions', title: 'Next skin', sub: 'press t', pn: 't', where: 'action', run: nextSkin },
       { group: 'Actions', title: 'Keyboard shortcuts', sub: 'press ?', pn: '?', where: 'action', run: openKeys },
-      { group: 'Actions', title: 'Copy the quick start', sub: 'uv sync · npm run build · uv run python main.py', pn: '⧉', where: 'action', run: async () => { const ok = await copyText(QUICKSTART); toast(ok ? 'Quick start copied' : 'Copy failed'); } },
-      { group: 'Actions', title: 'Open the repository', sub: 'github.com/Shio-T0/Tubcal', pn: '↗', where: 'github', run: () => window.open(T.repo, '_blank', 'noopener') },
+      { group: 'Actions', title: 'Copy the install command', sub: 'paste it into a terminal on Linux', pn: '⧉', where: 'action', run: async () => { const ok = await copyText(T.install); toast(ok ? 'Install command copied' : 'Copy failed'); } },
+      { group: 'Actions', title: 'Open the project on GitHub', sub: 'github.com/Shio-T0/Tubcal', pn: '↗', where: 'github', run: () => window.open(T.repo, '_blank', 'noopener') },
     );
-    if (window.TUBCAL_ROUTES && page === 'manual') {
-      out.push({ group: 'Actions', title: 'Search the API', sub: `${window.TUBCAL_ROUTES.length} routes`, pn: '/', where: 'here', run: () => { goSection('api'); setTimeout(() => { const f = $('#api-q'); if (f) f.focus(); }, 450); } });
-    }
     return out;
   }
-  const QUICKSTART = 'uv sync\ncd frontend && npm install && npm run build && cd ..\nuv run python main.py';
 
   function score(q, text) {
     if (!q) return 1;
@@ -235,13 +232,13 @@
     scrim = document.createElement('div');
     scrim.className = 'scrim';
     scrim.innerHTML = `
-      <div class="palette" role="dialog" aria-modal="true" aria-label="Search the docs">
+      <div class="palette" role="dialog" aria-modal="true" aria-label="Search this site">
         <label class="palette-in">${icon('search', 'ico-lg')}
           <input id="pal-q" type="text" placeholder="Jump to a section, a room, a skin…" autocomplete="off" spellcheck="false" aria-controls="pal-list" />
           <kbd>esc</kbd>
         </label>
         <ul class="palette-list" id="pal-list" role="listbox"></ul>
-        <div class="palette-foot"><span><kbd>↑</kbd><kbd>↓</kbd> move</span><span><kbd>↵</kbd> go</span><span><kbd>t</kbd> cycle skin</span><span><kbd>?</kbd> all keys</span></div>
+        <div class="palette-foot"><span><kbd>↑</kbd><kbd>↓</kbd> move</span><span><kbd>↵</kbd> go</span><span><kbd>t</kbd> next skin</span><span><kbd>?</kbd> all keys</span></div>
       </div>`;
     document.body.appendChild(scrim);
     pal = $('.palette', scrim);
@@ -266,7 +263,7 @@
     palItems = ranked.map((x) => x.it);
     palSel = 0;
     if (!palItems.length) {
-      palList.innerHTML = `<li class="palette-empty">Nothing on this channel matches “${esc(q)}”.</li>`;
+      palList.innerHTML = `<li class="palette-empty">No results for “${esc(q)}”.</li>`;
       return;
     }
     let html = '', lastGroup = '';
@@ -328,17 +325,17 @@
       const chords = list.filter((s) => s.chord).map((s) => `<div class="keyrow"><span>${esc(s.title)}</span><span><kbd>g</kbd><kbd>${s.chord}</kbd></span></div>`).join('');
       keysScrim.innerHTML = `
         <div class="keysheet" role="dialog" aria-modal="true" aria-labelledby="ks-title">
-          <div class="keysheet-head"><div><span class="kicker">This page speaks the app's keys</span><h3 id="ks-title">Keyboard</h3></div>
+          <div class="keysheet-head"><div><span class="kicker">Shortcuts for this site</span><h3 id="ks-title">Keyboard</h3></div>
           <button class="iconbtn" data-close aria-label="Close">${icon('x', 'ico-lg')}</button></div>
           <div class="keysheet-cols">
             <div>
-              <div class="keyrow"><span>Channel 1 · the tour</span><span><kbd>1</kbd></span></div>
-              <div class="keyrow"><span>Channel 2 · the manual</span><span><kbd>2</kbd></span></div>
-              <div class="keyrow"><span>Search everything</span><span><kbd>/</kbd> or <kbd>Ctrl</kbd><kbd>K</kbd></span></div>
+              <div class="keyrow"><span>The tour</span><span><kbd>1</kbd></span></div>
+              <div class="keyrow"><span>The manual</span><span><kbd>2</kbd></span></div>
+              <div class="keyrow"><span>Search this site</span><span><kbd>/</kbd> or <kbd>Ctrl</kbd><kbd>K</kbd></span></div>
               <div class="keyrow"><span>Next · previous section</span><span><kbd>j</kbd> <kbd>k</kbd></span></div>
               <div class="keyrow"><span>Top · bottom</span><span><kbd>g</kbd><kbd>g</kbd> · <kbd>G</kbd></span></div>
-              <div class="keyrow"><span>Cycle the skin</span><span><kbd>t</kbd></span></div>
-              <div class="keyrow"><span>This sheet</span><span><kbd>?</kbd></span></div>
+              <div class="keyrow"><span>Next skin</span><span><kbd>t</kbd></span></div>
+              <div class="keyrow"><span>This list</span><span><kbd>?</kbd></span></div>
             </div>
             <div>${chords}</div>
           </div>

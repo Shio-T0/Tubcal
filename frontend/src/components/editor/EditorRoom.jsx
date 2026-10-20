@@ -22,7 +22,7 @@ import WhichKey from './WhichKey.jsx';
 
 // xterm.js only downloads when the terminal panel first opens
 const TerminalPanel = lazy(() => import('./Terminal.jsx'));
-import { runCommand } from './cm/languages.js';
+import { runCommand } from '../../lib/languages.js';
 import { setGitMarks } from './cm/gitGutter.js';
 import s from './editor.module.css';
 

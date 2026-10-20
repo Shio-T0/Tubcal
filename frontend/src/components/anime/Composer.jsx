@@ -117,7 +117,7 @@ export function PostPreview({ me, text, title, previewAs, onHide }) {
         <span className={m.previewLabel}><Eye size={12} /> How others will see your {kind}</span>
         <span className={`${m.fidelity} ${isExact ? m.fidelityExact : ''}`} title={isExact
           ? "This is AniList's own render of your text — exactly what will be published."
-          : 'Rendered as you type; AniList’s own render follows when you pause.'}
+          : 'Rendered while you type!'}
         >
           {checking && !isExact ? <Loader2 size={11} className={m.spin} /> : null}
           {isExact ? 'AniList render ✓' : 'live'}

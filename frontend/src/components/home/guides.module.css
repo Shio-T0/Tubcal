@@ -34,6 +34,10 @@
   grid-column: 1 / -1;
   animation-delay: 0.6s;
 }
+/* Social or Coding without the other beside it: it takes the row */
+.lone {
+  grid-column: 1 / -1;
+}
 .guide:hover,
 .guide:focus-within {
   transform: translateY(-3px);
@@ -414,6 +418,10 @@
   display: grid;
   grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
   gap: 22px;
+}
+/* a copy with only one of the Screening Room and the Anime */
+.halvesOne {
+  grid-template-columns: minmax(0, 1fr);
 }
 .half {
   display: flex;

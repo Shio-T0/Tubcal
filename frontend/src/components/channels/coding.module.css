@@ -90,6 +90,7 @@
   background: var(--surface-hover);
 }
 .actIcon {
+  position: relative;
   display: grid;
   place-items: center;
   width: 36px;
@@ -344,4 +345,20 @@
   .tools {
     margin-left: 0;
   }
+}
+
+/* unread notifications on GitHub's key */
+.badge {
+  position: absolute;
+  top: -3px;
+  right: -2px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--c-github);
+  color: var(--ink);
+  font: 700 9.5px/15px var(--font-mono);
+  text-align: center;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--ink) 70%, var(--ink-2));
 }

@@ -21,16 +21,12 @@ import { useSaved, useToast } from '../../state.jsx';
 import { Receiving } from '../layout/Section.jsx';
 import { HnHtml } from './HnHtml.jsx';
 import { lastVisit, visit } from './seen.js';
+import { splitKind } from '../../lib/format.js';
 import { scrollMotion } from '../../lib/motion.js';
 import r from './reader.module.css';
 
-const KIND = /^(Ask|Show|Tell|Launch) HN:\s*/i;
-
-/** "Ask HN: Why…" → { kind: 'Ask HN', rest: 'Why…' } */
-export function splitKind(title = '') {
-  const m = KIND.exec(title);
-  return m ? { kind: `${m[1][0].toUpperCase()}${m[1].slice(1).toLowerCase()} HN`, rest: title.slice(m[0].length) } : { kind: null, rest: title };
-}
+// splitKind lives in the core (the Edition reads it without the Wire installed)
+export { splitKind };
 
 function countAll(nodes) {
   return (nodes || []).reduce((n, c) => n + 1 + countAll(c.children), 0);

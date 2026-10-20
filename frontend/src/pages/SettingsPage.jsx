@@ -11,7 +11,7 @@
 // Switches are for on/off, Choices for a few named options, sliders and selects for
 // the rest. Rows sit in Groups (a card per topic).
 
-import { useEffect, useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   Check, ChevronLeft, ChevronRight, Copy, ExternalLink, FileText, Minus, Plus, RotateCw, Search, Trash2, X,
@@ -22,11 +22,13 @@ import { Avatar } from '../components/ui/Avatar.jsx';
 import AddSubscriptionModal from '../components/modals/AddSubscriptionModal.jsx';
 import { useSettings, useSubscriptions, useToast } from '../state.jsx';
 import { THEMES, skinsFor } from '../lib/themes.js';
-import { CHANNELS, ROOMS, getRoomById, knownActiveIds } from '../lib/rooms.js';
+import { ALL_FIXED, ALL_ROOMS, CHANNELS, ROOMS, getRoomById, knownActiveIds } from '../lib/rooms.js';
+import { hasModule, missingModules, moduleLazy } from '../lib/modules.js';
 import { latestParams } from '../lib/urlState.js';
 import { subtitleStyle, SUBTITLE_FONTS } from '../lib/subtitleStyle.js';
 import { SubtitleStyleEditor } from '../components/player/Subtitles.jsx';
-import { SETTINGS_GROUPS, SETTINGS_SECTIONS } from './settingsSections.js';
+import { useGhAccount } from '../lib/gh.js';
+import { SETTINGS_GROUPS, SETTINGS_SECTIONS, settingsSectionIds } from './settingsSections.js';
 import s from './settings.module.css';
 
 // Which build this is: the desktop app or the phone one (set by each vite.config).
@@ -35,7 +37,10 @@ const APP = typeof __TUBCAL_APP__ !== 'undefined'
   ? __TUBCAL_APP__
   : { name: 'Tubcal', year: '2026', author: 'shio-t0', source: 'https://github.com/Shio-T0/Tubcal' };
 
-const SECTION_IDS = SETTINGS_GROUPS.flatMap((g) => g.ids).filter((id) => !(APP.phone && SETTINGS_SECTIONS[id].desktopOnly));
+const SECTION_IDS = settingsSectionIds(APP.phone);
+
+// GitHub's link panel is the GitHub module's (lib/modules.js).
+const LinkAccount = moduleLazy('github', () => import('../components/github/LinkAccount.jsx'));
 
 // ── the pieces every section is made of ──────────────────────────────────────
 
@@ -119,23 +124,26 @@ function Select({ value, onChange, children, label }) {
 const PROVIDERS = [
   {
     id: 'anilist',
+    module: 'anime',
     name: 'AniList',
     unlocks: 'Your anime list, progress sync, reviews and the social pages.',
     setup: 'Create a client at anilist.co/settings/developer and register the redirect URL below.',
   },
   {
     id: 'google',
+    module: 'youtube',
     name: 'Google · YouTube',
     unlocks: 'Your real YouTube subscriptions feed.',
     setup: 'Create an OAuth client (type: Web application) in Google Cloud Console with the YouTube Data API v3 enabled.',
   },
   {
     id: 'reddit',
+    module: 'reddit',
     name: 'Reddit',
     unlocks: 'Your home feed, scores and full comment threads.',
     setup: 'Create a “web app” at reddit.com/prefs/apps.',
   },
-];
+].filter((p) => hasModule(p.module)); // an account only matters with its room
 
 function Connection({ provider, status, onChanged }) {
   const toast = useToast();
@@ -222,6 +230,29 @@ function Connection({ provider, status, onChanged }) {
   );
 }
 
+/** GitHub links differently: no OAuth client to register, just the GitHub CLI's
+ *  sign-in or a pasted token (components/github/LinkAccount.jsx). */
+function GithubConnection() {
+  const { me, reload } = useGhAccount();
+  const linked = me?.linked;
+  return (
+    <div className={s.account}>
+      <div className={s.accountHead}>
+        <span className={linked ? s.dotOn : me?.broken ? s.dotHalf : s.dot} aria-hidden="true" />
+        <span className={s.accountText}>
+          <b>GitHub</b>
+          <em>{linked ? `Linked as ${me.login}` : me?.broken ? 'The saved token was refused' : 'Not linked'}</em>
+        </span>
+      </div>
+      <p className={s.accountNote}>
+        Your notifications, open work and stars; starring, following and commenting; private repositories; and 5,000
+        API calls an hour instead of 60.
+      </p>
+      {me && <div className={s.creds}><Suspense fallback={null}><LinkAccount me={me} onChanged={reload} /></Suspense></div>}
+    </div>
+  );
+}
+
 function AccountsSection({ oauth }) {
   return (
     <>
@@ -230,6 +261,11 @@ function AccountsSection({ oauth }) {
           <Connection provider={p} status={oauth.data?.[p.id]} onChanged={oauth.reload} />
         </Group>
       ))}
+      {hasModule('github') && (
+        <Group>
+          <GithubConnection />
+        </Group>
+      )}
     </>
   );
 }
@@ -240,7 +276,7 @@ const SUB_GROUPS = [
   { platform: 'youtube', label: 'YouTube channels', color: 'var(--c-youtube)' },
   { platform: 'reddit', label: 'Subreddits', color: 'var(--c-reddit)' },
   { platform: 'github', label: 'GitHub repos and users', color: 'var(--c-github)' },
-];
+].filter((g) => hasModule(g.platform));
 
 function SubscriptionsSection() {
   const { subs, refreshSubs } = useSubscriptions();
@@ -428,7 +464,28 @@ function RoomsSection() {
           </Group>
         );
       })}
+      {!APP.phone && <NotInstalled />}
     </>
+  );
+}
+
+/** The rooms this install left out, and the command that adds one back. */
+function NotInstalled() {
+  const missing = missingModules()
+    .map((id) => [...ALL_ROOMS, ...ALL_FIXED].find((r) => r.id === id))
+    .filter(Boolean);
+  if (!missing.length) return null;
+  return (
+    <Group
+      title="Not installed"
+      note="These rooms were left out when Tubcal was installed, so none of their files are on this machine. Add one from a terminal, then reload this page."
+    >
+      {missing.map((room) => (
+        <Row key={room.id} label={<span className={s.room} style={{ '--room-c': room.color }} data-off="">{room.label}</span>}>
+          <code className={s.cmd}>tubcal add {room.id}</code>
+        </Row>
+      ))}
+    </Group>
   );
 }
 
@@ -748,10 +805,12 @@ function AboutSection() {
 function useSummaries(oauth) {
   const { settings } = useSettings();
   const { subs } = useSubscriptions();
+  const { linked: github } = useGhAccount();
   return useMemo(() => {
     const st = settings || {};
     const linked = PROVIDERS.filter((p) => oauth.data?.[p.id]?.connected).map((p) => p.name.split(' ')[0]);
-    const nSubs = Object.values(subs || {}).reduce((n, l) => n + (l?.length || 0), 0);
+    if (github) linked.push('GitHub');
+    const nSubs = SUB_GROUPS.reduce((n, g) => n + (subs?.[g.platform]?.length || 0), 0);
     const sub = subtitleStyle(st.subtitle_style);
     const active = knownActiveIds(st.active_rooms);
     return {
@@ -770,7 +829,7 @@ function useSummaries(oauth) {
       editor: `${st.editor_lsp_enabled !== false ? 'LSP on' : 'LSP off'} · ${st.editor_autosave ? 'autosave' : 'save on :w'}`,
       about: 'GPL-3.0 · licences',
     };
-  }, [settings, subs, oauth.data]);
+  }, [settings, subs, oauth.data, github]);
 }
 
 function useNarrow() {

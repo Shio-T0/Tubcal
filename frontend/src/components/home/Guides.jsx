@@ -16,6 +16,7 @@ import { Link } from 'react-router-dom';
 import { ArrowRight, Bookmark, FileCode2, Play, Radio, Search } from 'lucide-react';
 
 import { useApi } from '../../api/client.js';
+import { hasModule } from '../../lib/modules.js';
 import { isStill } from '../../lib/motion.js';
 import { ANIME_HOME } from '../../lib/rooms.js';
 import { channelOfItem } from '../../lib/saveable.js';
@@ -57,6 +58,19 @@ export function Keys({ keys }) {
       {keys.map((k, i) => (k === 'or' ? <em key={i}>or</em> : <kbd key={i}>{k}</kbd>))}
     </span>
   );
+}
+
+// How a channel's rooms are named in its guide's kicker line.
+const KICKER = {
+  edition: 'Edition', hackernews: 'Wire', reddit: 'Dispatch',
+  editor: 'Editor', dev: 'Workbench', github: 'GitHub',
+  youtube: 'Screening Room', anime: 'Anime', archive: 'Archive',
+};
+
+/** "Channel 2 · Editor, Workbench, GitHub": the channel's number and the rooms
+ *  this copy has in it. */
+function kicker(ch) {
+  return `Channel ${ch.n} · ${ch.rooms.map((id) => KICKER[id] || id).join(', ')}`;
 }
 
 function ChannelHead({ n, id, to, kicker, title, extra }) {
@@ -149,14 +163,14 @@ function RoomKeys({ rooms, badges = {}, label }) {
   );
 }
 
-export function SocialGuide({ rooms, paper, now }) {
+export function SocialGuide({ ch, rooms, paper, now, lone }) {
   const homes = useChannelHomes();
   return (
-    <section className={`${g.guide} ${g.social}`} aria-labelledby="ch-social">
-      <ChannelHead n={1} id="ch-social" to={homes.social} kicker="Channel 1 · Edition, Wire, Dispatch" title="Social" />
-      <Paper req={paper} now={now} />
+    <section className={`${g.guide} ${g.social} ${lone ? g.lone : ''}`} aria-labelledby="ch-social">
+      <ChannelHead n={ch.n} id="ch-social" to={homes.social} kicker={kicker(ch)} title="Social" />
+      {hasModule('edition') && <Paper req={paper} now={now} />}
       <RoomKeys rooms={rooms} label="Social rooms" />
-      <Foot channel="social" n={1}>
+      <Foot channel="social" n={ch.n}>
         <button type="button" onClick={openPalette}><Search size={13} /> Search</button>
       </Foot>
     </section>
@@ -221,7 +235,7 @@ function Languages({ on }) {
   );
 }
 
-export function CodingGuide({ rooms }) {
+export function CodingGuide({ ch, rooms, lone }) {
   const homes = useChannelHomes();
   const { subs } = useSubscriptions();
   const ids = new Set(rooms.map((r) => r.id));
@@ -230,13 +244,13 @@ export function CodingGuide({ rooms }) {
     github: following > 0 ? <span className={g.badge}>{following} followed</span> : null,
   };
   return (
-    <section className={`${g.guide} ${g.coding}`} aria-labelledby="ch-coding">
-      <ChannelHead n={2} id="ch-coding" to={homes.coding} kicker="Channel 2 · Editor, Workbench, GitHub" title="Coding" />
+    <section className={`${g.guide} ${g.coding} ${lone ? g.lone : ''}`} aria-labelledby="ch-coding">
+      <ChannelHead n={ch.n} id="ch-coding" to={homes.coding} kicker={kicker(ch)} title="Coding" />
       <OpenFiles on={ids.has('editor')} />
       <Languages on={ids.has('dev')} />
       <RoomKeys rooms={rooms} badges={badges} label="Coding rooms" />
-      <Foot channel="coding" n={2}>
-        {!ids.has('github') && <Link to="/settings?s=rooms">GitHub is off</Link>}
+      <Foot channel="coding" n={ch.n}>
+        {hasModule('github') && !ids.has('github') && <Link to="/settings?s=rooms">GitHub is off</Link>}
       </Foot>
     </section>
   );
@@ -332,10 +346,12 @@ function Uploads({ feed, newUploads, liveNow }) {
   );
 }
 
-export function VideoGuide({ rooms, anime, covers, feed, newUploads, liveNow }) {
+export function VideoGuide({ ch, rooms, anime, covers, feed, newUploads, liveNow }) {
   const homes = useChannelHomes();
   const behind = covers.slice(REEL);
   const archive = rooms.find((r) => r.id === 'archive');
+  const screening = hasModule('youtube');
+  const animeHere = hasModule('anime');
   return (
     <section className={`${g.guide} ${g.video}`} aria-labelledby="ch-video">
       {behind.length > 0 && (
@@ -343,41 +359,45 @@ export function VideoGuide({ rooms, anime, covers, feed, newUploads, liveNow }) 
           {behind.map((m, i) => <img key={m.id} src={m.cover} alt="" loading="lazy" style={{ '--i': i }} />)}
         </div>
       )}
-      <ChannelHead n={3} id="ch-video" to={homes.video} kicker="Channel 3 · Screening Room, Anime, Archive" title="Video" />
-      <div className={g.halves}>
-        <div className={g.half}>
-          <Link to="/youtube" className={g.halfHead} style={{ '--room-c': 'var(--c-youtube)' }}>
-            Screening Room <ArrowRight size={14} />
-          </Link>
-          <Uploads feed={feed} newUploads={newUploads} liveNow={liveNow} />
-          {archive && (
-            <Link to={archive.route} className={g.halfHead} style={{ '--room-c': archive.color }}>
-              The Archive <ArrowRight size={14} />
+      <ChannelHead n={ch.n} id="ch-video" to={homes.video} kicker={kicker(ch)} title="Video" />
+      <div className={`${g.halves} ${screening && animeHere ? '' : g.halvesOne}`}>
+        {screening && (
+          <div className={g.half}>
+            <Link to="/youtube" className={g.halfHead} style={{ '--room-c': 'var(--c-youtube)' }}>
+              Screening Room <ArrowRight size={14} />
             </Link>
-          )}
-        </div>
-        <div className={g.half}>
-          <Link to={ANIME_HOME} className={g.halfHead} style={{ '--room-c': 'var(--c-anime)' }}>
-            The Anime <i lang="ja">アニメ</i> <ArrowRight size={14} />
-          </Link>
-          {anime.entries ? (
-            <Shelves entries={anime.entries} />
-          ) : !anime.loading && !anime.connected ? (
-            <Link to="/settings?s=accounts" className={g.connect}>
-              Connect AniList in Settings to bring your shelves, your next episodes and their air dates here.
+            <Uploads feed={feed} newUploads={newUploads} liveNow={liveNow} />
+            {archive && (
+              <Link to={archive.route} className={g.halfHead} style={{ '--room-c': archive.color }}>
+                The Archive <ArrowRight size={14} />
+              </Link>
+            )}
+          </div>
+        )}
+        {animeHere && (
+          <div className={g.half}>
+            <Link to={ANIME_HOME} className={g.halfHead} style={{ '--room-c': 'var(--c-anime)' }}>
+              The Anime <i lang="ja">アニメ</i> <ArrowRight size={14} />
             </Link>
-          ) : (
-            <div className={g.shelves} aria-hidden="true" />
-          )}
-          {covers.length > 0 && <Reel covers={covers} />}
-          <nav className={g.doors} aria-label="Anime sections">
-            {DOORS.map(([label, to], i) => (
-              <Link key={label} to={to} className={g.door} style={{ '--i': i }} data-kbd-tile>{label}</Link>
-            ))}
-          </nav>
-        </div>
+            {anime.entries ? (
+              <Shelves entries={anime.entries} />
+            ) : !anime.loading && !anime.connected ? (
+              <Link to="/settings?s=accounts" className={g.connect}>
+                Connect AniList in Settings to bring your shelves, your next episodes and their air dates here.
+              </Link>
+            ) : (
+              <div className={g.shelves} aria-hidden="true" />
+            )}
+            {covers.length > 0 && <Reel covers={covers} />}
+            <nav className={g.doors} aria-label="Anime sections">
+              {DOORS.map(([label, to], i) => (
+                <Link key={label} to={to} className={g.door} style={{ '--i': i }} data-kbd-tile>{label}</Link>
+              ))}
+            </nav>
+          </div>
+        )}
       </div>
-      <Foot channel="video" n={3} />
+      <Foot channel="video" n={ch.n} />
     </section>
   );
 }

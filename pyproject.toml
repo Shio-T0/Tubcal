@@ -11,10 +11,9 @@ dependencies = [
     "feedparser>=6.0",
     "python-dotenv>=1.0",
     "rapidfuzz>=3.14.5",
-    "anipy-api>=3.8.21",
-    "weeb-cli>=3.0.0",
 ]
 
+# Each module's own packages (modules.ini says which module takes which).
 [project.optional-dependencies]
 # The Archive (local second brain). Heavy + needs a Python with ML wheels
 # (3.12, not the system 3.14) — install with: uv sync --extra brain.
@@ -26,11 +25,24 @@ brain = [
 editor = [
     "flask-sock>=0.7.0",
 ]
+# The Edition's semantic clusters (without numpy it prints a wire edition).
+edition = [
+    "numpy>=1.26",
+]
 
 [dependency-groups]
 dev = [
     "pytest>=8.0",
 ]
+# The Anime's scrapers. A group rather than an extra so a plain `uv sync` still
+# installs them (default-groups below); install.sh leaves them out with the Anime.
+anime = [
+    "anipy-api>=3.8.21",
+    "weeb-cli>=3.0.0",
+]
+
+[tool.uv]
+default-groups = ["dev", "anime"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]

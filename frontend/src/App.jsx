@@ -12,14 +12,16 @@ import { VideoFrame } from './components/channels/VideoFrame.jsx';
 import Pocket from './components/pocket/Pocket.jsx';
 import PlayerLayer from './components/player/PlayerLayer.jsx';
 import { Spinner } from './components/ui/index.jsx';
-import CurtainCallHost from './components/anime/CurtainCallHost.jsx';
-import { AnimeLayout } from './components/anime/AnimeTree.jsx';
-import { AnimeCalcProvider } from './components/anime/WatchCalculator.jsx';
+import { hasModule as has, moduleLazy } from './lib/modules.js';
 import { AppProviders } from './state.jsx';
 
 // Home is the "/" channel chooser — keep it eager so first paint has no chunk
 // wait. Every room is code-split and fetched on first visit.
 import Home from './pages/Home.jsx';
+
+// Every room is a module an install can leave out (modules.ini): its routes are
+// only here when it is (`has`, lib/modules.js), and its pages load through
+// import(), which the build points at an empty stand-in when it isn't built.
 
 const Edition = lazy(() => import('./pages/Edition.jsx'));
 const ScreeningRoom = lazy(() => import('./pages/ScreeningRoom.jsx'));
@@ -39,10 +41,16 @@ const AnimeUser = lazy(() => import('./pages/AnimeUser.jsx'));
 const AnimeThread = lazy(() => import('./pages/AnimeThread.jsx'));
 const AnimeActivity = lazy(() => import('./pages/AnimeThread.jsx').then(m => ({ default: m.AnimeActivity })));
 const Github = lazy(() => import('./pages/Github.jsx'));
+const GithubRepo = lazy(() => import('./pages/GithubRepo.jsx'));
+const GithubThread = lazy(() => import('./pages/GithubRepo.jsx').then(m => ({ default: m.GithubThread })));
+const GithubCommit = lazy(() => import('./pages/GithubRepo.jsx').then(m => ({ default: m.GithubCommit })));
+const GithubUser = lazy(() => import('./pages/GithubUser.jsx'));
 const Workbench = lazy(() => import('./pages/Workbench.jsx'));
 const Composer = lazy(() => import('./pages/Composer.jsx'));
 const SavedPage = lazy(() => import('./pages/SavedPage.jsx'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage.jsx'));
+const AnimeSection = moduleLazy('anime', () => import('./components/anime/AnimeSection.jsx'));
+const CurtainCallHost = moduleLazy('anime', () => import('./components/anime/CurtainCallHost.jsx'));
 
 function RouteFallback() {
   return (
@@ -73,21 +81,8 @@ const DeskLayout = framed(DeskFrame);
 
 // The Video channel's frame holds the Screening Room, the Archive and the Anime
 // alike, so moving between them never rebuilds the console. The Anime's routes
-// add its path bar, and the watch-time calculator (The Reckoner) — a single
-// instance across all of the Anime: hover a title anywhere in it, tap C, and the
-// same tally grows.
+// add its path bar and the watch-time calculator (components/anime/AnimeSection.jsx).
 const VideoLayout = framed(VideoFrame);
-function AnimeSection() {
-  return (
-    <AnimeCalcProvider>
-      <AnimeLayout>
-        <Suspense fallback={<RouteFallback />}>
-          <Outlet />
-        </Suspense>
-      </AnimeLayout>
-    </AnimeCalcProvider>
-  );
-}
 
 function RememberPlace() {
   useRememberPlace();
@@ -103,34 +98,49 @@ export default function App() {
           <Routes>
             <Route path="/" element={<Home />} />
             <Route element={<SocialLayout />}>
-              <Route path="/edition" element={<Edition />} />
-              <Route path="/hackernews" element={<Wire />} />
-              <Route path="/reddit" element={<Dispatch />} />
-              <Route path="/reddit/r/:sub" element={<SubredditPage />} />
+              {has('edition') && <Route path="/edition" element={<Edition />} />}
+              {has('hackernews') && <Route path="/hackernews" element={<Wire />} />}
+              {has('reddit') && <Route path="/reddit" element={<Dispatch />} />}
+              {has('reddit') && <Route path="/reddit/r/:sub" element={<SubredditPage />} />}
             </Route>
             <Route element={<CodingLayout />}>
-              <Route path="/editor" element={<Composer />} />
-              <Route path="/dev" element={<Workbench />} />
-              <Route path="/github" element={<Github />} />
+              {has('editor') && <Route path="/editor" element={<Composer />} />}
+              {has('dev') && <Route path="/dev" element={<Workbench />} />}
+              {has('github') && (
+                <>
+                  <Route path="/github" element={<Github />} />
+                  <Route path="/github/r/:owner/:repo" element={<GithubRepo />} />
+                  <Route path="/github/r/:owner/:repo/issues/:number" element={<GithubThread kind="issue" />} />
+                  <Route path="/github/r/:owner/:repo/pull/:number" element={<GithubThread kind="pull" />} />
+                  <Route path="/github/r/:owner/:repo/commit/:sha" element={<GithubCommit />} />
+                  <Route path="/github/u/:login" element={<GithubUser />} />
+                </>
+              )}
             </Route>
             <Route element={<VideoLayout />}>
-              <Route path="/youtube" element={<ScreeningRoom />} />
-              <Route path="/youtube/c/:channelId" element={<ChannelPage />} />
-              <Route path="/youtube/playlist/:playlistId" element={<PlaylistPage />} />
-              <Route path="/youtube/history" element={<HistoryPage />} />
-              <Route path="/archive" element={<Archive />} />
-              <Route element={<AnimeSection />}>
-                <Route path="/anime" element={<Anime />} />
-                {/* Static segment outranks /anime/:id in the router's own ranking, so
-                    a seiyuu id can never be mistaken for a media id. */}
-                <Route path="/anime/voice/:id" element={<VoiceActor />} />
-                <Route path="/anime/character/:id" element={<AnimeCharacter />} />
-                <Route path="/anime/studio/:id" element={<AnimeStudio />} />
-                <Route path="/anime/user/:name" element={<AnimeUser />} />
-                <Route path="/anime/thread/:id" element={<AnimeThread />} />
-                <Route path="/anime/activity/:id" element={<AnimeActivity />} />
-                <Route path="/anime/:id" element={<AnimeDetail />} />
-              </Route>
+              {has('youtube') && (
+                <>
+                  <Route path="/youtube" element={<ScreeningRoom />} />
+                  <Route path="/youtube/c/:channelId" element={<ChannelPage />} />
+                  <Route path="/youtube/playlist/:playlistId" element={<PlaylistPage />} />
+                  <Route path="/youtube/history" element={<HistoryPage />} />
+                </>
+              )}
+              {has('archive') && <Route path="/archive" element={<Archive />} />}
+              {has('anime') && (
+                <Route element={<AnimeSection fallback={<RouteFallback />} />}>
+                  <Route path="/anime" element={<Anime />} />
+                  {/* Static segment outranks /anime/:id in the router's own ranking, so
+                      a seiyuu id can never be mistaken for a media id. */}
+                  <Route path="/anime/voice/:id" element={<VoiceActor />} />
+                  <Route path="/anime/character/:id" element={<AnimeCharacter />} />
+                  <Route path="/anime/studio/:id" element={<AnimeStudio />} />
+                  <Route path="/anime/user/:name" element={<AnimeUser />} />
+                  <Route path="/anime/thread/:id" element={<AnimeThread />} />
+                  <Route path="/anime/activity/:id" element={<AnimeActivity />} />
+                  <Route path="/anime/:id" element={<AnimeDetail />} />
+                </Route>
+              )}
             </Route>
             <Route element={<DeskLayout />}>
               <Route path="/saved" element={<SavedPage />} />
@@ -141,7 +151,9 @@ export default function App() {
         </Suspense>
       </div>
       <PlayerLayer />
-      <CurtainCallHost />
+      <Suspense fallback={null}>
+        <CurtainCallHost />
+      </Suspense>
       <Pocket />
       <RememberPlace />
       <CommandPalette />

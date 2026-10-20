@@ -12,10 +12,18 @@
 // ROOMS are the rooms Settings → Rooms can switch off (their ids are
 // config.ROOM_IDS on the server). The Anime is always on, so it isn't one of them;
 // it sits in the Video channel through FIXED.
+//
+// Every room is also a module (modules.ini): an install can leave it out. ROOMS,
+// FIXED and CHANNELS hold only what this copy has (lib/modules.js), so everything
+// built on them — the frames, Home, the palette, the keys — rearranges itself. A
+// channel left with no rooms disappears and the others are numbered 1, 2…
+// ALL_ROOMS keeps the full list, for Settings to say what was left out.
+
+import { hasModule } from './modules.js';
 
 export const ANIME_HOME = '/anime';
 
-export const ROOMS = [
+export const ALL_ROOMS = [
   { id: 'edition',   label: 'The Edition', short: 'Edition', color: 'var(--c-foryou)', route: '/edition', default_enabled: true },
   { id: 'youtube',   label: 'Screening Room', short: 'YouTube', color: 'var(--c-youtube)', route: '/youtube', default_enabled: true },
   { id: 'reddit',    label: 'The Dispatch', short: 'Reddit', color: 'var(--c-reddit)', route: '/reddit', default_enabled: true },
@@ -27,17 +35,33 @@ export const ROOMS = [
 ];
 
 /** Rooms that are always on (not in Settings → Rooms). */
-export const FIXED = [
+export const ALL_FIXED = [
   { id: 'anime', label: 'The Anime', short: 'Anime', color: 'var(--c-anime)', route: ANIME_HOME, fixed: true },
 ];
 
-export const CHANNELS = [
-  { id: 'social', n: 1, key: 's', label: 'Social', color: 'var(--c-social)', rooms: ['edition', 'hackernews', 'reddit'] },
-  { id: 'coding', n: 2, key: 'c', label: 'Coding', color: 'var(--c-coding)', rooms: ['editor', 'dev', 'github'] },
-  { id: 'video', n: 3, key: 'v', label: 'Video', color: 'var(--c-video)', rooms: ['youtube', 'anime', 'archive'] },
+export const ALL_CHANNELS = [
+  { id: 'social', key: 's', label: 'Social', color: 'var(--c-social)', rooms: ['edition', 'hackernews', 'reddit'] },
+  { id: 'coding', key: 'c', label: 'Coding', color: 'var(--c-coding)', rooms: ['editor', 'dev', 'github'] },
+  { id: 'video', key: 'v', label: 'Video', color: 'var(--c-video)', rooms: ['youtube', 'anime', 'archive'] },
 ];
 
+// What this copy has.
+export const ROOMS = ALL_ROOMS.filter((r) => hasModule(r.id));
+export const FIXED = ALL_FIXED.filter((r) => hasModule(r.id));
+export const CHANNELS = ALL_CHANNELS
+  .map((ch) => ({ ...ch, rooms: ch.rooms.filter(hasModule) }))
+  .filter((ch) => ch.rooms.length)
+  .map((ch, i) => ({ ...ch, n: i + 1 }));
+
 export const ROOM_IDS = ROOMS.map(r => r.id);
+
+/** The channels saved things sort into: this copy's, plus any it left out that
+ *  still holds something you saved (`has(id)`), so nothing saved goes missing. */
+export function savedChannels(has = () => false) {
+  return ALL_CHANNELS
+    .map((ch) => CHANNELS.find((c) => c.id === ch.id) || (has(ch.id) ? ch : null))
+    .filter(Boolean);
+}
 
 const ALL = [...ROOMS, ...FIXED];
 
@@ -57,6 +81,11 @@ export function channelOfRoom(roomId) {
 /** The room a path is inside, if any (`/youtube/c/x` → youtube). */
 export function roomOfPath(pathname) {
   return ALL.find(r => pathname === r.route || pathname.startsWith(`${r.route}/`)) || null;
+}
+
+/** The room a path belongs to, installed or not (for "X isn't installed"). */
+export function anyRoomOfPath(pathname) {
+  return [...ALL_ROOMS, ...ALL_FIXED].find((r) => pathname === r.route || pathname.startsWith(`${r.route}/`)) || null;
 }
 
 /** The channel a path is inside, if any. */

@@ -10,6 +10,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
+import { hasModule } from '../../lib/modules.js';
 import { useShared } from '../../lib/useShared.js';
 import { COMPLETE_RATIO, useProgress, useSubscriptions } from '../../state.jsx';
 
@@ -22,8 +23,9 @@ export const LIVE_PATH = '/youtube/live';
 /** The subscription feed (newest first) and what's live across your channels. */
 export function useChannelFeed(source = 'curated') {
   const { subs } = useSubscriptions();
-  const hasSubs = subs.youtube.length > 0;
-  const feed = useShared(FEED_PATH(source), { enabled: source === 'account' || hasSubs });
+  // Home and the player read this too; without the Screening Room there's no feed
+  const hasSubs = hasModule('youtube') && subs.youtube.length > 0;
+  const feed = useShared(FEED_PATH(source), { enabled: hasModule('youtube') && (source === 'account' || hasSubs) });
   const live = useShared(LIVE_PATH, { enabled: hasSubs, maxAge: 120_000 });
   return { feed, live, hasSubs };
 }

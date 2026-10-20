@@ -12,13 +12,13 @@
 // keeps the full shell width; it folds to a rail of icons (remembered), and on a
 // phone it becomes a compact bar across the top.
 
+import { Suspense } from 'react';
 import { Link, NavLink } from 'react-router-dom';
 import { ChevronsLeft, ChevronsRight, Clapperboard, Library, Search, Tv } from 'lucide-react';
 
+import { moduleLazyNamed } from '../../lib/modules.js';
 import { useMedia } from '../../lib/useMedia.js';
 import { useStoredFlag } from '../../lib/useStoredFlag.js';
-import { ScreeningIndex } from '../screening/ScreeningIndex.jsx';
-import { AnimePlaces } from '../anime/AnimeTree.jsx';
 import { ChannelKnobs, PocketButtons, SkinButton, dateLine, openPalette, useChannelRooms } from './common.jsx';
 import c from './video.module.css';
 
@@ -29,9 +29,10 @@ const ICONS = {
 };
 
 // A room's own index, shown under it in the console while you're inside it.
+// Each belongs to its room's module, so it loads with it (lib/modules.js).
 const PLACES = {
-  youtube: ScreeningIndex,
-  anime: AnimePlaces,
+  youtube: moduleLazyNamed('youtube', () => import('../screening/ScreeningIndex.jsx'), 'ScreeningIndex'),
+  anime: moduleLazyNamed('anime', () => import('../anime/AnimeTree.jsx'), 'AnimePlaces'),
 };
 
 function Knobs({ rail }) {
@@ -94,7 +95,7 @@ function Console({ rail, onRail }) {
               </NavLink>
               {Places && (
                 <div className={c.places}>
-                  <Places />
+                  <Suspense fallback={null}><Places /></Suspense>
                 </div>
               )}
             </div>
@@ -141,7 +142,7 @@ function PhoneBar() {
           );
         })}
       </nav>
-      {Places && <Places compact />}
+      {Places && <Suspense fallback={null}><Places compact /></Suspense>}
     </header>
   );
 }

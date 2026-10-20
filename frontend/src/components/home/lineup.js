@@ -12,9 +12,10 @@
 
 import { useEffect, useMemo, useState } from 'react';
 
+import { hasModule } from '../../lib/modules.js';
 import { useShared } from '../../lib/useShared.js';
 import { COMPLETE_RATIO, applyOverlay, useAnimeSync, useProgress } from '../../state.jsx';
-import { ACTIVE, watchState } from '../anime/watching.js';
+import { ACTIVE, watchState } from '../player/anime/watching.js';
 import { useChannelFeed, useSeen, useWatched } from '../screening/feed.js';
 
 export const PICKUP_MAX = 6;
@@ -42,7 +43,7 @@ export function useMinute() {
 /** Your AniList list, flattened: every title once, with the list's local edits
  *  painted over it. `null` while loading or when AniList isn't connected. */
 export function useAnimeEntries() {
-  const lists = useShared('/anime/lists', { maxAge: 60_000 });
+  const lists = useShared(hasModule('anime') ? '/anime/lists' : null, { maxAge: 60_000 });
   const { overlay } = useAnimeSync();
   const entries = useMemo(() => {
     if (!lists.data?.lists) return null;
@@ -59,14 +60,14 @@ export function useAnimeEntries() {
     }
     return out;
   }, [lists.data, overlay]);
-  return { entries, connected: !lists.error, loading: lists.loading };
+  return { entries, connected: hasModule('anime') && !lists.error, loading: lists.loading };
 }
 
 /** Half-watched videos and the next episode of what you're watching, newest
  *  first; then — if that leaves room — the freshest uploads you haven't seen. */
 export function usePickUp(entries) {
   const { progress } = useProgress();
-  const cont = useShared('/youtube/continue', { maxAge: 30_000 });
+  const cont = useShared(hasModule('youtube') ? '/youtube/continue' : null, { maxAge: 30_000 });
   const { feed } = useChannelFeed();
   const { isNew } = useSeen();
   const watched = useWatched();

@@ -7,9 +7,10 @@ SQLite, and when they haven't, the fetch primes the user's morning anyway.
 Embedding is ONE batched Ollama call per build, for new items only.
 """
 
+import importlib
 import time
 
-from .. import config, db
+from .. import config, db, modules
 from . import llm
 
 
@@ -22,28 +23,27 @@ def _snippet(item):
 def collect_items():
     """Normalized items from every followed source, deduped, windowed to
     EDITION_WINDOW_H, snippeted, newest-first, capped."""
-    from ..sources import hackernews, reddit, youtube
-
     raw = []
-    try:
-        raw += hackernews.get_feed("top", 0)["items"]
-    except Exception:
-        pass
+
+    def take(room, fetch):
+        # only the rooms that are installed (modules.ini); each one fails alone
+        if not modules.has(room):
+            return
+        try:
+            raw.extend(fetch(importlib.import_module(f"server.sources.{room}")))
+        except Exception:
+            pass
+
+    take("hackernews", lambda hn: hn.get_feed("top", 0)["items"])
 
     yt_subs = db.list_subscriptions("youtube")
     if yt_subs:
-        try:
-            raw += youtube.get_feed([s["source_id"] for s in yt_subs])["items"]
-        except Exception:
-            pass
+        take("youtube", lambda yt: yt.get_feed([s["source_id"] for s in yt_subs])["items"])
 
     rd_subs = db.list_subscriptions("reddit")
     if rd_subs:
         sort = db.get_setting("reddit_sort") or "hot"
-        try:
-            raw += reddit.get_feed([s["source_id"] for s in rd_subs], sort)["items"]
-        except Exception:
-            pass
+        take("reddit", lambda rd: rd.get_feed([s["source_id"] for s in rd_subs], sort)["items"])
 
     cutoff = time.time() - config.EDITION_WINDOW_H * 3600
     seen, items = set(), []

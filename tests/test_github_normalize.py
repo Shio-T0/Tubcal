@@ -22,7 +22,9 @@ def test_normalize_repo_with_id():
     }
     item = normalize(raw)
     assert item is not None
-    assert item["id"] == "github:repo:123456"
+    # Repos are keyed by name, so a repo saved from trending (which has no
+    # numeric id) is the same saved entry everywhere else.
+    assert item["id"] == "github:repo:octocat/awesome-repo"
     assert item["platform"] == "github"
     assert item["title"] == "awesome-repo"
     assert item["source"] == "octocat/awesome-repo"
@@ -57,7 +59,7 @@ def test_normalize_repo_without_id_uses_full_name():
 
 
 def test_normalize_release_with_id():
-    """Releases should use their id (or node_id) for bookmarking."""
+    """Releases are keyed by repo and tag, the same from the API or an Atom feed."""
     from server.sources.github import normalize
 
     raw = {
@@ -73,7 +75,7 @@ def test_normalize_release_with_id():
     }
     item = normalize(raw)
     assert item is not None
-    assert item["id"] == "github:release:999"
+    assert item["id"] == "github:release:octocat/awesome-repo@v1.0.0"
     assert item["extra"]["type"] == "release"
     assert item["extra"]["tag"] == "v1.0.0"
 
@@ -95,7 +97,7 @@ def test_normalize_release_without_id_uses_repo_full_name():
     item = normalize(raw)
     assert item is not None
     # Falls back to repo full_name extracted from url
-    assert item["id"] == "github:release:user/repo"
+    assert item["id"] == "github:release:user/repo@v2.0.0"
     assert item["extra"]["type"] == "release"
     assert item["extra"]["tag"] == "v2.0.0"
     assert item["extra"]["prerelease"] is True

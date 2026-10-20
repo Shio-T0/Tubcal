@@ -20,6 +20,10 @@
 @font-face { font-family: 'Archivo'; font-style: normal; font-display: swap; font-weight: 900; src: url('../fonts/archivo-900.woff2') format('woff2'); }
 @font-face { font-family: 'Space Grotesk Variable'; font-style: normal; font-display: swap; font-weight: 300 700; src: url('../fonts/space-grotesk.woff2') format('woff2-variations'); }
 @font-face { font-family: 'Inter Variable'; font-style: normal; font-display: swap; font-weight: 100 900; src: url('../fonts/inter.woff2') format('woff2-variations'); }
+/* JetBrains Mono for Cutting Mat (the app uses the system's copy; here it's served, Latin only) */
+@font-face { font-family: 'JetBrains Mono'; font-style: normal; font-display: swap; font-weight: 400 500; src: url('../fonts/jetbrains-mono-400.woff2') format('woff2'); }
+@font-face { font-family: 'JetBrains Mono'; font-style: normal; font-display: swap; font-weight: 600 700; src: url('../fonts/jetbrains-mono-700.woff2') format('woff2'); }
+@font-face { font-family: 'JetBrains Mono'; font-style: normal; font-display: swap; font-weight: 800 900; src: url('../fonts/jetbrains-mono-800.woff2') format('woff2'); }
 
 /* ===================================================================== *
  * SHŌWA NIGHT — the house look (tokens.css, verbatim)
@@ -357,6 +361,60 @@
   --rail-2: #ff5ca8;
   --rail-3: #34e2b0;
   --rail-4: #ffd25c;
+  color-scheme: dark;
+}
+
+/* CUTTING MAT — Catppuccin Macchiato windows over a teal self-healing mat */
+[data-theme='bench'] {
+  --ink: #161c26;
+  --ink-2: #1c2230;
+  --ink-3: #242a3b;
+  --paper: #cad3f5;
+  --paper-dim: #a5adcb;
+  --paper-faint: #8087a2;
+  --rule: rgba(202, 211, 245, 0.1);
+  --rule-strong: rgba(202, 211, 245, 0.22);
+  --surface: rgba(202, 211, 245, 0.045);
+  --surface-hover: rgba(202, 211, 245, 0.085);
+  --surface-input: rgba(8, 10, 18, 0.42);
+  --backdrop: rgba(10, 18, 22, 0.72);
+  --shadow-modal: 0 24px 70px rgba(4, 14, 16, 0.55);
+  --glow-strength: 0;
+  --grain-opacity: 0;
+  --signal: #8aadf4;
+  --signal-soft: rgba(138, 173, 244, 0.16);
+  --c-youtube: #ed8796;
+  --c-reddit: #f5a97f;
+  --c-hn: #eed49f;
+  --c-foryou: #91d7e3;
+  --c-github: #c6a0f6;
+  --c-editor: #a6da95;
+  --c-dev: #8bd5ca;
+  --success: #a6da95;
+  --danger: #ed8796;
+  --accent-strong: #f5a97f;
+  --accent-glow: rgba(138, 173, 244, 0.35);
+  --shadow-card: 0 10px 26px rgba(6, 14, 18, 0.32);
+  --font-display: 'JetBrains Mono', 'IBM Plex Mono', ui-monospace, monospace;
+  --font-body: 'Inter Variable', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'IBM Plex Mono', ui-monospace, monospace;
+  --r-card: 10px;
+  --r-media: 8px;
+  --r-modal: 12px;
+  --r-pill: 999px;
+  --r-input: 8px;
+  --rail-0: #8aadf4;
+  --rail-1: #eed49f;
+  --rail-2: #a6da95;
+  --rail-3: #f5a97f;
+  --rail-4: #c6a0f6;
+  /* the skin's own: the mat, the window glass, the bar, the supply's LCD */
+  --bench-mat: #5f948f;
+  --bench-window: rgba(17, 21, 32, 0.9);
+  --bench-edge: rgba(202, 211, 245, 0.07);
+  --bench-bar: rgba(11, 13, 22, 0.95);
+  --bench-lcd: #4cca64;
+  --bench-shadow: 0 16px 40px rgba(8, 26, 28, 0.38);
   color-scheme: dark;
 }
 
@@ -720,7 +778,7 @@ kbd + kbd {
   color: var(--paper-dim);
 }
 
-/* the topline strip (the chooser's, the console's) */
+/* the topline strip (the tour's top, the console's) */
 .tc-topline {
   display: flex;
   align-items: center;
@@ -1707,17 +1765,17 @@ th.nowrap {
   padding: 6px 10px;
   text-shadow: 0 0 4px rgba(54, 255, 106, 0.4);
 }
-[data-theme='terminal'] .tc-wordmark {
+[data-theme='terminal'] .tc-wordmark:not(.skincard:not([data-theme='terminal']) *) {
   font-weight: 400;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   text-shadow: 0 0 10px rgba(54, 255, 106, 0.55);
 }
-[data-theme='terminal'] .tc-wordmark::before {
+[data-theme='terminal'] .tc-wordmark:not(.skincard:not([data-theme='terminal']) *)::before {
   content: 'C:\\> ';
   color: var(--paper-dim);
 }
-[data-theme='terminal'] .tc-wordmark::after {
+[data-theme='terminal'] .tc-wordmark:not(.skincard:not([data-theme='terminal']) *)::after {
   content: '\2588';
   margin-left: 0.08em;
   animation: tcBlink 1.06s steps(1) infinite;
@@ -1761,7 +1819,7 @@ th.nowrap {
   padding: 6px 10px;
   color: #111111;
 }
-[data-theme='bauhaus'] .tc-wordmark {
+[data-theme='bauhaus'] .tc-wordmark:not(.skincard:not([data-theme='bauhaus']) *) {
   font-weight: 900;
   text-transform: uppercase;
   letter-spacing: -0.035em;
@@ -1807,12 +1865,12 @@ th.nowrap {
   background: rgba(11, 37, 69, 0.5);
   padding: 6px 10px;
 }
-[data-theme='blueprint'] .tc-wordmark {
+[data-theme='blueprint'] .tc-wordmark:not(.skincard:not([data-theme='blueprint']) *) {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.02em;
 }
-[data-theme='blueprint'] .tc-wordmark::after {
+[data-theme='blueprint'] .tc-wordmark:not(.skincard:not([data-theme='blueprint']) *)::after {
   content: ' REV.A';
   font-family: var(--font-mono);
   font-size: 0.26em;
@@ -1851,7 +1909,7 @@ th.nowrap {
   background: #ff5f57;
   box-shadow: 18px 0 0 #febc2e, 36px 0 0 #28c840;
 }
-[data-theme='aqua'] .tc-wordmark {
+[data-theme='aqua'] .tc-wordmark:not(.skincard:not([data-theme='aqua']) *) {
   font-weight: 700;
   letter-spacing: -0.01em;
   text-shadow: 0 1px 0 rgba(255, 255, 255, 0.8);
@@ -1880,7 +1938,7 @@ th.nowrap {
   background: rgba(18, 22, 44, 0.4);
   backdrop-filter: blur(10px);
 }
-[data-theme='space'] .tc-wordmark {
+[data-theme='space'] .tc-wordmark:not(.skincard:not([data-theme='space']) *) {
   font-weight: 600;
   letter-spacing: -0.02em;
   background: linear-gradient(96deg, #b9a8ff 0%, #7c5cff 42%, #22d3ee 100%);
@@ -1889,13 +1947,201 @@ th.nowrap {
   color: transparent;
   filter: drop-shadow(0 0 22px rgba(124, 92, 255, 0.45));
 }
-[data-theme='space'] .tc-wordmark em {
+[data-theme='space'] .tc-wordmark:not(.skincard:not([data-theme='space']) *) em {
   color: #22d3ee;
   -webkit-text-fill-color: #22d3ee;
 }
 [data-theme='space'] .btn-lit {
   background: linear-gradient(96deg, #7c5cff, #22d3ee);
   color: #ffffff;
+}
+
+/* ===================================================================== *
+ * CUTTING MAT — the desk it runs on (themes.css + backdrop.css). Nothing may
+ * sit on the bare mat: pages are translucent windows, the consoles and bars
+ * are near-black, and the few lines the tour's top prints straight on the mat
+ * get a strip of bar to stand on.
+ * ===================================================================== */
+.bd-bench__mat {
+  inset: 0;
+  background: linear-gradient(168deg, #6ba09b 0%, #5f948f 42%, #4f837e 100%);
+}
+/* the mat's grid, seen at an angle: one set of lines rising ~20°, one falling ~32° */
+.bd-bench__grid {
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100%25' height='100%25'%3E%3Cdefs%3E%3Cpattern id='a' width='36' height='36' patternUnits='userSpaceOnUse' patternTransform='rotate(-20)'%3E%3Crect y='34.5' width='36' height='1.5' fill='%23d8f6ef' fill-opacity='.32'/%3E%3C/pattern%3E%3Cpattern id='b' width='48' height='48' patternUnits='userSpaceOnUse' patternTransform='rotate(32)'%3E%3Crect y='46.5' width='48' height='1.5' fill='%23d8f6ef' fill-opacity='.32'/%3E%3C/pattern%3E%3C/defs%3E%3Crect width='100%25' height='100%25' fill='url(%23a)'/%3E%3Crect width='100%25' height='100%25' fill='url(%23b)'/%3E%3C/svg%3E");
+}
+/* the desk lamp: a soft pool top left, the far corner falling into shade */
+.bd-bench__light {
+  inset: 0;
+  background:
+    radial-gradient(70vmax 55vmax at 12% -6%, rgba(255, 255, 255, 0.11), transparent 62%),
+    radial-gradient(85vmax 70vmax at 104% 108%, rgba(18, 38, 42, 0.42), transparent 66%);
+}
+
+html[data-theme='bench'],
+[data-theme='bench'] body {
+  background: var(--bench-mat);
+}
+[data-theme='bench'] h1,
+[data-theme='bench'] h2 {
+  letter-spacing: -0.02em;
+}
+[data-theme='bench'] ::selection {
+  background: #8aadf4;
+  color: #1e2030;
+}
+[data-theme='bench'] .glass {
+  background: var(--bench-window);
+  border: 1px solid var(--bench-edge);
+  border-radius: var(--r-card);
+  box-shadow: var(--bench-shadow);
+}
+
+/* the windows: each tour stop, the manual's page and the footer */
+[data-theme='bench'] .tour-sec > .shell,
+[data-theme='bench'] .man-main,
+[data-theme='bench'] .sitefoot {
+  border: 1px solid var(--bench-edge);
+  border-radius: 10px;
+  background: var(--bench-window);
+  box-shadow: var(--bench-shadow);
+}
+[data-theme='bench'] .tour-sec > .shell {
+  width: calc(100% - 2 * var(--space-4));
+  padding-top: var(--space-6);
+}
+[data-theme='bench'] .man-main {
+  margin-bottom: var(--space-6);
+  padding: 0 var(--space-6) var(--space-6);
+}
+[data-theme='bench'] .sitefoot {
+  width: min(var(--shell), calc(100% - 2 * var(--space-4)));
+  margin: var(--space-7) auto var(--space-6);
+}
+[data-theme='bench'] .man-main .sitefoot {
+  width: auto;
+  margin: var(--space-7) 0 0;
+  border: 0;
+  border-top: 3px double var(--rule-strong);
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+}
+@media (max-width: 960px) {
+  [data-theme='bench'] .man-main {
+    margin-top: var(--space-4);
+    padding: 0 var(--space-4) var(--space-5);
+  }
+}
+/* a panel inside a window needn't be a second window */
+[data-theme='bench'] .tour-sec .glass,
+[data-theme='bench'] .man-main .glass {
+  background: rgba(202, 211, 245, 0.035);
+  box-shadow: none;
+}
+
+/* the bars: near-black, like the one down the screen's edge */
+[data-theme='bench'] .tc-console,
+[data-theme='bench'] .bar-in {
+  border: 1px solid var(--bench-edge);
+  border-radius: 10px;
+  background: var(--bench-bar);
+  box-shadow: var(--bench-shadow);
+}
+[data-theme='bench'] .tour-sec .tc-console {
+  background: var(--bench-bar);
+}
+
+/* the top line, lit like the bench supply's display: green segments on glass */
+[data-theme='bench'] .tc-topline {
+  --signal: var(--bench-lcd);
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: #1d211f;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.55), inset 0 3px 10px rgba(0, 0, 0, 0.6);
+  color: color-mix(in srgb, var(--bench-lcd) 70%, #1d211f);
+  text-shadow: 0 0 6px rgba(76, 202, 100, 0.5);
+}
+
+/* the wordmark is a shell prompt */
+[data-theme='bench'] .tc-wordmark:not(.skincard:not([data-theme='bench']) *) {
+  font-variation-settings: normal;
+  font-weight: 800;
+  letter-spacing: -0.05em;
+}
+[data-theme='bench'] .tc-wordmark:not(.skincard:not([data-theme='bench']) *)::before {
+  content: '\276F\00a0';
+  color: var(--c-editor);
+  font-weight: 700;
+}
+[data-theme='bench'] .tc-wordmark:not(.skincard:not([data-theme='bench']) *) em {
+  font-style: normal;
+  color: var(--signal);
+}
+
+/* the rooms: workspace keys; the one you're on is a lualine mode block in its
+   own colour, pointed on the right like the status line's segments */
+[data-theme='bench'] .tc-navitem {
+  border-radius: 8px;
+}
+[data-theme='bench'] .tc-navno {
+  border-radius: 6px;
+  background: rgba(202, 211, 245, 0.06);
+  box-shadow: none;
+  font-family: var(--font-mono);
+}
+[data-theme='bench'] .tc-navitem-on,
+[data-theme='bench'] .tc-navitem-on:hover {
+  background: var(--room-c, var(--signal));
+  color: #1e2030;
+  border-radius: 8px 0 0 8px;
+  clip-path: polygon(0 0, calc(100% - 11px) 0, 100% 50%, calc(100% - 11px) 100%, 0 100%);
+  box-shadow: none;
+}
+[data-theme='bench'] .tc-navitem-on .tc-navno {
+  background: #1e2030;
+  color: var(--room-c, var(--signal));
+  box-shadow: none;
+}
+
+/* the tour's top prints its name straight on the mat, as the app's Home does;
+   the words under it sit in a window, and the facts and the hint get one each */
+[data-theme='bench'] .hero-mark {
+  color: #e8ecfb;
+  text-shadow: 0 3px 0 rgba(20, 54, 54, 0.35), 0 10px 30px rgba(10, 30, 32, 0.35);
+}
+[data-theme='bench'] .hero-mark em {
+  margin-left: -0.35em; /* a mono cell's side-bearing would float the stop off the word */
+}
+[data-theme='bench'] .hero-body,
+[data-theme='bench'] .hero-facts > div,
+[data-theme='bench'] .hint {
+  border: 1px solid var(--bench-edge);
+  background: var(--bench-window);
+  box-shadow: var(--bench-shadow);
+}
+[data-theme='bench'] .hero-body {
+  margin-top: var(--space-4);
+  padding: var(--space-5);
+  border-radius: 12px;
+}
+[data-theme='bench'] .hero-tag {
+  margin-top: 0;
+  font-style: normal;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+[data-theme='bench'] .hint {
+  width: fit-content;
+  max-width: 100%;
+  margin-inline: auto;
+  padding: 6px 16px;
+  border-radius: 10px;
+}
+[data-theme='bench'] .btn-lit {
+  color: #1e2030;
 }
 
 @media (prefers-reduced-motion: reduce) {

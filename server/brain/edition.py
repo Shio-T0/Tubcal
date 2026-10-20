@@ -15,8 +15,8 @@ import json
 import threading
 import time
 
-from .. import config, db
-from . import cluster, feed_index, llm, search
+from .. import config, db, modules
+from . import cluster, feed_index, llm
 
 POLL_SECONDS = 600        # builder heartbeat (one paper a day, like a paper)
 SYNTH_DEADLINE = 240      # seconds of LLM budget per build before templating the rest
@@ -130,7 +130,9 @@ def _transcript_block(ranked, headline, embed_model):
     parts, not the opening minutes, since the vectors are already sitting there.
 
     Returns (block_text, item_number) or (None, None). Never raises: the paper
-    goes out with or without this."""
+    goes out with or without this, and without the Archive installed."""
+    if not modules.has("archive"):
+        return None, None
     for n, i in enumerate(ranked, start=1):
         item_id = i.get("id")
         if not item_id:
@@ -149,6 +151,7 @@ def _transcript_block(ranked, headline, embed_model):
         picks = []
         if embed_model:
             try:
+                from . import search  # the Archive's; it holds the transcript
                 picks = search.rank_doc_chunks(
                     item_id, headline, embed_model, k=config.EDITION_TRANSCRIPT_CHUNKS)
             except Exception:

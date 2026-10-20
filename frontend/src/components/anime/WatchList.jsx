@@ -24,7 +24,7 @@ import {
   CoverRatings, MONTH_SHORT, SyncBadge, airingDateLabel, fmtCountdown, fmtDuration, formatLabel,
   personalScore, seasonLabel, useCountdownTick,
 } from './shared.jsx';
-import { ACTIVE, RESUMABLE, usePlayEpisode, watchState } from './watching.js';
+import { ACTIVE, RESUMABLE, usePlayEpisode, watchState } from '../player/anime/watching.js';
 import { useAnimeCalc } from './WatchCalculator.jsx';
 import s from '../../pages/anime.module.css';
 import k from './watchlist.module.css';

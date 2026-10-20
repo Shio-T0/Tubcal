@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { ANIME_HOME } from '../../lib/rooms.js';
+import { ANIME_HOME, anyRoomOfPath, roomOfPath } from '../../lib/rooms.js';
 import { scrollMotion } from '../../lib/motion.js';
 import { openPocket, useChannelHomes } from '../channels/common.jsx';
 import k from './KeyboardShortcuts.module.css';
@@ -18,7 +18,8 @@ import k from './KeyboardShortcuts.module.css';
 //   Enter/Space  activate the focused tile (handled by the tile itself)
 // `/` and Ctrl-K belong to the command palette. Stands down while typing or while
 // a video is expanded (the player owns those keys then).
-const GOTO = {
+// Only the rooms this copy has: a left-out room's address would bounce to Home.
+const GOTO = Object.fromEntries(Object.entries({
   h: '/',
   e: '/edition',
   y: '/youtube',
@@ -29,7 +30,7 @@ const GOTO = {
   a: ANIME_HOME,
   d: '/dev',
   s: '/saved',
-};
+}).filter(([, to]) => roomOfPath(to) || !anyRoomOfPath(to)));
 
 const DIRS = {
   j: 'down', k: 'up', h: 'left', l: 'right',
@@ -62,7 +63,7 @@ export default function KeyboardShortcuts() {
   const navigate = useNavigate();
   const homes = useChannelHomes();
   const goto = useRef({});
-  goto.current = { s: homes.social, c: homes.coding, v: homes.video, a: ANIME_HOME, h: '/' };
+  goto.current = { s: homes.social, c: homes.coding, v: homes.video, a: GOTO.a, h: '/' };
   const gPending = useRef(0);
   // stage 1: Space pressed, waiting for g · stage 2: Space g, waiting for a/h
   const leader = useRef({ stage: 0, at: 0 });

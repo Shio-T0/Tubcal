@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 
 
+import { hasModule } from '../../lib/modules.js';
 import { api, useApi } from '../../api/client.js';
 import { useShared } from '../../lib/useShared.js';
 import { compact } from '../../lib/format.js';
@@ -314,8 +315,9 @@ export function notesTabs(info) {
     { id: 'about', label: 'About', Icon: BookOpen },
     info?.chapters?.length ? { id: 'chapters', label: 'Chapters', Icon: ListOrdered, count: info.chapters.length } : null,
     { id: 'comments', label: 'Comments', Icon: MessageSquare, count: info?.comment_count },
-    { id: 'transcript', label: 'Transcript', Icon: FileText },
-    { id: 'summary', label: 'Summary', Icon: Sparkles },
+    // the Archive's, when this copy has it (lib/modules.js)
+    hasModule('archive') ? { id: 'transcript', label: 'Transcript', Icon: FileText } : null,
+    hasModule('archive') ? { id: 'summary', label: 'Summary', Icon: Sparkles } : null,
   ].filter(Boolean);
 }
 

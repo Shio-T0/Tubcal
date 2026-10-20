@@ -8,7 +8,7 @@ import { useMemo } from 'react';
 
 import { useShared } from '../../../lib/useShared.js';
 import { applyOverlay, useAnimeSync } from '../../../state.jsx';
-import { buildEpisodeList, episodeItem } from '../../anime/episodeList.js';
+import { buildEpisodeList, episodeItem } from './episodeList.js';
 
 // The audio you switched to, per show, for this session — so the next episode (from
 // the strip, the rail or the countdown) keeps it. Only an explicit switch sets it:

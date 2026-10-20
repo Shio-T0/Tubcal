@@ -19,6 +19,7 @@ import { Search } from 'lucide-react';
 
 import { useApi } from '../api/client.js';
 import { Bookmark, Settings } from 'lucide-react';
+import { hasModule } from '../lib/modules.js';
 
 import { useProgress, useSaved, useSettings } from '../state.jsx';
 import { themeMeta } from '../lib/themes.js';
@@ -111,16 +112,17 @@ export default function Home() {
   const { saved } = useSaved();
   const homes = useChannelHomes();
   const rooms = Object.fromEntries(CHANNELS.map((ch) => [ch.id, channelRooms(ch.id, settings?.active_rooms)]));
+  const channel = Object.fromEntries(CHANNELS.map((ch) => [ch.id, ch])); // only the ones this copy has
 
   const anime = useAnimeEntries();
   const pickUp = usePickUp(anime.entries);
   const { feed, live, hasSubs } = useChannelFeed();
   const comingUp = useComingUp(anime.entries, live, now);
   const { newCount } = useSeen();
-  const paper = useApi('/edition/latest');
+  const paper = useApi('/edition/latest', hasModule('edition'));
   // This season's covers behind Channel 3 — the browse shelf is cached server-side
   // for half an hour, so the home screen costs AniList next to nothing.
-  const season = useApi('/anime/browse?kind=seasonal');
+  const season = useApi('/anime/browse?kind=seasonal', hasModule('anime'));
   const covers = (season.data?.items || []).filter((m) => m.cover).slice(0, 30);
 
   const newUploads = newCount(feed.data?.items);
@@ -150,9 +152,9 @@ export default function Home() {
 
   const savedCount = Object.keys(saved || {}).length;
   const subs = {
-    social: paperToday ? 'paper’s out' : plural(rooms.social.length, 'room'),
-    coding: plural(rooms.coding.length, 'room'),
-    video: newUploads ? `${newUploads} new` : anime.entries ? `${tallyShelves(anime.entries).watching} watching` : plural(rooms.video.length, 'room'),
+    social: paperToday ? 'paper’s out' : plural(rooms.social?.length || 0, 'room'),
+    coding: plural(rooms.coding?.length || 0, 'room'),
+    video: newUploads ? `${newUploads} new` : anime.entries ? `${tallyShelves(anime.entries).watching} watching` : plural(rooms.video?.length || 0, 'room'),
   };
 
   return (
@@ -197,16 +199,19 @@ export default function Home() {
       <TheSet pickUp={pickUp} comingUp={comingUp} comingReady={comingReady} now={now} subs={subs} />
 
       <div className={h.guides}>
-        <SocialGuide rooms={rooms.social} paper={paper} now={now} />
-        <CodingGuide rooms={rooms.coding} />
-        <VideoGuide
-          rooms={rooms.video} anime={anime} covers={covers}
-          feed={feed} newUploads={newUploads} liveNow={liveRows.length}
-        />
+        {/* Social and Coding share a row; one without the other takes it whole */}
+        {channel.social && <SocialGuide ch={channel.social} rooms={rooms.social} paper={paper} now={now} lone={!channel.coding} />}
+        {channel.coding && <CodingGuide ch={channel.coding} rooms={rooms.coding} lone={!channel.social} />}
+        {channel.video && (
+          <VideoGuide
+            ch={channel.video} rooms={rooms.video} anime={anime} covers={covers}
+            feed={feed} newUploads={newUploads} liveNow={liveRows.length}
+          />
+        )}
       </div>
 
       <p className={`${h.hint} tc-strip`}>
-        <kbd>Space</kbd><kbd>g</kbd> then <kbd>s</kbd> <kbd>c</kbd> <kbd>v</kbd> switch channels from anywhere
+        <kbd>Space</kbd><kbd>g</kbd> then {CHANNELS.flatMap((ch, i) => [i ? ' ' : null, <kbd key={ch.id}>{ch.key}</kbd>])} switch channels from anywhere
         · <kbd>Space</kbd><kbd>s</kbd> Saved · <kbd>Space</kbd><kbd>,</kbd> Settings
         · <kbd>h</kbd><kbd>j</kbd><kbd>k</kbd><kbd>l</kbd> walk the screen
       </p>

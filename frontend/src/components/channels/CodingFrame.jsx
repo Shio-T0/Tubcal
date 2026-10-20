@@ -7,6 +7,8 @@
 // and on the right search, Saved, Settings and the skin. In the Composing Room
 // the title bar also carries the workspace root and which tools it found (git,
 // rg, a terminal, language servers), so the editor gets the whole height below.
+// In GitHub the path goes on into the repository being read, and the room's key
+// carries the count of unread notifications when an account is linked.
 // On a phone the activity bar lies flat across the top.
 
 import { Link, NavLink, useLocation } from 'react-router-dom';
@@ -25,11 +27,22 @@ const ICONS = {
 // the names under the icons, short enough for the bar
 const SHORT = { editor: 'Editor', dev: 'Bench', github: 'GitHub' };
 
-/** The rest of the path after the room: the Workbench's language, a search. */
-function crumbsFor(room, search) {
+/** The rest of the path after the room: the Workbench's language; in GitHub the
+ *  view, a search, or the repository / thread / commit / person being read. */
+function crumbsFor(room, pathname, search) {
   const q = new URLSearchParams(search);
   if (room?.id === 'dev') return [q.get('l') || 'rust'];
-  if (room?.id === 'github' && q.get('q')) return [`“${q.get('q')}”`];
+  if (room?.id === 'github') {
+    if (q.get('q')) return [`“${q.get('q')}”`];
+    const m = pathname.match(/^\/github\/r\/([^/]+)\/([^/]+)(?:\/(issues|pull|commit)\/([^/]+))?/);
+    if (m) {
+      const tail = m[3] === 'commit' ? [m[4].slice(0, 7)] : m[3] ? [`#${m[4]}`] : q.get('path') ? q.get('path').split('/') : [];
+      return [m[1], m[2], ...tail];
+    }
+    const u = pathname.match(/^\/github\/u\/([^/]+)/);
+    if (u) return [`@${u[1]}`];
+    if (q.get('v')) return [q.get('v')];
+  }
   return [];
 }
 
@@ -59,7 +72,14 @@ function EditorColophon() {
   );
 }
 
+/** Unread GitHub notifications, for the badge on the room's key (account linked). */
+function useGithubUnread(on) {
+  const res = useShared('/github/inbox/count', { enabled: on, maxAge: 120_000 });
+  return on && res.data?.available ? res.data.unread : 0;
+}
+
 function ActivityBar({ rooms, current, flat }) {
+  const unread = useGithubUnread(rooms.some((r) => r.id === 'github'));
   return (
     <aside className={`${flat ? c.flat : c.activity} tc-console`} aria-label="Coding">
       <Link to="/" className={`${c.mark} tc-wordmark`} title="Home — choose a channel">
@@ -79,7 +99,10 @@ function ActivityBar({ rooms, current, flat }) {
               aria-current={on ? 'page' : undefined}
               title={`${room.label} (${i + 1})`}
             >
-              <span className={`${c.actIcon} tc-navno`}><Icon size={19} /></span>
+              <span className={`${c.actIcon} tc-navno`}>
+                <Icon size={19} />
+                {room.id === 'github' && unread > 0 && <span className={c.badge} title={`${unread} unread on GitHub`}>{unread > 9 ? '9+' : unread}</span>}
+              </span>
               <span className={c.actLabel}>{SHORT[room.id] || room.short}</span>
             </NavLink>
           );
@@ -93,9 +116,9 @@ function ActivityBar({ rooms, current, flat }) {
 
 export function CodingFrame({ children }) {
   const { rooms, current } = useChannelRooms('coding');
-  const { search } = useLocation();
+  const { pathname, search } = useLocation();
   const phone = useMedia('(max-width: 900px)');
-  const crumbs = crumbsFor(current, search);
+  const crumbs = crumbsFor(current, pathname, search);
   return (
     <div className={c.frame} data-channel="coding">
       <ActivityBar rooms={rooms} current={current} flat={phone} />
@@ -111,7 +134,7 @@ export function CodingFrame({ children }) {
                 <Link to={current.route} className={c.here} style={{ '--room-c': current.color }}>{current.label.replace(/^The /, '').toLowerCase()}</Link>
               </>
             )}
-            {crumbs.map((x) => <span key={x}><i>/</i>{x}</span>)}
+            {crumbs.map((x, i) => <span key={`${i}-${x}`}><i>/</i>{x}</span>)}
           </span>
           {current?.id === 'editor' && !phone && <EditorColophon />}
           <span className={c.tools}>

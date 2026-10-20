@@ -6,11 +6,13 @@ import {
   Captions, Code2, History, KeyRound, LayoutGrid, Library, Newspaper, Palette, Rss, Scale, Tv, Volume2,
 } from 'lucide-react';
 
+import { hasModule } from '../lib/modules.js';
+
 export const SETTINGS_SECTIONS = {
   accounts: {
     title: 'Accounts', icon: KeyRound,
-    blurb: 'Sign in to YouTube, Reddit and AniList for your own feeds and lists. Optional, and the tokens stay on this machine.',
-    find: 'oauth connect login sign in google youtube reddit anilist credentials client id secret redirect',
+    blurb: 'Sign in to YouTube, Reddit, AniList and GitHub for your own feeds, lists and inbox. Optional, and the tokens stay on this machine.',
+    find: 'oauth connect login sign in google youtube reddit anilist github gh cli token personal access notifications credentials client id secret redirect',
   },
   subscriptions: {
     title: 'Subscriptions', icon: Rss,
@@ -43,22 +45,22 @@ export const SETTINGS_SECTIONS = {
     find: 'subtitles captions font size colour color outline shadow backdrop language height',
   },
   anime: {
-    title: 'Anime', icon: Tv,
+    title: 'Anime', icon: Tv, module: 'anime',
     blurb: 'Episodes stream from hianime, the source ani-cli uses. Connect AniList under Accounts to sync your list.',
     find: 'anime sub dub audio anilist sync progress skip openings opening theme song volume',
   },
   edition: {
-    title: 'The Edition', icon: Newspaper,
+    title: 'The Edition', icon: Newspaper, module: 'edition',
     blurb: 'The daily paper, composed from everything you follow. Works without AI; Ollama upgrades it to written prose.',
     find: 'edition paper daily news hour writer model ollama recompose press',
   },
   archive: {
-    title: 'The Archive', icon: Library,
+    title: 'The Archive', icon: Library, module: 'archive',
     blurb: 'Transcribes what you watch into a private, searchable memory, with on-device summaries.',
     find: 'archive transcription whisper ollama llm summaries embedding search index brain',
   },
   editor: {
-    title: 'The Composing Room', icon: Code2, desktopOnly: true,
+    title: 'The Composing Room', icon: Code2, desktopOnly: true, module: 'editor',
     blurb: 'The code editor over your local workspace.',
     find: 'editor code composing lsp language servers autosave line numbers relative leader vim',
   },
@@ -68,6 +70,15 @@ export const SETTINGS_SECTIONS = {
     find: 'about licence license gpl copyright source notices libraries warranty',
   },
 };
+
+/** The sections this copy shows: a module's section only with its module, and
+ *  desktop-only ones not on the phone. */
+export function settingsSectionIds(phone = false) {
+  return SETTINGS_GROUPS.flatMap((g) => g.ids).filter((id) => {
+    const sec = SETTINGS_SECTIONS[id];
+    return !(phone && sec.desktopOnly) && (!sec.module || hasModule(sec.module));
+  });
+}
 
 export const SETTINGS_GROUPS = [
   { title: 'Your things', ids: ['accounts', 'subscriptions', 'history'] },

@@ -80,11 +80,29 @@ TTL_ANIME_EPISODES = 600  # aggregator episode list
 # cour adds one, but an airing show's OP often lands days after its premiere.
 TTL_ANIMETHEMES = 86400
 TTL_ANIMETHEMES_EMPTY = 21600
-# GitHub (60 req/hr unauthenticated → cache aggressively)
-TTL_GITHUB_FEED = 600  # 10 min for subscribed repo/user activity
+# GitHub. The REST API allows 60 requests an hour without a token and 5,000 with
+# one, so anything that costs an API call caches harder while no account is
+# linked. github.com's own pages and Atom feeds (trending, commits, releases, the
+# contribution calendar) don't count against that budget at all.
+TTL_GITHUB_FEED = 600  # 10 min for subscribed repo/user activity (account linked)
+TTL_GITHUB_FEED_ANON = 1800  # 30 min for the same with no token
+TTL_GITHUB_ATOM = 600  # 10 min — a repo's commits.atom / releases.atom (free)
 TTL_GITHUB_SEARCH = 300  # 5 min for search results
 TTL_GITHUB_ITEM = 1800  # 30 min for a single repo detail
-TTL_GITHUB_TRENDING = 1800  # 30 min — trending is a search call, keep it cheap
+TTL_GITHUB_TRENDING = 1800  # 30 min — github.com/trending (or the search stand-in)
+TTL_GITHUB_ME = 600  # 10 min — who the linked token belongs to, and its scopes
+TTL_GITHUB_NOTIFS = 60  # 1 min — the inbox; GitHub asks clients to poll ≥60s apart
+TTL_GITHUB_WORK = 180  # 3 min — your reviews/PRs/assignments (four search calls)
+TTL_GITHUB_STARS = 600  # 10 min — your starred repos
+TTL_GITHUB_TREE = 1800  # 30 min — a directory listing at a ref
+TTL_GITHUB_FILE = 3600  # 1 h — a file at a ref (a sha'd ref never changes)
+TTL_GITHUB_COMMITS = 600  # 10 min — a branch's commit list
+TTL_GITHUB_THREAD = 300  # 5 min — an issue or pull request with its comments
+TTL_GITHUB_USER = 3600  # 1 h — a person's or org's profile and repo list
+TTL_GITHUB_CONTRIB = 10800  # 3 h — the contribution calendar
+TTL_GITHUB_RELEASES = 1800  # 30 min — the release radar across what you follow
+TTL_GITHUB_PARTICIPATION = 21600  # 6 h — a repo's 52-week commit counts
+TTL_GITHUB_UPSTREAM = 600  # 10 min — has a local clone's upstream moved?
 # The Workbench (No 09): per-language shelves. Podcast/blog feeds move slowly;
 # the release stamp barely moves at all.
 TTL_DEV_PODCASTS = 21600  # 6 h — a show posts weekly at best

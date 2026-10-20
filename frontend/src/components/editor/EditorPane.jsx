@@ -19,7 +19,7 @@ import { lintKeymap, forEachDiagnostic } from '@codemirror/lint';
 import { vim, Vim, getCM } from '@replit/codemirror-vim';
 
 import { showaEditorTheme } from './cm/theme.js';
-import { languageFor, lspLanguage } from './cm/languages.js';
+import { languageFor, lspLanguage } from '../../lib/languages.js';
 import { gitGutter } from './cm/gitGutter.js';
 
 // The room registers itself here on mount; every vim ex command and update

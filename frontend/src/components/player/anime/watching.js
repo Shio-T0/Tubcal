@@ -3,10 +3,10 @@
 // apart from WatchList.jsx (which re-exports them) so the eager home screen can use
 // them without pulling the Anime's stylesheets into the first paint.
 
-import { fetchShared } from '../../lib/useShared.js';
-import { COMPLETE_RATIO, usePlayer, useToast } from '../../state.jsx';
+import { fetchShared } from '../../../lib/useShared.js';
+import { COMPLETE_RATIO, usePlayer, useToast } from '../../../state.jsx';
 import { episodeItem } from './episodeList.js';
-import { audioFor } from '../player/anime/useAnimeShow.js';
+import { audioFor } from './useAnimeShow.js';
 
 /** Shelves you're actively watching from. */
 export const ACTIVE = new Set(['CURRENT', 'REPEATING']);

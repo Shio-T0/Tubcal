@@ -25,12 +25,15 @@ import {
 import { compact } from '../lib/format.js';
 import { clock } from '../lib/time.js';
 import { useParamState } from '../lib/urlState.js';
-import { CHANNELS } from '../lib/rooms.js';
+import { ALL_CHANNELS, CHANNELS, getRoomById, savedChannels } from '../lib/rooms.js';
 import { KINDS, KIND_ORDER, channelOfItem, kindOf, toneOf } from '../lib/saveable.js';
 import { useSaved } from '../state.jsx';
 import { KindIcon, keptAgo, kindLine } from '../components/saved/kinds.jsx';
 import { useOpenSaved } from '../components/saved/useOpenSaved.jsx';
 import s from './saved.module.css';
+
+// Where the empty page sends you in each channel: rooms full of things to save.
+const DOORS = ['edition', 'dev', 'youtube'];
 
 const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
@@ -38,7 +41,7 @@ const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 const LAYOUT = {
   video: 'media', moment: 'media', playlist: 'media', ytchannel: 'media',
   anime: 'poster', character: 'poster', staff: 'poster', studio: 'poster',
-  file: 'mono', page: 'mono',
+  file: 'mono', page: 'mono', commit: 'mono',
 };
 const layoutOf = (kind) => LAYOUT[kind] || 'card';
 
@@ -228,7 +231,7 @@ function Catalogue({ items, ch, k, st, setFilter, setSt }) {
     }
     return t;
   }, [items]);
-  const groups = [...CHANNELS, { id: 'other', label: 'Elsewhere', color: 'var(--paper-faint)' }];
+  const groups = [...savedChannels((id) => tally.channel[id]), { id: 'other', label: 'Elsewhere', color: 'var(--paper-faint)' }];
   return (
     <nav className={s.catalogue} aria-label="Sort saved by channel and kind">
       <div className={s.catGroup}>
@@ -346,7 +349,7 @@ export default function SavedPage() {
         </p>
         <div className={s.emptyDoors}>
           {CHANNELS.map((c) => (
-            <Link key={c.id} to={`/${{ social: 'edition', coding: 'dev', video: 'youtube' }[c.id]}`} style={{ '--ch-c': c.color }}>
+            <Link key={c.id} to={getRoomById(c.rooms.find((r) => DOORS.includes(r)) || c.rooms[0])?.route || '/'} style={{ '--ch-c': c.color }}>
               <b>{c.n}</b> {c.label}
             </Link>
           ))}
@@ -355,7 +358,7 @@ export default function SavedPage() {
     );
   }
 
-  const scopeLabel = k ? KINDS[k].label : ch === 'all' ? 'Everything' : ch === 'other' ? 'Elsewhere' : CHANNELS.find((c) => c.id === ch)?.label;
+  const scopeLabel = k ? KINDS[k].label : ch === 'all' ? 'Everything' : ch === 'other' ? 'Elsewhere' : ALL_CHANNELS.find((c) => c.id === ch)?.label;
 
   return (
     <div className={s.page}>
