@@ -2,11 +2,23 @@ import json
 
 from flask import Flask, request, send_from_directory
 
-from . import config, modules
+from . import config, localguard, modules
 
 
 def create_app():
     app = Flask(__name__, static_folder=None)
+
+    @app.before_request
+    def only_this_machine():
+        # Other websites open in the browser can address 127.0.0.1 too; see
+        # server/localguard.py for what this refuses and why.
+        why = localguard.refusal(request.path, request.headers)
+        if why is None:
+            return None
+        if request.path.startswith("/api/"):
+            from .api import err
+            return err(why, 403)
+        return why + "\n", 403, {"Content-Type": "text/plain; charset=utf-8"}
 
     from .api import register_blueprints
     register_blueprints(app)

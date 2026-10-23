@@ -138,6 +138,43 @@
   text-decoration-color: var(--signal);
 }
 
+/* the nightcap: late, the set offers to sleep after the next thing */
+.nightcap {
+  grid-column: 1 / -1;
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  margin: 0;
+  padding: 6px 14px 6px 12px;
+  border: 1px solid color-mix(in srgb, var(--signal) 22%, var(--rule));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--signal) 6%, var(--surface-glass));
+  font-size: 13.5px;
+  color: var(--text-secondary);
+  animation: clauseIn 0.8s var(--hand) 0.6s both;
+}
+.nightcap svg {
+  color: var(--signal);
+}
+.nightcap button {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: 560;
+  color: var(--text-primary);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--signal) 55%, transparent);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 4px;
+  cursor: pointer;
+}
+.nightcap button:hover {
+  color: var(--signal);
+}
+
 /* search, the one other thing you'd come here for */
 .tools {
   display: flex;

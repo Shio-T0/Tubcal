@@ -3,6 +3,7 @@ saved items, the palette's search across rooms, the For You mix, and cache
 refresh. Each room's own routes live in its module's blueprint."""
 
 import importlib
+import json
 import logging
 import re
 import threading
@@ -181,6 +182,9 @@ def saved_add():
     item = body.get("item") or {}
     if not item.get("id") or not item.get("platform"):
         return err("item with id and platform required")
+    # a feed's links come from outside too (an RSS episode link can say anything),
+    # and Saved hands them to window.open: only http(s) and in-app paths are kept
+    item = _with_safe_links(item)
     try:
         db.add_saved(item)
     except Exception as e:
@@ -190,6 +194,81 @@ def saved_add():
 
 
 SAVED_NOTE_MAX = 2000
+SAVED_IMPORT_MAX = 5000      # entries per import
+SAVED_ITEM_BYTES = 64 * 1024  # one entry, as JSON
+
+
+def _safe_link(value):
+    """A link an imported entry may carry: http(s), or a path in this app. An
+    import file comes from outside, so a javascript: or data: URL never gets in."""
+    if not isinstance(value, str):
+        return None
+    v = value.strip()
+    if v.startswith("/") and not v.startswith("//"):
+        return v
+    return v if v.lower().startswith(("http://", "https://")) else None
+
+
+def _with_safe_links(raw):
+    """A copy of an entry whose url/thumbnail are links it may carry (see
+    _safe_link); anything else is left out."""
+    item = dict(raw)
+    for key in ("url", "thumbnail"):
+        if key in item:
+            link = _safe_link(item[key])
+            if link is None:
+                item.pop(key)
+            else:
+                item[key] = link
+    return item
+
+
+def _clean_import(raw):
+    """One entry from an export, made safe to keep, or None to skip it."""
+    if not isinstance(raw, dict):
+        return None
+    iid, platform = raw.get("id"), raw.get("platform")
+    if not (isinstance(iid, str) and isinstance(platform, str) and 0 < len(iid) <= 512 and 0 < len(platform) <= 32):
+        return None
+    item = _with_safe_links(raw)
+    if not isinstance(item.get("title", ""), str):
+        item.pop("title")
+    note = item.get("note")
+    if note is not None:
+        if isinstance(note, str) and note.strip():
+            item["note"] = note.strip()[:SAVED_NOTE_MAX]
+        else:
+            item.pop("note")
+    for key in ("done_at", "saved_at"):  # epoch seconds; a bool is an int in Python
+        v = item.get(key)
+        if v is not None and (isinstance(v, bool) or not isinstance(v, int)):
+            item.pop(key)
+    try:
+        if len(json.dumps(item)) > SAVED_ITEM_BYTES:
+            return None
+    except (TypeError, ValueError):
+        return None
+    return item
+
+
+@feeds_bp.post("/saved/import")
+def saved_import():
+    """Bring back a Saved export (Settings never sees it: the Saved page sends the
+    file's contents). Accepts the export itself or just its `items`."""
+    body = request.get_json(silent=True)
+    items = body.get("items") if isinstance(body, dict) else body
+    if not isinstance(items, list):
+        return err("expected a Tubcal Saved export (JSON with an items list)")
+    if len(items) > SAVED_IMPORT_MAX:
+        return err(f"at most {SAVED_IMPORT_MAX} entries at a time")
+    clean = [c for c in (_clean_import(r) for r in items) if c]
+    seen, unique = set(), []
+    for it in clean:
+        if it["id"] not in seen:
+            seen.add(it["id"])
+            unique.append(it)
+    added, already = db.import_saved(unique)
+    return ok({"added": added, "already": already, "skipped": len(items) - len(unique)})
 
 
 @feeds_bp.patch("/saved/<path:item_id>")

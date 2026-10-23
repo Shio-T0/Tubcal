@@ -25,6 +25,11 @@ TTL_BRAIN_DIGEST = 1800  # digest is expensive — cache it (SWR)
 HOST = "127.0.0.1"
 PORT = int(os.environ.get("TUBCAL_PORT", "5000"))
 
+# How many cache entries stay in memory (the rest are one SQLite read away).
+CACHE_MEM_MAX = int(os.environ.get("TUBCAL_CACHE_MEM_MAX", "1500"))
+# How often a long-running server tidies itself (prune, vacuum), in seconds.
+HOUSEKEEPING_EVERY = 86400
+
 # The Anime room: AniList (GraphQL) + a local, AniList-id-mapped episode aggregator.
 # The aggregator base URL can also be set in Settings (key: anime_source_url); the
 # env/default here is the fallback. Provider is an adapter-specific hint (optional).

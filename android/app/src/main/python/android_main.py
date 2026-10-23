@@ -74,7 +74,9 @@ def _background(brain):
         desktop_main._backfill_avatars()
     except Exception:
         pass
-    for job in (brain.start, brain.edition.start):
+    from server import housekeeping
+
+    for job in (brain.start, brain.edition.start, housekeeping.start):
         try:
             job()
         except Exception:

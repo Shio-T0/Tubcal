@@ -21,7 +21,7 @@ import { api } from '../../api/client.js';
 import { formatWhen, timeUntil } from '../../lib/time.js';
 import { streamApi } from '../../lib/streams.js';
 import { useShared } from '../../lib/useShared.js';
-import { COMPLETE_RATIO, useAnimeSync, usePlayer, useProgress, useSettings } from '../../state.jsx';
+import { COMPLETE_RATIO, useAnimeSync, usePlayer, useProgress, useSettings, useToast } from '../../state.jsx';
 import { useVideoControls } from '../../lib/useVideoControls.js';
 import NotesPanel from './NotesPanel.jsx';
 import { SubtitleOverlay, SubtitleStyleEditor, useSubtitleStyle } from './Subtitles.jsx';
@@ -33,6 +33,7 @@ import EpisodeRail from './anime/EpisodeRail.jsx';
 import { NextUp, SkipCue } from './anime/Cues.jsx';
 import { rememberAudio, showAccent, skipChapters, skipSpans, useAnimeShow } from './anime/useAnimeShow.js';
 import { attachHls } from '../../lib/hlsPlayback.js';
+import { clearSleep, fallAsleep, stopsAtEnd, useSleepFade, useSleepTimer } from '../../lib/sleepTimer.js';
 import s from './player.module.css';
 
 const MARGIN = 20;
@@ -162,6 +163,11 @@ function PlayerCard({ item, expanded, style, dragging, muted, rate, notes, onCha
   const [animeInfo, setAnimeInfo] = useState(null); // {skip, audio, audioKeys}
   const [synced, setSynced] = useState(false);
   const [nextUp, setNextUp] = useState(false);
+  // The sleep timer (lib/sleepTimer.js): the player you can hear fades out so it
+  // is silent right on time, and every player pauses when it goes off. The picture
+  // dims as the sound goes, and stays dim until something plays again.
+  const [dozing, setDozing] = useState(false);
+  useSleepFade(videoRef, { audible: !muted, onDoze: setDozing });
   const effItem = audioKey ? { ...item, extra: { ...item.extra, stream_key: audioKey } } : item;
 
   const sapi = streamApi(effItem);
@@ -398,6 +404,7 @@ function PlayerCard({ item, expanded, style, dragging, muted, rate, notes, onCha
   // Playing again after a hiccup: whatever error was showing no longer applies,
   // and the progressive path's reload budget refills.
   const onPlaying = () => {
+    setDozing(false);
     retryRef.current = 0;
     setPlayErr(null);
     setHealing(false);
@@ -464,6 +471,7 @@ function PlayerCard({ item, expanded, style, dragging, muted, rate, notes, onCha
     <div
       ref={cardRef}
       className={`${s.card} ${expanded ? s.cardExpanded : s.cardDocked} ${over ? s.cardOver : ''}`}
+      data-dozing={dozing ? '' : undefined}
       style={cardStyle}
       onDragOver={drag ? (e) => { e.preventDefault(); setOver(true); } : undefined}
       onDragLeave={drag ? () => setOver(false) : undefined}
@@ -553,7 +561,12 @@ function PlayerCard({ item, expanded, style, dragging, muted, rate, notes, onCha
               onCanPlay={onReady}
               onPlaying={onPlaying}
               onPause={onPauseFlush}
-              onEnded={() => (isAnime && expanded && show.next ? setNextUp(true) : onEnded?.())}
+              onEnded={() => {
+                // "Stop at the end": no next episode, no Up next, just goodnight
+                if (!muted && stopsAtEnd()) { fallAsleep({ atEnd: true }); onEnded?.({ advance: false }); }
+                else if (isAnime && expanded && show.next) setNextUp(true);
+                else onEnded?.();
+              }}
               onRateChange={onRateEvt}
               onError={onVideoError}
             >
@@ -587,6 +600,7 @@ function PlayerCard({ item, expanded, style, dragging, muted, rate, notes, onCha
             {showControls ? (
               <PlayerControls
                 expanded={expanded}
+                endWord={isAnime ? 'episode' : 'video'}
                 isLive={isLive}
                 dragging={dragging}
                 videoRef={videoRef}
@@ -694,6 +708,16 @@ export default function PlayerLayer() {
     try { return localStorage.getItem('tubcal.player.notes') !== '0'; } catch { return true; }
   });
   const [panelTab, setPanelTab] = useState('about');
+
+  // The sleep timer went off: say goodnight once, then it's done.
+  const toast = useToast();
+  const sleep = useSleepTimer();
+  useEffect(() => {
+    if (sleep?.mode !== 'asleep') return;
+    if (sleep.atEnd) toast('That’s the end. Sleep well.', 'info');
+    else if (sleep.heard || players.length) toast('Sleep timer · paused. Sleep well.', 'info');
+    clearSleep();
+  }, [sleep, players.length, toast]);
 
   const soloAudio = settings?.solo_audio !== false;
   const rate = settings?.playback_rate || 1;
@@ -822,7 +846,7 @@ export default function PlayerLayer() {
             onClose={() => (isExpanded ? close() : undock(id))}
             onMinimize={minimize}
             onExpand={() => expandFromDock(id)}
-            onEnded={() => ended(id)}
+            onEnded={(opts) => ended(id, opts)}
             onRateChange={(r) => updateSettings({ playback_rate: r })}
             drag={
               isExpanded

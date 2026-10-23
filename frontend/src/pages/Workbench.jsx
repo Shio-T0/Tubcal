@@ -7,6 +7,7 @@ import {
   ArrowUpRight,
   ExternalLink,
   GitFork,
+  Moon,
   Pause,
   Play,
   Star,
@@ -21,6 +22,9 @@ import { usePlayer } from '../state.jsx';
 import { useHorizontalWheel } from '../lib/useHorizontalWheel.js';
 import { compact } from '../lib/format.js';
 import { timeAgo } from '../lib/time.js';
+import {
+  chooseSleep, fallAsleep, nextSleepChoice, sleepLabel, stopsAtEnd, useSleepCountdown, useSleepFade,
+} from '../lib/sleepTimer.js';
 import s from './workbench.module.css';
 
 /* ---------------------------------------------------------------- helpers */
@@ -275,7 +279,28 @@ function BenchRadio({ episode, playing, onToggle, audioRef }) {
         </div>
         <span className={s.radioShow}>{episode.show}</span>
       </div>
+      <SleepDial />
     </div>
+  );
+}
+
+/** The radio's sleep dial: each press steps off → end of this episode → 15 → 30
+ *  → 60 minutes, the same timer as the player's moon. */
+function SleepDial() {
+  const sleep = useSleepCountdown();
+  const tag = sleepLabel(sleep);
+  const words = tag === 'end' ? 'at the end of this episode' : tag ? `in ${tag.replace('m', ' min')}` : null;
+  return (
+    <button
+      type="button"
+      className={`${s.radioSleep} ${tag ? s.radioSleepOn : ''}`}
+      onClick={() => chooseSleep(nextSleepChoice(sleep))}
+      aria-label={words ? `Sleep timer: ${words}` : 'Sleep timer'}
+      title={words ? `Sleeps ${words} · press to change` : 'Sleep timer'}
+    >
+      <Moon size={14} />
+      {tag && <span>{tag}</span>}
+    </button>
   );
 }
 
@@ -504,13 +529,27 @@ export default function Workbench() {
   const [episode, setEpisode] = useState(null);
   const [playing, setPlaying] = useState(false);
 
+  // The element says whether it's playing: a pause can come from elsewhere (media
+  // keys, the browser's media controls, the sleep timer), and the button must follow.
   useEffect(() => {
     const el = audioRef.current;
     if (!el) return undefined;
-    const onEnd = () => setPlaying(false);
+    const onPlay = () => setPlaying(true);
+    const onPause = () => setPlaying(false);
+    const onEnd = () => {
+      setPlaying(false);
+      if (stopsAtEnd()) fallAsleep({ atEnd: true });
+    };
+    el.addEventListener('play', onPlay);
+    el.addEventListener('pause', onPause);
     el.addEventListener('ended', onEnd);
-    return () => el.removeEventListener('ended', onEnd);
+    return () => {
+      el.removeEventListener('play', onPlay);
+      el.removeEventListener('pause', onPause);
+      el.removeEventListener('ended', onEnd);
+    };
   }, []);
+  useSleepFade(audioRef);
 
   const pickEpisode = useCallback(
     (ep) => {

@@ -225,6 +225,16 @@ a.title:hover {
   display: block;
 }
 
+/* The sleep timer's fade: the picture dims with the sound (over its 12s), stays
+   dim while it sleeps, and brightens again when something plays. */
+.frame {
+  transition: filter 0.8s ease;
+}
+.card[data-dozing] .frame {
+  filter: brightness(0.38) saturate(0.6);
+  transition: filter 12s linear;
+}
+
 /* While dragging, the video must not swallow the dragover/drop events. */
 .frameNoPointer {
   pointer-events: none;

@@ -132,6 +132,9 @@ CREATE TABLE IF NOT EXISTS editions (
 
 DEFAULT_SETTINGS = {
     "theme": "dark",
+    # Settings → Your data: how many daily snapshots of this file to keep
+    # (server/snapshots.py); 0 stops the daily copy.
+    "snapshots_keep": 7,
     # Fast mode (Settings → Appearance): nothing animates or transitions, anywhere.
     # Stamped on <html data-fast> at serve time so even the first paint is still.
     "fast_mode": False,
@@ -144,6 +147,9 @@ DEFAULT_SETTINGS = {
     "player_volume": 1,   # 0..1, remembered across videos (custom controls)
     # Desktop notify-send 10 min before a subscribed channel goes live.
     "notify_live": True,
+    # [from_hour, to_hour] when live alerts keep quiet (server/notifier.py) and the
+    # home screen offers to let the set sleep; null = no quiet hours.
+    "quiet_hours": None,
     # The Archive (local second brain): transcription + semantic search + LLM.
     "brain_enabled": True,        # master gate for the background worker
     "brain_auto_index": False,    # opt-in: index videos as you watch them
@@ -582,6 +588,31 @@ def add_saved(item):
             (item.get("platform"), item.get("id"), json.dumps(item), at),
         )
     con.close()
+
+
+def import_saved(items):
+    """Add many entries in one transaction, each with its own kept date. An id
+    that's already saved is left as it is: what's here (and its note) wins.
+    Returns (added, skipped)."""
+    now = int(time.time())
+    added = 0
+    con = connect()
+    try:
+        with con:
+            for item in items:
+                try:
+                    at = int(item.get("saved_at") or 0)
+                except (TypeError, ValueError):
+                    at = 0
+                cur = con.execute(
+                    "INSERT INTO saved (platform, item_id, payload, saved_at) VALUES (?, ?, ?, ?) "
+                    "ON CONFLICT(item_id) DO NOTHING",
+                    (item["platform"], item["id"], json.dumps(item), at if 0 < at <= now else now),
+                )
+                added += cur.rowcount
+    finally:
+        con.close()
+    return added, len(items) - added
 
 
 def update_saved(item_id, note=None, done=None):

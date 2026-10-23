@@ -181,3 +181,48 @@ def test_retired_rooms_are_dropped_from_saved_settings(client):
     assert db.get_setting("active_rooms") == ["edition", "youtube", "editor"]
     r = client.put("/api/settings", json={"active_rooms": ["edition", "anime"]})
     assert r.status_code == 400 and "unknown room id: anime" in r.get_json()["error"]
+
+
+def test_quiet_hours_setting_and_window(client):
+    from server import notifier
+
+    assert client.put("/api/settings", json={"quiet_hours": [23, 8]}).status_code == 200
+    assert client.get("/api/settings").get_json()["data"]["quiet_hours"] == [23, 8]
+    assert client.put("/api/settings", json={"quiet_hours": None}).status_code == 200
+    for bad in ([5, 5], [24, 1], [1], "23-8", [True, 2]):
+        assert client.put("/api/settings", json={"quiet_hours": bad}).status_code == 400
+    # wraps past midnight
+    assert [h for h in range(24) if notifier.in_quiet_hours([23, 8], h)] == [0, 1, 2, 3, 4, 5, 6, 7, 23]
+    assert [h for h in range(24) if notifier.in_quiet_hours([1, 4], h)] == [1, 2, 3]
+    assert not notifier.in_quiet_hours(None, 3)
+
+
+def test_saved_import_round_trip_keeps_what_is_here(client):
+    client.post("/api/saved", json={"item": {"id": "web:here", "platform": "web", "title": "Mine", "note": "keep me"}})
+    export = {"app": "Tubcal", "items": [
+        {"id": "web:here", "platform": "web", "title": "Theirs", "note": "not this"},
+        {"id": "yt:abc", "platform": "youtube", "title": "Rainy day", "url": "https://youtube.com/watch?v=abc",
+         "saved_at": 1_700_000_000, "note": "  for later  ", "done_at": 1_700_000_100},
+        {"id": "page:/dev", "platform": "page", "title": "The Workbench", "url": "/dev"},
+        {"id": "x:evil", "platform": "web", "title": "click", "url": "javascript:alert(1)", "thumbnail": "data:text/html,x"},
+        {"id": "yt:abc", "platform": "youtube", "title": "dupe"},
+        {"platform": "web"}, "nonsense",
+    ]}
+    r = client.post("/api/saved/import", json=export).get_json()["data"]
+    assert r == {"added": 3, "already": 1, "skipped": 3}
+    items = {it["id"]: it for it in client.get("/api/saved").get_json()["data"]["items"]}
+    assert items["web:here"]["title"] == "Mine" and items["web:here"]["note"] == "keep me"
+    assert items["yt:abc"]["saved_at"] == 1_700_000_000 and items["yt:abc"]["note"] == "for later"
+    assert items["yt:abc"]["done_at"] == 1_700_000_100 and items["page:/dev"]["url"] == "/dev"
+    assert "url" not in items["x:evil"] and "thumbnail" not in items["x:evil"]
+    assert client.post("/api/saved/import", json={"items": "no"}).status_code == 400
+    assert client.post("/api/saved/import", json=[{"id": "web:bare", "platform": "web"}]).get_json()["data"]["added"] == 1
+
+
+def test_saving_keeps_only_safe_links_and_real_dates(client):
+    client.post("/api/saved", json={"item": {"id": "pod:1", "platform": "web", "title": "Ep",
+                                             "url": "javascript:alert(1)", "thumbnail": "https://x/y.jpg"}})
+    client.post("/api/saved/import", json=[{"id": "web:b", "platform": "web", "done_at": True, "saved_at": True}])
+    items = {it["id"]: it for it in client.get("/api/saved").get_json()["data"]["items"]}
+    assert "url" not in items["pod:1"] and items["pod:1"]["thumbnail"] == "https://x/y.jpg"
+    assert "done_at" not in items["web:b"] and items["web:b"]["saved_at"] > 1_700_000_000

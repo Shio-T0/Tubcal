@@ -119,6 +119,92 @@
   background: var(--surface-hover);
   color: var(--signal);
 }
+/* the empty page's way in from another machine */
+.emptyMove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 22px;
+  font-size: 13px;
+  color: var(--paper-faint);
+}
+/* Export: a small menu of formats under its button */
+.exportWrap {
+  position: relative;
+  display: inline-flex;
+}
+.exportWrap > button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.exportWrap > button:disabled {
+  opacity: 0.45;
+}
+.exportMenu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 292px;
+  padding: 10px;
+  border: 1px solid var(--rule-strong);
+  border-radius: 14px;
+  background: var(--ink-2);
+  box-shadow: var(--shadow-card);
+  animation: rise 0.22s var(--hand) both;
+}
+.exportMenu p {
+  margin: 0 6px 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--paper-faint);
+}
+.exportMenu button {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 10px;
+  border-radius: 9px;
+  text-align: left;
+  color: var(--text-primary);
+  font-size: 13.5px;
+}
+.exportMenu button:hover,
+.exportMenu button:focus-visible {
+  background: var(--surface-hover);
+  outline: none;
+}
+.exportMenu button b {
+  font-weight: 560;
+}
+.exportMenu button span {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--paper-faint);
+}
+.exportMenu button:disabled {
+  opacity: 0.4;
+}
+.exportMenu .exportImport {
+  margin-top: 4px;
+  border-top: 1px dashed var(--rule);
+  border-radius: 0 0 9px 9px;
+}
+.exportMenu small {
+  margin: 6px 6px 2px;
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--paper-faint);
+}
+
 .select,
 .selectOn {
   height: 38px;

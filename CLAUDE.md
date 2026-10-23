@@ -109,14 +109,21 @@ expanded player, media, and keyboard-focused controls. An element marked
   page and the command palette (which also searches saved entries).
 - `pages/SavedPage.jsx`: a catalogue by channel → kind with counts, To do / Done,
   search over titles, sources and notes, sort, shelves (each kind its own layout) or a
-  dense list, notes, select-many. All view state in the URL.
+  dense list, notes, select-many, and Export (`lib/savedExport.js`: what's shown, or
+  what's selected, as a Netscape bookmarks file foldered by channel → kind, Markdown
+  with done ticks and notes, or JSON; built in the page and handed to the browser's
+  download, no endpoint). "Bring back an export" (in that menu, and on the empty page)
+  posts a JSON export to `POST /api/saved/import`: one transaction, what's already here
+  wins (notes included), kept dates and done marks carried over, and since the file comes
+  from outside, a `url`/`thumbnail` that isn't http(s) or an in-app path is dropped. All
+  view state in the URL.
 - The editor opens `/editor?open=<path>` over the restored session; `<leader> b` and
   the tab strip's bookmark save the current file. The phone's Saved screen routes the
   new kinds by `kindOf` and hides desktop-only ones (files).
 
 **The home screen** (`/`, `pages/Home.jsx` + `components/home/`) answers "what now?"
 before "where to?":
-- A greeting, then one sentence of links saying what's waiting: new uploads, episodes
+- A greeting ("Late night" from 23:00), then one sentence of links saying what's waiting: new uploads, episodes
   of shows still airing, who's live, what airs next, today's paper.
 - `TheSet.jsx` is a TV. Its screen is tuned to the first entry of the "pick up" queue.
   Videos and your shows' next episodes are ordered by when you last touched them
@@ -130,6 +137,9 @@ before "where to?":
   in the editor (`/editor/state`), the Workbench's languages and its rooms; Video (full
   width) the newest uploads beside your AniList shelf counts, this season's six most
   popular and the Anime's doors. Each foot links to Saved filtered to that channel.
+- Late (your quiet hours, else 23:00–05:00) a nightcap under the summary offers to
+  let the set sleep after the next thing you play (the sleep timer's end mode), and
+  says so while any sleep timer runs.
 - `lineup.js` builds all of it from reads the rooms already make and cache, so the
   page adds no new endpoints.
 - The screen and guides use `overflow: clip`, not `hidden`: their glow and cover wall
@@ -279,15 +289,19 @@ rotates its site crypto and the fix ships as a release); it must run *before*
 anything imports anipy, is best-effort/offline-safe, and honors
 `TUBCAL_AUTO_UPDATE=0`. `server/notifier.py` polls upcoming subscribed streams and
 fires a `notify-send` desktop ping ~10 min before one goes live (no-op if
-`notify-send` is absent).
+`notify-send` is absent). Inside the `quiet_hours` setting (`[from, to]`, wrapping past
+midnight; Settings → Playback → Night) it keeps quiet and lets that stream go.
 
-**Caching (`server/cache.py`) is central.** Two layers (in-memory dict + a `cache`
-table in SQLite) so caches survive restarts. Key functions: `cached(key, ttl,
+**Caching (`server/cache.py`) is central.** Two layers (a bounded in-memory LRU,
+`CACHE_MEM_MAX` entries, in front of a `cache` table in SQLite) so caches survive
+restarts and a long-running server doesn't grow. Key functions: `cached(key, ttl,
 fetcher)`, `cached_swr(...)` (stale-while-revalidate), `warm(...)`, `invalidate(prefix)`.
 Expired rows are kept deliberately: if an upstream fetch fails, the stale payload is
 served instead of erroring — this is what keeps Reddit's aggressive rate limiting from
 breaking the app. TTLs live in `server/config.py`. When adding a source call, wrap it
-in the cache with an appropriate TTL rather than fetching raw.
+in the cache with an appropriate TTL rather than fetching raw. Rows a week past
+their fetch are pruned by `db.prune_old_data`, at startup and then daily from
+`server/housekeeping.py` (wall-clock, so a suspended laptop still comes due).
 
 **Rate limiting:** `server/httpc.py` enforces per-host minimum spacing via
 `config.HOST_INTERVALS` (Reddit is throttled to one request / 3s). It also runs a
@@ -297,9 +311,16 @@ many concurrent segment fetches to one googlevideo host.
 **State & persistence:** everything lives in one SQLite file `data/tubcal.db`
 (git-ignored) via `server/db.py` — subscriptions, settings (key/value), watch
 history + playback progress, saved items, OAuth credentials/tokens, and all Archive
-data (transcripts, chunk vectors as float32 blobs, queue/status). `data/` also holds
-`.bak-*` DB snapshots. All DB access goes through the functions in `db.py`; there is
-no ORM.
+data (transcripts, chunk vectors as float32 blobs, queue/status). All DB access goes
+through the functions in `db.py`; there is no ORM. `server/snapshots.py` copies the
+file once a day (from `housekeeping`) to `data/snapshots/tubcal-YYYY-MM-DD.db`: SQLite's
+online backup API, the cache table emptied and vacuumed out, folder 0700 and files
+0600 (they hold the same tokens), the newest `snapshots_keep` kept (0 = off).
+`restore(name)` snapshots the present first ("before-restore"), backs the chosen file
+up over the live one while the server runs, then re-runs `init_db` and drops the cache.
+Settings → Your data (`GET /api/data`, `POST /api/data/snapshot|restore`) shows the
+file, what it holds and the snapshots. `android/tools/sync-data.sh` still leaves its
+own `<db>.bak-<stamp>` copies beside the DB. Tests: `tests/test_snapshots.py`.
 
 **Sources (`server/sources/`)** each own one platform's quirks:
 - `youtube.py` — RSS for subscriptions (no API key needed), `innertube.py` for
@@ -615,8 +636,15 @@ count, comment count, tags. The card and the notes share that one request throug
 `lib/useShared.js`. Comments are `/youtube/comments/<id>?sort=top|new&continuation=`
 (`{comments, continuation, count}`); each carries the author's face and channel id
 and the creator/verified/member/hearted/edited marks. Keys while expanded: Space/K,
-J/L, arrows, 0–9, M/F/C, `<`/`>` speed, Ctrl+←/→ chapters, Shift+N next, `?` help,
-Esc to the corner.
+J/L, arrows, 0–9, M/F/C, `<`/`>` speed, Ctrl+←/→ chapters, Shift+N next, `Z` sleep
+timer, `?` help, Esc to the corner. The sleep timer (`lib/sleepTimer.js`, a moon in the
+controls) is one store for the whole station, so it outlives the video it was set on:
+"end of this video/episode" stops there (no Up next, no next-episode countdown, via
+`ended(id, {advance:false})`), or after N minutes the player you can hear fades out
+over 12s so it is silent on time, every player pauses, the picture stays dimmed until
+something plays, and your volume is put back for next time. Any media element joins it
+through `useSleepFade(ref, {audible, onDoze})`; the Workbench's bench radio does (a
+moon dial on the radio steps the same timer).
 
 **Settings** (`pages/SettingsPage.jsx`) is an index plus one open section:
 - `pages/settingsSections.js` lists the sections, their groups and the words
@@ -880,6 +908,14 @@ floats/rails otherwise.
 - Backend API endpoints return `ok(data)` / `err(msg, status)` — never bare `jsonify`.
 - New external fetches go through `server/httpc.py` and are wrapped in `server/cache.py`
   with a TTL constant added to `server/config.py`.
+- **Only this machine's pages.** Binding to 127.0.0.1 keeps other machines out,
+  not other websites. `server/localguard.py` runs before every request (a
+  `before_request` in `create_app`) and refuses a `Host` that isn't a loopback name
+  (DNS rebinding), an `Origin` that isn't this machine (WebSockets ignore CORS, and
+  `/api/editor/pty` is a shell), and `/api/` subresources marked `Sec-Fetch-Site:
+  cross-site`. Top-level navigations pass (OAuth callbacks), and so do requests with
+  none of those headers (curl, the launcher, tests). Never add CORS headers or a
+  route that sidesteps it. Tests: `tests/test_localguard.py`.
 - **Cookie containment.** `httpc`'s `session` is shared process-wide, so its jar
   accumulates whatever hosts set — scraping a YouTube channel page seeds
   `VISITOR_INFO1_LIVE`/`YSC`/`__Secure-YNID`, which requests then merges into every

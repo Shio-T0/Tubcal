@@ -14,7 +14,8 @@
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
-  Check, ChevronLeft, ChevronRight, Copy, ExternalLink, FileText, Minus, Plus, RotateCw, Search, Trash2, X,
+  ArchiveRestore, Check, ChevronLeft, ChevronRight, Copy, DatabaseBackup, ExternalLink, FileText, Minus, Plus,
+  RotateCw, Search, Trash2, X,
 } from 'lucide-react';
 
 import { api, useApi } from '../api/client.js';
@@ -28,6 +29,8 @@ import { latestParams } from '../lib/urlState.js';
 import { subtitleStyle, SUBTITLE_FONTS } from '../lib/subtitleStyle.js';
 import { SubtitleStyleEditor } from '../components/player/Subtitles.jsx';
 import { useGhAccount } from '../lib/gh.js';
+import { fileSize } from '../lib/format.js';
+import { ago } from '../lib/time.js';
 import { SETTINGS_GROUPS, SETTINGS_SECTIONS, settingsSectionIds } from './settingsSections.js';
 import s from './settings.module.css';
 
@@ -354,6 +357,122 @@ function HistorySection() {
   );
 }
 
+// ── Your data ────────────────────────────────────────────────────────────────
+
+const KEEP_OPTIONS = [
+  { value: 0, label: 'Off' }, { value: 3, label: '3 days' }, { value: 7, label: 'A week' }, { value: 14, label: 'Two weeks' },
+];
+
+const plural = (n, one, many = `${one}s`) => `${n.toLocaleString()} ${n === 1 ? one : many}`;
+
+function snapshotWhen(t) {
+  return new Date(t * 1000).toLocaleString(undefined, { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+}
+
+/** One snapshot: when, how big, and a Restore that asks twice. */
+function SnapshotRow({ snap, onRestore, busy }) {
+  const [sure, setSure] = useState(false);
+  useEffect(() => {
+    if (!sure) return undefined;
+    const t = setTimeout(() => setSure(false), 4000);
+    return () => clearTimeout(t);
+  }, [sure]);
+  const hint = [fileSize(snap.size), ago(snap.taken_at), snap.before_restore ? 'taken before a restore' : null]
+    .filter(Boolean).join(' · ');
+  return (
+    <Row label={snapshotWhen(snap.taken_at)} hint={hint}>
+      <button
+        type="button"
+        className={sure ? s.btnDanger : s.btnGhost}
+        disabled={busy}
+        onClick={() => (sure ? onRestore(snap.name) : setSure(true))}
+      >
+        <ArchiveRestore size={14} /> {sure ? 'Tap again to restore' : 'Restore'}
+      </button>
+    </Row>
+  );
+}
+
+function DataSection() {
+  const toast = useToast();
+  const { settings, updateSettings } = useSettings();
+  const data = useApi('/data');
+  const [busy, setBusy] = useState(false);
+  const d = data.data;
+  const keep = settings?.snapshots_keep ?? 7;
+  const counts = d?.counts || {};
+  const holds = [
+    counts.saved != null && plural(counts.saved, 'saved thing'),
+    counts.watched != null && plural(counts.watched, 'video watched', 'videos watched'),
+    counts.subscriptions != null && plural(counts.subscriptions, 'follow'),
+    counts.transcripts ? plural(counts.transcripts, 'transcript') : null,
+  ].filter(Boolean).join(' · ');
+
+  const takeNow = async () => {
+    setBusy(true);
+    try {
+      await api('/data/snapshot', { method: 'POST' });
+      toast('Snapshot taken', 'success');
+      data.reload();
+    } catch (e) {
+      toast(e.message, 'error');
+    } finally {
+      setBusy(false);
+    }
+  };
+  const restore = async (name) => {
+    setBusy(true);
+    try {
+      await api('/data/restore', { method: 'POST', body: JSON.stringify({ name }) });
+      toast('Restored. Reopening with that day’s things…', 'success');
+      // every room's state came from the old file: start the page over
+      setTimeout(() => window.location.reload(), 900);
+    } catch (e) {
+      toast(e.message, 'error');
+      setBusy(false);
+    }
+  };
+
+  return (
+    <>
+      <Group>
+        <Row label="On this machine" hint={d ? <code className={s.path}>{d.path}</code> : 'Looking…'}>
+          <span className={s.readout}>{d ? fileSize(d.size) : '—'}</span>
+        </Row>
+        {holds && <Row label="What it holds" hint={holds} />}
+        {d && (
+          <Row
+            label="Fetched pages"
+            hint={`${plural(d.cache.rows, 'page')} kept so rooms open at once and survive a site’s bad day. Not in snapshots: it can all be fetched again.`}
+          >
+            <span className={s.readout}>{fileSize(d.cache.bytes)}</span>
+          </Row>
+        )}
+      </Group>
+
+      <Group
+        title="Snapshots"
+        note="While Tubcal runs it copies the file once a day into a folder beside it. Nothing leaves this machine, and restoring keeps a copy of how things are now, so it can be undone."
+        actions={(
+          <button type="button" className={s.btnGhost} onClick={takeNow} disabled={busy}>
+            <DatabaseBackup size={14} /> Take one now
+          </button>
+        )}
+      >
+        <Row label="Daily snapshot" hint={keep ? `The newest ${keep} are kept` : 'Only the ones you take by hand'}>
+          <Choice label="Daily snapshot" options={KEEP_OPTIONS} value={keep} onChange={(v) => updateSettings({ snapshots_keep: v })} />
+        </Row>
+        {d?.snapshots?.length ? (
+          d.snapshots.map((snap) => <SnapshotRow key={snap.name} snap={snap} onRestore={restore} busy={busy} />)
+        ) : (
+          <Row label="None yet" hint={keep ? 'The first is taken a couple of minutes after Tubcal starts.' : 'Daily snapshots are off.'} />
+        )}
+        {d && <Row label="Kept in" hint={<code className={s.path}>{d.folder}</code>} />}
+      </Group>
+    </>
+  );
+}
+
 // ── Appearance ───────────────────────────────────────────────────────────────
 
 function AppearanceSection() {
@@ -493,27 +612,58 @@ function NotInstalled() {
 
 const SPEEDS = [0.75, 1, 1.25, 1.5, 1.75, 2];
 
+const QUIET_OPTIONS = [
+  { value: 'off', label: 'Never' },
+  { value: '22-7', label: '22–07' },
+  { value: '23-8', label: '23–08' },
+  { value: '0-9', label: '00–09' },
+];
+const quietKey = (span) => (Array.isArray(span) ? `${span[0]}-${span[1]}` : 'off');
+const quietSpan = (key) => (key === 'off' ? null : key.split('-').map(Number));
+
 function PlaybackSection() {
   const { settings, updateSettings } = useSettings();
+  const quiet = quietKey(settings?.quiet_hours);
+  const custom = quiet !== 'off' && !QUIET_OPTIONS.some((o) => o.value === quiet);
   return (
-    <Group>
-      <Row label="Sound from" hint="One: only the video you're watching plays sound, the corner players stay muted. All: every player plays sound.">
-        <Choice
-          label="Sound from"
-          options={[{ value: true, label: 'One' }, { value: false, label: 'All' }]}
-          value={settings?.solo_audio !== false}
-          onChange={(v) => updateSettings({ solo_audio: v })}
-        />
-      </Row>
-      <Row label="Speed" hint="Every video starts at this speed. A player's own menu changes it too.">
-        <Choice
-          label="Speed"
-          options={SPEEDS.map((v) => ({ value: v, label: v === 1 ? 'Normal' : `${v}×` }))}
-          value={settings?.playback_rate || 1}
-          onChange={(v) => updateSettings({ playback_rate: v })}
-        />
-      </Row>
-    </Group>
+    <>
+      <Group>
+        <Row label="Sound from" hint="One: only the video you're watching plays sound, the corner players stay muted. All: every player plays sound.">
+          <Choice
+            label="Sound from"
+            options={[{ value: true, label: 'One' }, { value: false, label: 'All' }]}
+            value={settings?.solo_audio !== false}
+            onChange={(v) => updateSettings({ solo_audio: v })}
+          />
+        </Row>
+        <Row label="Speed" hint="Every video starts at this speed. A player's own menu changes it too.">
+          <Choice
+            label="Speed"
+            options={SPEEDS.map((v) => ({ value: v, label: v === 1 ? 'Normal' : `${v}×` }))}
+            value={settings?.playback_rate || 1}
+            onChange={(v) => updateSettings({ playback_rate: v })}
+          />
+        </Row>
+      </Group>
+      <Group title="Night">
+        {hasModule('youtube') && (
+          <Row label="Live alerts" hint="A desktop note ten minutes before a channel you follow goes live.">
+            <Switch label="Live alerts" checked={settings?.notify_live !== false} onChange={(v) => updateSettings({ notify_live: v })} />
+          </Row>
+        )}
+        <Row
+          label="Quiet hours"
+          hint="No live alerts in these hours, and the home screen offers to let the set sleep after the next thing you play. A player’s moon (Z) sets a sleep timer any time."
+        >
+          <Choice
+            label="Quiet hours"
+            options={custom ? [...QUIET_OPTIONS, { value: quiet, label: quiet.replace('-', '–') }] : QUIET_OPTIONS}
+            value={quiet}
+            onChange={(v) => updateSettings({ quiet_hours: quietSpan(v) })}
+          />
+        </Row>
+      </Group>
+    </>
   );
 }
 
@@ -817,9 +967,10 @@ function useSummaries(oauth) {
       accounts: linked.length ? `${linked.join(', ')} connected` : 'None connected',
       subscriptions: `${nSubs} followed`,
       history: 'Kept on this machine',
+      data: (st.snapshots_keep ?? 7) ? `Snapshot daily · keeps ${st.snapshots_keep ?? 7}` : 'Daily snapshots off',
       appearance: `${THEMES.find((t) => t.value === (st.theme || 'dark'))?.label || st.theme}${st.fast_mode ? ' · fast mode' : ''}`,
       rooms: `${active.length} of ${st.max_active_rooms ?? 6} switched on`,
-      playback: `${st.solo_audio === false ? 'Sound from all' : 'Sound from one'} · ${(st.playback_rate || 1) === 1 ? 'normal speed' : `${st.playback_rate}×`}`,
+      playback: `${st.solo_audio === false ? 'Sound from all' : 'Sound from one'} · ${(st.playback_rate || 1) === 1 ? 'normal speed' : `${st.playback_rate}×`}${Array.isArray(st.quiet_hours) ? ' · quiet at night' : ''}`,
       subtitles: sub.show
         ? `${SUBTITLE_FONTS.find((f) => f.value === sub.font)?.label} · ${Math.round(sub.size * 100)}%`
         : 'Off when a video starts',
@@ -848,6 +999,7 @@ const BODIES = {
   accounts: AccountsSection,
   subscriptions: SubscriptionsSection,
   history: HistorySection,
+  data: DataSection,
   appearance: AppearanceSection,
   rooms: RoomsSection,
   playback: PlaybackSection,

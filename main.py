@@ -1,4 +1,4 @@
-from server import brain, cache, config, db, modules
+from server import brain, cache, config, db, housekeeping, modules
 from server import create_app
 
 
@@ -49,6 +49,7 @@ def main():
         _backfill_avatars()
         notifier.start()
     brain.start()
+    housekeeping.start()
     print(f"\n  Tubcal — private social hub")
     print(f"  http://{config.HOST}:{config.PORT}\n")
     app.run(host=config.HOST, port=config.PORT, debug=False, threaded=True)

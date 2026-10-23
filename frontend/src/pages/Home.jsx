@@ -15,7 +15,7 @@
 
 import { useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Search } from 'lucide-react';
+import { Moon, Search } from 'lucide-react';
 
 import { useApi } from '../api/client.js';
 import { Bookmark, Settings } from 'lucide-react';
@@ -23,6 +23,8 @@ import { hasModule } from '../lib/modules.js';
 
 import { useProgress, useSaved, useSettings } from '../state.jsx';
 import { themeMeta } from '../lib/themes.js';
+import { inHours } from '../lib/time.js';
+import { clearSleep, sleepAtEnd, sleepLabel, useSleepCountdown } from '../lib/sleepTimer.js';
 import { CHANNELS, channelRooms } from '../lib/rooms.js';
 import { openPalette, openPocket, useChannelHomes } from '../components/channels/common.jsx';
 import { useChannelFeed, useSeen } from '../components/screening/feed.js';
@@ -35,7 +37,7 @@ import h from './home.module.css';
 
 function daypart(d) {
   const hr = d.getHours();
-  if (hr < 5) return { hello: 'Late night', part: 'night' };
+  if (hr < 5 || hr >= 23) return { hello: 'Late night', part: 'night' };
   if (hr < 12) return { hello: 'Good morning', part: 'morning' };
   if (hr < 18) return { hello: 'Good afternoon', part: 'afternoon' };
   return { hello: 'Good evening', part: 'evening' };
@@ -102,6 +104,28 @@ function Summary({ ready, part, live, newUploads, backlog, soon, paperToday, now
     body = <span className={h.clause}>Nothing new since you last looked. A quiet {part} in.</span>;
   }
   return <p className={`${h.summary} tc-strip`} aria-live="polite">{body}</p>;
+}
+
+/** Late at night (your quiet hours, else 23:00–05:00) the set offers to sleep after
+ *  the next thing you play, and while a sleep timer runs it says so. */
+function Nightcap({ late }) {
+  const sleep = useSleepCountdown();
+  const tag = sleepLabel(sleep);
+  if (!tag && !late) return null;
+  return (
+    <p className={`${h.nightcap} tc-strip`}>
+      <Moon size={14} aria-hidden="true" />
+      {!tag && (
+        <>
+          <span>It’s getting late.</span>
+          <button type="button" onClick={sleepAtEnd}>Let the set sleep after the next thing you play</button>
+        </>
+      )}
+      {tag === 'end' && <span>The set will sleep when the next thing ends.</span>}
+      {tag && tag !== 'end' && <span>The set sleeps in {tag.replace('m', ' min')}.</span>}
+      {tag && <button type="button" onClick={clearSleep}>Never mind</button>}
+    </p>
+  );
 }
 
 export default function Home() {
@@ -194,6 +218,7 @@ export default function Home() {
           ready={ready} part={part} live={liveRows} newUploads={newUploads} backlog={backlog}
           soon={soon} paperToday={paperToday} now={now}
         />
+        <Nightcap late={settings?.quiet_hours ? inHours(settings.quiet_hours, now.getHours()) : now.getHours() >= 23 || now.getHours() < 5} />
       </header>
 
       <TheSet pickUp={pickUp} comingUp={comingUp} comingReady={comingReady} now={now} subs={subs} />

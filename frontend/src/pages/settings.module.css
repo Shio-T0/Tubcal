@@ -313,6 +313,18 @@
   font-size: 11.5px;
   color: var(--text-secondary);
 }
+/* Your data: where the file lives, and how big things are */
+.path {
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+.readout {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
 /* Rooms → Not installed: the command that adds one */
 .cmd {
   padding: 4px 9px;

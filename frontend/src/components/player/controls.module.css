@@ -196,6 +196,14 @@
   box-shadow: 0 0 12px color-mix(in srgb, var(--signal) 24%, transparent);
 }
 
+/* the sleep timer when it's set: a moon and how long is left */
+.sleepOn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-variant-numeric: tabular-nums;
+}
+
 /* ── popover menu ─────────────────────────────────────────────────────────────*/
 .menuWrap {
   position: relative;

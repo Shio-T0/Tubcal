@@ -1,15 +1,27 @@
 """Desktop notifications: ping the user ~10 minutes before a subscribed channel
-goes live, via `notify-send` (no-op if it isn't installed). Best-effort, local."""
+goes live, via `notify-send` (no-op if it isn't installed). Best-effort, local.
+Inside the `quiet_hours` setting nothing pings; a stream starting then is let go
+rather than announced in the morning."""
 
 import shutil
 import subprocess
 import threading
 import time
+from datetime import datetime
 
 from . import db
 
 LEAD_SECONDS = 600   # notify 10 minutes before the scheduled start
 POLL_SECONDS = 90    # how often to re-check upcoming streams
+
+
+def in_quiet_hours(span, hour):
+    """True when `hour` (0–23) falls inside [from, to), which may wrap past
+    midnight: [23, 8] is 23:00 to 08:00."""
+    if not span:
+        return False
+    start, end = span
+    return start <= hour < end if start < end else hour >= start or hour < end
 
 
 def _notify(item):
@@ -48,7 +60,8 @@ def _loop():
                             continue
                         upcoming_ids.add(vid)
                         if vid not in notified and 0 < sched - now <= LEAD_SECONDS:
-                            _notify(item)
+                            if not in_quiet_hours(db.get_setting("quiet_hours"), datetime.now().hour):
+                                _notify(item)
                             notified.add(vid)
                     # Drop ids no longer upcoming so a re-scheduled stream can ping again.
                     notified &= upcoming_ids
