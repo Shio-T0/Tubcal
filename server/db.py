@@ -590,6 +590,31 @@ def add_saved(item):
     con.close()
 
 
+def import_saved(items):
+    """Add many entries in one transaction, each with its own kept date. An id
+    that's already saved is left as it is: what's here (and its note) wins.
+    Returns (added, skipped)."""
+    now = int(time.time())
+    added = 0
+    con = connect()
+    try:
+        with con:
+            for item in items:
+                try:
+                    at = int(item.get("saved_at") or 0)
+                except (TypeError, ValueError):
+                    at = 0
+                cur = con.execute(
+                    "INSERT INTO saved (platform, item_id, payload, saved_at) VALUES (?, ?, ?, ?) "
+                    "ON CONFLICT(item_id) DO NOTHING",
+                    (item["platform"], item["id"], json.dumps(item), at if 0 < at <= now else now),
+                )
+                added += cur.rowcount
+    finally:
+        con.close()
+    return added, len(items) - added
+
+
 def update_saved(item_id, note=None, done=None):
     """Change a kept entry's note and/or done mark. Returns the entry, or None
     when nothing is saved under `item_id`."""

@@ -112,7 +112,11 @@ expanded player, media, and keyboard-focused controls. An element marked
   dense list, notes, select-many, and Export (`lib/savedExport.js`: what's shown, or
   what's selected, as a Netscape bookmarks file foldered by channel → kind, Markdown
   with done ticks and notes, or JSON; built in the page and handed to the browser's
-  download, no endpoint). All view state in the URL.
+  download, no endpoint). "Bring back an export" (in that menu, and on the empty page)
+  posts a JSON export to `POST /api/saved/import`: one transaction, what's already here
+  wins (notes included), kept dates and done marks carried over, and since the file comes
+  from outside, a `url`/`thumbnail` that isn't http(s) or an in-app path is dropped. All
+  view state in the URL.
 - The editor opens `/editor?open=<path>` over the restored session; `<leader> b` and
   the tab strip's bookmark save the current file. The phone's Saved screen routes the
   new kinds by `kindOf` and hides desktop-only ones (files).

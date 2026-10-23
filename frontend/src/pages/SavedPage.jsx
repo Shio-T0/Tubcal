@@ -28,7 +28,8 @@ import { useParamState } from '../lib/urlState.js';
 import { ALL_CHANNELS, CHANNELS, getRoomById, savedChannels } from '../lib/rooms.js';
 import { KINDS, KIND_ORDER, channelOfItem, kindOf, toneOf } from '../lib/saveable.js';
 import { EXPORT_FORMATS, download, exportSaved } from '../lib/savedExport.js';
-import { useSaved } from '../state.jsx';
+import { api } from '../api/client.js';
+import { useSaved, useToast } from '../state.jsx';
 import { KindIcon, keptAgo, kindLine } from '../components/saved/kinds.jsx';
 import { useOpenSaved } from '../components/saved/useOpenSaved.jsx';
 import s from './saved.module.css';
@@ -48,9 +49,31 @@ const layoutOf = (kind) => LAYOUT[kind] || 'card';
 
 /** Export what's shown (a bookmarks file, Markdown or JSON), made in the page and
  *  handed to the browser's download: nothing leaves this machine. */
-function ExportMenu({ items, scope }) {
+function ExportMenu({ items, scope, label = 'Export', importOnly = false }) {
   const [open, setOpen] = useState(false);
   const wrap = useRef(null);
+  const file = useRef(null);
+  const toast = useToast();
+  const { reloadSaved } = useSaved();
+  // Bring back a JSON export (from this machine, another, or the phone). What's
+  // already here stays as it is, notes included.
+  const bringBack = async (e) => {
+    const f = e.target.files?.[0];
+    e.target.value = '';
+    setOpen(false);
+    if (!f) return;
+    try {
+      const data = JSON.parse(await f.text());
+      const r = await api('/saved/import', { method: 'POST', body: JSON.stringify(data) });
+      await reloadSaved();
+      const parts = [`${plural(r.added, 'thing')} brought back`];
+      if (r.already) parts.push(`${r.already} already here`);
+      if (r.skipped) parts.push(`${r.skipped} couldn’t be read`);
+      toast(parts.join(' · '), r.added ? 'success' : 'info');
+    } catch (err) {
+      toast(err instanceof SyntaxError ? 'That file isn’t a Tubcal export (it isn’t JSON)' : err.message, 'error');
+    }
+  };
   useEffect(() => {
     if (!open) return undefined;
     const away = (e) => { if (!wrap.current?.contains(e.target)) setOpen(false); };
@@ -68,26 +91,30 @@ function ExportMenu({ items, scope }) {
       <button
         type="button"
         className={open ? s.selectOn : s.select}
-        onClick={() => setOpen((o) => !o)}
-        aria-expanded={open}
-        aria-haspopup="menu"
-        disabled={!items.length}
-        title="Take these with you"
+        onClick={() => (importOnly ? file.current?.click() : setOpen((o) => !o))}
+        aria-expanded={importOnly ? undefined : open}
+        aria-haspopup={importOnly ? undefined : 'menu'}
+        title="Take these with you, or bring some back"
       >
-        <Download size={14} /> Export
+        <Download size={14} /> {label}
       </button>
       {open && (
         <div className={s.exportMenu} role="menu">
           <p>{plural(items.length, 'thing')} · {scope}</p>
           {EXPORT_FORMATS.map((f) => (
-            <button key={f.id} type="button" role="menuitem" onClick={() => save(f.id)}>
+            <button key={f.id} type="button" role="menuitem" onClick={() => save(f.id)} disabled={!items.length}>
               <b>{f.label}</b>
               <span>.{f.ext}</span>
             </button>
           ))}
+          <button type="button" role="menuitem" className={s.exportImport} onClick={() => file.current?.click()}>
+            <b>Bring back an export…</b>
+            <span>.json</span>
+          </button>
           <small>Made right here and saved by your browser. Nothing is uploaded.</small>
         </div>
       )}
+      <input ref={file} type="file" accept="application/json,.json" hidden onChange={bringBack} />
     </span>
   );
 }
@@ -401,6 +428,10 @@ export default function SavedPage() {
             </Link>
           ))}
         </div>
+        <p className={s.emptyMove}>
+          Coming from another machine?
+          <ExportMenu items={[]} label="Bring back an export" importOnly />
+        </p>
       </div>
     );
   }

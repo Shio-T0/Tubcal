@@ -352,17 +352,18 @@ export function AppProviders({ children }) {
 
   // Saved / watch-later, keyed by item id (value = the full item for rendering).
   const [saved, setSaved] = useState({});
+  const reloadSaved = useCallback(() => api('/saved')
+    .then((d) => {
+      const m = {};
+      (d?.items || []).forEach((it) => {
+        m[it.id] = it;
+      });
+      setSaved(m);
+    })
+    .catch(() => {}), []);
   useEffect(() => {
-    api('/saved')
-      .then((d) => {
-        const m = {};
-        (d?.items || []).forEach((it) => {
-          m[it.id] = it;
-        });
-        setSaved(m);
-      })
-      .catch(() => {});
-  }, []);
+    reloadSaved();
+  }, [reloadSaved]);
   // The request goes out from the handler, not from inside a state updater (React
   // may run an updater twice, which sent every save/unsave twice). The ref lets a
   // quick double-tap see the first tap's result before React re-renders.
@@ -432,7 +433,7 @@ export function AppProviders({ children }) {
       toast('Failed to update a saved item', 'error');
     });
   }, [toast]);
-  const savedApi = { saved, toggleSaved, addSaved, removeSaved, updateSaved };
+  const savedApi = { saved, toggleSaved, addSaved, removeSaved, updateSaved, reloadSaved };
 
   // ── Anime list sync ─────────────────────────────────────────────────────────
   // AniList edits (status / progress / score / …) apply locally at once and push

@@ -119,6 +119,17 @@
   background: var(--surface-hover);
   color: var(--signal);
 }
+/* the empty page's way in from another machine */
+.emptyMove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 22px;
+  font-size: 13px;
+  color: var(--paper-faint);
+}
 /* Export: a small menu of formats under its button */
 .exportWrap {
   position: relative;
@@ -178,6 +189,14 @@
   font-family: var(--font-mono);
   font-size: 11px;
   color: var(--paper-faint);
+}
+.exportMenu button:disabled {
+  opacity: 0.4;
+}
+.exportMenu .exportImport {
+  margin-top: 4px;
+  border-top: 1px dashed var(--rule);
+  border-radius: 0 0 9px 9px;
 }
 .exportMenu small {
   margin: 6px 6px 2px;
