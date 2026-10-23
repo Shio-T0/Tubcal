@@ -68,6 +68,68 @@ def _load_entry(key):
     return None
 
 
+_BATCH = 500  # keys per IN (...) query, well under SQLite's variable limit
+
+
+def _load_entries(keys):
+    """{key: entry} for every key with a cached value: memory first, then the
+    rest in one SQLite pass (one connection, a few IN queries), not a connection
+    per key. Opening a connection is the expensive part of a cold read."""
+    out, cold = {}, []
+    with _lock:
+        for k in dict.fromkeys(keys):
+            entry = _mem.get(k)
+            if entry is not None:
+                _mem.move_to_end(k)
+                out[k] = entry
+            else:
+                cold.append(k)
+    if not cold:
+        return out
+    loaded = {}
+    con = db.connect()
+    try:
+        for i in range(0, len(cold), _BATCH):
+            part = cold[i:i + _BATCH]
+            rows = con.execute(
+                f"SELECT key, payload, fetched_at, ttl FROM cache WHERE key IN ({','.join('?' * len(part))})",
+                part,
+            ).fetchall()
+            for r in rows:
+                loaded[r["key"]] = {
+                    "payload": json.loads(r["payload"]),
+                    "fetched_at": r["fetched_at"],
+                    "ttl": r["ttl"],
+                }
+    finally:
+        con.close()
+    with _lock:
+        for k, entry in loaded.items():
+            _remember(k, entry)
+    out.update(loaded)
+    return out
+
+
+def _store_many(payloads, now, ttl):
+    """_store for many keys in one transaction."""
+    if not payloads:
+        return
+    with _lock:
+        for k, payload in payloads.items():
+            _remember(k, {"payload": payload, "fetched_at": now, "ttl": ttl})
+    con = db.connect()
+    try:
+        with con:
+            con.executemany(
+                "INSERT INTO cache (key, payload, fetched_at, ttl) VALUES (?, ?, ?, ?) "
+                "ON CONFLICT(key) DO UPDATE SET payload=excluded.payload, "
+                "fetched_at=excluded.fetched_at, ttl=excluded.ttl",
+                [(k, json.dumps(v), int(now), ttl) for k, v in payloads.items()],
+            )
+    finally:
+        con.close()
+
+
 def cached_swr(key, ttl, fetcher):
     """Stale-while-revalidate. Always returns instantly when *any* cached value
     exists (even expired), kicking off a background refresh when it's stale.
@@ -168,8 +230,9 @@ def cached_many(keys, ttl, fetch_missing):
     so "the upstream is down" never masquerades as "there's nothing there"."""
     now = time.time()
     out, stale, missing = {}, {}, []
+    entries = _load_entries(keys)
     for k in keys:
-        entry = _load_entry(k)
+        entry = entries.get(k)
         if entry and now - entry["fetched_at"] < ttl:
             out[k] = entry["payload"]
         else:
@@ -184,9 +247,9 @@ def cached_many(keys, ttl, fetch_missing):
         if any(k not in stale for k in missing):
             raise
         fresh = {}
+    _store_many({k: fresh[k] for k in missing if k in fresh}, now, ttl)
     for k in missing:
         if k in fresh:
-            _store(k, fresh[k], now, ttl)
             out[k] = fresh[k]
         elif k in stale:
             out[k] = stale[k]
@@ -199,6 +262,11 @@ def peek(key):
     without hitting the API."""
     entry = _load_entry(key)
     return entry["payload"] if entry else None
+
+
+def peek_many(keys):
+    """peek() for many keys in one pass: {key: payload} for those cached."""
+    return {k: e["payload"] for k, e in _load_entries(keys).items()}
 
 
 def invalidate(prefix=""):

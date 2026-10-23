@@ -1076,11 +1076,16 @@ def search(query, page=0, scope="repos", sort=None, language=None):
     if scope == "repos" and page == 0 and len(items) < 5:
         from .. import db as tubcal_db
         candidates = []
-        for s in tubcal_db.list_subscriptions("github")[:8]:
-            for k in (f"github:atom:releases:{s['source_id'].lower()}", f"github:atom:commits:{s['source_id'].lower()}"):
-                got = cache.peek(k)
-                if isinstance(got, list):
-                    candidates.extend(got)
+        keys = [
+            f"github:atom:{feed}:{s['source_id'].lower()}"
+            for s in tubcal_db.list_subscriptions("github")[:8]
+            for feed in ("releases", "commits")
+        ]
+        cached_feeds = cache.peek_many(keys)
+        for k in keys:
+            got = cached_feeds.get(k)
+            if isinstance(got, list):
+                candidates.extend(got)
         if candidates:
             seen = {i["id"] for i in items}
             for hit, _score in fuzzy_filter(candidates, query, threshold=60, limit=10):

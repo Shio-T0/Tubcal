@@ -113,8 +113,9 @@ def search(query, sort="relevance", range_=None):
         if cached_feed:
             # Reconstruct items from the cached id list (fetch each from cache)
             fuzzy_candidates = []
+            got = cache.peek_many([f"hn:item:{hn_id}" for hn_id in cached_feed[:200]])
             for hn_id in cached_feed[:200]:
-                cached_item = cache.peek(f"hn:item:{hn_id}")
+                cached_item = got.get(f"hn:item:{hn_id}")
                 if cached_item:
                     n = normalize(cached_item)
                     if n:

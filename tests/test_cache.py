@@ -51,3 +51,26 @@ def test_housekeeping_comes_due_by_wall_clock():
     assert housekeeping.due(1000, 1000 + 86400, every=86400)
     # a laptop that slept through the night: a monotonic sleep would miss this
     assert housekeeping.due(1000, 1000 + 3 * 86400, every=86400)
+
+
+def test_cached_many_reads_and_writes_in_batches(client, monkeypatch):
+    monkeypatch.setattr(cache, "_mem", OrderedDict())
+    monkeypatch.setattr(cache, "_BATCH", 3)  # several IN (...) queries
+    keys = [f"many:{i}" for i in range(8)]
+    calls = []
+
+    def fetch(missing):
+        calls.append(list(missing))
+        return {k: {"n": k} for k in missing if k != "many:5"}  # one comes back empty
+
+    got = cache.cached_many(keys + ["many:0"], 60, fetch)  # a repeat is harmless
+    assert calls == [keys + ["many:0"]] and "many:5" not in got and got["many:7"] == {"n": "many:7"}
+
+    cache._mem.clear()  # cold: everything from SQLite, in batches
+    connects = []
+    real = cache.db.connect
+    monkeypatch.setattr(cache.db, "connect", lambda: connects.append(1) or real())
+    again = cache.cached_many(keys, 60, lambda missing: {k: {"n": "refetched"} for k in missing})
+    assert again["many:3"] == {"n": "many:3"} and again["many:5"] == {"n": "refetched"}
+    assert len(connects) == 2  # one read pass + one write for the single miss
+    assert cache.peek_many(["many:1", "nope"]) == {"many:1": {"n": "many:1"}}
