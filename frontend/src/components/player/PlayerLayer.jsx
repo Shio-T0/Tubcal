@@ -33,9 +33,7 @@ import EpisodeRail from './anime/EpisodeRail.jsx';
 import { NextUp, SkipCue } from './anime/Cues.jsx';
 import { rememberAudio, showAccent, skipChapters, skipSpans, useAnimeShow } from './anime/useAnimeShow.js';
 import { attachHls } from '../../lib/hlsPlayback.js';
-import {
-  FADE_MS, clearSleep, fadeOut, fallAsleep, getSleep, stopsAtEnd, useSleepTimer,
-} from '../../lib/sleepTimer.js';
+import { clearSleep, fallAsleep, stopsAtEnd, useSleepFade, useSleepTimer } from '../../lib/sleepTimer.js';
 import s from './player.module.css';
 
 const MARGIN = 20;
@@ -168,30 +166,8 @@ function PlayerCard({ item, expanded, style, dragging, muted, rate, notes, onCha
   // The sleep timer (lib/sleepTimer.js): the player you can hear fades out so it
   // is silent right on time, and every player pauses when it goes off. The picture
   // dims as the sound goes, and stays dim until something plays again.
-  const sleep = useSleepTimer();
   const [dozing, setDozing] = useState(false);
-  useEffect(() => {
-    if (sleep?.mode === 'asleep') {
-      videoRef.current?.pause();
-      return undefined;
-    }
-    if (sleep?.mode !== 'at' || muted) return undefined;
-    let cancel = null;
-    const t = setTimeout(() => {
-      const el = videoRef.current;
-      if (!el || el.paused) return;
-      setDozing(true);
-      cancel = fadeOut(el, FADE_MS);
-    }, Math.max(0, sleep.at - FADE_MS - Date.now()));
-    return () => {
-      clearTimeout(t);
-      if (!cancel) return;
-      // going off: pause before the volume comes back, so there's no last blip
-      if (getSleep()?.mode === 'asleep') videoRef.current?.pause();
-      else setDozing(false);
-      cancel();
-    };
-  }, [sleep, muted]);
+  useSleepFade(videoRef, { audible: !muted, onDoze: setDozing });
   const effItem = audioKey ? { ...item, extra: { ...item.extra, stream_key: audioKey } } : item;
 
   const sapi = streamApi(effItem);
@@ -739,7 +715,7 @@ export default function PlayerLayer() {
   useEffect(() => {
     if (sleep?.mode !== 'asleep') return;
     if (sleep.atEnd) toast('That’s the end. Sleep well.', 'info');
-    else if (players.length) toast('Sleep timer · paused. Sleep well.', 'info');
+    else if (sleep.heard || players.length) toast('Sleep timer · paused. Sleep well.', 'info');
     clearSleep();
   }, [sleep, players.length, toast]);
 

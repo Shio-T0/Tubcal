@@ -581,6 +581,32 @@ a.stamp:hover {
   color: var(--lang-c);
 }
 
+/* the radio's sleep dial, the same timer as the player's moon */
+.radioSleep {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  color: var(--paper-faint);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+.radioSleep:hover {
+  color: var(--paper);
+  border-color: var(--rule-strong);
+}
+.radioSleepOn {
+  color: var(--lang-c);
+  border-color: color-mix(in srgb, var(--lang-c) 50%, var(--rule));
+  background: color-mix(in srgb, var(--lang-c) 10%, transparent);
+}
+
 .episodes {
   display: flex;
   flex-direction: column;

@@ -7,25 +7,28 @@
 //   { mode: 'asleep' }           it just went off; every player pauses, the layer
 //                                says goodnight and clears it
 //
-// The store schedules the moment itself. Players only react: the one you can
-// hear starts its fade FADE_MS early (`fadeOut`), so it is silent right on time,
-// and every player pauses when the state turns 'asleep'.
+// The store schedules the moment itself. Media only react, through
+// `useSleepFade`: whatever you can hear starts its fade FADE_MS early, so it is
+// silent right on time, and everything pauses when the state turns 'asleep'. The
+// video player and the Workbench's bench radio both use it.
 
-import { useEffect, useState, useSyncExternalStore } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 
 export const FADE_MS = 12_000;
 export const SLEEP_MINUTES = [15, 30, 45, 60, 90];
 
 let state = null;
 let alarm = 0;
+let heard = false; // something was actually fading when the timer went off
 const subs = new Set();
 const emit = () => subs.forEach((f) => f());
 
 function set(next) {
   clearTimeout(alarm);
+  if (next?.mode !== 'asleep') heard = false;
   state = next;
   if (next?.mode === 'at') {
-    alarm = setTimeout(() => set({ mode: 'asleep', at: next.at }), Math.max(0, next.at - Date.now()));
+    alarm = setTimeout(() => set({ mode: 'asleep', at: next.at, heard }), Math.max(0, next.at - Date.now()));
   }
   emit();
 }
@@ -79,6 +82,39 @@ export function nextSleepChoice(st) {
   const order = ['off', 'end', 15, 30, 60];
   const i = order.indexOf(sleepChoice(st));
   return order[(i + 1) % order.length];
+}
+
+/** Put a media element (`ref` to a <video> or <audio>) under the sleep timer:
+ *  when `audible`, fade it out ahead of the alarm; always pause it when the timer
+ *  goes off. `onDoze(true|false)` hears when its fade starts or is called off. */
+export function useSleepFade(ref, { audible = true, onDoze } = {}) {
+  const sleep = useSleepTimer();
+  const doze = useRef(onDoze);
+  doze.current = onDoze;
+  useEffect(() => {
+    if (sleep?.mode === 'asleep') {
+      ref.current?.pause();
+      return undefined;
+    }
+    if (sleep?.mode !== 'at' || !audible) return undefined;
+    let cancel = null;
+    const t = setTimeout(() => {
+      const el = ref.current;
+      if (!el || el.paused) return;
+      heard = true;
+      doze.current?.(true);
+      cancel = fadeOut(el, FADE_MS);
+    }, Math.max(0, sleep.at - FADE_MS - Date.now()));
+    return () => {
+      clearTimeout(t);
+      if (!cancel) return;
+      // going off: pause before the volume comes back, so there's no last blip
+      if (state?.mode === 'asleep') ref.current?.pause();
+      else doze.current?.(false);
+      cancel();
+    };
+  }, [sleep, audible, ref]);
+  return sleep;
 }
 
 /** Lower a media element's volume to nothing over `ms`, then leave it paused at

@@ -635,7 +635,9 @@ controls) is one store for the whole station, so it outlives the video it was se
 "end of this video/episode" stops there (no Up next, no next-episode countdown, via
 `ended(id, {advance:false})`), or after N minutes the player you can hear fades out
 over 12s so it is silent on time, every player pauses, the picture stays dimmed until
-something plays, and your volume is put back for next time.
+something plays, and your volume is put back for next time. Any media element joins it
+through `useSleepFade(ref, {audible, onDoze})`; the Workbench's bench radio does (a
+moon dial on the radio steps the same timer).
 
 **Settings** (`pages/SettingsPage.jsx`) is an index plus one open section:
 - `pages/settingsSections.js` lists the sections, their groups and the words
