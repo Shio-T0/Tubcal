@@ -7,7 +7,7 @@ pulled, callers get a clear RuntimeError and the UI shows a calm "offline" card.
 
 import requests
 
-from .. import config
+from .. import config, db
 
 _TIMEOUT_FAST = 5
 _TIMEOUT_EMBED = 120
@@ -31,6 +31,13 @@ def models():
         return [m["name"] for m in r.json().get("models", [])]
     except requests.RequestException:
         return []
+
+
+def chat_model():
+    """The chat model the station writes with: the Edition's Writer, else the
+    Archive's model (Settings → The Edition / The Archive)."""
+    return (db.get_setting("edition_llm_model", "")
+            or db.get_setting("brain_llm_model", "qwen3.5:9b"))
 
 
 def has_model(name):

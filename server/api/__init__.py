@@ -13,6 +13,7 @@ def err(message, status=400):
 MODULE_BLUEPRINTS = {
     "edition": ("edition", ["edition_bp"]),
     "hackernews": ("hackernews", ["hn_bp"]),
+    "topics": ("topics", ["topics_bp"]),
     "reddit": ("reddit", ["reddit_bp"]),
     "editor": ("editor", ["editor_bp"]),
     "dev": ("dev", ["dev_bp"]),

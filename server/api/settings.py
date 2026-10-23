@@ -90,8 +90,9 @@ def put_settings():
         if isinstance(val, bool) or not isinstance(val, int) or not 0 <= val <= 600:
             return err("anime_theme_seconds must be whole seconds, 0 (the whole song) to 600")
 
-    if "fast_mode" in body and not isinstance(body["fast_mode"], bool):
-        return err("fast_mode must be true or false")
+    for key in ("fast_mode", "objects_3d"):
+        if key in body and not isinstance(body[key], bool):
+            return err(f"{key} must be true or false")
 
     if "quiet_hours" in body:
         val = body["quiet_hours"]

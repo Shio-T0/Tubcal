@@ -138,6 +138,9 @@ DEFAULT_SETTINGS = {
     # Fast mode (Settings → Appearance): nothing animates or transitions, anywhere.
     # Stamped on <html data-fast> at serve time so even the first paint is still.
     "fast_mode": False,
+    # 3D objects (Settings → Appearance, and an installer option): the home screen
+    # is a box you turn, the set on its front and a channel on each other side.
+    "objects_3d": False,
     "reddit_sort": "hot",
     "hn_list": "top",
     "foryou_weights": {"youtube": 2, "reddit": 2, "hackernews": 1},
@@ -389,6 +392,24 @@ def note_modules(installed, chosen=False):
     if seen is None or sorted(seen) != sorted(installed):
         set_setting("_modules_seen", list(installed))
     return added
+
+
+def note_install(choices):
+    """Apply what the installer was told this time (install.conf, exported by the
+    launcher), when it differs from what it was told last time. So re-running
+    install.sh with a new choice changes the setting, while a switch you flipped
+    in Settings stays flipped across restarts. `choices` maps a setting key to the
+    installer's value, or None where the installer said nothing."""
+    seen = get_setting("_install_seen") or {}
+    applied = {}
+    for key, value in choices.items():
+        if value is None or seen.get(key) == value:
+            continue
+        set_setting(key, value)
+        applied[key] = value
+    if applied:
+        set_setting("_install_seen", {**seen, **applied})
+    return applied
 
 
 def get_settings():

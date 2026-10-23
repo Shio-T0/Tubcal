@@ -51,6 +51,10 @@ def create_app():
         # already still (styles/base.css holds the rule).
         if db.get_setting("fast_mode", False) is True:
             html = html.replace("<html ", '<html data-fast="" ', 1)
+        # 3D objects: Home lays out its box from the first render, rather than
+        # showing the flat page until the settings arrive.
+        if db.get_setting("objects_3d", False) is True:
+            html = html.replace("<html ", '<html data-3d="" ', 1)
         # The modules this server has, before the bundle runs: the page leaves out
         # a room the build has but the server doesn't (frontend/src/lib/modules.js).
         if modules.known():

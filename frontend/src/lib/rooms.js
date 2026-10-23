@@ -34,6 +34,12 @@ export const ALL_ROOMS = [
   { id: 'dev',       label: 'The Workbench', short: 'Workbench', color: 'var(--c-dev)', route: '/dev', default_enabled: true },
 ];
 
+/** Modules that aren't rooms: a page of a room's, which an install can leave out
+ *  like a room (`room` is the one it belongs to). */
+export const ALL_PAGES = [
+  { id: 'topics', label: 'By topic', color: 'var(--c-hn)', route: '/hackernews/topics', room: 'hackernews' },
+];
+
 /** Rooms that are always on (not in Settings → Rooms). */
 export const ALL_FIXED = [
   { id: 'anime', label: 'The Anime', short: 'Anime', color: 'var(--c-anime)', route: ANIME_HOME, fixed: true },
@@ -48,6 +54,7 @@ export const ALL_CHANNELS = [
 // What this copy has.
 export const ROOMS = ALL_ROOMS.filter((r) => hasModule(r.id));
 export const FIXED = ALL_FIXED.filter((r) => hasModule(r.id));
+export const PAGES = ALL_PAGES.filter((p) => hasModule(p.id));
 export const CHANNELS = ALL_CHANNELS
   .map((ch) => ({ ...ch, rooms: ch.rooms.filter(hasModule) }))
   .filter((ch) => ch.rooms.length)

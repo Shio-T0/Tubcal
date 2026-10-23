@@ -12,18 +12,18 @@
 // history, so Back closes it. List, search, order and window live in the URL too.
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
-  Briefcase, Clock, Flame, HelpCircle, MessageSquare, RefreshCw, Rocket, Search, Sparkles, Star, TrendingUp, X,
+  Briefcase, Clock, HelpCircle, Pentagon, RefreshCw, Rocket, Search, Sparkles, Star, TrendingUp, X,
 } from 'lucide-react';
 
 import { api, useApi } from '../api/client.js';
 import { ErrorBox, Receiving, useDebounced } from '../components/layout/Section.jsx';
-import { SaveButton } from '../components/ui/ItemActions.jsx';
-import { HNReader, ReaderSheet, splitKind } from '../components/wire/HNReader.jsx';
+import { HNReader, ReaderSheet } from '../components/wire/HNReader.jsx';
+import StoryLine from '../components/wire/StoryLine.jsx';
 import { useWireSeen } from '../components/wire/seen.js';
-import { compact } from '../lib/format.js';
-import { timeAgo } from '../lib/time.js';
+import { hasModule } from '../lib/modules.js';
+import { useObjects3d } from '../lib/objects3d.js';
 import { latestParams, useParamState } from '../lib/urlState.js';
 import { useSettings } from '../state.jsx';
 import s from './wire.module.css';
@@ -38,13 +38,6 @@ const LISTS = [
 ];
 const RANGES = [['all', 'any time'], ['day', 'past day'], ['week', 'past week'], ['month', 'past month'], ['year', 'past year']];
 
-/** Points per hour since posting, as a 0–1 "how hot" reading. */
-function heatOf(item) {
-  if (!item.score || !item.published_at) return 0;
-  const hours = Math.max(1, (Date.now() / 1000 - item.published_at) / 3600);
-  return Math.min(1, item.score / hours / 60);
-}
-
 function useWidth(ref) {
   const [w, setW] = useState(0);
   useLayoutEffect(() => {
@@ -56,59 +49,6 @@ function useWidth(ref) {
     return () => ro.disconnect();
   }, [ref]);
   return w;
-}
-
-function Line({ item, rank, open, onOpen, seen, fresh, compactMode }) {
-  const read = !!seen;
-  const { kind, rest } = splitKind(item.title);
-  const heat = heatOf(item);
-  const domain = item.extra?.domain;
-  const linkOut = item.url && !item.url.includes('news.ycombinator.com/item');
-  return (
-    <div
-      className={`${s.line} ${read ? s.lineRead : ''} ${open ? s.lineOpen : ''}`}
-      data-kbd-tile
-      tabIndex={0}
-      role="button"
-      aria-current={open ? 'true' : undefined}
-      onClick={() => onOpen(item)}
-      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(item); } }}
-    >
-      <span className={s.rank}>{String(rank).padStart(2, '0')}</span>
-      <div className={s.main}>
-        <div className={s.headline}>
-          {kind && <span className={s.kind}>{kind}</span>}
-          {linkOut ? (
-            <a href={item.url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} title="Open the article">
-              {rest}
-            </a>
-          ) : (
-            <span>{rest}</span>
-          )}
-        </div>
-        <div className={s.meta}>
-          {domain && <span className={s.domain}>{domain}</span>}
-          {!compactMode && item.author && <span>{item.author}</span>}
-          {item.published_at ? <span>{timeAgo(item.published_at)}</span> : null}
-          {read && <span className={s.readMark}>read</span>}
-        </div>
-      </div>
-      <div className={s.nums}>
-        <span className={s.points} title={`${item.score ?? 0} points`}>
-          {heat > 0.6 && <Flame size={12} className={s.flame} />}
-          <b>{compact(item.score) ?? '–'}</b>
-          <span className={s.gauge} aria-hidden="true"><i style={{ width: `${Math.max(6, heat * 100)}%` }} /></span>
-        </span>
-        <span className={s.cmts} title={`${item.comments_count ?? 0} comments`}>
-          <MessageSquare size={13} /> {compact(item.comments_count) ?? 0}
-          {fresh > 0 && <em className={s.freshN}>+{compact(fresh)}</em>}
-        </span>
-      </div>
-      <div className={s.acts} onClick={(e) => e.stopPropagation()}>
-        <SaveButton item={item} className={s.save} />
-      </div>
-    </div>
-  );
 }
 
 export default function Wire() {
@@ -124,6 +64,7 @@ export default function Wire() {
   const width = useWidth(roomRef);
   const split = width >= 980;
   const { seen, newSince } = useWireSeen();
+  const topics = useObjects3d() && hasModule('topics');
 
   const [text, setText] = useState(q);
   const dq = useDebounced(text.trim(), 400);
@@ -223,6 +164,11 @@ export default function Wire() {
               </button>
             );
           })}
+          {topics && (
+            <Link to="/hackernews/topics" className={s.list} title="The front page sorted into five topics by the local AI">
+              <Pentagon size={14} /> By topic
+            </Link>
+          )}
         </nav>
         <label className={s.search}>
           <Search size={15} />
@@ -276,7 +222,7 @@ export default function Wire() {
           {shown && !shown.length && !isLoading && <p className={s.muted}>{searching ? 'Nothing on the wire matches that.' : 'The wire is quiet.'}</p>}
 
           {shown && shown.map((item, i) => (
-            <Line
+            <StoryLine
               key={item.id}
               item={item}
               rank={i + 1}
@@ -284,7 +230,7 @@ export default function Wire() {
               onOpen={openStory}
               seen={seen[item.extra?.hn_id]}
               fresh={newSince(item)}
-              compactMode={!!openId && split}
+              tight={!!openId && split}
             />
           ))}
 

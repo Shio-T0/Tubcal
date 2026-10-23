@@ -238,11 +238,6 @@ def _numpy_ok():
         return False
 
 
-def _chat_model():
-    return (db.get_setting("edition_llm_model", "")
-            or db.get_setting("brain_llm_model", "qwen3.5:9b"))
-
-
 def build(force=False):
     """Compose today's paper. Returns True if a paper was built. Never raises —
     the builder thread and the rebuild endpoint both call this blind."""
@@ -292,7 +287,7 @@ def _build():
     slots = cluster.layout(scored)
 
     # Ladder rung 2 -> 3: synthesis, hard-capped and time-boxed.
-    chat_model = _chat_model()
+    chat_model = llm.chat_model()
     chat_ok = llm.available() and llm.has_model(chat_model)
 
     def write(c, budget_left, lead=False):

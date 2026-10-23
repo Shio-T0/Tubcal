@@ -8,6 +8,9 @@
 // window, the three channel knobs (1 Social, 2 Coding, 3 Video), a slip of what's
 // coming up — streams live now, premieres, your shows' next episodes — and the
 // speaker grille with the maker's plate.
+//
+// With 3D objects on, the set is the front of the box (TheBox.jsx): `inBox` leaves
+// the cabinet to the box. Its knobs still go into their channels.
 
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -333,10 +336,10 @@ function ComingUp({ rows, now, ready }) {
   );
 }
 
-export default function TheSet({ pickUp, comingUp, comingReady, now, subs }) {
+export default function TheSet({ pickUp, comingUp, comingReady, now, subs, inBox = false }) {
   const homes = useChannelHomes();
   return (
-    <section className={s.set} aria-label="Pick up where you left off">
+    <section className={`${s.set} ${inBox ? s.inBox : ''}`} aria-label="Pick up where you left off">
       <Screen items={pickUp.items} loading={pickUp.loading} />
       <aside className={s.panel} aria-label="Clock, channels and what's coming up">
         <Clock now={now} />

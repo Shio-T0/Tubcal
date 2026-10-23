@@ -32,7 +32,7 @@ export const SETTINGS_SECTIONS = {
   appearance: {
     title: 'Appearance', icon: Palette,
     blurb: 'Repaint the whole station, or keep it still with Fast mode. The Shōwa set is home; the rest are other machines.',
-    find: 'skin theme look colours dark light night day terminal bauhaus blueprint aqua space fast mode animation animations motion transitions still speed reduce',
+    find: 'skin theme look colours dark light night day terminal bauhaus blueprint aqua space fast mode animation animations motion transitions still speed reduce 3d objects box cube turn rotate spin home by topic sorter topics',
   },
   rooms: {
     title: 'Rooms', icon: LayoutGrid,

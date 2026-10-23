@@ -1,0 +1,170 @@
+/* A channel's side of the box (Sides.jsx), laid out like the set on the front:
+   the guide where the screen is, a strip of rooms where the controls are, and the
+   speaker grille at the foot of the strip with the channel's name on its plate. */
+
+.side {
+  --ch: var(--signal);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 292px;
+  gap: 14px;
+  padding: 14px;
+}
+.main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.main > * {
+  flex: 1 1 auto;
+}
+
+/* ── the strip ───────────────────────────────────────────────────────────── */
+.strip {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  padding: 4px 2px 2px;
+}
+.stripHead {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 4px 0;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--paper-faint);
+}
+.stripHead span:first-child {
+  color: var(--ch);
+}
+
+.room {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 9px 10px 10px;
+  border-radius: 14px;
+  border: 1px solid var(--rule);
+  background: color-mix(in srgb, var(--ink) 45%, transparent);
+}
+.roomHead {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 2px 4px;
+  border-radius: 9px;
+  color: var(--text-primary);
+  outline: none;
+}
+.roomNo {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--room-c);
+}
+.roomName {
+  overflow: hidden;
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 620;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  transition: color 0.2s ease;
+}
+.roomArrow {
+  color: var(--paper-faint);
+  transition: transform 0.25s var(--hand), color 0.2s ease;
+}
+.roomHead:hover .roomName,
+.roomHead:focus-visible .roomName {
+  color: var(--room-c);
+}
+.roomHead:hover .roomArrow,
+.roomHead:focus-visible .roomArrow {
+  transform: translateX(4px);
+  color: var(--room-c);
+}
+.roomHead:focus-visible {
+  box-shadow: 0 0 0 2px var(--room-c);
+}
+
+.places {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.place {
+  padding: 4px 10px 5px;
+  border-radius: var(--r-pill);
+  border: 1px solid color-mix(in srgb, var(--room-c) 22%, var(--rule));
+  background: color-mix(in srgb, var(--room-c) 6%, transparent);
+  font-size: 12.5px;
+  line-height: 1.25;
+  color: var(--text-secondary);
+  outline: none;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+.place:hover,
+.place:focus-visible {
+  border-color: var(--room-c);
+  background: color-mix(in srgb, var(--room-c) 16%, transparent);
+  color: var(--text-primary);
+}
+
+/* the grille fills what the rooms leave */
+.grille {
+  display: grid;
+  place-items: center;
+  flex: 1 1 auto;
+  min-height: 58px;
+  border-radius: 14px;
+  background:
+    repeating-linear-gradient(to bottom, color-mix(in srgb, var(--paper) 8%, transparent) 0 2px, transparent 2px 6px),
+    color-mix(in srgb, var(--ink) 45%, transparent);
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+.plate {
+  padding: 3px 13px 4px;
+  border-radius: 7px;
+  border: 1px solid var(--rule-strong);
+  background: linear-gradient(180deg, var(--ink-3), var(--ink-2));
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.35), inset 0 1px 0 color-mix(in srgb, var(--paper) 12%, transparent);
+  font-family: var(--font-display);
+  font-variation-settings: 'opsz' 144, 'SOFT' 40, 'WONK' 1;
+  font-size: 18px;
+  font-weight: 640;
+  color: var(--paper-dim);
+}
+.plate em {
+  font-style: italic;
+  color: var(--ch);
+}
+
+/* the box is the size container (box.module.css): narrow, the strip goes under */
+@container (max-width: 1000px) {
+  /* the guide takes whatever height the box has beyond the strip */
+  .side {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr auto;
+  }
+  .strip {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    align-items: start;
+    align-content: start;
+  }
+  .stripHead {
+    grid-column: 1 / -1;
+  }
+  .grille {
+    display: none;
+  }
+}
+@container (max-width: 560px) {
+  .side {
+    padding: 10px;
+  }
+}

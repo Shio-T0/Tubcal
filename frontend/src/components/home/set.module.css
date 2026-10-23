@@ -25,6 +25,15 @@
   }
 }
 
+/* the front of the box (TheBox.jsx): the box's side is the cabinet */
+.inBox {
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  animation: none;
+}
+
 /* ── the screen ──────────────────────────────────────────────────────────── */
 .screen {
   position: relative;

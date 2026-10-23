@@ -112,14 +112,15 @@ openSUSE Tumbleweed and Alpine 3.24.
 
 ### Rooms
 
-Every room is optional. A room you leave out has no files, Python packages or pages on
-your machine, and Tubcal's channels, home screen and settings show only the rooms you
+Every room is optional, and so is By topic, a page of the Wire's. A room you leave out
+has no files, Python packages or pages on your machine, and Tubcal's channels, home screen and settings show only the rooms you
 have. A channel with none of its rooms installed isn't shown.
 
 | Room | Name | What it adds |
 |---|---|---|
 | The Edition | `edition` | the daily paper; numpy, about 20 MB |
 | The Wire | `hackernews` (or `wire`) | Hacker News |
+| By topic | `topics` (or `bytopic`, `sorter`) | not a room but a page of the Wire's: its front page sorted into five topics by Ollama, shown in the Social bar with 3D objects on; needs the Wire |
 | The Dispatch | `reddit` (or `dispatch`) | Reddit |
 | The Composing Room | `editor` | the code editor, with flask-sock for its terminal and language servers |
 | The Workbench | `dev` (or `workbench`) | the programming-language manuals |
@@ -139,6 +140,7 @@ need GitHub. Without them those parts don't appear.
 | App-menu entry & icon | `desktop` | launch Tubcal like any other app *(on)* |
 | Start when I log in | `autostart` | a systemd user service, or XDG autostart *(off)* |
 | Distro extras | `extras` | `notify-send` for live-stream pings (Screening Room) and `ripgrep` for the editor's search (Composing Room) *(on when there's root)* |
+| 3D objects | `3d` | the home screen as a box you turn, with the TV on the front and a channel on each other side, and By topic in the Social channel (Hacker News sorted into five topics by the local AI); Settings → Appearance changes it later *(off)* |
 
 ```bash
 ./install.sh --yes                                # no questions: defaults, or your last choices

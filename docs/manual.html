@@ -93,6 +93,7 @@
               <tbody>
                 <tr><td class="nowrap muted">1 · Social</td><td class="nowrap"><b>The Edition</b></td><td>A daily paper made from the rooms you follow.</td><td>on</td></tr>
                 <tr><td></td><td class="nowrap"><b>The Wire</b></td><td>Hacker News.</td><td>on</td></tr>
+                <tr><td></td><td class="nowrap"><b>By topic</b></td><td>Not a room but a page of the Wire's: the Wire's front page sorted into five topics by an AI model on your computer. It shows up with the <b>3D objects</b> option, and needs the Wire (see <a href="#ai">Optional AI</a>).</td><td>on</td></tr>
                 <tr><td></td><td class="nowrap"><b>The Dispatch</b></td><td>Reddit.</td><td>on</td></tr>
                 <tr><td class="nowrap muted">2 · Coding</td><td class="nowrap"><b>The Composing Room</b></td><td>A code editor for the projects in your <code>~/Projects</code> folder, with a terminal.</td><td>on</td></tr>
                 <tr><td></td><td class="nowrap"><b>The Workbench</b></td><td>Talks, podcasts, news and releases for four programming languages.</td><td>on</td></tr>
@@ -111,6 +112,7 @@
                 <tr><td class="nowrap"><b>App-menu entry</b></td><td>Adds Tubcal to your app menu.</td><td>on</td></tr>
                 <tr><td class="nowrap"><b>Start when I log in</b></td><td>Starts Tubcal in the background when you log in.</td><td>off</td></tr>
                 <tr><td class="nowrap"><b>Distro extras</b></td><td>A desktop notification shortly before a channel you follow goes live (with the Screening Room), and faster search in the code editor (with the Composing Room).</td><td>on</td></tr>
+                <tr><td class="nowrap"><b>3D objects</b></td><td>Makes the home screen a box you can turn: the TV is on the front, and each channel has a side with its rooms and links into them. It also adds <b>By topic</b> to the Social channel (see <a href="#ai">Optional AI</a>). You can change this later in Settings, under Appearance.</td><td>off</td></tr>
               </tbody>
             </table>
           </div>
@@ -135,7 +137,7 @@
         </header>
         <div class="prose">
           <ol class="steps">
-            <li><b>The home screen</b> shows what to watch next: the video or episode you stopped halfway through, new uploads, who's live and what airs soon. Turn one of its three knobs, or press <kbd>1</kbd>, <kbd>2</kbd> or <kbd>3</kbd>, to go into the Social, Coding or Video channel.</li>
+            <li><b>The home screen</b> shows what to watch next: the video or episode you stopped halfway through, new uploads, who's live and what airs soon. Turn one of its three knobs, or press <kbd>1</kbd>, <kbd>2</kbd> or <kbd>3</kbd>, to go into the Social, Coding or Video channel. With <b>3D objects</b> switched on, the home screen is a box instead: drag it sideways or press <kbd>←</kbd> <kbd>→</kbd> to turn it, and each channel's side lists its rooms with links straight to the places inside them.</li>
             <li><b>Add YouTube channels.</b> In the Screening Room, press <b>Add a channel</b> and type the channel's handle (like <code>@name</code>) or paste its link. If you <a href="#accounts">connect your YouTube account</a> instead, all your subscriptions come in at once.</li>
             <li><b>Add subreddits</b> in <b>Settings → Subscriptions</b>, with <b>Add a subscription</b>. They appear in the Dispatch and in the daily paper.</li>
             <li><b>For anime</b>, <a href="#accounts">connect a free AniList account</a>. The Anime doesn't work without one.</li>
@@ -198,7 +200,7 @@
 
           <h3>Getting from one to another</h3>
           <ul class="feature-list compact">
-            <li>On the home screen, turn a knob or press <kbd>1</kbd>, <kbd>2</kbd> or <kbd>3</kbd>.</li>
+            <li>On the home screen, turn a knob or press <kbd>1</kbd>, <kbd>2</kbd> or <kbd>3</kbd>. With 3D objects on, this works the same from the TV. From a channel's side, another number turns the box to that channel's side first; press the number again to go in, or <kbd>0</kbd> to turn back to the TV.</li>
             <li>From anywhere, press <kbd>Space</kbd>, then <kbd>g</kbd>, then <kbd>s</kbd> for Social, <kbd>c</kbd> for Coding or <kbd>v</kbd> for Video. <kbd>a</kbd> goes straight to the Anime and <kbd>h</kbd> to the home screen.</li>
             <li>Press <kbd>/</kbd> or <kbd>Ctrl</kbd><kbd>K</kbd> to search. From there you can jump to any room, search YouTube, Reddit and Hacker News together, or find something you saved.</li>
           </ul>
@@ -314,12 +316,13 @@
       <section class="msec" id="ai" data-section>
         <header class="tc-sectionhead" style="--sec-c: var(--c-dev)">
           <span class="plate">08</span><span class="kicker">Optional</span><h2>Optional AI</h2>
-          <p class="dek">Two features work better with an AI model running on your own computer. Nothing is sent to an online AI service, and the rest of Tubcal works without it.</p>
+          <p class="dek">Three features use an AI model running on your own computer. Nothing is sent to an online AI service, and the rest of Tubcal works without it.</p>
         </header>
         <div class="prose">
           <ul class="feature-list">
             <li><b>The Archive</b> transcribes the videos you watch. You can then search what was said, read a short summary of a video, or ask a question and get an answer that links to the moments it came from.</li>
             <li><b>The Edition</b> can group posts about the same story even when they link to different pages, and write a short article for each top story, citing the posts it was written from. Without the AI it lists the headlines.</li>
+            <li><b>By topic</b> (in the Social channel, with <b>3D objects</b> on) takes the 100 hottest stories on Hacker News and has the model sort them into five topics it picks itself. Stories that fit none of them are left out. A five-sided wooden column reads the headlines, then splits into five panels, one per topic, that you turn like the home screen's box. It sorts again when you open it and the last sort is over an hour old, or when you press <b>Sort again</b>. If you left it out when installing, add it with <code>tubcal add topics</code>.</li>
           </ul>
 
           <h3>Setting it up</h3>
@@ -333,7 +336,7 @@
 <span class="k">ollama pull qwen3.5:9b</span>         <span class="c"># for writing and answers</span></pre>
               </div>
             </li>
-            <li><b>Restart Tubcal</b> with <code>tubcal restart</code>. <b>Settings → The Archive</b> and <b>Settings → The Edition</b> show whether they found the models.</li>
+            <li><b>Restart Tubcal</b> with <code>tubcal restart</code>. <b>Settings → The Archive</b> and <b>Settings → The Edition</b> show whether they found the models. By topic uses the model chosen as the Edition's <b>Writer</b>, or the Archive's model if the Writer is left on <b>Same as The Archive</b>.</li>
           </ol>
 
           <h3>Using The Archive</h3>
@@ -361,13 +364,13 @@
       <section class="msec" id="settings" data-section>
         <header class="tc-sectionhead" style="--sec-c: var(--c-editor)">
           <span class="plate">10</span><span class="kicker">Using Tubcal</span><h2>Settings</h2>
-          <p class="dek">Press <b>Settings</b> in any channel's bar, or <kbd>Space</kbd> then <kbd>,</kbd>. A panel opens at the side with the skins, the switches people change most (fast mode, sound, live alerts, skipping anime openings, opening songs) and a link to every section below. The full Settings page shows how each section is set, and <b>Find a setting</b> searches all of them.</p>
+          <p class="dek">Press <b>Settings</b> in any channel's bar, or <kbd>Space</kbd> then <kbd>,</kbd>. A panel opens at the side with the skins, the switches people change most (fast mode, 3D objects, sound, live alerts, skipping anime openings, opening songs) and a link to every section below. The full Settings page shows how each section is set, and <b>Find a setting</b> searches all of them.</p>
         </header>
         <div class="setgrid">
           <div class="setcard"><h4>Accounts</h4><p>Connect AniList, Reddit, YouTube and GitHub. See <a href="#accounts">Accounts</a>.</p></div>
           <div class="setcard"><h4>Subscriptions</h4><p>Add and remove the channels, subreddits and GitHub projects you follow.</p></div>
           <div class="setcard"><h4>Watch history</h4><p>How many videos Tubcal remembers, and a button to clear them. The history is used for suggestions and for resuming videos.</p></div>
-          <div class="setcard"><h4>Appearance</h4><p>The skin, and <b>Fast mode</b>, which turns off all animation.</p></div>
+          <div class="setcard"><h4>Appearance</h4><p>The skin, <b>Fast mode</b>, which turns off all animation, and <b>3D objects</b>, which makes the home screen a box you turn and adds By topic to the Social channel.</p></div>
           <div class="setcard"><h4>Rooms</h4><p>Which rooms each channel shows. It also lists the rooms you didn't install, with the command that adds each one.</p></div>
           <div class="setcard"><h4>Playback</h4><p>Which videos play sound, and the speed they start at.</p></div>
           <div class="setcard"><h4>Subtitles</h4><p>How subtitles look in every player, and your preferred language.</p></div>

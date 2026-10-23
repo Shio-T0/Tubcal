@@ -36,8 +36,10 @@ are the helpers. Adding a room = an entry in `ROOMS` + its id in a channel + a p
 module (see "Modules" below). GitHub ships off by default. `db.init_db` strips retired
 ids from `active_rooms`.
 
-**Modules.** Every room is a module an install can leave out; `modules.ini` (repo root)
-lists them with the files each owns (`paths`), the rooms it `needs` (the Archive needs
+**Modules.** Every room is a module an install can leave out, and so is By topic (`topics`),
+a page of the Wire's that isn't a room (`ALL_PAGES` in `lib/rooms.js`: it isn't in Settings →
+Rooms or `config.ROOM_IDS`, `db.note_modules` doesn't switch it on, and it `needs` its room);
+`modules.ini` (repo root) lists them with the files each owns (`paths`), the rooms it `needs` (the Archive needs
 the Screening Room), its pyproject `extras`/`groups`, private `tools` (yt-dlp) and distro
 `packages`. Everything not listed under some module's `paths` is the core. A left-out
 module's files aren't on disk (install.sh's sparse checkout), so:
@@ -145,6 +147,26 @@ before "where to?":
 - The screen and guides use `overflow: clip`, not `hidden`: their glow and cover wall
   spill past the edges, and a hidden box is still a scroll container that focus and
   h/j/k/l's `scrollIntoView` would scroll.
+- **3D objects** (setting `objects_3d`, Settings → Appearance and the drawer; desktop
+  only; the installer's `3d` option) turns the set and the guides into one box,
+  `TheBox.jsx` + `box.module.css` (its turning is `lib/turntable.js`, shared with the
+  Wire's By topic machine; `lib/objects3d.js` `useObjects3d()` says whether it's on):
+  the set on the front (`TheSet inBox`; its knobs and 1 2 3 still go into the
+  channels), each channel's guide (`inBox`: a `<div>`, no room keys or Anime doors) on
+  a side of its own beside a strip of its rooms with their places
+  (`Sides.jsx`). The facing side is `?side=`. Geometry is CSS: every side in one grid
+  cell (the box is as tall as its tallest side), placed by `rotateY(i·360°/n)` and
+  pushed out by the apothem in `cqw` of the stage. Script moves only `--turn` and
+  each side's `.shade` opacity; `--turn`/`--lift` are `@property` with `inherits:
+  false`, so a frame restyles the cube, not everything on it. Turning: drag (pointer
+  capture, the click after a drag swallowed), a sideways wheel, ←/→ (not on a tile),
+  Tab with nothing focused, the side tabs, 1 2 3 / 0 on a channel's side (Home; a
+  number again goes in), and h/l at a side's edge (KeyboardShortcuts fires
+  `tubcal:kbd-edge`, and skips tiles under `[inert]`). Sides not facing you are
+  `inert`. `serve_index` stamps
+  `<html data-3d>` for the first render. `db.note_install` applies the installer's
+  answer (`TUBCAL_3D` from install.conf's `OBJECTS_3D`) only when it changes, so a
+  switch flipped in Settings stays. Tests: `tests/test_objects_3d.py`.
 
 **The Android app lives in `android/`**: a Gradle project with Chaquopy and Kotlin
 (`app/`), a separate phone UI (`phone/`, Vite + React) and tools (`tools/`).
@@ -189,7 +211,7 @@ re-execs itself from `sh`, and it keeps its own state in `$TUBCAL_HOME`
 
 The menu lists the rooms by channel (from `modules.ini`; piped from curl, from the
 copy in `embedded_manifest` at the end of install.sh, which must match) and the
-options `desktop`/`autostart`/`extras`. Picking a room brings what it needs; dropping
+options `desktop`/`autostart`/`extras`/`3d`. Picking a room brings what it needs; dropping
 one drops what needs it. Defaults: every room but the Archive, and GitHub is off in a
 clone (on in your own checkout). Flags: `--rooms LIST` (exact), `--with`/`--without`
 (rooms or options), `--add`/`--remove` (what `tubcal add/remove` run), `--list`. The
@@ -755,7 +777,39 @@ article button, Ask/Show post text (`story.text_html`), OP marks, click-a-rail t
 fold, fold-all, and comments new since your last visit marked with a chip that
 walks through them (`components/wire/seen.js`, localStorage `tubcal.wire.seen`).
 HN HTML goes through `HnHtml.jsx` (allow-list walk, ">" paragraphs drawn as quotes,
-HN item links opened in the reader). Tests: `tests/test_wire.py`.
+HN item links opened in the reader). A story line is `components/wire/StoryLine.jsx`
+(shared with By topic). Tests: `tests/test_wire.py`.
+
+**By topic** (`/hackernews/topics`, `pages/ByTopic.jsx`; the `topics` module, which needs
+the Wire; only with 3D objects on, otherwise one line saying so) sorts the front page's 100
+hottest stories into five topics the local AI names, and spikes the rest:
+- Server: `server/sources/hn_topics.py`. `hackernews.top_items(100)` (HN's own order,
+  each story's `extra.rank`). Stage 1, one call over all the headlines, names five topics
+  (`parse_topics`: exactly five, distinct, short, no catch-all like "Other"). Stage 2,
+  five calls of 20, puts each headline under a topic or 0 (`parse_sort`: junk → 0, an
+  answer covering under half → asked again). One retry per call; then a batch is spiked
+  as jammed, or at stage 1 the sort is jammed. A daemon thread does it (one at a time);
+  `_state` carries a partial payload rewritten after each batch, and the finished one goes
+  to the cache table (`cache.put("hn:topics", …)`, `TTL_HN_TOPICS`). The model is
+  `llm.chat_model()` (the Edition's Writer, else the Archive's; the Edition uses it too).
+  `server/api/topics.py` (`topics_bp`): `GET /api/hackernews/topics` only reads; `POST
+  …/topics/sort` starts one (503 with the reason when Ollama or the model is missing).
+- Page: polls every 1.5s only while a sort runs (and replaces its state only on a real
+  change), asks for a sort once a visit when the last is over an hour old. `?t=` the topic
+  facing you (1–5 keys), `?s=` the reader sheet.
+- The machine, `components/topics/` (`Sorter.jsx` + `sorter.module.css`): a
+  five-sided column on a turntable, a glass dome (lamp + model plate) on top, a tape reel
+  of headlines (SVG `textPath`) and a spike. While sorting it turns slowly, the plates are
+  stamped with the topic names, and each batch's slips fly (Web Animations, made outside
+  React) into their wedge or onto the spike. When the sort is in, the wedges slide out
+  and each front unfolds into a wide panel of `StoryLine`s; then it turns with
+  `lib/turntable.js`. Sizes are worked out in JS from the stage and handed to the CSS as
+  px custom properties; the open/close sequence is CSS transitions with delays each way.
+  The fronts unfold by `left`/`right`, not a transform: an animated transform inside a
+  face that's turned in 3D gets its own compositor layer, and Chrome then paints the
+  wrong faces until it settles.
+- The Social bar and the Wire link to it only when `hasModule('topics')` and 3D is on.
+- Tests: `tests/test_topics.py`.
 
 The GitHub room (`pages/Github.jsx`, `/github`) borrows git's own visual language:
 lanes and nodes, release tags cut like luggage tags (`TagLabel`), short hashes,

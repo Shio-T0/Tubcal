@@ -14,7 +14,9 @@ import k from './KeyboardShortcuts.module.css';
 //   gg / G       jump to the first / last tile on the page
 //   h j k l      move a roving focus across tiles by geometry — works in both the
 //                horizontal shelves and the wall grids (arrows mirror them once a
-//                tile is focused, so they still scroll the page otherwise)
+//                tile is focused, so they still scroll the page otherwise). With
+//                nowhere further left or right, `tubcal:kbd-edge` says so (Home's
+//                box turns on it).
 //   Enter/Space  activate the focused tile (handled by the tile itself)
 // `/` and Ctrl-K belong to the command palette. Stands down while typing or while
 // a video is expanded (the player owns those keys then).
@@ -71,12 +73,14 @@ export default function KeyboardShortcuts() {
   const hintTimer = useRef(null);
 
   useEffect(() => {
-    // visible tiles only (an off-screen / display:none tile has no offsetParent) —
-    // and only inside an open drawer or dialog that marks itself as the scope
+    // visible tiles only (an off-screen / display:none tile has no offsetParent,
+    // and an inert one — the box's sides turned away — can't take focus) — and
+    // only inside an open drawer or dialog that marks itself as the scope
     const tiles = () => {
       const scopes = document.querySelectorAll('[data-kbd-scope]');
       const root = scopes.length ? scopes[scopes.length - 1] : document;
-      return Array.from(root.querySelectorAll('[data-kbd-tile]')).filter((el) => el.offsetParent !== null);
+      return Array.from(root.querySelectorAll('[data-kbd-tile]'))
+        .filter((el) => el.offsetParent !== null && !el.closest('[inert]'));
     };
 
     const focusTile = (el) => {
@@ -133,6 +137,7 @@ export default function KeyboardShortcuts() {
         }
       }
       if (best) focusTile(best);
+      else if (horizontal) window.dispatchEvent(new CustomEvent('tubcal:kbd-edge', { detail: { dir, from: cur } }));
     };
 
     const setStage = (stage) => {

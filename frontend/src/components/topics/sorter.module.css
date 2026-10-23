@@ -1,0 +1,842 @@
+/* The sorter (Sorter.jsx): By topic's machine. Sorter.jsx works the sizes out
+   from the stage (--P an opened panel's width, --c a closed wedge's front, --a0 /
+   --a1 how far each stands from the middle, --T the room above for the dome, --hf
+   the faces' height, --foot the apron) and this places it all.
+
+   Closed, the five wedges stand close round the middle as one column, each front
+   folded to --c; open (data-open), they stand out at --a1 and unfold to --P. The
+   transitions are sequenced by their delays, one set each way: opening, the band
+   lets go, the wedges slide out, the fronts unfold, the stories come in, the dome
+   rises; closing runs it backwards. Script moves --turn on the table (registered,
+   not inherited) and each face's .shade. */
+
+@property --turn {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+
+.wrap {
+  --brass: color-mix(in srgb, var(--signal) 58%, var(--paper-dim));
+  --brass-dark: color-mix(in srgb, var(--brass) 55%, var(--ink));
+  /* paper is paper in every skin (--paper is the text colour, dark in a light one) */
+  --slip: #ece2cb;
+  --slip-ink: #2b1f14;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* a turning panel may reach into the page's margins, never past them */
+.bleed {
+  margin-inline: calc(-1 * var(--gutter, 0px));
+  padding-inline: var(--gutter, 0px);
+  overflow-x: clip;
+}
+
+.stage {
+  position: relative;
+  height: clamp(540px, calc(100svh - var(--chrome-top, 72px) - 170px), 900px);
+  perspective: var(--persp, 2000px);
+  /* the eye a little above the top of the panels: you look down onto the table */
+  perspective-origin: 50% 8%;
+  touch-action: pan-y;
+  animation: rise 0.6s var(--hand) both;
+}
+.stage[data-open] {
+  cursor: grab;
+}
+.stage[data-dragging],
+.stage[data-dragging] * {
+  cursor: grabbing !important;
+  user-select: none;
+}
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+}
+
+.scene {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+}
+/* The middle of the turntable, at the top of the faces. Pushed back by --a1, so
+   an opened panel facing you sits exactly where a flat page would. */
+.rig {
+  position: absolute;
+  left: 50%;
+  top: var(--T);
+  width: 0;
+  height: 0;
+  transform-style: preserve-3d;
+  transform: translateZ(calc(-1 * var(--a1, 0px)));
+  transition: transform 0.5s var(--hand);
+}
+.stage[data-turning] .rig {
+  transform: translateZ(calc(-1 * var(--a1, 0px) - 70px));
+  transition-duration: 0.26s;
+}
+.table {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+  transform: rotateY(var(--turn));
+  will-change: transform;
+}
+
+/* the turntable under the wedges, with its rails */
+.disc {
+  --R: calc(var(--a1, 0px) + 40px);
+  position: absolute;
+  left: calc(-1 * var(--R));
+  top: calc(var(--hf, 0px) - var(--R));
+  width: calc(2 * var(--R));
+  height: calc(2 * var(--R));
+  border-radius: 50%;
+  background:
+    repeating-conic-gradient(from 36deg, color-mix(in srgb, var(--brass) 38%, transparent) 0 0.5deg, transparent 0.5deg 72deg),
+    repeating-radial-gradient(circle, transparent 0 22px, color-mix(in srgb, var(--paper) 4%, transparent) 22px 23px),
+    radial-gradient(circle, var(--ink-3), var(--ink-2) 62%, var(--ink));
+  box-shadow: 0 0 0 2px var(--brass-dark), 0 0 0 7px color-mix(in srgb, var(--ink) 80%, transparent);
+  transform: rotateX(90deg);
+}
+
+/* ── a wedge ─────────────────────────────────────────────────────────────── */
+.face {
+  position: absolute;
+  left: calc(var(--P, 0px) / -2);
+  top: 0;
+  width: var(--P, 0px);
+  height: var(--hf, 0px);
+  transform: rotateY(calc(var(--i) * 72deg)) translateZ(var(--a0, 0px));
+  backface-visibility: hidden;
+  /* closing: in once its front has folded */
+  transition: transform 0.75s var(--hand) 0.5s;
+}
+.stage[data-open] .face {
+  transform: rotateY(calc(var(--i) * 72deg)) translateZ(var(--a1, 0px));
+  /* opening: out as soon as the band lets go */
+  transition: transform 1s cubic-bezier(0.2, 0.8, 0.25, 1) 0.25s;
+}
+
+/* its front: the cabinet, with the five leaves of a folding screen in it, folded
+   up to the wedge's width while closed. It unfolds by its edges, not by a scale:
+   a transform animated inside a face that is itself turned in 3D gets its own
+   compositor layer, and Chrome then paints the wrong faces (backs, not fronts)
+   until it settles. */
+.leaf,
+.shade {
+  position: absolute;
+  inset: 0 calc(50% - var(--c, 0px) / 2);
+  transition: left 0.5s var(--hand) 0.05s, right 0.5s var(--hand) 0.05s;
+}
+.stage[data-open] .leaf,
+.stage[data-open] .shade {
+  inset: 0;
+  transition: left 0.7s var(--hand) 0.95s, right 0.7s var(--hand) 0.95s;
+}
+.leaf {
+  border-radius: 3px;
+  background:
+    linear-gradient(180deg, var(--brass) 0 5px, var(--brass-dark) 5px 7px, transparent 7px),
+    repeating-linear-gradient(90deg, color-mix(in srgb, var(--paper) 4%, transparent) 0 calc(20% - 1px), rgba(0, 0, 0, 0.3) calc(20% - 1px) 20%),
+    repeating-linear-gradient(92deg, transparent 0 7px, color-mix(in srgb, var(--paper) 2.5%, transparent) 7px 8px),
+    linear-gradient(160deg, var(--ink-3), var(--ink-2) 55%, var(--ink));
+  box-shadow:
+    inset 0 0 0 1px var(--rule-strong),
+    inset 0 -14px 24px rgba(0, 0, 0, 0.25);
+}
+.shade {
+  z-index: 10;
+  border-radius: 3px;
+  background: #000;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* the seams it will split along, lit in its colour */
+.seam {
+  position: absolute;
+  top: 7px;
+  bottom: 0;
+  width: 2px;
+  background: var(--tone);
+  box-shadow: 0 0 10px var(--tone);
+  opacity: 0.28;
+  transition: opacity 0.3s ease 0.5s;
+}
+.seamL {
+  left: calc(50% - var(--c, 0px) / 2);
+}
+.seamR {
+  left: calc(50% + var(--c, 0px) / 2 - 2px);
+}
+.stage[data-sorting] .seam {
+  opacity: 0.6;
+}
+.stage[data-open] .seam {
+  opacity: 0;
+  transition: opacity 0.3s ease 0.6s;
+}
+.stage[data-late] .seam {
+  animation: seamsGlow 0.6s ease both;
+}
+@keyframes seamsGlow {
+  40% {
+    opacity: 1;
+    box-shadow: 0 0 22px var(--tone);
+  }
+}
+
+/* the brass band round its waist: the topic's plate and its counter */
+.band {
+  position: absolute;
+  top: 40%;
+  left: calc(50% - var(--c, 0px) / 2);
+  width: var(--c, 0px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 8px 10px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--brass) 92%, white), var(--brass) 45%, var(--brass-dark));
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  transition: opacity 0.3s ease 0.55s;
+}
+.stage[data-open] .band {
+  opacity: 0;
+  transition: opacity 0.25s ease 0.8s;
+}
+.clasp {
+  position: absolute;
+  top: 50%;
+  width: 9px;
+  height: 22px;
+  margin-top: -11px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--brass-dark), var(--brass));
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  transition: transform 0.25s var(--hand) 1.1s;
+}
+.clasp:first-child {
+  left: -5px;
+  transform-origin: 0 50%;
+}
+.clasp:last-child {
+  right: -5px;
+  transform-origin: 100% 50%;
+}
+.stage[data-open] .clasp:first-child {
+  transform: rotate(-70deg);
+  transition-delay: 0s;
+}
+.stage[data-open] .clasp:last-child {
+  transform: rotate(70deg);
+  transition-delay: 0s;
+}
+
+.tag {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  width: 100%;
+  min-height: 52px;
+  padding: 6px 6px 7px;
+  border-radius: 4px;
+  border: 1px solid color-mix(in srgb, var(--tone) 50%, var(--ink));
+  background: linear-gradient(180deg, color-mix(in srgb, var(--tone) 24%, var(--ink-2)), color-mix(in srgb, var(--tone) 10%, var(--ink)));
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--paper) 14%, transparent);
+  font-family: var(--font-display);
+  font-size: 13.5px;
+  font-weight: 620;
+  line-height: 1.15;
+  text-align: center;
+  color: var(--paper);
+}
+.tag b {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--tone);
+}
+.blank {
+  display: block;
+  width: 70%;
+  height: 10px;
+  margin-top: 4px;
+  border-radius: 2px;
+  background: repeating-linear-gradient(90deg, color-mix(in srgb, var(--paper) 14%, transparent) 0 6px, transparent 6px 10px);
+}
+/* a name stamped in, letter by letter */
+.word {
+  display: inline-block;
+  white-space: nowrap;
+}
+.word + .word {
+  margin-left: 0.28em;
+}
+.word span {
+  display: inline-block;
+  animation: stamp 0.32s var(--hand) var(--d) both;
+}
+@keyframes stamp {
+  from {
+    opacity: 0;
+    transform: scale(1.7);
+    filter: blur(2px);
+  }
+}
+
+.odo {
+  display: inline-flex;
+  overflow: hidden;
+  padding: 2px 8px;
+  border-radius: 3px;
+  background: #120c07;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.8);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  color: #f2e4c4;
+  font-variant-numeric: tabular-nums;
+}
+.odoNum {
+  display: inline-block;
+  animation: roll 0.3s var(--hand) both;
+}
+@keyframes roll {
+  from {
+    transform: translateY(-90%);
+    opacity: 0.2;
+  }
+}
+
+/* a slip landing: the band (or the spike) flashes */
+.hit {
+  animation: hit 0.6s ease-out;
+}
+@keyframes hit {
+  from {
+    box-shadow: 0 0 0 2px var(--tone, var(--paper)), 0 0 26px var(--tone, var(--paper));
+    filter: brightness(1.25);
+  }
+}
+
+/* ── an opened panel ─────────────────────────────────────────────────────── */
+.panel {
+  position: absolute;
+  inset: 12px 10px 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: clip;
+  border-radius: 6px 6px 0 0;
+  border: 1px solid var(--rule);
+  border-bottom: 0;
+  background: color-mix(in srgb, var(--ink) 86%, transparent);
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--paper) 8%, transparent) inset;
+  animation: panelIn 0.35s ease both;
+}
+.panelLate {
+  animation-delay: 1.45s;
+  animation-duration: 0.45s;
+}
+@keyframes panelIn {
+  from {
+    opacity: 0;
+  }
+}
+.head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  padding: 13px 18px 12px;
+  border-bottom: 2px solid var(--tone);
+  /* enamel, in the topic's colour */
+  background: linear-gradient(180deg, color-mix(in srgb, var(--tone) 26%, var(--ink-2)), color-mix(in srgb, var(--tone) 11%, var(--ink-2)));
+}
+.no {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 2px solid var(--tone);
+  font-family: var(--font-display);
+  font-size: 17px;
+  color: var(--tone);
+}
+.headText {
+  min-width: 0;
+}
+.name {
+  margin: 0;
+  overflow: hidden;
+  font-family: var(--font-display);
+  font-size: 25px;
+  font-weight: 620;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--paper);
+}
+.about {
+  margin: 3px 0 0;
+  overflow: hidden;
+  font-size: 13px;
+  font-style: italic;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--paper-dim);
+}
+.count {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--paper-faint);
+}
+.count b {
+  font-size: 15px;
+  color: var(--tone);
+}
+.list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--tone) 40%, transparent) transparent;
+}
+.empty {
+  margin: 0;
+  padding: 26px 18px;
+  font-size: 14px;
+  color: var(--paper-faint);
+}
+
+/* ── the dome: the reading lamp, and the model's name under it ───────────── */
+.dome {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+  transform: translate(-50%, -100%);
+  transition: transform 0.6s var(--hand) 0.35s;
+}
+.stage[data-open] .dome {
+  transform: translate(-50%, calc(-100% - 30px));
+  transition: transform 0.8s var(--hand) 1.05s;
+}
+.dome:disabled {
+  cursor: default;
+}
+.glass {
+  position: relative;
+  width: 78px;
+  height: 58px;
+  border-radius: 40px 40px 5px 5px;
+  border: 1px solid color-mix(in srgb, var(--paper) 30%, transparent);
+  background:
+    radial-gradient(60% 50% at 34% 28%, rgba(255, 255, 255, 0.28), transparent 70%),
+    linear-gradient(180deg, color-mix(in srgb, var(--paper) 10%, transparent), color-mix(in srgb, var(--paper) 3%, transparent));
+  box-shadow: inset 0 -8px 16px rgba(0, 0, 0, 0.3);
+}
+.lamp {
+  position: absolute;
+  left: 50%;
+  bottom: 7px;
+  width: 26px;
+  height: 26px;
+  margin-left: -13px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff1c9 0 18%, #f0b862 34%, rgba(230, 171, 94, 0) 70%);
+  opacity: 0.18;
+  transition: opacity 0.4s ease;
+}
+.stage[data-lit] .lamp {
+  opacity: 0.85;
+}
+.stage[data-sorting] .lamp {
+  animation: pulse 1.5s ease-in-out infinite;
+}
+@keyframes pulse {
+  50% {
+    opacity: 1;
+    transform: scale(1.35);
+    filter: drop-shadow(0 0 12px #f0b862);
+  }
+}
+.domeBase {
+  margin-top: -1px;
+  padding: 3px 12px 4px;
+  border-radius: 3px 3px 9px 9px;
+  background: linear-gradient(180deg, var(--brass), var(--brass-dark));
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.45);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  color: #1c140d;
+}
+.dome:not(:disabled):hover .glass,
+.dome:focus-visible .glass {
+  border-color: var(--signal);
+  box-shadow: inset 0 -8px 16px rgba(0, 0, 0, 0.3), 0 0 18px color-mix(in srgb, var(--signal) 40%, transparent);
+}
+.dome:focus-visible {
+  outline: none;
+}
+
+/* ── what stands on the table in front: reel, tape, apron, spike ──────────── */
+.overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.tape {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  transition: opacity 0.4s ease;
+}
+.tape path {
+  fill: none;
+  stroke: var(--slip);
+  stroke-width: 15;
+  filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.35));
+}
+.tape text {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 600;
+  fill: #8d5f17;
+  dominant-baseline: central;
+}
+.stage[data-open] .tape {
+  opacity: 0;
+}
+.reel {
+  position: absolute;
+  left: calc(8.5% - 46px);
+  bottom: calc(var(--foot, 70px) - 8px);
+  width: 92px;
+  height: 92px;
+  border-radius: 50%;
+  border: 3px solid var(--brass-dark);
+  background:
+    radial-gradient(circle, var(--brass) 0 8px, var(--ink) 8px 11px, transparent 11px),
+    repeating-radial-gradient(circle, var(--slip) 0 1px, color-mix(in srgb, var(--slip) 82%, #000) 1px 2.4px);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.45);
+  transition: opacity 0.4s ease, transform 0.5s var(--hand);
+}
+.reel i {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: repeating-conic-gradient(rgba(0, 0, 0, 0.18) 0 4deg, transparent 4deg 60deg);
+  animation: reelSpin 3.2s linear infinite;
+  animation-play-state: paused;
+}
+.stage[data-sorting] .reel i {
+  animation-play-state: running;
+}
+@keyframes reelSpin {
+  to {
+    transform: rotate(-360deg);
+  }
+}
+.stage[data-open] .reel {
+  opacity: 0;
+  transform: translateY(26px);
+}
+
+.apron {
+  position: absolute;
+  left: 2%;
+  right: 2%;
+  bottom: 0;
+  height: var(--foot, 70px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px 3px 10px 10px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--paper) 14%, var(--ink-3)) 0 3px, transparent 3px),
+    repeating-linear-gradient(92deg, transparent 0 9px, color-mix(in srgb, var(--paper) 2.5%, transparent) 9px 10px),
+    linear-gradient(180deg, var(--ink-3), var(--ink-2) 60%, var(--ink));
+  box-shadow: 0 16px 30px rgba(0, 0, 0, 0.42), inset 0 0 0 1px var(--rule);
+}
+.plate {
+  padding: 4px 16px 5px;
+  border-radius: 4px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--brass) 90%, white), var(--brass-dark));
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 640;
+  letter-spacing: 0.04em;
+  color: #241810;
+}
+
+.spike {
+  position: absolute;
+  right: calc(7% - 34px);
+  bottom: calc(var(--foot, 70px) - 10px);
+  width: 68px;
+  height: 128px;
+}
+.spikeTip {
+  position: absolute;
+  left: 50%;
+  bottom: 18px;
+  width: 4px;
+  height: 104px;
+  margin-left: -2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #6c6f74, #d9dde2 45%, #7b7f85);
+  clip-path: polygon(50% 0, 100% 9%, 100% 100%, 0 100%, 0 9%);
+}
+.pile span {
+  position: absolute;
+  left: 50%;
+  bottom: calc(20px + var(--k) * 4px);
+  width: 48px;
+  height: 30px;
+  margin-left: -24px;
+  border-radius: 1px;
+  background:
+    repeating-linear-gradient(180deg, transparent 0 5px, color-mix(in srgb, var(--slip-ink) 16%, transparent) 5px 6px),
+    var(--slip);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  transform: rotate(var(--tilt));
+  pointer-events: auto;
+}
+.spikeCount {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+  padding: 2px 9px 3px;
+  border-radius: 9px;
+  background: #120c07;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  white-space: nowrap;
+  color: #c9b48f;
+}
+.spikeCount b {
+  color: #f2e4c4;
+}
+
+/* the slips in flight */
+.slip {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 3;
+  width: 150px;
+  padding: 5px 7px 5px 8px;
+  overflow: hidden;
+  border-left: 3px solid var(--tone);
+  border-radius: 1px;
+  background: var(--slip);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.4);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  line-height: 1.3;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--slip-ink);
+  pointer-events: none;
+  backface-visibility: hidden;
+  will-change: transform, opacity;
+}
+
+/* hung on a closed column: out of order, or jammed */
+.card {
+  position: absolute;
+  left: 50%;
+  top: 42%;
+  width: min(380px, 84%);
+  padding: 14px 18px 15px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--paper) 94%, var(--ink));
+  color: var(--ink);
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.5);
+  transform: translateX(-50%) rotate(-1.6deg);
+  pointer-events: auto;
+  animation: swing 0.9s var(--hand) both;
+}
+.card::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: -46px;
+  width: 1px;
+  height: 46px;
+  background: color-mix(in srgb, var(--paper) 50%, transparent);
+}
+.card b {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--danger, #c75a44);
+}
+.card p {
+  margin: 6px 0 0;
+  font-size: 13.5px;
+  line-height: 1.45;
+}
+.card code {
+  padding: 0 4px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--ink) 12%, transparent);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+@keyframes swing {
+  from {
+    transform: translateX(-50%) rotate(6deg);
+    opacity: 0;
+  }
+}
+
+/* ── the topics, named, under the machine ────────────────────────────────── */
+.dial {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  align-self: center;
+  max-width: 100%;
+  padding: 5px;
+  border-radius: 22px;
+  border: 1px solid var(--rule);
+  background: color-mix(in srgb, var(--ink) 55%, transparent);
+}
+.tab,
+.step {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  border: 1px solid transparent;
+  border-radius: var(--r-pill);
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, opacity 0.2s ease;
+}
+.tab:disabled,
+.step:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.step {
+  justify-content: center;
+  width: 34px;
+  color: var(--paper-faint);
+}
+.tab {
+  max-width: 220px;
+  padding: 0 12px 0 5px;
+}
+.tab span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.tab b {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1.5px solid color-mix(in srgb, var(--tone) 55%, var(--rule-strong));
+  font-family: var(--font-display);
+  font-size: 12.5px;
+  color: var(--tone);
+}
+.tab small {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--paper-faint);
+}
+.tab:not(:disabled):hover,
+.step:not(:disabled):hover {
+  background: color-mix(in srgb, var(--paper) 6%, transparent);
+  color: var(--text-primary);
+}
+.tab:focus-visible,
+.step:focus-visible {
+  outline: none;
+  border-color: var(--tone, var(--signal));
+}
+.tabOn {
+  border-color: color-mix(in srgb, var(--tone) 45%, transparent);
+  background: color-mix(in srgb, var(--tone) 14%, transparent);
+  color: var(--text-primary);
+  cursor: default;
+}
+.tabOn b {
+  background: color-mix(in srgb, var(--tone) 22%, transparent);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--tone) 35%, transparent);
+}
+
+/* narrow: the panels take most of the width, so the reel and the spike stand
+   right at the ends of the apron, a size down */
+.stage[data-narrow] .spike {
+  right: -4px;
+  transform: scale(0.78);
+  transform-origin: 100% 100%;
+}
+.stage[data-narrow] .reel {
+  left: 0;
+  transform: scale(0.78);
+  transform-origin: 0 100%;
+}
+
+@media (max-width: 760px) {
+  .tab span {
+    display: none;
+  }
+  .tab {
+    padding: 0 8px 0 5px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stage,
+  .card {
+    animation: none;
+  }
+  .stage[data-sorting] .lamp,
+  .reel i {
+    animation: none;
+  }
+}

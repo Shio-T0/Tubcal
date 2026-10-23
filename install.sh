@@ -98,6 +98,8 @@ Options
 Rooms (a room you leave out isn't downloaded)
   edition     The Edition: a daily paper from the rooms you follow
   hackernews  The Wire: Hacker News (also: wire, hn)
+  topics      By topic: the Wire sorted into five topics by Ollama, shown with
+              3D objects (also: bytopic, sorter; needs hackernews)
   reddit      The Dispatch: Reddit (also: dispatch)
   editor      The Composing Room: a code editor with a terminal
   dev         The Workbench: one manual per programming language (also: workbench)
@@ -111,6 +113,9 @@ Options
   autostart  start the server when you log in
   extras     distro packages the rooms use: notify-send (live-stream pings),
              ripgrep (the editor's search)
+  3d         3D objects: the home screen is a box you turn, with the TV on the
+             front and a channel on each other side, and By topic sorts Hacker
+             News into five topics with the local AI (Settings changes it later)
 
 Environment
   TUBCAL_REPO, TUBCAL_BRANCH   what to clone (default: GitHub, main)
@@ -605,7 +610,7 @@ room_list() { # room_list KEY → REPLY: the KEY values (extras, groups, tools, 
 }
 wants_tool() { room_list tools; [[ " $REPLY " == *" $1 "* ]]; }
 
-OPTS=(desktop autostart extras)
+OPTS=(desktop autostart extras 3d)
 PREV_CLONED=""
 declare -A ON=() LOCKED=()
 PREV_LOADED=0
@@ -615,7 +620,7 @@ PREV_ROOMS="" # what the install record says is installed now (for --add / --rem
 load_previous() {
   [[ -r $CONF ]] || return 0
   local here=$APP_DIR id
-  local EDITOR_X="" ARCHIVE="" DESKTOP="" AUTOSTART="" EXTRAS="" APP_DIR="" CLONED=0
+  local EDITOR_X="" ARCHIVE="" DESKTOP="" AUTOSTART="" EXTRAS="" OBJECTS_3D="" APP_DIR="" CLONED=0
   local MODULES="" KNOWN_MODULES="" HAS_ROOMS=0
   local UV="" NODE_BIN="" BIN_DIR="" SYSTEMD="" PKGS_ADDED="" INSTALLED_AT=""
   # shellcheck source=/dev/null
@@ -637,6 +642,7 @@ load_previous() {
   [[ -n $DESKTOP ]] && ON[desktop]=$DESKTOP
   [[ -n $AUTOSTART ]] && ON[autostart]=$AUTOSTART
   [[ -n $EXTRAS ]] && ON[extras]=$EXTRAS
+  [[ -n $OBJECTS_3D ]] && ON[3d]=$OBJECTS_3D
   rooms_on; PREV_ROOMS=$REPLY
   return 0
 }
@@ -659,6 +665,7 @@ default_choices() {
   : "${ON[desktop]:=1}"
   : "${ON[autostart]:=0}"
   : "${ON[extras]:=$CAN_PKG}"
+  : "${ON[3d]:=0}"
   apply_force
   for id in "${MOD_IDS[@]}"; do ((ON[$id])) && mod_on "$id"; done
   extras_lock
@@ -672,7 +679,7 @@ apply_force() { # --rooms, --with and --without
   fi
   for w in "${!FORCE[@]}"; do
     case $w in
-      desktop|autostart|extras) ON[$w]=${FORCE[$w]} ;;
+      desktop|autostart|extras|3d) ON[$w]=${FORCE[$w]} ;;
       *)
         module_id "$w" || bad_room "$w"
         if ((FORCE[$w])); then mod_on "$REPLY"; else mod_off "$REPLY"; fi ;;
@@ -698,10 +705,12 @@ declare -A LABEL=(
   [desktop]="App-menu entry & icon"
   [autostart]="Start when I log in"
   [extras]="Distro extras for the rooms"
+  [3d]="3D objects"
 )
 declare -A DESC=(
   [desktop]="Launch Tubcal from your app menu like any other app."
   [autostart]="The server waits in the background, so the app opens at once."
+  [3d]="Home becomes a box you turn: the TV in front, a channel on each other side. The Wire gets By topic, sorted by the local AI."
 )
 
 extras_desc() { # → REPLY: what the extras would bring, for the rooms chosen
@@ -719,7 +728,7 @@ extras_desc() { # → REPLY: what the extras would bring, for the rooms chosen
 
 side_note() { # side_note ROW → REPLY: the menu's right-hand column
   case $1 in
-    desktop) REPLY="" ;;
+    desktop|3d) REPLY="" ;;
     autostart) ((SYSTEMD)) && REPLY="systemd --user" || REPLY="XDG autostart" ;;
     extras)
       if ((LOCKED[extras] == 1)); then
@@ -750,7 +759,7 @@ row_label() { if [[ -n ${LABEL[$1]:-} ]]; then REPLY=${LABEL[$1]}; else REPLY=${
 row_desc() { # row_desc ROW → REPLY: the line under the menu for the row the cursor is on
   case $1 in
     extras) extras_desc ;;
-    desktop|autostart) REPLY=${DESC[$1]} ;;
+    desktop|autostart|3d) REPLY=${DESC[$1]} ;;
     *)
       local about=${MAN[$1.about]:-}
       if [[ -n ${MAN[$1.needs]:-} ]]; then room_names ${MAN[$1.needs]}; about+=" Comes with $REPLY."; fi
@@ -818,7 +827,7 @@ _menu_toggle() {
   local row=$1 before after
   ((LOCKED[$row] == 1)) && return
   case $row in
-    desktop|autostart|extras) ON[$row]=$((1 - ON[$row])) ;;
+    desktop|autostart|extras|3d) ON[$row]=$((1 - ON[$row])) ;;
     *)
       rooms_on; before=$REPLY
       if ((ON[$row])); then mod_off "$row"; else mod_on "$row"; fi
@@ -1372,14 +1381,14 @@ render() { # render TEMPLATE → stdout, with @TOKENS@ filled
 write_conf() {
   mkdir -p "$TUBCAL_HOME"
   local MODULES KNOWN_MODULES="${MOD_IDS[*]}" DESKTOP=${ON[desktop]}
-  local AUTOSTART=${ON[autostart]} EXTRAS=${ON[extras]} INSTALLED_AT k
+  local AUTOSTART=${ON[autostart]} EXTRAS=${ON[extras]} OBJECTS_3D=${ON[3d]} INSTALLED_AT k
   rooms_on; MODULES=$REPLY
   INSTALLED_AT=$(date '+%Y-%m-%d %H:%M')
   {
     echo "# Tubcal's install record: written by install.sh, read by \`tubcal\`."
     echo "# Re-run install.sh (or \`tubcal update\`, \`tubcal add\`) rather than editing this."
     echo "# MODULES: the rooms installed; KNOWN_MODULES: every room there was to pick."
-    for k in APP_DIR CLONED UV NODE_BIN BIN_DIR MODULES KNOWN_MODULES DESKTOP AUTOSTART EXTRAS SYSTEMD PKGS_ADDED INSTALLED_AT; do
+    for k in APP_DIR CLONED UV NODE_BIN BIN_DIR MODULES KNOWN_MODULES DESKTOP AUTOSTART EXTRAS OBJECTS_3D SYSTEMD PKGS_ADDED INSTALLED_AT; do
       printf '%s=%q\n' "$k" "${!k}"
     done
   } >"$CONF.new" && mv "$CONF.new" "$CONF"
@@ -1999,6 +2008,7 @@ running_order() {
   ((ON[desktop])) && l+=" $SEP app menu"
   ((ON[autostart])) && l+=" $SEP autostart"
   kv "Launcher" "$l"
+  ((ON[3d])) && kv "Home" "3D objects: a box you turn, the TV in front"
   if ((ON[extras])) && ((!CAN_PKG)); then
     note "notify-send/ripgrep are only used if already installed."
   fi
@@ -2068,11 +2078,12 @@ on_air() {
   local notes=()
   [[ ":$PATH:" == *":$BIN_DIR:"* ]] || { tilde "$BIN_DIR"; notes+=("$REPLY isn't on your PATH yet; add it to use plain \`tubcal\`."); }
   ((PHONE_SEEN)) && notes+=("A phone is plugged in: \`tubcal phone\` puts Tubcal for Android on it.")
-  if ((ON[archive] || ON[edition])) && ! has ollama; then
+  if ((ON[archive] || ON[edition] || ON[topics])) && ! has ollama; then
     local writers=()
-    for l in edition archive; do ((ON[$l])) && writers+=("$l"); done
+    for l in edition topics archive; do ((ON[$l])) && writers+=("$l"); done
     room_names "${writers[@]}"
-    notes+=("No Ollama yet: ${REPLY/, / and } $( ((${#writers[@]} == 1)) && echo writes || echo write) with it (ollama.com).")
+    ((${#writers[@]} > 1)) && REPLY="${REPLY%, *} and ${REPLY##*, }"
+    notes+=("No Ollama yet: $REPLY $( ((${#writers[@]} == 1)) && echo needs || echo need) it (ollama.com).")
   fi
   if ((${#WARNINGS[@]} + ${#notes[@]})); then
     printf '\n'
@@ -2361,6 +2372,19 @@ about = Hacker News: the six lists, search, and threads that mark what's new.
 aliases = wire hn
 size = under 1 MB
 needs =
+extras =
+groups =
+tools =
+packages =
+
+# Not a room: a page of the Wire's, shown in the Social bar with 3D objects on.
+[topics]
+name = By topic
+channel = social
+about = The Wire's front page sorted into five topics by Ollama, as a 3D machine.
+aliases = bytopic sorter
+size = under 1 MB
+needs = hackernews
 extras =
 groups =
 tools =

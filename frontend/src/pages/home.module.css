@@ -276,6 +276,14 @@
 .hint kbd:not(:first-child) {
   margin-left: 1px;
 }
+/* with the box, its own keys sit right under the box's tabs */
+.hintBox {
+  margin: calc(-1 * var(--space-2)) 0 0;
+  animation-delay: 0.6s;
+}
+.hintBox + .hint {
+  margin-top: calc(-1 * var(--space-3));
+}
 
 @media (max-width: 900px) {
   .guides {

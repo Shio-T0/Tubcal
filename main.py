@@ -42,6 +42,7 @@ def main():
         updater.check_and_update()
     db.init_db()
     db.note_modules(modules.installed(), chosen=modules.chosen_explicitly())
+    db.note_install({"objects_3d": config.INSTALL_3D})
     app = create_app()
     if modules.has("youtube"):
         from server import notifier

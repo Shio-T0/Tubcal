@@ -23,7 +23,7 @@ import { Avatar } from '../components/ui/Avatar.jsx';
 import AddSubscriptionModal from '../components/modals/AddSubscriptionModal.jsx';
 import { useSettings, useSubscriptions, useToast } from '../state.jsx';
 import { THEMES, skinsFor } from '../lib/themes.js';
-import { ALL_FIXED, ALL_ROOMS, CHANNELS, ROOMS, getRoomById, knownActiveIds } from '../lib/rooms.js';
+import { ALL_FIXED, ALL_PAGES, ALL_ROOMS, CHANNELS, ROOMS, getRoomById, knownActiveIds } from '../lib/rooms.js';
 import { hasModule, missingModules, moduleLazy } from '../lib/modules.js';
 import { latestParams } from '../lib/urlState.js';
 import { subtitleStyle, SUBTITLE_FONTS } from '../lib/subtitleStyle.js';
@@ -487,6 +487,14 @@ function AppearanceSection() {
         >
           <Switch label="Fast mode" checked={settings?.fast_mode === true} onChange={(v) => updateSettings({ fast_mode: v })} />
         </Row>
+        {!APP.phone && (
+          <Row
+            label="3D objects"
+            hint="The home screen becomes a box with the TV on the front and a channel on each other side. Drag it sideways or press ← → to turn it. The Social channel also gets By topic: Hacker News's front page, sorted into five topics by the local AI."
+          >
+            <Switch label="3D objects" checked={settings?.objects_3d === true} onChange={(v) => updateSettings({ objects_3d: v })} />
+          </Row>
+        )}
       </Group>
       <AppearanceSkins value={value} onPick={(theme) => updateSettings({ theme })} />
     </>
@@ -588,16 +596,16 @@ function RoomsSection() {
   );
 }
 
-/** The rooms this install left out, and the command that adds one back. */
+/** The rooms (and pages) this install left out, and the command that adds one back. */
 function NotInstalled() {
   const missing = missingModules()
-    .map((id) => [...ALL_ROOMS, ...ALL_FIXED].find((r) => r.id === id))
+    .map((id) => [...ALL_ROOMS, ...ALL_FIXED, ...ALL_PAGES].find((r) => r.id === id))
     .filter(Boolean);
   if (!missing.length) return null;
   return (
     <Group
       title="Not installed"
-      note="These rooms were left out when Tubcal was installed, so none of their files are on this machine. Add one from a terminal, then reload this page."
+      note="These were left out when Tubcal was installed, so none of their files are on this machine. Add one from a terminal, then reload this page."
     >
       {missing.map((room) => (
         <Row key={room.id} label={<span className={s.room} style={{ '--room-c': room.color }} data-off="">{room.label}</span>}>
@@ -968,7 +976,7 @@ function useSummaries(oauth) {
       subscriptions: `${nSubs} followed`,
       history: 'Kept on this machine',
       data: (st.snapshots_keep ?? 7) ? `Snapshot daily · keeps ${st.snapshots_keep ?? 7}` : 'Daily snapshots off',
-      appearance: `${THEMES.find((t) => t.value === (st.theme || 'dark'))?.label || st.theme}${st.fast_mode ? ' · fast mode' : ''}`,
+      appearance: `${THEMES.find((t) => t.value === (st.theme || 'dark'))?.label || st.theme}${st.fast_mode ? ' · fast mode' : ''}${st.objects_3d && !APP.phone ? ' · 3D' : ''}`,
       rooms: `${active.length} of ${st.max_active_rooms ?? 6} switched on`,
       playback: `${st.solo_audio === false ? 'Sound from all' : 'Sound from one'} · ${(st.playback_rate || 1) === 1 ? 'normal speed' : `${st.playback_rate}×`}${Array.isArray(st.quiet_hours) ? ' · quiet at night' : ''}`,
       subtitles: sub.show

@@ -182,6 +182,7 @@ function SavedTab({ onDone, openItem }) {
 
 const SWITCHES = [
   { key: 'fast_mode', label: 'Fast mode', hint: 'Nothing animates', fallback: false },
+  { key: 'objects_3d', label: '3D objects', hint: 'Home as a box, and By topic', fallback: false },
   { key: 'solo_audio', label: 'One sound at a time', hint: 'Only the video in front plays sound', fallback: true },
   { key: 'notify_live', label: 'Live alerts', hint: 'A desktop note before a stream starts', fallback: true },
   { key: 'anime_auto_skip', label: 'Skip anime openings', hint: 'The player jumps them by itself', fallback: false },

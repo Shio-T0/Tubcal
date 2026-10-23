@@ -256,6 +256,11 @@ def cached_many(keys, ttl, fetch_missing):
     return out
 
 
+def put(key, payload, ttl):
+    """Store a payload made elsewhere (a background job's result) under key."""
+    _store(key, payload, time.time(), ttl)
+
+
 def peek(key):
     """Return the cached payload for a key if it exists (even if expired), or None.
     Does NOT trigger a fetch. Useful for fuzzy fallback: check what's cached

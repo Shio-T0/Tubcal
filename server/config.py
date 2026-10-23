@@ -22,6 +22,11 @@ BRAIN_ASK_EXPAND = int(os.environ.get("TUBCAL_BRAIN_ASK_EXPAND", "3"))
 BRAIN_ASK_EXPAND_RADIUS = 2  # chunks either side of a chosen hit (~±90s)
 TTL_BRAIN_DIGEST = 1800  # digest is expensive — cache it (SWR)
 
+# The installer's "3D objects" option (install.conf, exported by the launcher as
+# TUBCAL_3D=1 or 0). Unset when Tubcal wasn't started by the launcher: then the
+# setting is whatever Settings → Appearance says. db.note_install applies it.
+INSTALL_3D = {"1": True, "0": False}.get(os.environ.get("TUBCAL_3D", "").strip())
+
 HOST = "127.0.0.1"
 PORT = int(os.environ.get("TUBCAL_PORT", "5000"))
 
@@ -51,6 +56,7 @@ REDDIT_UA = "linux:tubcal:v0.1 (localhost personal aggregator)"
 TTL_HN_LIST = 120
 TTL_HN_ITEM = 1800
 TTL_HN_COMMENTS = 300
+TTL_HN_TOPICS = 3600  # By topic: how long a sort of the front page stands
 TTL_REDDIT_LISTING = 300
 TTL_REDDIT_COMMENTS = 300
 TTL_YT_RSS = 600

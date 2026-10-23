@@ -1,0 +1,231 @@
+/* The box (TheBox.jsx): Home as a solid cabinet you turn. The stage is a size
+   container, so the box's depth is worked out from its width (cqw) with no
+   script: every side sits in the one grid cell, turned to its place around the
+   middle and pushed out by the apothem (--apothem · half the width); the cube is
+   pushed back by the same amount so the side facing you sits exactly where a flat
+   page would. Script moves --turn (degrees) and sets data-turning while it turns,
+   which lifts the box back and tips it towards you so its top shows. Neither
+   number is inherited: a frame of the turn restyles the cube, not what's on it. */
+
+@property --turn {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+@property --lift {
+  syntax: '<number>';
+  inherits: false;
+  initial-value: 0;
+}
+
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* A turning corner may reach past the page's column: it may use the margins
+   either side (--gutter, measured by TheBox), but never makes a sideways
+   scrollbar. */
+.bleed {
+  margin-inline: calc(-1 * var(--gutter, 0px));
+  padding-inline: var(--gutter, 0px);
+  overflow-x: clip;
+}
+
+.stage {
+  position: relative;
+  container-type: inline-size;
+  touch-action: pan-y;
+  cursor: grab;
+  animation: rise 0.7s var(--hand) 0.1s both;
+}
+.stage[data-turning] .cube,
+.stage[data-turning] .floor {
+  --lift: 1;
+  transition-duration: 0.26s;
+}
+.stage[data-dragging],
+.stage[data-dragging] * {
+  cursor: grabbing !important;
+  user-select: none;
+}
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+}
+
+.box {
+  /* the eye a little below the top edge: standing at a table, looking at the box */
+  perspective: 170cqw;
+  perspective-origin: 50% 12%;
+}
+
+.cube {
+  --lift: 0;
+  position: relative;
+  display: grid;
+  transform-style: preserve-3d;
+  transform:
+    translateZ(calc(-50cqw * var(--apothem) - var(--lift) * 30cqw))
+    rotateX(calc(var(--lift) * -6deg))
+    rotateY(var(--turn));
+  will-change: transform;
+  transition: --lift 0.5s var(--hand);
+}
+
+/* ── the sides ───────────────────────────────────────────────────────────── */
+.side {
+  grid-area: 1 / 1;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border-radius: 4px;
+  /* the cabinet, as on the set: a fine vertical grain over a lit-from-above finish */
+  background:
+    repeating-linear-gradient(92deg, transparent 0 7px, color-mix(in srgb, var(--paper) 2.5%, transparent) 7px 8px),
+    linear-gradient(160deg, var(--ink-3), var(--ink-2) 55%, var(--ink));
+  box-shadow:
+    inset 0 0 0 1px var(--rule-strong),
+    inset 0 1px 0 color-mix(in srgb, var(--paper) 10%, transparent);
+  transform: rotateY(calc(var(--i) * var(--step))) translateZ(calc(50cqw * var(--apothem)));
+  backface-visibility: hidden;
+  isolation: isolate;
+}
+.side > * {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+/* a side turning away goes into shadow (TheBox sets the opacity) */
+.side > .shade {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  border-radius: inherit;
+  background: #000;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* the top, seen while the box is lifted */
+.cap {
+  position: absolute;
+  left: calc(50% - 50cqw * var(--corner));
+  top: calc(-50cqw * var(--corner));
+  width: calc(100cqw * var(--corner));
+  height: calc(100cqw * var(--corner));
+  /* lit from above, so a shade lighter than the sides */
+  background:
+    repeating-linear-gradient(2deg, transparent 0 9px, color-mix(in srgb, var(--paper) 4%, transparent) 9px 10px),
+    radial-gradient(70% 70% at 50% 70%, color-mix(in srgb, var(--paper) 9%, var(--ink-3)), var(--ink-3));
+  transform: rotateX(90deg);
+  backface-visibility: hidden;
+  pointer-events: none;
+}
+
+/* its shadow on the table, spreading as it lifts */
+.floor {
+  --lift: 0;
+  position: absolute;
+  left: 4%;
+  right: 4%;
+  bottom: -22px;
+  z-index: -1;
+  height: 44px;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(0, 0, 0, 0.5), transparent);
+  opacity: calc(0.45 + var(--lift) * 0.35);
+  transform: scaleX(calc(1 - var(--lift) * 0.14));
+  pointer-events: none;
+  transition: --lift 0.5s var(--hand);
+}
+
+/* ── the sides, named, under the box ─────────────────────────────────────── */
+.dial {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  align-self: center;
+  padding: 5px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--rule);
+  background: color-mix(in srgb, var(--ink) 55%, transparent);
+  animation: rise 0.6s var(--hand) 0.3s both;
+}
+.tab,
+.step {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  border: 1px solid transparent;
+  border-radius: var(--r-pill);
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+.step {
+  justify-content: center;
+  width: 34px;
+  color: var(--paper-faint);
+}
+.tab {
+  padding: 0 14px 0 5px;
+}
+.tab b {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1.5px solid color-mix(in srgb, var(--tone) 55%, var(--rule-strong));
+  font-family: var(--font-display);
+  font-size: 12.5px;
+  color: var(--tone);
+  transition: transform 0.45s var(--hand);
+}
+.tab:hover,
+.step:hover {
+  background: color-mix(in srgb, var(--paper) 6%, transparent);
+  color: var(--text-primary);
+}
+.tab:focus-visible,
+.step:focus-visible {
+  outline: none;
+  border-color: var(--tone, var(--signal));
+}
+.tabOn {
+  border-color: color-mix(in srgb, var(--tone) 45%, transparent);
+  background: color-mix(in srgb, var(--tone) 14%, transparent);
+  color: var(--text-primary);
+  cursor: default;
+}
+.tabOn b {
+  transform: rotate(-30deg);
+  background: color-mix(in srgb, var(--tone) 22%, transparent);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--tone) 35%, transparent);
+}
+
+@media (max-width: 520px) {
+  .tab span {
+    display: none;
+  }
+  .tab {
+    padding: 0 5px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stage,
+  .dial {
+    animation: none;
+  }
+}

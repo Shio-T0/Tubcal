@@ -66,6 +66,25 @@ def get_feed(list_name="top", page=0):
     return {"items": items, "has_more": start + PAGE_SIZE < len(ids), "stale": stale}
 
 
+def top_items(n=100):
+    """The first `n` live stories of the front page, in HN's own order (points
+    decayed by age, so the hottest first). Reads a few ids past `n` to make up
+    for dead and deleted ones; each story carries its front-page `rank`."""
+    def fetch_ids():
+        return httpc.get(f"{FIREBASE}/{LISTS['top']}.json").json()
+
+    ids, _ = cache.cached("hn:list:top", config.TTL_HN_LIST, fetch_ids)
+    with ThreadPoolExecutor(max_workers=12) as ex:
+        raw = list(ex.map(_fetch_item, ids[: n + n // 10]))
+    items = []
+    for rank, it in enumerate(raw, start=1):
+        story = normalize(it)
+        if story:
+            story["extra"]["rank"] = rank
+            items.append(story)
+    return items[:n]
+
+
 def search_url(query, sort="relevance", range_=None, now=None):
     """Pure: the Algolia request for a Wire search — relevance or newest first,
     optionally only stories from the last day/week/month/year."""

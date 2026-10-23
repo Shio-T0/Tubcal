@@ -43,6 +43,15 @@
   transform: translateY(-3px);
   box-shadow: 0 24px 56px rgba(0, 0, 0, 0.4), 0 0 0 1px color-mix(in srgb, var(--ch) 35%, transparent);
 }
+/* a side of the box (Sides.jsx): set into the cabinet, so it doesn't rise or lift */
+.inBox {
+  animation: none;
+}
+.inBox:hover,
+.inBox:focus-within {
+  transform: none;
+  box-shadow: var(--shadow-card), 0 0 0 1px color-mix(in srgb, var(--ch) 35%, transparent);
+}
 
 @keyframes rise {
   from {

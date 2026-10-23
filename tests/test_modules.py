@@ -64,14 +64,18 @@ def test_needs_and_channels_name_real_things():
 def test_every_room_is_a_module():
     rooms = (ROOT / "frontend/src/lib/rooms.js").read_text()
     ids = set(re.findall(r"\{ id: '(\w+)',\s*label:", rooms))
-    assert ids == set(MANIFEST), "lib/rooms.js rooms and modules.ini disagree"
-    assert set(config.ROOM_IDS) | {"anime"} == set(MANIFEST)
+    assert ids == set(MANIFEST), "lib/rooms.js rooms (and pages) and modules.ini disagree"
+    # a module that isn't a room is a page of one (ALL_PAGES), and needs that room
+    pages = dict(re.findall(r"\{ id: '(\w+)',[^}]*room: '(\w+)'", rooms))
+    for page, room in pages.items():
+        assert room in MANIFEST[page]["needs"], page
+    assert set(config.ROOM_IDS) | {"anime"} | set(pages) == set(MANIFEST)
     from server.api import MODULE_BLUEPRINTS
     assert set(MODULE_BLUEPRINTS) == set(MANIFEST)
     # and each channel's rooms are the modules of that channel
     for ch, room_list in re.findall(r"\{ id: '(\w+)', key: '\w', .*?rooms: \[([^\]]*)\]", rooms):
         listed = re.findall(r"'(\w+)'", room_list)
-        assert sorted(listed) == sorted(m for m in MANIFEST if MANIFEST[m]["channel"] == ch), ch
+        assert sorted(listed) == sorted(m for m in MANIFEST if MANIFEST[m]["channel"] == ch and m not in pages), ch
 
 
 def test_the_extras_and_groups_exist_in_pyproject():
@@ -230,6 +234,18 @@ def test_a_left_out_module_has_no_routes(only):
     assert c.get("/api/hackernews/item/abc").status_code == 404  # an installed room's routes are there
     r = c.post("/api/subscriptions", json={"platform": "youtube", "input": "@x"})
     assert r.status_code == 404 and "tubcal add youtube" in r.get_json()["error"]
+
+
+def test_by_topic_is_a_module_of_its_own(only):
+    c = only("hackernews")  # the Wire without By topic
+    assert c.get("/api/hackernews/topics").status_code == 404
+    c = only("topics")  # By topic without the Wire it needs
+    assert modules.installed() == [] and c.get("/api/hackernews/topics").status_code == 404
+    c = only("hackernews", "topics")
+    assert modules.installed() == ["hackernews", "topics"]
+    assert c.get("/api/hackernews/topics").status_code == 200
+    from server import db
+    assert "topics" not in db.note_modules(["hackernews", "topics"], chosen=True)  # not a room
 
 
 def test_the_page_learns_which_modules_the_server_has(only):

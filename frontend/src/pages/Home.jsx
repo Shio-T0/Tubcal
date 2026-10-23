@@ -12,6 +12,13 @@
 //
 // Everything is read from what the rooms already fetch and cache, so the front of
 // the set costs next to nothing (components/home/lineup.js).
+//
+// With 3D objects on (Settings → Appearance, or the installer's `3d` option) the
+// set and the guides become one box (TheBox.jsx): the set on the front, each
+// channel's guide on a side of its own beside its rooms (Sides.jsx). The side
+// facing you is `?side=`, so Back returns to it. From the set, 1 2 3 still go
+// into a channel; from a channel's side another number turns to that channel's
+// side (the same number again goes in), and 0 turns back to the set.
 
 import { useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
@@ -22,13 +29,17 @@ import { Bookmark, Settings } from 'lucide-react';
 import { hasModule } from '../lib/modules.js';
 
 import { useProgress, useSaved, useSettings } from '../state.jsx';
+import { useObjects3d } from '../lib/objects3d.js';
 import { themeMeta } from '../lib/themes.js';
 import { inHours } from '../lib/time.js';
 import { clearSleep, sleepAtEnd, sleepLabel, useSleepCountdown } from '../lib/sleepTimer.js';
 import { CHANNELS, channelRooms } from '../lib/rooms.js';
+import { useParamState } from '../lib/urlState.js';
 import { openPalette, openPocket, useChannelHomes } from '../components/channels/common.jsx';
 import { useChannelFeed, useSeen } from '../components/screening/feed.js';
 import TheSet from '../components/home/TheSet.jsx';
+import TheBox from '../components/home/TheBox.jsx';
+import { ChannelSide } from '../components/home/Sides.jsx';
 import { CodingGuide, SocialGuide, VideoGuide } from '../components/home/Guides.jsx';
 import {
   airingBacklog, slotLabel, tallyShelves, useAnimeEntries, useComingUp, useMinute, usePickUp,
@@ -158,21 +169,29 @@ export default function Home() {
   const ready = !anime.loading && !(hasSubs && feed.loading && !feed.data) && !paper.loading;
   const comingReady = !anime.loading && !(hasSubs && live.loading && !live.data);
   const { hello, part } = daypart(now);
+  const boxed = useObjects3d();
+  const [side, setSide] = useParamState('side', 'set');
 
   // Channel numbers: 1 Social, 2 Coding, 3 Video (plain keys, only on this
-  // screen — and never while the player or the editor has the keyboard).
+  // screen — and never while the player or the editor has the keyboard). In the
+  // box, from a channel's side a number turns to that channel's side first, and
+  // 0 back to the set.
   useEffect(() => {
     const onKey = (e) => {
       if (e.ctrlKey || e.metaKey || e.altKey || e.repeat || e.defaultPrevented) return;
       if (document.body.dataset.playerExpanded || document.body.dataset.editorFocused) return;
       const el = e.target;
       if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable)) return;
+      if (boxed && e.key === '0') { e.preventDefault(); setSide('set'); return; }
       const ch = CHANNELS.find((c) => String(c.n) === e.key);
-      if (ch) { e.preventDefault(); navigate(homes[ch.id]); }
+      if (!ch) return;
+      e.preventDefault();
+      if (boxed && side !== 'set' && side !== ch.id) setSide(ch.id);
+      else navigate(homes[ch.id]);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [navigate, homes]);
+  }, [navigate, homes, boxed, side, setSide]);
 
   const savedCount = Object.keys(saved || {}).length;
   const subs = {
@@ -180,6 +199,33 @@ export default function Home() {
     coding: plural(rooms.coding?.length || 0, 'room'),
     video: newUploads ? `${newUploads} new` : anime.entries ? `${tallyShelves(anime.entries).watching} watching` : plural(rooms.video?.length || 0, 'room'),
   };
+
+  const set = (
+    <TheSet
+      pickUp={pickUp} comingUp={comingUp} comingReady={comingReady} now={now} subs={subs}
+      inBox={boxed}
+    />
+  );
+  const videoGuide = {
+    ch: channel.video, rooms: rooms.video, anime, covers, feed, newUploads, liveNow: liveRows.length,
+  };
+  // The box's sides, in order round it: the set, then the channels by number.
+  const sides = boxed ? [
+    { id: 'set', label: 'Pick up', tone: 'var(--signal)', node: set },
+    ...CHANNELS.map((ch) => ({
+      id: ch.id,
+      n: ch.n,
+      label: ch.label,
+      tone: ch.color,
+      node: (
+        <ChannelSide ch={ch} rooms={rooms[ch.id]}>
+          {ch.id === 'social' && <SocialGuide ch={ch} rooms={rooms.social} paper={paper} now={now} lone inBox />}
+          {ch.id === 'coding' && <CodingGuide ch={ch} rooms={rooms.coding} lone inBox />}
+          {ch.id === 'video' && <VideoGuide {...videoGuide} inBox />}
+        </ChannelSide>
+      ),
+    })),
+  ] : [];
 
   return (
     <div className={h.home}>
@@ -221,20 +267,27 @@ export default function Home() {
         <Nightcap late={settings?.quiet_hours ? inHours(settings.quiet_hours, now.getHours()) : now.getHours() >= 23 || now.getHours() < 5} />
       </header>
 
-      <TheSet pickUp={pickUp} comingUp={comingUp} comingReady={comingReady} now={now} subs={subs} />
+      {boxed ? (
+        <TheBox key={CHANNELS.length} sides={sides} side={side} onSide={setSide} />
+      ) : (
+        <>
+          {set}
+          <div className={h.guides}>
+            {/* Social and Coding share a row; one without the other takes it whole */}
+            {channel.social && <SocialGuide ch={channel.social} rooms={rooms.social} paper={paper} now={now} lone={!channel.coding} />}
+            {channel.coding && <CodingGuide ch={channel.coding} rooms={rooms.coding} lone={!channel.social} />}
+            {channel.video && <VideoGuide {...videoGuide} />}
+          </div>
+        </>
+      )}
 
-      <div className={h.guides}>
-        {/* Social and Coding share a row; one without the other takes it whole */}
-        {channel.social && <SocialGuide ch={channel.social} rooms={rooms.social} paper={paper} now={now} lone={!channel.coding} />}
-        {channel.coding && <CodingGuide ch={channel.coding} rooms={rooms.coding} lone={!channel.social} />}
-        {channel.video && (
-          <VideoGuide
-            ch={channel.video} rooms={rooms.video} anime={anime} covers={covers}
-            feed={feed} newUploads={newUploads} liveNow={liveRows.length}
-          />
-        )}
-      </div>
-
+      {boxed && (
+        <p className={`${h.hint} ${h.hintBox} tc-strip`}>
+          Drag the box sideways or press <kbd>←</kbd><kbd>→</kbd> to turn it
+          · on a channel's side, {CHANNELS.map((ch) => <kbd key={ch.id}>{ch.n}</kbd>)} turn to that channel, press again to go in
+          · <kbd>0</kbd> back to the set
+        </p>
+      )}
       <p className={`${h.hint} tc-strip`}>
         <kbd>Space</kbd><kbd>g</kbd> then {CHANNELS.flatMap((ch, i) => [i ? ' ' : null, <kbd key={ch.id}>{ch.key}</kbd>])} switch channels from anywhere
         · <kbd>Space</kbd><kbd>s</kbd> Saved · <kbd>Space</kbd><kbd>,</kbd> Settings

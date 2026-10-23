@@ -80,6 +80,9 @@ server_env() {
   # The rooms installed (server/modules.py). A record from before rooms could be
   # left out has none, and then the server has every room it finds.
   if grep -q '^MODULES=' "$CONF"; then export TUBCAL_MODULES="${MODULES// /,}"; fi
+  # The installer's "3D objects" answer; the server applies it when it changes
+  # (db.note_install), so a switch flipped in Settings stays flipped.
+  if [[ -n ${OBJECTS_3D:-} ]]; then export TUBCAL_3D=$OBJECTS_3D; fi
 }
 
 # yt-dlp breaks whenever YouTube changes something, and the fix ships as a

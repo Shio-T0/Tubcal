@@ -31,6 +31,7 @@ const HistoryPage = lazy(() => import('./pages/ScreeningRoom.jsx').then(m => ({ 
 const Dispatch = lazy(() => import('./pages/Dispatch.jsx'));
 const SubredditPage = lazy(() => import('./pages/Dispatch.jsx').then(m => ({ default: m.SubredditPage })));
 const Wire = lazy(() => import('./pages/Wire.jsx'));
+const ByTopic = lazy(() => import('./pages/ByTopic.jsx'));
 const Archive = lazy(() => import('./pages/Archive.jsx'));
 const Anime = lazy(() => import('./pages/Anime.jsx'));
 const AnimeDetail = lazy(() => import('./pages/Anime.jsx').then(m => ({ default: m.AnimeDetail })));
@@ -100,6 +101,7 @@ export default function App() {
             <Route element={<SocialLayout />}>
               {has('edition') && <Route path="/edition" element={<Edition />} />}
               {has('hackernews') && <Route path="/hackernews" element={<Wire />} />}
+              {has('topics') && <Route path="/hackernews/topics" element={<ByTopic />} />}
               {has('reddit') && <Route path="/reddit" element={<Dispatch />} />}
               {has('reddit') && <Route path="/reddit/r/:sub" element={<SubredditPage />} />}
             </Route>

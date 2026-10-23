@@ -10,6 +10,11 @@
 //
 // Each guide's foot says how much you've saved in that channel (a door into the
 // Saved page, filtered to it) and the keys that open the channel.
+//
+// With 3D objects on, each guide is a side of the box (Sides.jsx). `inBox` drops
+// its room keys and the Anime's doors, since the side's strip lists the rooms
+// with the places inside them, and makes it a plain <div>, so h / l walk the
+// whole side (the side is the <section>).
 
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -163,17 +168,18 @@ function RoomKeys({ rooms, badges = {}, label }) {
   );
 }
 
-export function SocialGuide({ ch, rooms, paper, now, lone }) {
+export function SocialGuide({ ch, rooms, paper, now, lone, inBox = false }) {
   const homes = useChannelHomes();
+  const Tag = inBox ? 'div' : 'section';
   return (
-    <section className={`${g.guide} ${g.social} ${lone ? g.lone : ''}`} aria-labelledby="ch-social">
+    <Tag className={`${g.guide} ${g.social} ${lone ? g.lone : ''} ${inBox ? g.inBox : ''}`} aria-labelledby="ch-social">
       <ChannelHead n={ch.n} id="ch-social" to={homes.social} kicker={kicker(ch)} title="Social" />
       {hasModule('edition') && <Paper req={paper} now={now} />}
-      <RoomKeys rooms={rooms} label="Social rooms" />
+      {!inBox && <RoomKeys rooms={rooms} label="Social rooms" />}
       <Foot channel="social" n={ch.n}>
         <button type="button" onClick={openPalette}><Search size={13} /> Search</button>
       </Foot>
-    </section>
+    </Tag>
   );
 }
 
@@ -235,7 +241,7 @@ function Languages({ on }) {
   );
 }
 
-export function CodingGuide({ ch, rooms, lone }) {
+export function CodingGuide({ ch, rooms, lone, inBox = false }) {
   const homes = useChannelHomes();
   const { subs } = useSubscriptions();
   const ids = new Set(rooms.map((r) => r.id));
@@ -243,16 +249,17 @@ export function CodingGuide({ ch, rooms, lone }) {
   const badges = {
     github: following > 0 ? <span className={g.badge}>{following} followed</span> : null,
   };
+  const Tag = inBox ? 'div' : 'section';
   return (
-    <section className={`${g.guide} ${g.coding} ${lone ? g.lone : ''}`} aria-labelledby="ch-coding">
+    <Tag className={`${g.guide} ${g.coding} ${lone ? g.lone : ''} ${inBox ? g.inBox : ''}`} aria-labelledby="ch-coding">
       <ChannelHead n={ch.n} id="ch-coding" to={homes.coding} kicker={kicker(ch)} title="Coding" />
       <OpenFiles on={ids.has('editor')} />
       <Languages on={ids.has('dev')} />
-      <RoomKeys rooms={rooms} badges={badges} label="Coding rooms" />
+      {!inBox && <RoomKeys rooms={rooms} badges={badges} label="Coding rooms" />}
       <Foot channel="coding" n={ch.n}>
         {hasModule('github') && !ids.has('github') && <Link to="/settings?s=rooms">GitHub is off</Link>}
       </Foot>
-    </section>
+    </Tag>
   );
 }
 
@@ -346,14 +353,15 @@ function Uploads({ feed, newUploads, liveNow }) {
   );
 }
 
-export function VideoGuide({ ch, rooms, anime, covers, feed, newUploads, liveNow }) {
+export function VideoGuide({ ch, rooms, anime, covers, feed, newUploads, liveNow, inBox = false }) {
   const homes = useChannelHomes();
   const behind = covers.slice(REEL);
   const archive = rooms.find((r) => r.id === 'archive');
   const screening = hasModule('youtube');
   const animeHere = hasModule('anime');
+  const Tag = inBox ? 'div' : 'section';
   return (
-    <section className={`${g.guide} ${g.video}`} aria-labelledby="ch-video">
+    <Tag className={`${g.guide} ${g.video} ${inBox ? g.inBox : ''}`} aria-labelledby="ch-video">
       {behind.length > 0 && (
         <div className={g.mosaic} aria-hidden="true">
           {behind.map((m, i) => <img key={m.id} src={m.cover} alt="" loading="lazy" style={{ '--i': i }} />)}
@@ -389,15 +397,17 @@ export function VideoGuide({ ch, rooms, anime, covers, feed, newUploads, liveNow
               <div className={g.shelves} aria-hidden="true" />
             )}
             {covers.length > 0 && <Reel covers={covers} />}
-            <nav className={g.doors} aria-label="Anime sections">
-              {DOORS.map(([label, to], i) => (
-                <Link key={label} to={to} className={g.door} style={{ '--i': i }} data-kbd-tile>{label}</Link>
-              ))}
-            </nav>
+            {!inBox && (
+              <nav className={g.doors} aria-label="Anime sections">
+                {DOORS.map(([label, to], i) => (
+                  <Link key={label} to={to} className={g.door} style={{ '--i': i }} data-kbd-tile>{label}</Link>
+                ))}
+              </nav>
+            )}
           </div>
         )}
       </div>
       <Foot channel="video" n={ch.n} />
-    </section>
+    </Tag>
   );
 }
