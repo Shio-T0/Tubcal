@@ -612,27 +612,58 @@ function NotInstalled() {
 
 const SPEEDS = [0.75, 1, 1.25, 1.5, 1.75, 2];
 
+const QUIET_OPTIONS = [
+  { value: 'off', label: 'Never' },
+  { value: '22-7', label: '22–07' },
+  { value: '23-8', label: '23–08' },
+  { value: '0-9', label: '00–09' },
+];
+const quietKey = (span) => (Array.isArray(span) ? `${span[0]}-${span[1]}` : 'off');
+const quietSpan = (key) => (key === 'off' ? null : key.split('-').map(Number));
+
 function PlaybackSection() {
   const { settings, updateSettings } = useSettings();
+  const quiet = quietKey(settings?.quiet_hours);
+  const custom = quiet !== 'off' && !QUIET_OPTIONS.some((o) => o.value === quiet);
   return (
-    <Group>
-      <Row label="Sound from" hint="One: only the video you're watching plays sound, the corner players stay muted. All: every player plays sound.">
-        <Choice
-          label="Sound from"
-          options={[{ value: true, label: 'One' }, { value: false, label: 'All' }]}
-          value={settings?.solo_audio !== false}
-          onChange={(v) => updateSettings({ solo_audio: v })}
-        />
-      </Row>
-      <Row label="Speed" hint="Every video starts at this speed. A player's own menu changes it too.">
-        <Choice
-          label="Speed"
-          options={SPEEDS.map((v) => ({ value: v, label: v === 1 ? 'Normal' : `${v}×` }))}
-          value={settings?.playback_rate || 1}
-          onChange={(v) => updateSettings({ playback_rate: v })}
-        />
-      </Row>
-    </Group>
+    <>
+      <Group>
+        <Row label="Sound from" hint="One: only the video you're watching plays sound, the corner players stay muted. All: every player plays sound.">
+          <Choice
+            label="Sound from"
+            options={[{ value: true, label: 'One' }, { value: false, label: 'All' }]}
+            value={settings?.solo_audio !== false}
+            onChange={(v) => updateSettings({ solo_audio: v })}
+          />
+        </Row>
+        <Row label="Speed" hint="Every video starts at this speed. A player's own menu changes it too.">
+          <Choice
+            label="Speed"
+            options={SPEEDS.map((v) => ({ value: v, label: v === 1 ? 'Normal' : `${v}×` }))}
+            value={settings?.playback_rate || 1}
+            onChange={(v) => updateSettings({ playback_rate: v })}
+          />
+        </Row>
+      </Group>
+      <Group title="Night">
+        {hasModule('youtube') && (
+          <Row label="Live alerts" hint="A desktop note ten minutes before a channel you follow goes live.">
+            <Switch label="Live alerts" checked={settings?.notify_live !== false} onChange={(v) => updateSettings({ notify_live: v })} />
+          </Row>
+        )}
+        <Row
+          label="Quiet hours"
+          hint="No live alerts in these hours, and the home screen offers to let the set sleep after the next thing you play. A player’s moon (Z) sets a sleep timer any time."
+        >
+          <Choice
+            label="Quiet hours"
+            options={custom ? [...QUIET_OPTIONS, { value: quiet, label: quiet.replace('-', '–') }] : QUIET_OPTIONS}
+            value={quiet}
+            onChange={(v) => updateSettings({ quiet_hours: quietSpan(v) })}
+          />
+        </Row>
+      </Group>
+    </>
   );
 }
 
@@ -939,7 +970,7 @@ function useSummaries(oauth) {
       data: (st.snapshots_keep ?? 7) ? `Snapshot daily · keeps ${st.snapshots_keep ?? 7}` : 'Daily snapshots off',
       appearance: `${THEMES.find((t) => t.value === (st.theme || 'dark'))?.label || st.theme}${st.fast_mode ? ' · fast mode' : ''}`,
       rooms: `${active.length} of ${st.max_active_rooms ?? 6} switched on`,
-      playback: `${st.solo_audio === false ? 'Sound from all' : 'Sound from one'} · ${(st.playback_rate || 1) === 1 ? 'normal speed' : `${st.playback_rate}×`}`,
+      playback: `${st.solo_audio === false ? 'Sound from all' : 'Sound from one'} · ${(st.playback_rate || 1) === 1 ? 'normal speed' : `${st.playback_rate}×`}${Array.isArray(st.quiet_hours) ? ' · quiet at night' : ''}`,
       subtitles: sub.show
         ? `${SUBTITLE_FONTS.find((f) => f.value === sub.font)?.label} · ${Math.round(sub.size * 100)}%`
         : 'Off when a video starts',

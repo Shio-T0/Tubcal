@@ -181,3 +181,17 @@ def test_retired_rooms_are_dropped_from_saved_settings(client):
     assert db.get_setting("active_rooms") == ["edition", "youtube", "editor"]
     r = client.put("/api/settings", json={"active_rooms": ["edition", "anime"]})
     assert r.status_code == 400 and "unknown room id: anime" in r.get_json()["error"]
+
+
+def test_quiet_hours_setting_and_window(client):
+    from server import notifier
+
+    assert client.put("/api/settings", json={"quiet_hours": [23, 8]}).status_code == 200
+    assert client.get("/api/settings").get_json()["data"]["quiet_hours"] == [23, 8]
+    assert client.put("/api/settings", json={"quiet_hours": None}).status_code == 200
+    for bad in ([5, 5], [24, 1], [1], "23-8", [True, 2]):
+        assert client.put("/api/settings", json={"quiet_hours": bad}).status_code == 400
+    # wraps past midnight
+    assert [h for h in range(24) if notifier.in_quiet_hours([23, 8], h)] == [0, 1, 2, 3, 4, 5, 6, 7, 23]
+    assert [h for h in range(24) if notifier.in_quiet_hours([1, 4], h)] == [1, 2, 3]
+    assert not notifier.in_quiet_hours(None, 3)

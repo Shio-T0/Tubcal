@@ -41,8 +41,8 @@ export const SETTINGS_SECTIONS = {
   },
   playback: {
     title: 'Playback', icon: Volume2,
-    blurb: 'How videos sound and how fast they play, everywhere.',
-    find: 'audio sound solo mix mute speed rate',
+    blurb: 'How videos sound and how fast they play, everywhere, and how quiet the station keeps at night.',
+    find: 'audio sound solo mix mute speed rate night quiet hours sleep timer live alerts notifications notify desktop',
   },
   subtitles: {
     title: 'Subtitles', icon: Captions,

@@ -93,6 +93,15 @@ def put_settings():
     if "fast_mode" in body and not isinstance(body["fast_mode"], bool):
         return err("fast_mode must be true or false")
 
+    if "quiet_hours" in body:
+        val = body["quiet_hours"]
+        if val is not None and not (
+            isinstance(val, list) and len(val) == 2
+            and all(isinstance(h, int) and not isinstance(h, bool) and 0 <= h <= 23 for h in val)
+            and val[0] != val[1]
+        ):
+            return err("quiet_hours must be null or [from_hour, to_hour], two different hours 0–23")
+
     if "snapshots_keep" in body:
         val = body["snapshots_keep"]
         if isinstance(val, bool) or not isinstance(val, int) or not 0 <= val <= 30:

@@ -147,6 +147,9 @@ DEFAULT_SETTINGS = {
     "player_volume": 1,   # 0..1, remembered across videos (custom controls)
     # Desktop notify-send 10 min before a subscribed channel goes live.
     "notify_live": True,
+    # [from_hour, to_hour] when live alerts keep quiet (server/notifier.py) and the
+    # home screen offers to let the set sleep; null = no quiet hours.
+    "quiet_hours": None,
     # The Archive (local second brain): transcription + semantic search + LLM.
     "brain_enabled": True,        # master gate for the background worker
     "brain_auto_index": False,    # opt-in: index videos as you watch them

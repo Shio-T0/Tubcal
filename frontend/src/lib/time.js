@@ -61,3 +61,11 @@ export function timeAgo(epochSeconds) {
   }
   return `${Math.floor(diff / 31557600)}y`;
 }
+
+/** True when `hour` (0–23) is inside the span [from, to), which may wrap past
+ *  midnight: [23, 8] is 23:00 to 08:00. Mirrors server/notifier.in_quiet_hours. */
+export function inHours(span, hour) {
+  if (!Array.isArray(span) || span.length !== 2) return false;
+  const [from, to] = span;
+  return from < to ? hour >= from && hour < to : hour >= from || hour < to;
+}

@@ -116,7 +116,7 @@ expanded player, media, and keyboard-focused controls. An element marked
 
 **The home screen** (`/`, `pages/Home.jsx` + `components/home/`) answers "what now?"
 before "where to?":
-- A greeting, then one sentence of links saying what's waiting: new uploads, episodes
+- A greeting ("Late night" from 23:00), then one sentence of links saying what's waiting: new uploads, episodes
   of shows still airing, who's live, what airs next, today's paper.
 - `TheSet.jsx` is a TV. Its screen is tuned to the first entry of the "pick up" queue.
   Videos and your shows' next episodes are ordered by when you last touched them
@@ -130,6 +130,9 @@ before "where to?":
   in the editor (`/editor/state`), the Workbench's languages and its rooms; Video (full
   width) the newest uploads beside your AniList shelf counts, this season's six most
   popular and the Anime's doors. Each foot links to Saved filtered to that channel.
+- Late (your quiet hours, else 23:00–05:00) a nightcap under the summary offers to
+  let the set sleep after the next thing you play (the sleep timer's end mode), and
+  says so while any sleep timer runs.
 - `lineup.js` builds all of it from reads the rooms already make and cache, so the
   page adds no new endpoints.
 - The screen and guides use `overflow: clip`, not `hidden`: their glow and cover wall
@@ -279,7 +282,8 @@ rotates its site crypto and the fix ships as a release); it must run *before*
 anything imports anipy, is best-effort/offline-safe, and honors
 `TUBCAL_AUTO_UPDATE=0`. `server/notifier.py` polls upcoming subscribed streams and
 fires a `notify-send` desktop ping ~10 min before one goes live (no-op if
-`notify-send` is absent).
+`notify-send` is absent). Inside the `quiet_hours` setting (`[from, to]`, wrapping past
+midnight; Settings → Playback → Night) it keeps quiet and lets that stream go.
 
 **Caching (`server/cache.py`) is central.** Two layers (a bounded in-memory LRU,
 `CACHE_MEM_MAX` entries, in front of a `cache` table in SQLite) so caches survive
