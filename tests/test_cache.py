@@ -1,10 +1,12 @@
 """cache.invalidate: a prefix is a literal prefix, not a LIKE pattern."""
 
+from collections import OrderedDict
+
 from server import cache
 
 
 def test_invalidate_treats_underscore_literally(client, monkeypatch):
-    monkeypatch.setattr(cache, "_mem", {})
+    monkeypatch.setattr(cache, "_mem", OrderedDict())
     for key in ("yt:info:ab_cd", "yt:info:abXcd", "yt:info:ab_cdef"):
         cache.cached(key, 60, lambda: {"k": 1})
     assert cache.invalidate("yt:info:ab_cd") == 2
@@ -13,7 +15,7 @@ def test_invalidate_treats_underscore_literally(client, monkeypatch):
 
 
 def test_invalidate_percent_is_literal(client, monkeypatch):
-    monkeypatch.setattr(cache, "_mem", {})
+    monkeypatch.setattr(cache, "_mem", OrderedDict())
     cache.cached("q:100%", 60, lambda: 1)
     cache.cached("q:1000", 60, lambda: 2)
     assert cache.invalidate("q:100%") == 1
@@ -21,10 +23,31 @@ def test_invalidate_percent_is_literal(client, monkeypatch):
 
 
 def test_cached_serves_stale_when_the_fetch_fails(client, monkeypatch):
-    monkeypatch.setattr(cache, "_mem", {})
+    monkeypatch.setattr(cache, "_mem", OrderedDict())
     assert cache.cached("s:k", 0, lambda: "old") == ("old", False)
 
     def boom():
         raise RuntimeError("upstream down")
 
     assert cache.cached("s:k", 0, boom) == ("old", True)
+
+
+def test_memory_layer_is_bounded_and_evicts_the_least_recent(client, monkeypatch):
+    monkeypatch.setattr(cache, "_mem", OrderedDict())
+    monkeypatch.setattr(cache.config, "CACHE_MEM_MAX", 3)
+    for k in ("a", "b", "c"):
+        cache.cached(f"lru:{k}", 60, lambda k=k: k)
+    cache.peek("lru:a")                      # a is now the most recent
+    cache.cached("lru:d", 60, lambda: "d")   # so b goes
+    assert list(cache._mem) == ["lru:c", "lru:a", "lru:d"]
+    # evicted from memory, not from the cache: SQLite still answers
+    assert cache.cached("lru:b", 60, lambda: "refetched") == ("b", False)
+
+
+def test_housekeeping_comes_due_by_wall_clock():
+    from server import housekeeping
+
+    assert not housekeeping.due(1000, 1000 + 3600, every=86400)
+    assert housekeeping.due(1000, 1000 + 86400, every=86400)
+    # a laptop that slept through the night: a monotonic sleep would miss this
+    assert housekeeping.due(1000, 1000 + 3 * 86400, every=86400)

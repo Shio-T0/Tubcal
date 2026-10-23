@@ -7,18 +7,31 @@ stale payload instead of erroring (important for Reddit rate limits).
 import json
 import threading
 import time
+from collections import OrderedDict
 
-from . import db
+from . import config, db
 
-_mem = {}
+# The memory layer is a bounded LRU in front of SQLite, which holds everything.
+# Unbounded, it kept every key ever read for the life of the process — every
+# search page, every per-URL segment index — so a Tubcal left running for weeks
+# only grew. An evicted key costs one indexed row read the next time it's asked.
+_mem = OrderedDict()
 _lock = threading.Lock()
 _refreshing = set()
+
+
+def _remember(key, entry):
+    """Put an entry in the memory layer as the most recent one (hold _lock)."""
+    _mem[key] = entry
+    _mem.move_to_end(key)
+    while len(_mem) > config.CACHE_MEM_MAX:
+        _mem.popitem(last=False)
 
 
 def _store(key, payload, now, ttl):
     entry = {"payload": payload, "fetched_at": now, "ttl": ttl}
     with _lock:
-        _mem[key] = entry
+        _remember(key, entry)
     con = db.connect()
     with con:
         con.execute(
@@ -34,6 +47,8 @@ def _store(key, payload, now, ttl):
 def _load_entry(key):
     with _lock:
         entry = _mem.get(key)
+        if entry is not None:
+            _mem.move_to_end(key)
     if entry is not None:
         return entry
     con = db.connect()
@@ -48,7 +63,7 @@ def _load_entry(key):
             "ttl": row["ttl"],
         }
         with _lock:
-            _mem[key] = entry
+            _remember(key, entry)
         return entry
     return None
 

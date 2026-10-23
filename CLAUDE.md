@@ -281,13 +281,16 @@ anything imports anipy, is best-effort/offline-safe, and honors
 fires a `notify-send` desktop ping ~10 min before one goes live (no-op if
 `notify-send` is absent).
 
-**Caching (`server/cache.py`) is central.** Two layers (in-memory dict + a `cache`
-table in SQLite) so caches survive restarts. Key functions: `cached(key, ttl,
+**Caching (`server/cache.py`) is central.** Two layers (a bounded in-memory LRU,
+`CACHE_MEM_MAX` entries, in front of a `cache` table in SQLite) so caches survive
+restarts and a long-running server doesn't grow. Key functions: `cached(key, ttl,
 fetcher)`, `cached_swr(...)` (stale-while-revalidate), `warm(...)`, `invalidate(prefix)`.
 Expired rows are kept deliberately: if an upstream fetch fails, the stale payload is
 served instead of erroring — this is what keeps Reddit's aggressive rate limiting from
 breaking the app. TTLs live in `server/config.py`. When adding a source call, wrap it
-in the cache with an appropriate TTL rather than fetching raw.
+in the cache with an appropriate TTL rather than fetching raw. Rows a week past
+their fetch are pruned by `db.prune_old_data`, at startup and then daily from
+`server/housekeeping.py` (wall-clock, so a suspended laptop still comes due).
 
 **Rate limiting:** `server/httpc.py` enforces per-host minimum spacing via
 `config.HOST_INTERVALS` (Reddit is throttled to one request / 3s). It also runs a

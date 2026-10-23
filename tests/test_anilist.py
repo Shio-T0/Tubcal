@@ -4,6 +4,7 @@ batch cache and the API's auth/validation edges. The AniList network is never
 touched; the I/O wrappers are monkeypatched where a route is exercised."""
 
 import datetime
+from collections import OrderedDict
 
 import pytest
 
@@ -265,7 +266,7 @@ def test_custom_list_memberships():
 # ── the batch cache ──────────────────────────────────────────────────────────
 
 def test_cached_many_fetches_only_misses_and_survives_failure(client, monkeypatch):
-    monkeypatch.setattr(cache, "_mem", {})
+    monkeypatch.setattr(cache, "_mem", OrderedDict())
     calls = []
 
     def fetch(missing):
