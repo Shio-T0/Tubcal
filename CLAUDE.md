@@ -625,8 +625,13 @@ count, comment count, tags. The card and the notes share that one request throug
 `lib/useShared.js`. Comments are `/youtube/comments/<id>?sort=top|new&continuation=`
 (`{comments, continuation, count}`); each carries the author's face and channel id
 and the creator/verified/member/hearted/edited marks. Keys while expanded: Space/K,
-J/L, arrows, 0–9, M/F/C, `<`/`>` speed, Ctrl+←/→ chapters, Shift+N next, `?` help,
-Esc to the corner.
+J/L, arrows, 0–9, M/F/C, `<`/`>` speed, Ctrl+←/→ chapters, Shift+N next, `Z` sleep
+timer, `?` help, Esc to the corner. The sleep timer (`lib/sleepTimer.js`, a moon in the
+controls) is one store for the whole station, so it outlives the video it was set on:
+"end of this video/episode" stops there (no Up next, no next-episode countdown, via
+`ended(id, {advance:false})`), or after N minutes the player you can hear fades out
+over 12s so it is silent on time, every player pauses, the picture stays dimmed until
+something plays, and your volume is put back for next time.
 
 **Settings** (`pages/SettingsPage.jsx`) is an index plus one open section:
 - `pages/settingsSections.js` lists the sections, their groups and the words

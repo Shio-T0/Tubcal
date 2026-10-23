@@ -222,16 +222,17 @@ export function AppProviders({ children }) {
   }, []);
 
   // Called when a video reaches its end. Remove it; if it was the one you were
-  // actually watching, auto-advance into the next queued video.
+  // actually watching, auto-advance into the next queued video (unless told not
+  // to: the sleep timer's "stop at the end").
   const endedVideo = useCallback(
-    (id) => {
+    (id, { advance = true } = {}) => {
       const wasExpanded = expandedRef.current === id;
       setPstate((st) => ({
         players: st.players.filter((x) => x.id !== id),
         order: st.order.filter((x) => x !== id),
         expandedId: st.expandedId === id ? null : st.expandedId,
       }));
-      if (wasExpanded) {
+      if (wasExpanded && advance) {
         setQueue((q) => {
           if (!q.length) return q;
           const [next, ...rest] = q;

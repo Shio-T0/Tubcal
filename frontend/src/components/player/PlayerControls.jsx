@@ -5,6 +5,7 @@ import {
   ChevronRight,
   Maximize2,
   Minimize2,
+  Moon,
   Pause,
   Play,
   RotateCcw,
@@ -16,6 +17,9 @@ import {
 } from 'lucide-react';
 
 import { clock } from '../../lib/time.js';
+import {
+  SLEEP_MINUTES, chooseSleep, nextSleepChoice, sleepChoice, sleepLabel, useSleepCountdown,
+} from '../../lib/sleepTimer.js';
 import s from './controls.module.css';
 
 const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
@@ -205,10 +209,13 @@ export default function PlayerControls({
   ccIndex = -1,
   onCc,
   onSubtitleStyle,
+  endWord = 'video', // what the sleep timer's "end of this …" stops at
 }) {
   const [idle, setIdle] = useState(false);
   const [scrubbing, setScrubbing] = useState(false);
-  const [menu, setMenu] = useState(null); // 'speed' | 'quality' | 'cc' | null
+  const [menu, setMenu] = useState(null); // 'speed' | 'quality' | 'cc' | 'sleep' | null
+  const sleep = useSleepCountdown();
+  const sleepTag = sleepLabel(sleep);
   const [hud, setHud] = useState(null); // { node, key }
   const [ripple, setRipple] = useState(null); // { side, key }
   const [buffering, setBuffering] = useState(false);
@@ -321,9 +328,16 @@ export default function PlayerControls({
     flash(<span className={`${s.hudText} ${s.hudChapter}`}>{target.title}</span>, true);
   };
 
+  const sleepWords = (v) => (v === 'off' ? 'Sleep timer off' : v === 'end' ? `Sleep at the end of this ${endWord}` : `Sleep in ${v} min`);
+  const stepSleep = () => {
+    const v = nextSleepChoice(sleep);
+    chooseSleep(v);
+    flash(<span className={s.hudText}><Moon size={20} /> {sleepWords(v)}</span>, true);
+  };
+
   // ── keyboard (only the expanded card owns the keys) ─────────────────────────
   const kref = useRef();
-  kref.current = { actToggle, actSkip, nudgeVol, actMute, toggleCC, nudgeSpeed, jumpChapter, onNext, ctl, subtitles, setShowKeys, wake };
+  kref.current = { actToggle, actSkip, nudgeVol, actMute, toggleCC, nudgeSpeed, jumpChapter, onNext, ctl, subtitles, setShowKeys, wake, stepSleep };
   useEffect(() => {
     if (!expanded) return undefined;
     const onKey = (e) => {
@@ -352,6 +366,7 @@ export default function PlayerControls({
       else if (k === '>') { h.nudgeSpeed(1); }
       else if (k === '<') { h.nudgeSpeed(-1); }
       else if (k === 'N' && h.onNext) { h.onNext(); }
+      else if (k === 'z') { h.stepSleep(); }
       else if (/^[0-9]$/.test(k) && h.ctl.duration) {
         e.preventDefault();
         h.ctl.seek(h.ctl.duration * (Number(k) / 10));
@@ -440,6 +455,7 @@ export default function PlayerControls({
             <div><dt>&lt; / &gt;</dt><dd>slower · faster</dd></div>
             <div><dt>Ctrl ← / →</dt><dd>previous · next chapter</dd></div>
             <div><dt>Shift N</dt><dd>next in Up next</dd></div>
+            <div><dt>Z</dt><dd>sleep timer</dd></div>
             <div><dt>Esc</dt><dd>keep playing in the corner</dd></div>
           </dl>
         </div>
@@ -523,6 +539,29 @@ export default function PlayerControls({
                 />
               </div>
             )}
+
+            <div className={s.menuWrap}>
+              <button
+                className={sleepTag ? `${s.pill} ${s.pillOn} ${s.sleepOn}` : s.btn}
+                onClick={() => setMenu(menu === 'sleep' ? null : 'sleep')}
+                aria-label={sleepTag ? `Sleep timer: ${sleepTag === 'end' ? 'at the end' : `in ${sleepTag}`}` : 'Sleep timer'}
+                title="Sleep timer (z)"
+              >
+                <Moon size={sleepTag ? 13 : 17} />
+                {sleepTag && <span>{sleepTag}</span>}
+              </button>
+              <Menu
+                open={menu === 'sleep'}
+                value={sleepChoice(sleep)}
+                onClose={() => setMenu(null)}
+                onPick={chooseSleep}
+                items={[
+                  { value: 'off', label: 'Off' },
+                  { value: 'end', label: `End of this ${endWord}` },
+                  ...SLEEP_MINUTES.map((m) => ({ value: m, label: m < 60 ? `${m} minutes` : m === 60 ? '1 hour' : `${m / 60} hours` })),
+                ]}
+              />
+            </div>
 
             <div className={s.menuWrap}>
               <button
