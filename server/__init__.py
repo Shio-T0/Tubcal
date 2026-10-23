@@ -1,12 +1,33 @@
 import json
+import logging
 
 from flask import Flask, request, send_from_directory
 
-from . import config, modules
+from . import config, guard, modules
 
 
 def create_app():
     app = Flask(__name__, static_folder=None)
+
+    # Only Tubcal's own pages get an answer: not another site's fetches, forms,
+    # sockets or frames, nor a rebound domain (server/guard.py).
+    @app.before_request
+    def same_site_only():
+        why = guard.refusal(request)
+        if why is None:
+            return None
+        logging.getLogger("tubcal").warning(
+            "refused %s %s (%s: %s)", request.method, request.path,
+            why, request.headers.get("Origin") or request.referrer or request.host)
+        if why == "host":
+            msg = (f"Tubcal only answers at 127.0.0.1 or localhost. Open http://{config.HOST}:{config.PORT}, "
+                   "or add the name you used to TUBCAL_ALLOWED_HOSTS in Tubcal's .env file.")
+        else:
+            msg = "This request came from another website, so Tubcal turned it down."
+        if request.path.startswith("/api/"):
+            from .api import err
+            return err(msg, 403)
+        return msg + "\n", 403, {"Content-Type": "text/plain; charset=utf-8"}
 
     from .api import register_blueprints
     register_blueprints(app)
@@ -26,6 +47,8 @@ def create_app():
             resp.headers["Cache-Control"] = "no-store"
         elif request.path.startswith("/assets/"):
             resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        # No other site may show Tubcal in a frame and steer clicks in it.
+        resp.headers["Content-Security-Policy"] = "frame-ancestors 'self'"
         return resp
 
     def serve_index(dist):

@@ -898,6 +898,13 @@ floats/rails otherwise.
   too, defensively: that's a different domain so the youtube.com jar never reached
   it, but the property shouldn't depend on that. `tests/test_httpc_anon.py` AST-sweeps
   `youtube.py` and fails if any call site is neither anonymous nor authenticated.
+- **Same-site only.** `server/guard.py` (one app-wide `before_request`) answers only
+  Tubcal's own pages. Host must be a loopback name or in `TUBCAL_ALLOWED_HOSTS` (stops DNS
+  rebinding). A sent `Origin` must be loopback, any port (stops another site's writes and
+  WebSockets: CORS doesn't cover sockets, and the editor's terminal is one). `/api/` refuses
+  `Sec-Fetch-Site: cross-site` unless it's a top-level navigation (the OAuth callbacks).
+  Requests with none of these headers (curl, the launcher, the phone's Kotlin) pass. Every
+  response carries `frame-ancestors 'self'`. Tests: `tests/test_guard.py`.
 - Configuration is env-driven through `server/config.py` (all optional, `.env` copied
   from `.env.example`); user-facing settings that can change at runtime are stored in the
   DB `settings` table and read via `db.get_setting()`.

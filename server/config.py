@@ -24,6 +24,11 @@ TTL_BRAIN_DIGEST = 1800  # digest is expensive — cache it (SWR)
 
 HOST = "127.0.0.1"
 PORT = int(os.environ.get("TUBCAL_PORT", "5000"))
+# Names besides localhost/127.0.0.1 that may reach Tubcal (a hosts-file alias).
+# Anything else in Host is refused: see server/guard.py.
+ALLOWED_HOSTS = {
+    h.strip().lower() for h in os.environ.get("TUBCAL_ALLOWED_HOSTS", "").split(",") if h.strip()
+}
 
 # The Anime room: AniList (GraphQL) + a local, AniList-id-mapped episode aggregator.
 # The aggregator base URL can also be set in Settings (key: anime_source_url); the
