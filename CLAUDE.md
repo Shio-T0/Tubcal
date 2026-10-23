@@ -880,6 +880,14 @@ floats/rails otherwise.
 - Backend API endpoints return `ok(data)` / `err(msg, status)` — never bare `jsonify`.
 - New external fetches go through `server/httpc.py` and are wrapped in `server/cache.py`
   with a TTL constant added to `server/config.py`.
+- **Only this machine's pages.** Binding to 127.0.0.1 keeps other machines out,
+  not other websites. `server/localguard.py` runs before every request (a
+  `before_request` in `create_app`) and refuses a `Host` that isn't a loopback name
+  (DNS rebinding), an `Origin` that isn't this machine (WebSockets ignore CORS, and
+  `/api/editor/pty` is a shell), and `/api/` subresources marked `Sec-Fetch-Site:
+  cross-site`. Top-level navigations pass (OAuth callbacks), and so do requests with
+  none of those headers (curl, the launcher, tests). Never add CORS headers or a
+  route that sidesteps it. Tests: `tests/test_localguard.py`.
 - **Cookie containment.** `httpc`'s `session` is shared process-wide, so its jar
   accumulates whatever hosts set — scraping a YouTube channel page seeds
   `VISITOR_INFO1_LIVE`/`YSC`/`__Secure-YNID`, which requests then merges into every
