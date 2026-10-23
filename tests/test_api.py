@@ -217,3 +217,12 @@ def test_saved_import_round_trip_keeps_what_is_here(client):
     assert "url" not in items["x:evil"] and "thumbnail" not in items["x:evil"]
     assert client.post("/api/saved/import", json={"items": "no"}).status_code == 400
     assert client.post("/api/saved/import", json=[{"id": "web:bare", "platform": "web"}]).get_json()["data"]["added"] == 1
+
+
+def test_saving_keeps_only_safe_links_and_real_dates(client):
+    client.post("/api/saved", json={"item": {"id": "pod:1", "platform": "web", "title": "Ep",
+                                             "url": "javascript:alert(1)", "thumbnail": "https://x/y.jpg"}})
+    client.post("/api/saved/import", json=[{"id": "web:b", "platform": "web", "done_at": True, "saved_at": True}])
+    items = {it["id"]: it for it in client.get("/api/saved").get_json()["data"]["items"]}
+    assert "url" not in items["pod:1"] and items["pod:1"]["thumbnail"] == "https://x/y.jpg"
+    assert "done_at" not in items["web:b"] and items["web:b"]["saved_at"] > 1_700_000_000

@@ -182,6 +182,9 @@ def saved_add():
     item = body.get("item") or {}
     if not item.get("id") or not item.get("platform"):
         return err("item with id and platform required")
+    # a feed's links come from outside too (an RSS episode link can say anything),
+    # and Saved hands them to window.open: only http(s) and in-app paths are kept
+    item = _with_safe_links(item)
     try:
         db.add_saved(item)
     except Exception as e:
@@ -206,13 +209,9 @@ def _safe_link(value):
     return v if v.lower().startswith(("http://", "https://")) else None
 
 
-def _clean_import(raw):
-    """One entry from an export, made safe to keep, or None to skip it."""
-    if not isinstance(raw, dict):
-        return None
-    iid, platform = raw.get("id"), raw.get("platform")
-    if not (isinstance(iid, str) and isinstance(platform, str) and 0 < len(iid) <= 512 and 0 < len(platform) <= 32):
-        return None
+def _with_safe_links(raw):
+    """A copy of an entry whose url/thumbnail are links it may carry (see
+    _safe_link); anything else is left out."""
     item = dict(raw)
     for key in ("url", "thumbnail"):
         if key in item:
@@ -221,6 +220,17 @@ def _clean_import(raw):
                 item.pop(key)
             else:
                 item[key] = link
+    return item
+
+
+def _clean_import(raw):
+    """One entry from an export, made safe to keep, or None to skip it."""
+    if not isinstance(raw, dict):
+        return None
+    iid, platform = raw.get("id"), raw.get("platform")
+    if not (isinstance(iid, str) and isinstance(platform, str) and 0 < len(iid) <= 512 and 0 < len(platform) <= 32):
+        return None
+    item = _with_safe_links(raw)
     if not isinstance(item.get("title", ""), str):
         item.pop("title")
     note = item.get("note")
@@ -229,8 +239,10 @@ def _clean_import(raw):
             item["note"] = note.strip()[:SAVED_NOTE_MAX]
         else:
             item.pop("note")
-    if item.get("done_at") is not None and not isinstance(item.get("done_at"), int):
-        item.pop("done_at")
+    for key in ("done_at", "saved_at"):  # epoch seconds; a bool is an int in Python
+        v = item.get(key)
+        if v is not None and (isinstance(v, bool) or not isinstance(v, int)):
+            item.pop(key)
     try:
         if len(json.dumps(item)) > SAVED_ITEM_BYTES:
             return None
