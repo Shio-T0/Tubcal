@@ -132,6 +132,9 @@ CREATE TABLE IF NOT EXISTS editions (
 
 DEFAULT_SETTINGS = {
     "theme": "dark",
+    # Settings → Your data: how many daily snapshots of this file to keep
+    # (server/snapshots.py); 0 stops the daily copy.
+    "snapshots_keep": 7,
     # Fast mode (Settings → Appearance): nothing animates or transitions, anywhere.
     # Stamped on <html data-fast> at serve time so even the first paint is still.
     "fast_mode": False,

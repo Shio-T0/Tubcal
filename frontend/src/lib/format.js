@@ -5,6 +5,15 @@ export function compact(n) {
   return `${(n / 1000000).toFixed(1)}M`;
 }
 
+/** A file's size for people: "820 KB", "48.2 MB", "1.3 GB". */
+export function fileSize(n) {
+  if (n == null) return '';
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 ** 2) return `${Math.round(n / 1024)} KB`;
+  if (n < 1024 ** 3) return `${(n / 1024 ** 2).toFixed(1)} MB`;
+  return `${(n / 1024 ** 3).toFixed(1)} GB`;
+}
+
 /** Light HTML sanitizer for remote comment/post bodies. */
 export function sanitizeHtml(html) {
   if (!html) return '';

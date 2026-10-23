@@ -300,9 +300,16 @@ many concurrent segment fetches to one googlevideo host.
 **State & persistence:** everything lives in one SQLite file `data/tubcal.db`
 (git-ignored) via `server/db.py` — subscriptions, settings (key/value), watch
 history + playback progress, saved items, OAuth credentials/tokens, and all Archive
-data (transcripts, chunk vectors as float32 blobs, queue/status). `data/` also holds
-`.bak-*` DB snapshots. All DB access goes through the functions in `db.py`; there is
-no ORM.
+data (transcripts, chunk vectors as float32 blobs, queue/status). All DB access goes
+through the functions in `db.py`; there is no ORM. `server/snapshots.py` copies the
+file once a day (from `housekeeping`) to `data/snapshots/tubcal-YYYY-MM-DD.db`: SQLite's
+online backup API, the cache table emptied and vacuumed out, folder 0700 and files
+0600 (they hold the same tokens), the newest `snapshots_keep` kept (0 = off).
+`restore(name)` snapshots the present first ("before-restore"), backs the chosen file
+up over the live one while the server runs, then re-runs `init_db` and drops the cache.
+Settings → Your data (`GET /api/data`, `POST /api/data/snapshot|restore`) shows the
+file, what it holds and the snapshots. `android/tools/sync-data.sh` still leaves its
+own `<db>.bak-<stamp>` copies beside the DB. Tests: `tests/test_snapshots.py`.
 
 **Sources (`server/sources/`)** each own one platform's quirks:
 - `youtube.py` — RSS for subscriptions (no API key needed), `innertube.py` for

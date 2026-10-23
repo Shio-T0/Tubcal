@@ -3,7 +3,7 @@
 // readers (the phone's app bar names the open section) needn't load the page.
 
 import {
-  Captions, Code2, History, KeyRound, LayoutGrid, Library, Newspaper, Palette, Rss, Scale, Tv, Volume2,
+  Captions, Code2, HardDrive, History, KeyRound, LayoutGrid, Library, Newspaper, Palette, Rss, Scale, Tv, Volume2,
 } from 'lucide-react';
 
 import { hasModule } from '../lib/modules.js';
@@ -23,6 +23,11 @@ export const SETTINGS_SECTIONS = {
     title: 'Watch history', icon: History,
     blurb: 'What you watch is remembered here to pick “The Projection”. Nothing is sent anywhere.',
     find: 'history watched clear forget privacy projection',
+  },
+  data: {
+    title: 'Your data', icon: HardDrive,
+    blurb: 'Everything Tubcal keeps is one file on this machine. A copy is taken each day, so a bad day can be undone.',
+    find: 'data database backup backups snapshot snapshots restore undo copy file size storage disk sqlite cache export',
   },
   appearance: {
     title: 'Appearance', icon: Palette,
@@ -81,7 +86,7 @@ export function settingsSectionIds(phone = false) {
 }
 
 export const SETTINGS_GROUPS = [
-  { title: 'Your things', ids: ['accounts', 'subscriptions', 'history'] },
+  { title: 'Your things', ids: ['accounts', 'subscriptions', 'history', 'data'] },
   { title: 'The look', ids: ['appearance', 'rooms'] },
   { title: 'Watching', ids: ['playback', 'subtitles', 'anime'] },
   { title: 'The machines', ids: ['edition', 'archive', 'editor'] },

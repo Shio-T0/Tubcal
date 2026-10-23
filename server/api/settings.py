@@ -93,6 +93,11 @@ def put_settings():
     if "fast_mode" in body and not isinstance(body["fast_mode"], bool):
         return err("fast_mode must be true or false")
 
+    if "snapshots_keep" in body:
+        val = body["snapshots_keep"]
+        if isinstance(val, bool) or not isinstance(val, int) or not 0 <= val <= 30:
+            return err("snapshots_keep must be a whole number from 0 (off) to 30")
+
     if "subtitle_style" in body:
         try:
             body["subtitle_style"] = subtitle_style(body["subtitle_style"])
@@ -102,3 +107,35 @@ def put_settings():
     for key, value in body.items():
         db.set_setting(key, value)
     return ok(db.get_settings())
+
+
+# ── your data: where it lives, what it holds, its daily snapshots ────────────
+
+@settings_bp.get("/data")
+def data_summary():
+    from .. import snapshots
+    return ok(snapshots.summary())
+
+
+@settings_bp.post("/data/snapshot")
+def data_snapshot():
+    from .. import snapshots
+    try:
+        return ok(snapshots.take(label=""))
+    except Exception as e:
+        return err(f"Couldn't take a snapshot: {e}", 500)
+
+
+@settings_bp.post("/data/restore")
+def data_restore():
+    from .. import snapshots
+    name = (request.get_json(silent=True) or {}).get("name")
+    try:
+        safety = snapshots.restore(name)
+    except ValueError as e:
+        return err(str(e))
+    except FileNotFoundError:
+        return err("No such snapshot", 404)
+    except Exception as e:
+        return err(f"Couldn't restore: {e}", 500)
+    return ok({"restored": name, "safety": safety})
