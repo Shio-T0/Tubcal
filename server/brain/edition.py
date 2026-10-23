@@ -239,8 +239,45 @@ def _numpy_ok():
 
 
 def _chat_model():
+    default = db.DEFAULT_SETTINGS["brain_llm_model"]
     return (db.get_setting("edition_llm_model", "")
-            or db.get_setting("brain_llm_model", "qwen3.5:9b"))
+            or db.get_setting("brain_llm_model", default))
+
+
+def _writers(tags):
+    """Names of the pulled models that can write (embedding models can't)."""
+    return [t["name"] for t in tags or [] if llm.can_chat(t)]
+
+
+def press():
+    """What the presses can do right now, for Settings → The Edition: whether
+    Ollama answers, which model writes the paper (the Edition's own choice, else
+    the Archive's) and whether it can, a pulled one to offer instead when it
+    can't, and whether stories can be grouped by topic. One Ollama request."""
+    tags = llm.tags()
+    names = [t["name"] for t in tags or []]
+    chat = _writers(tags)
+    default = db.DEFAULT_SETTINGS["brain_llm_model"]
+    fallback = db.get_setting("brain_llm_model", default)
+    writer = _chat_model()
+    writer_ready = llm.pulled(writer, chat)
+    suggest = None
+    if not writer_ready and chat:
+        suggest = next((m for m in chat if llm.pulled(default, [m])), chat[0])
+    grouper = db.get_setting("brain_embed_model", "nomic-embed-text")
+    grouper_pulled = llm.pulled(grouper, names)
+    return {
+        "ollama": tags is not None,
+        "models": chat,
+        "writer": writer,
+        "writer_ready": writer_ready,
+        "fallback": fallback,
+        "fallback_ready": llm.pulled(fallback, chat),
+        "suggest": suggest,
+        "grouper": grouper,
+        "grouper_pulled": grouper_pulled,
+        "grouper_ready": grouper_pulled and _numpy_ok(),
+    }
 
 
 def build(force=False):
@@ -272,7 +309,7 @@ def _build():
     # Ladder rung 1 -> 2: embeddings, if the local stack is up.
     vectors = None
     embed_model = db.get_setting("brain_embed_model", "nomic-embed-text")
-    if _numpy_ok() and llm.available() and llm.has_model(embed_model):
+    if _numpy_ok() and llm.pulled(embed_model, llm.models()):
         try:
             feed_index.index_new(items, embed_model)
             vectors = feed_index.vectors_for(items, embed_model)
@@ -293,7 +330,7 @@ def _build():
 
     # Ladder rung 2 -> 3: synthesis, hard-capped and time-boxed.
     chat_model = _chat_model()
-    chat_ok = llm.available() and llm.has_model(chat_model)
+    chat_ok = llm.pulled(chat_model, _writers(llm.tags()))
 
     def write(c, budget_left, lead=False):
         if chat_ok and budget_left:

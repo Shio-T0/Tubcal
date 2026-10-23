@@ -508,6 +508,11 @@ and to no block at all otherwise; it never raises, and it costs one embed call, 
 extra chat call. Columns deliberately stay on the cheap prompt. The story records
 `transcript_of` (the item id read in full, or null). Degrades: no numpy/Ollama → "wire" edition
 (URL hard-links only) → embed model adds semantic clusters → chat model adds prose.
+Settings → The Edition reads `GET /edition/press` (`edition.press()`, one Ollama call): the
+writer in effect (`edition_llm_model`, else `brain_llm_model`), whether it's pulled
+(`llm.pulled`: exact name among chat models, the build's own test), a pulled one to offer
+in one press (it sets whichever of the two settings the paper follows), and the topic
+model. Never the Archive's `/brain/status`: an install without the Archive has none.
 
 **The Archive (`server/brain/`)** is optional and fully local. A background `worker`
 transcribes watched videos with faster-whisper (`transcribe.py`), chunks + embeds

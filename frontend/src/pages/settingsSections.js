@@ -52,7 +52,7 @@ export const SETTINGS_SECTIONS = {
   edition: {
     title: 'The Edition', icon: Newspaper, module: 'edition',
     blurb: 'The daily paper, composed from everything you follow. Works without AI; Ollama upgrades it to written prose.',
-    find: 'edition paper daily news hour writer model ollama recompose press',
+    find: 'edition paper daily news hour writer model ollama recompose press headlines topics',
   },
   archive: {
     title: 'The Archive', icon: Library, module: 'archive',

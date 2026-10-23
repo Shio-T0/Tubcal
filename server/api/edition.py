@@ -33,6 +33,12 @@ def edition_status():
     return ok(builder.status())
 
 
+@edition_bp.get("/edition/press")
+def edition_press():
+    """Ollama, the writer and the topic model as the next build would find them."""
+    return ok(builder.press())
+
+
 @edition_bp.post("/edition/rebuild")
 def edition_rebuild():
     builder.rebuild_async()  # no-op if a build is already holding the lock

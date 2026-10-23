@@ -580,42 +580,104 @@ function AnimeSection() {
 
 // ── The Edition ──────────────────────────────────────────────────────────────
 
+/** Why the paper can't be written, in a sentence, and the fix: one press when
+ *  another model is pulled, the command when none is. (Ollama not running is
+ *  the Writer row's hint: the paper works without it.) */
+function PressNotice({ press: p, shared, busy, onUse }) {
+  if (!p?.ollama || p.writer_ready) return null;
+  return (
+    <div className={s.notice} role="status">
+      <p>
+        <b>{p.writer}</b> isn't installed in Ollama, so your paper comes out as headlines only.
+        {shared && ' The Archive uses the same model.'}
+        {!p.suggest && <> Run <code className={s.command}>ollama pull {p.writer}</code>, then press Recompose now.</>}
+      </p>
+      {p.suggest && (
+        <button type="button" className={s.btnSolid} disabled={busy} onClick={() => onUse(p.suggest)}>
+          Write it with {p.suggest}
+        </button>
+      )}
+    </div>
+  );
+}
+
 function EditionSection() {
   const { settings, updateSettings } = useSettings();
   const toast = useToast();
-  const status = useApi('/brain/status');
-  const installed = status.data?.models || [];
+  const press = useApi('/edition/press');
+  const p = press.data;
+  const [busy, setBusy] = useState(false);
   const enabled = settings?.edition_enabled !== false;
-  const recompose = async () => {
+  const own = settings?.edition_llm_model || '';
+  // With no writer of its own the paper uses the Archive's model, so the fix
+  // goes there and keeps the two together.
+  const archive = hasModule('archive');
+  const recompose = async (said = 'The presses are running — the paper will recompose shortly.') => {
     try {
       await api('/edition/rebuild', { method: 'POST' });
-      toast('The presses are running — the paper will recompose shortly.');
+      toast(said);
     } catch (e) {
       toast(e.message, 'error');
     }
+    press.reload();
   };
+  const chooseWriter = async (model) => {
+    setBusy(true);
+    if (await updateSettings(own ? { edition_llm_model: model } : { brain_llm_model: model })) {
+      await recompose(`Recomposing with ${model}. The new paper takes about a minute.`);
+    }
+    setBusy(false);
+  };
+  const named = (m, ready) => (ready ? m : `${m} · not installed`);
   return (
-    <Group>
-      <Row label="Daily paper" hint="Compose a new paper each day in the background.">
-        <Switch checked={enabled} onChange={(v) => updateSettings({ edition_enabled: v })} label="Daily paper" />
-      </Row>
-      {enabled && (
-        <Row label="Goes to press after" hint="The local hour from which today's paper may be composed.">
-          <Select label="Goes to press after" value={settings?.edition_hour ?? 6} onChange={(v) => updateSettings({ edition_hour: Number(v) })}>
-            {Array.from({ length: 24 }, (_, h) => <option key={h} value={h}>{String(h).padStart(2, '0')}:00</option>)}
+    <>
+      {p && (
+        <div className={s.status}>
+          <span className={p.ollama ? s.statusOn : s.statusOff}>{p.ollama ? 'Ollama online' : 'Ollama offline'}</span>
+          <span className={p.writer_ready ? s.statusOn : s.statusOff}>{p.writer_ready ? `Writer: ${p.writer}` : 'Headlines only'}</span>
+          <span className={p.grouper_ready ? s.statusOn : s.statusOff}>{p.grouper_ready ? 'Grouped by topic' : 'Grouped by link'}</span>
+        </div>
+      )}
+      {enabled && <PressNotice press={p} shared={!own && archive} busy={busy} onUse={chooseWriter} />}
+      <Group>
+        <Row label="Daily paper" hint="Compose a new paper each day in the background.">
+          <Switch checked={enabled} onChange={(v) => updateSettings({ edition_enabled: v })} label="Daily paper" />
+        </Row>
+        {enabled && (
+          <Row label="Goes to press after" hint="The local hour from which today's paper may be composed.">
+            <Select label="Goes to press after" value={settings?.edition_hour ?? 6} onChange={(v) => updateSettings({ edition_hour: Number(v) })}>
+              {Array.from({ length: 24 }, (_, h) => <option key={h} value={h}>{String(h).padStart(2, '0')}:00</option>)}
+            </Select>
+          </Row>
+        )}
+        <Row
+          label="Writer"
+          hint={p && !p.ollama && !APP.phone ? "Ollama isn't running, so papers come out as headlines only." : 'The Ollama model that writes the stories.'}
+        >
+          <Select label="Writer" value={own} onChange={(v) => updateSettings({ edition_llm_model: v }).then(press.reload)}>
+            <option value="">
+              {archive ? 'Same as The Archive' : 'Default'}{p ? ` (${named(p.fallback, p.fallback_ready)})` : ''}
+            </option>
+            {own && !(p?.models || []).includes(own) && <option value={own}>{p ? named(own, p.writer_ready) : own}</option>}
+            {(p?.models || []).map((m) => <option key={m} value={m}>{m}</option>)}
           </Select>
         </Row>
-      )}
-      <Row label="Writer" hint={status.data?.ollama ? 'The Ollama model that writes the stories.' : 'Ollama is offline: the paper comes out as a wire edition.'}>
-        <Select label="Writer" value={settings?.edition_llm_model || ''} onChange={(v) => updateSettings({ edition_llm_model: v })}>
-          <option value="">Same as The Archive</option>
-          {installed.map((m) => <option key={m} value={m}>{m}</option>)}
-        </Select>
-      </Row>
-      <Row label="Recompose" hint="Print a fresh paper from what's out now.">
-        <button type="button" className={s.btnGhost} onClick={recompose}><RotateCw size={14} /> Recompose now</button>
-      </Row>
-    </Group>
+        {p?.ollama && (
+          <Row
+            label="Topics"
+            hint={p.grouper_ready ? `${p.grouper} groups stories about the same thing.` : (
+              <>
+                Stories are grouped only when they share a link.
+                {!p.grouper_pulled && <> Run <code className={s.command}>ollama pull {p.grouper}</code> to group them by topic too.</>}
+              </>
+            )}
+          />
+        )}
+        <Row label="Recompose" hint="Print a fresh paper from what's out now.">
+          <button type="button" className={s.btnGhost} onClick={() => recompose()}><RotateCw size={14} /> Recompose now</button>
+        </Row>
+      </Group>
+    </>
   );
 }
 
