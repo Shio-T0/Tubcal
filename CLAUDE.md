@@ -109,7 +109,10 @@ expanded player, media, and keyboard-focused controls. An element marked
   page and the command palette (which also searches saved entries).
 - `pages/SavedPage.jsx`: a catalogue by channel → kind with counts, To do / Done,
   search over titles, sources and notes, sort, shelves (each kind its own layout) or a
-  dense list, notes, select-many. All view state in the URL.
+  dense list, notes, select-many, and Export (`lib/savedExport.js`: what's shown, or
+  what's selected, as a Netscape bookmarks file foldered by channel → kind, Markdown
+  with done ticks and notes, or JSON; built in the page and handed to the browser's
+  download, no endpoint). All view state in the URL.
 - The editor opens `/editor?open=<path>` over the restored session; `<leader> b` and
   the tab strip's bookmark save the current file. The phone's Saved screen routes the
   new kinds by `kindOf` and hides desktop-only ones (files).

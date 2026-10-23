@@ -18,8 +18,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  ArrowUp, Bookmark, Check, CheckCheck, LayoutGrid, List, MessageSquare, PenLine, Play, Search, Square, SquareCheck,
-  Star, Trash2, X,
+  ArrowUp, Bookmark, Check, CheckCheck, Download, LayoutGrid, List, MessageSquare, PenLine, Play, Search, Square,
+  SquareCheck, Star, Trash2, X,
 } from 'lucide-react';
 
 import { compact } from '../lib/format.js';
@@ -27,6 +27,7 @@ import { clock } from '../lib/time.js';
 import { useParamState } from '../lib/urlState.js';
 import { ALL_CHANNELS, CHANNELS, getRoomById, savedChannels } from '../lib/rooms.js';
 import { KINDS, KIND_ORDER, channelOfItem, kindOf, toneOf } from '../lib/saveable.js';
+import { EXPORT_FORMATS, download, exportSaved } from '../lib/savedExport.js';
 import { useSaved } from '../state.jsx';
 import { KindIcon, keptAgo, kindLine } from '../components/saved/kinds.jsx';
 import { useOpenSaved } from '../components/saved/useOpenSaved.jsx';
@@ -44,6 +45,52 @@ const LAYOUT = {
   file: 'mono', page: 'mono', commit: 'mono',
 };
 const layoutOf = (kind) => LAYOUT[kind] || 'card';
+
+/** Export what's shown (a bookmarks file, Markdown or JSON), made in the page and
+ *  handed to the browser's download: nothing leaves this machine. */
+function ExportMenu({ items, scope }) {
+  const [open, setOpen] = useState(false);
+  const wrap = useRef(null);
+  useEffect(() => {
+    if (!open) return undefined;
+    const away = (e) => { if (!wrap.current?.contains(e.target)) setOpen(false); };
+    const esc = (e) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('mousedown', away);
+    document.addEventListener('keydown', esc);
+    return () => { document.removeEventListener('mousedown', away); document.removeEventListener('keydown', esc); };
+  }, [open]);
+  const save = (format) => {
+    download(exportSaved(format, items, { origin: window.location.origin }));
+    setOpen(false);
+  };
+  return (
+    <span className={s.exportWrap} ref={wrap}>
+      <button
+        type="button"
+        className={open ? s.selectOn : s.select}
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        aria-haspopup="menu"
+        disabled={!items.length}
+        title="Take these with you"
+      >
+        <Download size={14} /> Export
+      </button>
+      {open && (
+        <div className={s.exportMenu} role="menu">
+          <p>{plural(items.length, 'thing')} · {scope}</p>
+          {EXPORT_FORMATS.map((f) => (
+            <button key={f.id} type="button" role="menuitem" onClick={() => save(f.id)}>
+              <b>{f.label}</b>
+              <span>.{f.ext}</span>
+            </button>
+          ))}
+          <small>Made right here and saved by your browser. Nothing is uploaded.</small>
+        </div>
+      )}
+    </span>
+  );
+}
 
 const SORTS = [
   ['new', 'Newest kept'],
@@ -396,6 +443,10 @@ export default function SavedPage() {
           <button type="button" className={selecting ? s.selectOn : s.select} onClick={() => (selecting ? endSelect() : setSelecting(true))}>
             {selecting ? 'Done selecting' : 'Select'}
           </button>
+          <ExportMenu
+            items={selecting && picked.size ? shown.filter((it) => picked.has(it.id)) : shown}
+            scope={selecting && picked.size ? 'the ones selected' : `${scopeLabel}${needle ? `, matching “${q.trim()}”` : ''}`}
+          />
         </div>
       </header>
 
