@@ -169,9 +169,10 @@ def _where():
 def readiness():
     """(model, problem): the model that sorts, and why it can't (None if it can)."""
     model = llm.chat_model()
-    if not llm.available():
+    tags = llm.tags()
+    if tags is None:
         return model, "Ollama isn't running, so nothing can read the headlines. Start it with `ollama serve`."
-    if not llm.has_model(model):
+    if not llm.pulled(model, llm.writers(tags)):
         where = f", or change {_where()}" if _where() else ""
         return model, f"{model} isn't pulled. Run `ollama pull {model}`{where}."
     return model, None

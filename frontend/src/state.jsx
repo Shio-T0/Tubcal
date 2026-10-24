@@ -69,13 +69,16 @@ export function AppProviders({ children }) {
     if (fast !== null) document.documentElement.toggleAttribute('data-fast', fast);
   }, [fast]);
 
+  // Resolves to whether the server kept the change.
   const updateSettings = useCallback(
     async (partial) => {
       setSettings((s) => ({ ...s, ...partial }));
       try {
         setSettings(await api('/settings', { method: 'PUT', body: JSON.stringify(partial) }));
+        return true;
       } catch (e) {
         toast(e.message, 'error');
+        return false;
       }
     },
     [toast],

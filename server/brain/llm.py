@@ -23,21 +23,49 @@ def available():
         return False
 
 
-def models():
-    """Names of locally-pulled Ollama models (e.g. ['qwen3.5:9b', ...])."""
+def tags():
+    """Ollama's list of locally-pulled models (name + details), or None when the
+    server doesn't answer — so one call tells "offline" from "nothing pulled"."""
     try:
         r = requests.get(f"{config.OLLAMA_URL}/api/tags", timeout=_TIMEOUT_FAST)
         r.raise_for_status()
-        return [m["name"] for m in r.json().get("models", [])]
-    except requests.RequestException:
-        return []
+        return r.json().get("models", [])
+    except (requests.RequestException, ValueError):
+        return None
+
+
+def models():
+    """Names of locally-pulled Ollama models (e.g. ['qwen3.5:9b', ...])."""
+    return [m["name"] for m in tags() or []]
+
+
+def can_chat(tag):
+    """Whether a pulled model (one entry of tags()) writes text. Embedding models
+    only make vectors: they're BERT-family, or say "embed" in their name."""
+    details = tag.get("details") or {}
+    families = details.get("families") or [details.get("family") or ""]
+    return "embed" not in tag.get("name", "") and not any("bert" in f for f in families)
+
+
+def writers(tags):
+    """Names of the pulled models that can write (embedding models can't)."""
+    return [t["name"] for t in tags or [] if can_chat(t)]
+
+
+def pulled(name, have):
+    """Whether exactly `name` is among the pulled names `have` (a bare name is its
+    `:latest`). Stricter than has_model: chatting with "llama3.1:8b" fails when
+    only "llama3.1:70b" is pulled."""
+    if not name:
+        return False
+    return name in have or (":" not in name and f"{name}:latest" in have)
 
 
 def chat_model():
     """The chat model the station writes with: the Edition's Writer, else the
     Archive's model (Settings → The Edition / The Archive)."""
     return (db.get_setting("edition_llm_model", "")
-            or db.get_setting("brain_llm_model", "qwen3.5:9b"))
+            or db.get_setting("brain_llm_model", db.DEFAULT_SETTINGS["brain_llm_model"]))
 
 
 def has_model(name):

@@ -1,4 +1,5 @@
 import json
+import logging
 
 from flask import Flask, request, send_from_directory
 
@@ -15,10 +16,14 @@ def create_app():
         why = localguard.refusal(request.path, request.headers)
         if why is None:
             return None
+        logging.getLogger("tubcal").warning(
+            "refused %s %s (%s: %s)", request.method, request.path,
+            why, request.headers.get("Origin") or request.referrer or request.host)
+        msg = localguard.message(why)
         if request.path.startswith("/api/"):
             from .api import err
-            return err(why, 403)
-        return why + "\n", 403, {"Content-Type": "text/plain; charset=utf-8"}
+            return err(msg, 403)
+        return msg + "\n", 403, {"Content-Type": "text/plain; charset=utf-8"}
 
     from .api import register_blueprints
     register_blueprints(app)
@@ -38,6 +43,8 @@ def create_app():
             resp.headers["Cache-Control"] = "no-store"
         elif request.path.startswith("/assets/"):
             resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        # No other site may show Tubcal in a frame and steer clicks in it.
+        resp.headers["Content-Security-Policy"] = "frame-ancestors 'self'"
         return resp
 
     def serve_index(dist):

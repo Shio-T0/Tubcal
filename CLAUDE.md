@@ -551,6 +551,11 @@ and to no block at all otherwise; it never raises, and it costs one embed call, 
 extra chat call. Columns deliberately stay on the cheap prompt. The story records
 `transcript_of` (the item id read in full, or null). Degrades: no numpy/Ollama → "wire" edition
 (URL hard-links only) → embed model adds semantic clusters → chat model adds prose.
+Settings → The Edition reads `GET /edition/press` (`edition.press()`, one Ollama call): the
+writer in effect (`edition_llm_model`, else `brain_llm_model`), whether it's pulled
+(`llm.pulled`: exact name among chat models, the build's own test), a pulled one to offer
+in one press (it sets whichever of the two settings the paper follows), and the topic
+model. Never the Archive's `/brain/status`: an install without the Archive has none.
 
 **The Archive (`server/brain/`)** is optional and fully local. A background `worker`
 transcribes watched videos with faster-whisper (`transcribe.py`), chunks + embeds
@@ -965,11 +970,13 @@ floats/rails otherwise.
 - **Only this machine's pages.** Binding to 127.0.0.1 keeps other machines out,
   not other websites. `server/localguard.py` runs before every request (a
   `before_request` in `create_app`) and refuses a `Host` that isn't a loopback name
-  (DNS rebinding), an `Origin` that isn't this machine (WebSockets ignore CORS, and
-  `/api/editor/pty` is a shell), and `/api/` subresources marked `Sec-Fetch-Site:
-  cross-site`. Top-level navigations pass (OAuth callbacks), and so do requests with
-  none of those headers (curl, the launcher, tests). Never add CORS headers or a
-  route that sidesteps it. Tests: `tests/test_localguard.py`.
+  or in `TUBCAL_ALLOWED_HOSTS` (DNS rebinding), an `Origin` that isn't this machine
+  (WebSockets ignore CORS, and `/api/editor/pty` is a shell), and `/api/` subresources
+  marked `Sec-Fetch-Site: cross-site`. Top-level navigations into a tab pass (OAuth
+  callbacks; not a cross-site frame), so a GET under `/api/` must never change
+  anything. Requests with none of those headers (curl, the launcher, the phone's
+  Kotlin, tests) pass. Every response carries `frame-ancestors 'self'`. Never add CORS
+  headers or a route that sidesteps it. Tests: `tests/test_localguard.py`.
 - **Cookie containment.** `httpc`'s `session` is shared process-wide, so its jar
   accumulates whatever hosts set — scraping a YouTube channel page seeds
   `VISITOR_INFO1_LIVE`/`YSC`/`__Secure-YNID`, which requests then merges into every

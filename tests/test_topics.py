@@ -28,8 +28,7 @@ def fresh(monkeypatch):
 
 @pytest.fixture
 def ready(monkeypatch):
-    monkeypatch.setattr(llm, "available", lambda: True)
-    monkeypatch.setattr(llm, "has_model", lambda m: True)
+    monkeypatch.setattr(llm, "tags", lambda: [{"name": "test-model"}])
     monkeypatch.setattr(llm, "chat_model", lambda: "test-model")
 
 
@@ -142,11 +141,11 @@ def test_no_five_topics_jams_the_sort(monkeypatch, ready):
 
 def test_not_ready_says_why(monkeypatch):
     monkeypatch.setattr(llm, "chat_model", lambda: "llama3.1:8b")
-    monkeypatch.setattr(llm, "available", lambda: True)
-    monkeypatch.setattr(llm, "has_model", lambda m: False)
+    # only a bigger llama3.1 is pulled: close isn't the model the Writer names
+    monkeypatch.setattr(llm, "tags", lambda: [{"name": "llama3.1:70b"}])
     model, problem = hn_topics.readiness()
     assert model == "llama3.1:8b" and "ollama pull llama3.1:8b" in problem
-    monkeypatch.setattr(llm, "available", lambda: False)
+    monkeypatch.setattr(llm, "tags", lambda: None)
     assert "Ollama isn't running" in hn_topics.readiness()[1]
 
 
@@ -160,7 +159,7 @@ def test_reading_never_starts_a_sort(client, monkeypatch, ready):
 
 
 def test_sort_endpoint_refuses_when_the_ai_is_out(client, monkeypatch):
-    monkeypatch.setattr(llm, "available", lambda: False)
+    monkeypatch.setattr(llm, "tags", lambda: None)
     r = client.post("/api/hackernews/topics/sort")
     assert r.status_code == 503 and "Ollama" in r.get_json()["error"]
 

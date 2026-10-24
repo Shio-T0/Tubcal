@@ -29,6 +29,11 @@ INSTALL_3D = {"1": True, "0": False}.get(os.environ.get("TUBCAL_3D", "").strip()
 
 HOST = "127.0.0.1"
 PORT = int(os.environ.get("TUBCAL_PORT", "5000"))
+# Names besides localhost/127.0.0.1 that may reach Tubcal (a hosts-file alias).
+# Anything else in Host is refused: see server/localguard.py.
+ALLOWED_HOSTS = {
+    h.strip().lower() for h in os.environ.get("TUBCAL_ALLOWED_HOSTS", "").split(",") if h.strip()
+}
 
 # How many cache entries stay in memory (the rest are one SQLite read away).
 CACHE_MEM_MAX = int(os.environ.get("TUBCAL_CACHE_MEM_MAX", "1500"))

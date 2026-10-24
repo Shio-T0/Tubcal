@@ -111,7 +111,7 @@ function Nameplate({ paper, read, total, plateRef }) {
           {edited ? (
             <span className={e.earSmall}>written by {paper.model}</span>
           ) : (
-            <Link to="/settings?s=edition" className={`${e.earSmall} ${e.wireMark}`} title="A wire edition: headlines only. With a local model (Ollama) the paper is written as stories">
+            <Link to="/settings?s=edition" className={`${e.earSmall} ${e.wireMark}`} title="No model wrote this paper, so it’s headlines only. Click for the Edition’s settings.">
               headlines only
             </Link>
           )}

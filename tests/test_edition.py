@@ -396,3 +396,109 @@ def test_feed_vectors_roundtrip(client):
     assert db.feed_vectors_missing(["hn:1"], "other-model") == {"hn:1"}
     got = db.feed_vectors_get(["hn:1"], "m")
     assert got["hn:1"] == v
+
+
+# ---- the presses: what Settings → The Edition reports ----
+
+def _tag(name, family="llama"):
+    return {"name": name, "details": {"family": family, "families": [family]}}
+
+
+def test_can_chat_drops_embedding_models():
+    from server.brain import llm
+    assert llm.can_chat(_tag("qwen3.5:9b", "qwen35"))
+    assert not llm.can_chat(_tag("nomic-embed-text:latest", "nomic-bert"))
+    assert not llm.can_chat(_tag("mxbai-embed-large:latest", "bert"))
+    assert not llm.can_chat(_tag("all-minilm:latest", "bert"))
+
+
+def test_pulled_is_exact_but_for_latest():
+    from server.brain import llm
+    assert llm.pulled("qwen3.5:9b", ["qwen3.5:9b"])
+    assert llm.pulled("nomic-embed-text", ["nomic-embed-text:latest"])
+    assert not llm.pulled("llama3.1:8b", ["llama3.1:70b"])  # same family, other model
+    assert not llm.pulled("qwen3.5", ["qwen3.5:9b"])  # bare name means :latest
+    assert not llm.pulled("", ["qwen3.5:9b"])
+
+
+def test_tags_is_none_when_ollama_does_not_answer(monkeypatch):
+    import requests
+    from server.brain import llm
+
+    def down(*a, **kw):
+        raise requests.ConnectionError("refused")
+
+    monkeypatch.setattr(llm.requests, "get", down)
+    assert llm.tags() is None
+    assert llm.models() == []
+
+
+def test_press_offers_a_pulled_writer_when_the_set_one_is_gone(client, monkeypatch):
+    """The setting outlived its model (a stale default): say so, and offer the
+    app's default because it is pulled, never an embedding model."""
+    from server import db
+    from server.brain import edition
+    db.set_setting("brain_llm_model", "llama3.1:8b")
+    monkeypatch.setattr(edition.llm, "tags", lambda: [
+        _tag("nomic-embed-text:latest", "nomic-bert"),
+        _tag("qwen2.5:1.5b", "qwen2"),
+        _tag("qwen3.5:9b", "qwen35"),
+    ])
+    p = client.get("/api/edition/press").get_json()["data"]
+    assert p["ollama"] is True
+    assert p["writer"] == "llama3.1:8b" and p["writer_ready"] is False
+    assert p["fallback"] == "llama3.1:8b" and p["fallback_ready"] is False
+    assert p["suggest"] == "qwen3.5:9b"
+    assert p["models"] == ["qwen2.5:1.5b", "qwen3.5:9b"]
+    assert p["grouper"] == "nomic-embed-text" and p["grouper_pulled"] is True
+
+
+def test_press_with_the_editions_own_writer(client, monkeypatch):
+    from server import db
+    from server.brain import edition
+    db.set_setting("edition_llm_model", "qwen2.5:1.5b")
+    monkeypatch.setattr(edition.llm, "tags", lambda: [_tag("qwen2.5:1.5b", "qwen2")])
+    p = edition.press()
+    assert p["writer"] == "qwen2.5:1.5b" and p["writer_ready"] is True
+    assert p["suggest"] is None
+    assert p["fallback"] == "qwen3.5:9b" and p["fallback_ready"] is False
+    assert p["grouper_pulled"] is False and p["grouper_ready"] is False
+
+
+def test_press_when_the_chosen_writer_was_removed(client, monkeypatch):
+    from server import db
+    from server.brain import edition
+    db.set_setting("edition_llm_model", "llama3.1:8b")
+    monkeypatch.setattr(edition.llm, "tags", lambda: [_tag("llama3.1:70b"), _tag("qwen3.5:9b", "qwen35")])
+    p = edition.press()
+    assert p["writer"] == "llama3.1:8b" and p["writer_ready"] is False
+    assert p["suggest"] == "qwen3.5:9b"
+
+
+def test_an_embedding_model_cannot_be_the_writer(client, monkeypatch):
+    """A writer saved from the old list, which offered every pulled model."""
+    from server import db
+    from server.brain import edition
+    db.set_setting("edition_llm_model", "nomic-embed-text:latest")
+    monkeypatch.setattr(edition.llm, "tags", lambda: [
+        _tag("nomic-embed-text:latest", "nomic-bert"), _tag("qwen2.5:1.5b", "qwen2")])
+    p = edition.press()
+    assert p["writer_ready"] is False
+    assert p["suggest"] == "qwen2.5:1.5b"  # the default isn't pulled: the first writer
+
+
+def test_press_without_ollama(client, monkeypatch):
+    from server.brain import edition
+    monkeypatch.setattr(edition.llm, "tags", lambda: None)
+    p = edition.press()
+    assert p["ollama"] is False
+    assert p["writer_ready"] is False and p["suggest"] is None
+    assert p["models"] == []
+
+
+def test_press_with_nothing_but_an_embedding_model(client, monkeypatch):
+    from server.brain import edition
+    monkeypatch.setattr(edition.llm, "tags", lambda: [_tag("nomic-embed-text:latest", "nomic-bert")])
+    p = edition.press()
+    assert p["ollama"] is True and p["models"] == []
+    assert p["suggest"] is None
