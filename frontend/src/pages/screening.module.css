@@ -217,8 +217,11 @@
 
 .feature {
   position: relative;
+  /* The column's width, at least 16:9 tall, and stretched to the listings beside
+     it. The width has to be set: left auto, a stretched height drives the width
+     through the ratio and the picture runs under the listings. */
+  width: 100%;
   min-height: 0;
-  /* at least 16:9, and as tall as the listings beside it */
   aspect-ratio: 16 / 9;
   align-self: stretch;
   border-radius: var(--r-media);

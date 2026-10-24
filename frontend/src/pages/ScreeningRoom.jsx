@@ -292,8 +292,11 @@ function Feature({ item, fresh, onPlay }) {
 }
 
 function OnNow({ feature, justIn, liveItems, isNew, onPlay, latestCount }) {
-  const onAir = liveItems.filter((i) => i.extra?.live_status === 'is_live');
+  const onAir = liveItems.filter((i) => i.extra?.live_status === 'is_live').slice(0, 2);
   const soon = liveItems.filter((i) => i.extra?.live_status !== 'is_live');
+  // Whatever's on air takes the place of the oldest uploads, so the listings
+  // stay about as tall as the picture instead of cropping it to a square.
+  const uploads = justIn.slice(0, 4 - onAir.length);
   return (
     <section className={s.band} aria-label="On now">
       <Feature item={feature} fresh={isNew(feature)} onPlay={onPlay} />
@@ -301,7 +304,7 @@ function OnNow({ feature, justIn, liveItems, isNew, onPlay, latestCount }) {
         {onAir.length > 0 && (
           <div className={s.guideBlock}>
             <h3 className={`${s.guideHead} ${s.guideLive}`}><span className={s.liveDot} /> On air now</h3>
-            {onAir.slice(0, 2).map((i) => <VideoRow key={i.id} item={i} onPlay={onPlay} />)}
+            {onAir.map((i) => <VideoRow key={i.id} item={i} onPlay={onPlay} />)}
           </div>
         )}
         <div className={s.guideBlock}>
@@ -309,7 +312,7 @@ function OnNow({ feature, justIn, liveItems, isNew, onPlay, latestCount }) {
             Just in
             {latestCount > 0 && <em className={s.guideNew}>{latestCount} new</em>}
           </h3>
-          {justIn.map((i) => <VideoRow key={i.id} item={i} onPlay={onPlay} fresh={isNew(i)} />)}
+          {uploads.map((i) => <VideoRow key={i.id} item={i} onPlay={onPlay} fresh={isNew(i)} />)}
         </div>
         {soon.length > 0 && (
           <Link to="/youtube?v=live" className={s.soon}>
