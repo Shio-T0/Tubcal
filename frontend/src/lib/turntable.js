@@ -12,6 +12,11 @@
 // darkens each face by how far it faces away through its `.shade`. While a turn
 // is under way the stage carries data-turning (and data-dragging while held),
 // for the CSS to lift it. The caller marks the faces not facing you inert.
+//
+// Once it has stopped and been set down, the stage carries data-still, and the
+// CSS shows the face you're looking at flat, out of 3D: browsers paint anything
+// under a 3D transform into a texture and then resample it, which blurs text
+// (Firefox most). The 3D comes back as soon as anything moves it again.
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
@@ -24,6 +29,8 @@ const SLOP = 8;
 // The spring a released turn settles on: critically damped.
 const STIFF = 110;
 const DAMP = 2 * Math.sqrt(STIFF);
+// How long it takes to be set down after a turn (the CSS's lift transition).
+const SET_DOWN_MS = 520;
 
 const idle = () => {
   const el = document.activeElement;
@@ -36,14 +43,16 @@ const typing = (el) =>
 /**
  * ids: the faces in order round it. side: the id facing you. onSide(id): a turn
  * landed on (or set off towards) id. enabled: false holds it still (nothing turns
- * it, from inside or out).
+ * it, from inside or out). front: a ref to a flat stand-in the caller shows over
+ * the face you're facing while it's still (the sorter's), which then holds that
+ * face's focus. onStill(still): it came to rest (true) or started moving (false).
  *
  * Returns the refs to attach (stage: what you drag; turner: what --turn moves;
  * faces[i] and shades[i]), `stageProps` for the stage, the face `facing` you,
  * commit / turnBy / towards to turn it by hand, and hold / angle for something
  * else turning it for a while (it carries on from wherever that left it).
  */
-export function useTurntable({ ids, side, onSide, enabled = true }) {
+export function useTurntable({ ids, side, onSide, enabled = true, front, onStill }) {
   const n = ids.length;
   const step = 360 / n;
   const start = Math.max(0, ids.indexOf(side));
@@ -58,10 +67,12 @@ export function useTurntable({ ids, side, onSide, enabled = true }) {
   const drag = useRef(null);
   const dragged = useRef(false);
   const wheel = useRef(null);
+  const rest = useRef(0);
+  const landed = useRef(0);
   const [facing, setFacing] = useState(start);
 
   const latest = useRef({});
-  latest.current = { ids, onSide, enabled };
+  latest.current = { ids, onSide, enabled, onStill };
 
   const paint = (deg) => {
     at.current = deg;
@@ -71,14 +82,39 @@ export function useTurntable({ ids, side, onSide, enabled = true }) {
       if (el) el.style.opacity = (0.72 * (1 - Math.cos(((deg + i * step) * Math.PI) / 180))).toFixed(3);
     });
   };
-  const lift = () => { if (!isStill()) stage.current?.setAttribute('data-turning', ''); };
-  const land = () => stage.current?.removeAttribute('data-turning');
+  const unsettle = () => {
+    clearTimeout(rest.current);
+    const el = stage.current;
+    if (!el?.hasAttribute('data-still')) return;
+    el.removeAttribute('data-still');
+    latest.current.onStill?.(false);
+  };
+  /** Still, once it has been set down. */
+  const settle = () => {
+    clearTimeout(rest.current);
+    rest.current = setTimeout(() => {
+      const el = stage.current;
+      if (!el || el.hasAttribute('data-still')) return;
+      el.setAttribute('data-still', '');
+      latest.current.onStill?.(true);
+    }, Math.max(0, landed.current + SET_DOWN_MS - performance.now()));
+  };
+  const lift = () => {
+    unsettle();
+    if (!isStill()) stage.current?.setAttribute('data-turning', '');
+  };
+  const land = () => {
+    const el = stage.current;
+    if (!el?.hasAttribute('data-turning')) return;
+    el.removeAttribute('data-turning');
+    landed.current = performance.now();
+  };
 
   /** Settle on face number `target` (round and round), from velocity v (°/s). */
   const glide = (target, v0 = 0) => {
     cancelAnimationFrame(raf.current);
     const goal = -target * step;
-    if (isStill()) { paint(goal); land(); return; }
+    if (isStill()) { unsettle(); paint(goal); land(); settle(); return; }
     lift();
     let x = at.current;
     let v = v0;
@@ -90,7 +126,7 @@ export function useTurntable({ ids, side, onSide, enabled = true }) {
       x += v * dt;
       // set it down during the last few degrees, so it lands as it stops
       if (Math.abs(x - goal) < 6) land();
-      if (Math.abs(x - goal) < 0.05 && Math.abs(v) < 1) { paint(goal); return; }
+      if (Math.abs(x - goal) < 0.05 && Math.abs(v) < 1) { paint(goal); land(); settle(); return; }
       paint(x);
       raf.current = requestAnimationFrame(tick);
     };
@@ -99,11 +135,13 @@ export function useTurntable({ ids, side, onSide, enabled = true }) {
 
   /** Turn to face number `target` and say so. */
   const commit = (target, v = 0, { tell = true } = {}) => {
+    const was = mod(spin.current, n);
     spin.current = target;
     const i = mod(target, n);
     // focus left on a face that's turning away would be stuck there
     const el = document.activeElement;
-    if (el && faces.current.some((f, k) => k !== i && f?.contains(el))) el.blur();
+    if (el && (faces.current.some((f, k) => k !== i && f?.contains(el))
+      || (was !== i && front?.current?.contains(el)))) el.blur();
     setFacing(i);
     glide(target, v);
     if (tell) latest.current.onSide(latest.current.ids[i]);
@@ -120,20 +158,29 @@ export function useTurntable({ ids, side, onSide, enabled = true }) {
   /** Stand at `deg`, turned by someone else; the nearest face counts as facing. */
   const hold = (deg) => {
     cancelAnimationFrame(raf.current);
+    unsettle();
     spin.current = Math.round(-deg / step);
     paint(deg);
   };
   const angle = () => at.current;
 
-  // The first paint already faces the right way.
-  useLayoutEffect(() => { paint(at.current); }, []);
-  useEffect(() => () => cancelAnimationFrame(raf.current), []);
+  // The first paint already faces the right way, at rest.
+  useLayoutEffect(() => {
+    paint(at.current);
+    stage.current?.setAttribute('data-still', '');
+  }, []);
+  useEffect(() => () => {
+    cancelAnimationFrame(raf.current);
+    clearTimeout(rest.current);
+  }, []);
 
   // Turned from outside: tabs, a key on the page, Back.
   useEffect(() => {
     const i = ids.indexOf(side);
-    if (!enabled || i < 0 || i === mod(spin.current, n)) return;
-    commit(towards(i), 0, { tell: false });
+    if (!enabled || i < 0) return;
+    if (i !== mod(spin.current, n)) commit(towards(i), 0, { tell: false });
+    // left between two faces by someone else (the sorter's slow turn): square up
+    else if (at.current !== -spin.current * step) glide(spin.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [side, n, enabled]);
 
@@ -161,10 +208,11 @@ export function useTurntable({ ids, side, onSide, enabled = true }) {
       if (!latest.current.enabled) return;
       const { dir, from } = e.detail || {};
       if (dir !== 'left' && dir !== 'right') return;
-      if (!from || !faces.current[mod(spin.current, n)]?.contains(from)) return;
+      if (!from || !(faces.current[mod(spin.current, n)]?.contains(from) || front?.current?.contains(from))) return;
       turnBy(dir === 'right' ? 1 : -1);
       requestAnimationFrame(() => requestAnimationFrame(() => {
-        const tiles = faces.current[mod(spin.current, n)]?.querySelectorAll('[data-kbd-tile]');
+        const host = front?.current || faces.current[mod(spin.current, n)];
+        const tiles = host?.querySelectorAll('[data-kbd-tile]');
         const el = tiles?.length ? tiles[dir === 'right' ? 0 : tiles.length - 1] : null;
         el?.focus({ preventScroll: true });
       }));

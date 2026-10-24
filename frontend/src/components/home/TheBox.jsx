@@ -13,7 +13,8 @@
 // turning itself is lib/turntable.js (shared with the Wire's sorter): it moves
 // --turn on the cube, darkens each side by how far it faces away, and says when
 // the box is lifted (data-turning). The sides not facing you are inert: no focus,
-// clicks, h/j/k/l or screen reader.
+// clicks, h/j/k/l or screen reader. At rest (data-still) the CSS takes the box
+// out of 3D altogether, so the side facing you is drawn as sharp as any page.
 
 import { useRef } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';

@@ -18,6 +18,11 @@
 // panel's edge, the topic tabs underneath, and 1–5 (the page). Sorting again
 // closes it the same way backwards.
 //
+// The turned panels are only for show. While the machine is still, a flat copy
+// of the one facing you stands exactly over it (.front): text under a 3D
+// transform comes out blurred, so that copy is the one you read and use, and it
+// hands its scroll position to its twin whenever a turn starts.
+//
 // The geometry (sizes in px from the stage's size) is worked out here and handed
 // to the CSS as custom properties; the CSS places everything. Slips are made and
 // flown with the Web Animations API, outside React, and removed when they land.
@@ -132,6 +137,7 @@ export default function Sorter({
 }) {
   const wrap = useRef(null);
   const bleed = useRef(null);
+  const front = useRef(null);
   const overlay = useRef(null);
   const bands = useRef([]);
   const spikeTip = useRef(null);
@@ -151,9 +157,20 @@ export default function Sorter({
   const open = !sorting && !!topics && pending === 0;
   const [late, setLate] = useState(false); // the panels are coming in after a split
 
+  // The flat copy and its turned twin keep one scroll position between them.
+  const shown = useRef(0);
+  const onStill = (still) => {
+    const twin = faces.current[shown.current]?.querySelector(`.${m.list}`);
+    const flat = front.current?.querySelector(`.${m.list}`);
+    if (!twin || !flat) return;
+    if (still) flat.scrollTop = twin.scrollTop;
+    else twin.scrollTop = flat.scrollTop;
+  };
+
   const {
     facing, stage, turner, faces, shades, stageProps, commit, turnBy, towards, hold, angle,
-  } = useTurntable({ ids: IDS, side, onSide, enabled: open });
+  } = useTurntable({ ids: IDS, side, onSide, enabled: open, front, onStill });
+  shown.current = facing;
   useGutter(wrap, bleed);
 
   // ── geometry from the stage's size ──
@@ -360,7 +377,8 @@ export default function Sorter({
                       ref={(el) => { faces.current[i] = el; }}
                       className={m.face}
                       style={{ '--i': i, '--tone': tone }}
-                      inert={!open || i !== facing}
+                      data-facing={(open && i === facing) || undefined}
+                      inert
                       aria-label={t ? `${t.n}. ${t.name}` : `Topic ${i + 1}`}
                     >
                       <div className={m.leaf} aria-hidden="true" />
@@ -397,6 +415,27 @@ export default function Sorter({
               </button>
             </div>
           </div>
+
+          {open && topics?.[facing] && (
+            <section
+              ref={front}
+              className={m.front}
+              style={{ '--tone': TONES[facing] }}
+              inert={late}
+              aria-label={`${topics[facing].n}. ${topics[facing].name}`}
+            >
+              <div className={m.leaf} aria-hidden="true" />
+              <Panel
+                key={topics[facing].n}
+                topic={topics[facing]}
+                tight={tight}
+                openId={openId}
+                onOpen={onOpen}
+                seen={seen}
+                newSince={newSince}
+              />
+            </section>
+          )}
 
           <div ref={overlay} className={m.overlay}>
             <svg className={m.tape} viewBox={g ? `0 0 ${g.w} ${g.h}` : undefined} aria-hidden="true">

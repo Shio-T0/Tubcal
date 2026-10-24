@@ -157,6 +157,28 @@
   pointer-events: none;
 }
 
+/* The panel facing you, flat, where its turned twin stands when the machine is
+   still (data-still, and not while the panels come in after a split). Text under
+   a 3D transform is painted into a texture and resampled, which blurs it; this
+   copy is drawn like any page and is the one you read, click and tab through.
+   The turned faces are only for show. */
+.front {
+  position: absolute;
+  left: calc(50% - var(--P, 0px) / 2);
+  top: var(--T);
+  width: var(--P, 0px);
+  height: var(--hf, 0px);
+  opacity: 0;
+  pointer-events: none;
+}
+.stage[data-still]:not([data-late]) .front {
+  opacity: 1;
+  pointer-events: auto;
+}
+.stage[data-still]:not([data-late]) .face[data-facing] {
+  visibility: hidden;
+}
+
 /* the seams it will split along, lit in its colour */
 .seam {
   position: absolute;

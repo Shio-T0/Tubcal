@@ -158,7 +158,11 @@ before "where to?":
   cell (the box is as tall as its tallest side), placed by `rotateY(i·360°/n)` and
   pushed out by the apothem in `cqw` of the stage. Script moves only `--turn` and
   each side's `.shade` opacity; `--turn`/`--lift` are `@property` with `inherits:
-  false`, so a frame restyles the cube, not everything on it. Turning: drag (pointer
+  false`, so a frame restyles the cube, not everything on it. At rest (the stage's
+  `data-still`, which `lib/turntable.js` sets once a turn has stopped and been set down,
+  and drops at the first move) the box leaves 3D altogether and the facing side is a
+  plain page: text under a 3D transform is painted into a texture and resampled, which
+  blurs it in a real browser (Firefox most; headless screenshots don't show it). Turning: drag (pointer
   capture, the click after a drag swallowed), a sideways wheel, ←/→ (not on a tile),
   Tab with nothing focused, the side tabs, 1 2 3 / 0 on a channel's side (Home; a
   number again goes in), and h/l at a side's edge (KeyboardShortcuts fires
@@ -812,7 +816,12 @@ hottest stories into five topics the local AI names, and spikes the rest:
   px custom properties; the open/close sequence is CSS transitions with delays each way.
   The fronts unfold by `left`/`right`, not a transform: an animated transform inside a
   face that's turned in 3D gets its own compositor layer, and Chrome then paints the
-  wrong faces until it settles.
+  wrong faces until it settles. The turned faces are only for show (all `inert`): while
+  the machine is still (`data-still`, not during `data-late`) a flat copy of the facing
+  panel (`.front`) stands exactly over its twin, for sharp text, and takes the clicks,
+  focus and h/l edge turns (the turntable's `front` ref); the two hand their scroll
+  position over through `onStill`. When the sort ends, the turntable squares the column
+  up from wherever the slow spin left it.
 - The Social bar and the Wire link to it only when `hasModule('topics')` and 3D is on.
 - Tests: `tests/test_topics.py`.
 

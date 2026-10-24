@@ -110,6 +110,28 @@
   pointer-events: none;
 }
 
+/* At rest (data-still: stopped and set down) nothing is in 3D: the side facing
+   you is a plain page and the rest are hidden, which they are anyway from the
+   front. Text under a 3D transform is painted into a texture and resampled, which
+   blurs it. The first move puts the 3D back, where the facing side sits exactly
+   as it does here. */
+.stage[data-still] .box {
+  perspective: none;
+}
+.stage[data-still] .cube {
+  transform: none;
+  transform-style: flat;
+  will-change: auto;
+}
+.stage[data-still] .side {
+  transform: none;
+  backface-visibility: visible;
+}
+.stage[data-still] .side[inert],
+.stage[data-still] .cap {
+  visibility: hidden;
+}
+
 /* the top, seen while the box is lifted */
 .cap {
   position: absolute;
