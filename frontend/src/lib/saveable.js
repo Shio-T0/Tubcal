@@ -211,6 +211,20 @@ export function podcastItem(ep, lang) {
   };
 }
 
+/** The other way: a saved podcast entry as an episode for the bench radio. */
+export function podcastEpisode(item) {
+  return {
+    id: item.id.replace(/^podcast:/, ''),
+    title: item.title,
+    show: item.source,
+    show_art: item.thumbnail || null,
+    audio: item.extra?.audio,
+    duration: item.extra?.duration || null,
+    url: item.url,
+    lang: item.extra?.lang || null,
+  };
+}
+
 /** A Workbench change-log entry (a release or a core-team post). */
 export function devPostItem(p, lang) {
   const release = p.type === 'release';

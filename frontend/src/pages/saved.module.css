@@ -517,11 +517,6 @@
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
 }
-.audio {
-  width: 100%;
-  height: 32px;
-  margin-top: 4px;
-}
 .note {
   margin-top: 2px;
   padding: 2px 0 2px 9px;

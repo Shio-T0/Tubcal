@@ -531,6 +531,16 @@ a.stamp:hover {
   transition: background 0.2s ease, transform 0.2s ease;
 }
 
+/* the sound is on its way */
+.spin {
+  animation: spin 0.9s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .radioBtn:hover {
   background: color-mix(in srgb, var(--lang-c) 30%, transparent);
   transform: scale(1.05);

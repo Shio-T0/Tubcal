@@ -11,6 +11,8 @@ import { ArrowLeft, Bookmark, Settings } from 'lucide-react';
 
 import { useSaved } from '../../state.jsx';
 import { roomOfPath } from '../../lib/rooms.js';
+import { useMedia } from '../../lib/useMedia.js';
+import RadioChip from '../radio/RadioChip.jsx';
 import { ChannelKnobs, SkinButton } from './common.jsx';
 import d from './desk.module.css';
 
@@ -34,6 +36,7 @@ export function DeskFrame({ children }) {
   const from = lastPlace();
   const room = from ? roomOfPath(from.split('?')[0]) : null;
   const n = Object.keys(saved || {}).length;
+  const narrow = useMedia('(max-width: 1279px)'); // the radio's title would squeeze Back
   return (
     <div className={d.frame}>
       <header className={`${d.bar} tc-bar`}>
@@ -51,6 +54,7 @@ export function DeskFrame({ children }) {
           </NavLink>
         </nav>
         <span className={d.right}>
+          <RadioChip compact={narrow} />
           <SkinButton className={d.skin} />
           <ChannelKnobs className={d.knobs} itemClass={d.knob} />
         </span>

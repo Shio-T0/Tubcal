@@ -242,10 +242,6 @@ function Entry({ item, i, selecting, selected, onToggle, onOpen }) {
         <span className={s.title}>{item.title || item.url}</span>
         {layout === 'poster' && item.extra?.native && <span className={s.native} lang="ja">{item.extra.native}</span>}
         {excerpt && <span className={s.excerpt}>{kind === 'moment' ? `“${excerpt}”` : excerpt}</span>}
-        {kind === 'podcast' && item.extra?.audio && (
-          // eslint-disable-next-line jsx-a11y/media-has-caption
-          <audio className={s.audio} controls preload="none" src={item.extra.audio} onClick={(e) => e.stopPropagation()} />
-        )}
         {noting ? (
           <NoteEditor item={item} onClose={() => setNoting(false)} />
         ) : item.note ? (

@@ -7,7 +7,7 @@
 // it plays. The side panel is the cabinet's control strip: a clock in a glowing
 // window, the three channel knobs (1 Social, 2 Coding, 3 Video), a slip of what's
 // coming up — streams live now, premieres, your shows' next episodes — and the
-// speaker grille with the maker's plate.
+// speaker grille with the maker's plate (and the bench radio, while it's on).
 //
 // With 3D objects on, the set is the front of the box (TheBox.jsx): `inBox` leaves
 // the cabinet to the box. Its knobs still go into their channels.
@@ -22,6 +22,7 @@ import { ago, clock } from '../../lib/time.js';
 import { CHANNELS } from '../../lib/rooms.js';
 import { usePlayEpisode } from '../player/anime/watching.js';
 import { useChannelHomes } from '../channels/common.jsx';
+import RadioChip from '../radio/RadioChip.jsx';
 import { slotLabel } from './lineup.js';
 import s from './set.module.css';
 
@@ -349,8 +350,9 @@ export default function TheSet({ pickUp, comingUp, comingReady, now, subs, inBox
           ))}
         </div>
         <ComingUp rows={comingUp} now={now} ready={comingReady} />
-        <div className={s.grille} aria-hidden="true">
-          <span className={`${s.plate} tc-wordmark`}>Tubcal<em>.</em></span>
+        <div className={s.grille}>
+          <RadioChip variant="grille" />
+          <span className={`${s.plate} tc-wordmark`} aria-hidden="true">Tubcal<em>.</em></span>
         </div>
       </aside>
     </section>

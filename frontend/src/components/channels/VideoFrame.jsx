@@ -19,6 +19,7 @@ import { ChevronsLeft, ChevronsRight, Clapperboard, Library, Search, Tv } from '
 import { moduleLazyNamed } from '../../lib/modules.js';
 import { useMedia } from '../../lib/useMedia.js';
 import { useStoredFlag } from '../../lib/useStoredFlag.js';
+import RadioChip from '../radio/RadioChip.jsx';
 import { ChannelKnobs, PocketButtons, SkinButton, dateLine, openPalette, useChannelRooms } from './common.jsx';
 import c from './video.module.css';
 
@@ -103,6 +104,7 @@ function Console({ rail, onRail }) {
         })}
       </nav>
 
+      <RadioChip variant="console" compact={rail} />
       <div className={c.foot}>
         <PocketButtons btnClass={c.footBtn} countClass={c.footCount} labels={!rail} />
         <SkinButton className={c.footBtn} />
@@ -122,6 +124,7 @@ function PhoneBar() {
         <Link to="/" className={`${c.wordmark} tc-wordmark`}>Tubcal<em>.</em></Link>
         <ChannelKnobs className={c.channels} itemClass={c.ch} onClass={c.chOn} labels={false} />
         <span className={c.phoneKnobs}>
+          <RadioChip compact />
           <button type="button" className={c.footBtn} onClick={openPalette} aria-label="Search everything"><Search size={16} /></button>
           <PocketButtons btnClass={c.footBtn} countClass={c.footCount} size={16} />
         </span>

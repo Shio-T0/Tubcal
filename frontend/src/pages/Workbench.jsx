@@ -1,12 +1,13 @@
 // The Workbench (Coding channel). A shelf of service manuals, one per programming
 // language: pull one onto the bench and its whole world opens — talks on film,
 // the bench radio, the change log, the reference shelf, and what's being built.
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   ArrowUpRight,
   ExternalLink,
   GitFork,
+  LoaderCircle,
   Moon,
   Pause,
   Play,
@@ -16,16 +17,21 @@ import {
 import { hasModule } from '../lib/modules.js';
 import { useApi } from '../api/client.js';
 import { ErrorBox, Receiving } from '../components/layout/Section.jsx';
+import RadioHost from '../components/radio/RadioHost.jsx';
 import { SaveButton } from '../components/ui/ItemActions.jsx';
 import { devPostItem, docItem, podcastItem } from '../lib/saveable.js';
 import { usePlayer } from '../state.jsx';
 import { useHorizontalWheel } from '../lib/useHorizontalWheel.js';
 import { compact } from '../lib/format.js';
 import { timeAgo } from '../lib/time.js';
-import {
-  chooseSleep, fallAsleep, nextSleepChoice, sleepLabel, stopsAtEnd, useSleepCountdown, useSleepFade,
-} from '../lib/sleepTimer.js';
+import { seek, toggle, tune, useRadio, useRadioClock, useRadioPlaces } from '../lib/radio.js';
+import { chooseSleep, nextSleepChoice, sleepLabel, useSleepCountdown } from '../lib/sleepTimer.js';
 import s from './workbench.module.css';
+
+/* global __TUBCAL_APP__ */
+// The bench radio plays on across the app (its host is at the root). The phone has
+// no bar to show it in, so there the page hosts it and leaving ends the broadcast.
+const PHONE = typeof __TUBCAL_APP__ !== 'undefined' && !!__TUBCAL_APP__.phone;
 
 /* ---------------------------------------------------------------- helpers */
 
@@ -220,22 +226,9 @@ function VideoShelf({ langId, n }) {
 
 /* ------------------------------------------------------ SEC 02 — the air */
 
-function BenchRadio({ episode, playing, onToggle, audioRef }) {
-  const [pos, setPos] = useState(0);
-  const [dur, setDur] = useState(null);
-
-  useEffect(() => {
-    const el = audioRef.current;
-    if (!el) return undefined;
-    const onTime = () => setPos(el.currentTime);
-    const onMeta = () => setDur(el.duration);
-    el.addEventListener('timeupdate', onTime);
-    el.addEventListener('loadedmetadata', onMeta);
-    return () => {
-      el.removeEventListener('timeupdate', onTime);
-      el.removeEventListener('loadedmetadata', onMeta);
-    };
-  }, [audioRef, episode?.id]);
+function BenchRadio() {
+  const { episode, playing, waiting } = useRadio();
+  const { pos, dur } = useRadioClock();
 
   if (!episode) {
     return (
@@ -253,10 +246,11 @@ function BenchRadio({ episode, playing, onToggle, audioRef }) {
       <button
         type="button"
         className={s.radioBtn}
-        onClick={onToggle}
+        onClick={toggle}
         aria-label={playing ? 'Pause episode' : 'Play episode'}
       >
-        {playing ? <Pause size={16} /> : <Play size={16} style={{ marginLeft: 2 }} />}
+        {playing && waiting ? <LoaderCircle size={16} className={s.spin} />
+          : playing ? <Pause size={16} /> : <Play size={16} style={{ marginLeft: 2 }} />}
       </button>
       <div className={s.radioMain}>
         <span className={s.radioTitle}>{episode.title}</span>
@@ -269,10 +263,7 @@ function BenchRadio({ episode, playing, onToggle, audioRef }) {
             max={total || 1}
             step={1}
             value={Math.min(pos, total || 1)}
-            onChange={(e) => {
-              const el = audioRef.current;
-              if (el) el.currentTime = Number(e.target.value);
-            }}
+            onChange={(e) => seek(Number(e.target.value))}
             aria-label="Seek within episode"
           />
           <span className={s.radioTime}>{fmtClock(total)}</span>
@@ -304,8 +295,10 @@ function SleepDial() {
   );
 }
 
-function PodcastSection({ langId, radio, n }) {
+function PodcastSection({ langId, lang, n }) {
   const { data, loading, error } = useApi(`/dev/${langId}/podcasts`);
+  const radio = useRadio();
+  const places = useRadioPlaces();
   const episodes = data?.episodes || [];
   const shows = [...new Set(episodes.map((e) => e.show))];
 
@@ -316,7 +309,7 @@ function PodcastSection({ langId, radio, n }) {
         label="on the air"
         note={shows.length ? `tuned to ${shows.join(' · ')}` : 'the language on the radio'}
       />
-      <BenchRadio {...radio} />
+      <BenchRadio />
       {error && <ErrorBox message={error} />}
       {loading && !data && <Receiving label="warming the valves" />}
       {!loading && episodes.length === 0 && !error && (
@@ -325,12 +318,13 @@ function PodcastSection({ langId, radio, n }) {
       <div className={s.episodes}>
         {episodes.slice(0, 12).map((ep) => {
           const isCurrent = radio.episode?.id === ep.id;
+          const stopped = !isCurrent && ep.duration && places.find(([id]) => id === ep.id)?.[1];
           return (
             <div key={ep.id} className={`${s.episode} ${isCurrent ? s.episodeOn : ''}`}>
               <button
                 type="button"
                 className={s.epPlay}
-                onClick={() => radio.onPick(ep)}
+                onClick={() => (isCurrent ? toggle() : tune({ ...ep, lang: langId, accent: lang?.accent }))}
                 aria-label={isCurrent && radio.playing ? `Pause ${ep.title}` : `Play ${ep.title}`}
               >
                 {isCurrent && radio.playing ? <Pause size={13} /> : <Play size={13} style={{ marginLeft: 1 }} />}
@@ -340,7 +334,7 @@ function PodcastSection({ langId, radio, n }) {
                 <span className={s.epMeta}>
                   {ep.show}
                   {ep.published_at ? ` · ${timeAgo(ep.published_at)}` : ''}
-                  {ep.duration ? ` · ${fmtClock(ep.duration)}` : ''}
+                  {stopped ? ` · ${fmtClock(ep.duration - stopped)} left` : ep.duration ? ` · ${fmtClock(ep.duration)}` : ''}
                 </span>
               </div>
               <SaveButton item={podcastItem(ep, langId)} className={s.save} />
@@ -523,69 +517,6 @@ export default function Workbench() {
   const languages = useApi('/dev/languages');
   const dossier = useApi(`/dev/${langId}`);
 
-  // The bench radio outlives language switches — one <audio>, page-scoped,
-  // so an episode keeps playing while you leaf through another manual.
-  const audioRef = useRef(null);
-  const [episode, setEpisode] = useState(null);
-  const [playing, setPlaying] = useState(false);
-
-  // The element says whether it's playing: a pause can come from elsewhere (media
-  // keys, the browser's media controls, the sleep timer), and the button must follow.
-  useEffect(() => {
-    const el = audioRef.current;
-    if (!el) return undefined;
-    const onPlay = () => setPlaying(true);
-    const onPause = () => setPlaying(false);
-    const onEnd = () => {
-      setPlaying(false);
-      if (stopsAtEnd()) fallAsleep({ atEnd: true });
-    };
-    el.addEventListener('play', onPlay);
-    el.addEventListener('pause', onPause);
-    el.addEventListener('ended', onEnd);
-    return () => {
-      el.removeEventListener('play', onPlay);
-      el.removeEventListener('pause', onPause);
-      el.removeEventListener('ended', onEnd);
-    };
-  }, []);
-  useSleepFade(audioRef);
-
-  const pickEpisode = useCallback(
-    (ep) => {
-      const el = audioRef.current;
-      if (!el) return;
-      if (episode?.id === ep.id) {
-        if (el.paused) {
-          el.play();
-          setPlaying(true);
-        } else {
-          el.pause();
-          setPlaying(false);
-        }
-        return;
-      }
-      setEpisode(ep);
-      el.src = ep.audio;
-      el.play().catch(() => setPlaying(false));
-      setPlaying(true);
-    },
-    [episode],
-  );
-
-  const toggle = useCallback(() => {
-    const el = audioRef.current;
-    if (!el || !episode) return;
-    if (el.paused) {
-      el.play();
-      setPlaying(true);
-    } else {
-      el.pause();
-      setPlaying(false);
-    }
-  }, [episode]);
-
-  const radio = { episode, playing, onPick: pickEpisode, onToggle: toggle, audioRef };
   const lang = dossier.data;
   const accent = lang?.accent || languages.data?.languages?.find((l) => l.id === langId)?.accent;
 
@@ -609,16 +540,14 @@ export default function Workbench() {
             <>
               <Dossier lang={lang} />
               {sections.map(({ id, Section }, i) => (
-                <Section key={id} n={String(i + 1).padStart(2, '0')} langId={langId} lang={lang} radio={radio} />
+                <Section key={id} n={String(i + 1).padStart(2, '0')} langId={langId} lang={lang} />
               ))}
             </>
           )}
         </div>
       </div>
 
-      {/* the one radio valve — never unmounted, so audio survives re-renders */}
-      {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-      <audio ref={audioRef} preload="none" />
+      {PHONE && <RadioHost />}
     </>
   );
 }

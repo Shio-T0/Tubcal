@@ -18,6 +18,7 @@ import { Pentagon, Search } from 'lucide-react';
 import { hasModule } from '../../lib/modules.js';
 import { useObjects3d } from '../../lib/objects3d.js';
 import { useMedia } from '../../lib/useMedia.js';
+import RadioChip from '../radio/RadioChip.jsx';
 import { ChannelKnobs, PocketButtons, SkinButton, openPalette, useChannelRooms } from './common.jsx';
 import s from './social.module.css';
 
@@ -80,6 +81,7 @@ export function SocialFrame({ children }) {
         </div>
         {!phone && <Sections rooms={rooms} current={current} pathname={pathname} />}
         <div className={s.tools}>
+          <RadioChip compact />
           <button type="button" className={s.search} onClick={openPalette} title="Search everything (Ctrl K or /)">
             <Search size={15} />
             {!phone && <kbd>Ctrl K</kbd>}

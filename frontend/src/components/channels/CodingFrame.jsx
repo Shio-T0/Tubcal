@@ -16,6 +16,7 @@ import { Code2, GitBranch, Search, Wrench } from 'lucide-react';
 
 import { useShared } from '../../lib/useShared.js';
 import { useMedia } from '../../lib/useMedia.js';
+import RadioChip from '../radio/RadioChip.jsx';
 import { ChannelKnobs, PocketButtons, SkinButton, openPalette, useChannelRooms } from './common.jsx';
 import c from './coding.module.css';
 
@@ -118,6 +119,7 @@ export function CodingFrame({ children }) {
   const { rooms, current } = useChannelRooms('coding');
   const { pathname, search } = useLocation();
   const phone = useMedia('(max-width: 900px)');
+  const narrow = useMedia('(max-width: 1179px)'); // no room for the radio's title beside the path
   const crumbs = crumbsFor(current, pathname, search);
   return (
     <div className={c.frame} data-channel="coding">
@@ -138,6 +140,7 @@ export function CodingFrame({ children }) {
           </span>
           {current?.id === 'editor' && !phone && <EditorColophon />}
           <span className={c.tools}>
+            <RadioChip compact={narrow} />
             <button type="button" className={c.search} onClick={openPalette} title="Search everything (Ctrl K or /)">
               <Search size={14} />
               {!phone && <span>Search</span>}

@@ -11,6 +11,7 @@ import { SocialFrame } from './components/channels/SocialFrame.jsx';
 import { VideoFrame } from './components/channels/VideoFrame.jsx';
 import Pocket from './components/pocket/Pocket.jsx';
 import PlayerLayer from './components/player/PlayerLayer.jsx';
+import RadioHost from './components/radio/RadioHost.jsx';
 import { Spinner } from './components/ui/index.jsx';
 import { hasModule as has, moduleLazy } from './lib/modules.js';
 import { AppProviders } from './state.jsx';
@@ -153,6 +154,7 @@ export default function App() {
         </Suspense>
       </div>
       <PlayerLayer />
+      <RadioHost />
       <Suspense fallback={null}>
         <CurtainCallHost />
       </Suspense>

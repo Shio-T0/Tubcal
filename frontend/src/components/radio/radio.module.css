@@ -1,0 +1,154 @@
+/* The bench radio in a frame's bar. Its colour is the manual's it was tuned
+   from (`--radio-c`, set inline), else the Workbench's own. */
+.chip {
+  --radio-c: var(--c-dev);
+  display: inline-flex;
+  flex: 0 1 auto;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 300px;
+  font-family: var(--font-body);
+  font-size: 12.5px;
+  color: var(--paper-dim);
+}
+
+.knob {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, var(--radio-c) 55%, var(--rule-strong));
+  background: color-mix(in srgb, var(--radio-c) 12%, transparent);
+  color: var(--paper);
+  cursor: pointer;
+  transition: background 0.15s ease, box-shadow 0.2s ease;
+}
+.knob:hover {
+  background: color-mix(in srgb, var(--radio-c) 26%, transparent);
+}
+/* on the air: a lit ring round the knob */
+.chip[data-on] .knob {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--radio-c) 22%, transparent);
+}
+
+.what {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 7px;
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+}
+a.what:hover .title {
+  color: var(--paper);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.title {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.left {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-style: normal;
+  color: var(--paper-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.off {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  color: var(--paper-faint);
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+.off:hover {
+  color: var(--paper);
+  background: var(--surface-hover);
+}
+
+/* ── where it sits ─────────────────────────────────────────────────────────── */
+
+.bar {
+  height: 32px;
+  margin-right: 4px;
+  padding: 0 2px 0 3px;
+}
+.bar .title {
+  max-width: 170px;
+}
+
+/* Where it's narrow: the title over the time left. */
+.console .what,
+.grille .what {
+  flex: 1;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+}
+.console .title,
+.grille .title {
+  max-width: 100%;
+}
+
+/* the Video console: a row of its own over Saved and Settings */
+.console {
+  display: flex;
+  max-width: none;
+  margin-bottom: 8px;
+  padding: 8px 2px 0 4px;
+  border-top: 1px solid var(--rule);
+}
+
+/* Home: a lit tuning plate over the set's speaker grille */
+.grille {
+  display: flex;
+  width: calc(100% - 24px);
+  max-width: 280px;
+  padding: 6px 5px 6px 7px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--radio-c) 35%, var(--rule-strong));
+  background: linear-gradient(180deg, var(--ink-3), var(--ink-2));
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.35), inset 0 1px 0 color-mix(in srgb, var(--paper) 12%, transparent);
+  animation: rise 0.5s var(--hand) both;
+}
+.grille .knob {
+  width: 30px;
+  height: 30px;
+}
+
+.compact {
+  max-width: none;
+  margin-right: 0;
+  padding: 0;
+}
+.compact.console {
+  justify-content: center;
+}
+
+/* the sound is on its way (a cold file, a seek far ahead) */
+.spin {
+  animation: spin 0.9s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}

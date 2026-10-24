@@ -68,7 +68,8 @@ module's files aren't on disk (install.sh's sparse checkout), so:
 - Shared pieces that look like a room's live in the core so others can use them:
   `components/screening/{feed.js,tiles.jsx,SubscribeButton.jsx}`, `components/player/anime/`
   (incl. `watching.js`, `episodeList.js`), `lib/gh.js`, `lib/languages.js`,
-  `splitKind` in `lib/format.js`, `components/modals/{AddSubscriptionModal,SafeHtml}.jsx`.
+  `splitKind` in `lib/format.js`, `components/modals/{AddSubscriptionModal,SafeHtml}.jsx`,
+  the bench radio (`lib/radio.js`, `components/radio/`).
 - `db.note_modules` (main.py) switches on, in `active_rooms`, a room whose module was
   added since the last start (and on a new DB with an explicit `TUBCAL_MODULES`, every
   chosen room); an existing DB's first run only records.
@@ -107,7 +108,7 @@ expanded player, media, and keyboard-focused controls. An element marked
 - The drawer (`components/pocket/Pocket.jsx`, mounted once in `App.jsx`): Saved (save
   this page, find, open in place, done/remove) and Settings (skins, common switches,
   every section). `components/saved/useOpenSaved.jsx` opens any entry the right way
-  (player, Reddit/HN/repo readers, in-app route, new tab) for the drawer, the Saved
+  (player, Reddit/HN/repo readers, the bench radio, in-app route, new tab) for the drawer, the Saved
   page and the command palette (which also searches saved entries).
 - `pages/SavedPage.jsx`: a catalogue by channel → kind with counts, To do / Done,
   search over titles, sources and notes, sort, shelves (each kind its own layout) or a
@@ -526,8 +527,8 @@ own `<db>.bak-<stamp>` copies beside the DB. Tests: `tests/test_snapshots.py`.
   "current stable" stamp is best-effort: GitHub `releases/latest`, falling back to
   a per-language `tag_re` over `/tags` (CPython finals only) or Go's own
   `go.dev/dl/?mode=json` — golang/go's tag listing is lexicographic garbage.
-  Podcast episodes play in the page's own "bench radio" `<audio>`; videos open in
-  the normal in-app player since Invidious items are already yt-shaped. Tests:
+  Podcast episodes play on the bench radio (below); videos open in the normal
+  in-app player since Invidious items are already yt-shaped. Tests:
   `tests/test_dev.py` (network edge monkeypatched).
 - `fuzzy.py` — rapidfuzz scoring over recently cached feed items, used as a
   fallback when a platform's own search returns little or nothing, so a near-miss
@@ -674,8 +675,21 @@ controls) is one store for the whole station, so it outlives the video it was se
 `ended(id, {advance:false})`), or after N minutes the player you can hear fades out
 over 12s so it is silent on time, every player pauses, the picture stays dimmed until
 something plays, and your volume is put back for next time. Any media element joins it
-through `useSleepFade(ref, {audible, onDoze})`; the Workbench's bench radio does (a
+through `useSleepFade(ref, {audible, onDoze})`; the bench radio does, from its host (a
 moon dial on the radio steps the same timer).
+
+**The bench radio** (the Workbench's podcasts, and saved episodes) is one for the
+whole station, so an episode plays on in whatever room you go to:
+- `lib/radio.js` is the store: `tune` (plays, from the episode's kept place) /
+  `toggle` / `seek` / `switchOff`; places in localStorage `tubcal.radio`, so a
+  half-heard episode resumes and the Workbench list says "46:10 left".
+- `components/radio/RadioHost.jsx`, mounted once in `App.jsx`, owns the one
+  `<audio>`, the sleep fade, MediaSession, and one sound at a time (a video turning
+  audible pauses the radio, the radio starting pauses the rest).
+- `RadioChip` shows it while it's on: in each frame's bar (just the button beside the
+  Social bar's sections and on narrow screens), the Video console's foot, and Home's
+  speaker grille.
+- On the phone the Workbench hosts it itself, so leaving the page ends it.
 
 **Settings** (`pages/SettingsPage.jsx`) is an index plus one open section:
 - `pages/settingsSections.js` lists the sections, their groups and the words

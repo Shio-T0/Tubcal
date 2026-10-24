@@ -1,8 +1,8 @@
 // Open a saved entry from wherever it's listed (the Saved page, the drawer, the
 // command palette): a video or a moment plays in the player, a Reddit post or an
 // HN story opens in its own reader over the current page, anything from GitHub
-// opens its page in the GitHub room, an in-app address is navigated to, and
-// anything else opens in a new tab.
+// opens its page in the GitHub room, a podcast episode plays on the bench radio,
+// an in-app address is navigated to, and anything else opens in a new tab.
 //
 //   const { openItem, modals } = useOpenSaved();
 //   …  <Row onClick={() => openItem(item)} />  …  {modals}
@@ -10,7 +10,8 @@
 import { Suspense, useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { kindOf } from '../../lib/saveable.js';
+import { kindOf, podcastEpisode } from '../../lib/saveable.js';
+import { tune } from '../../lib/radio.js';
 import { hasModule, moduleLazy, moduleLazyNamed } from '../../lib/modules.js';
 import { anyRoomOfPath, getRoomById, roomOfPath } from '../../lib/rooms.js';
 import { usePlayer, useToast } from '../../state.jsx';
@@ -75,7 +76,8 @@ export function useOpenSaved() {
         return;
       }
       case 'podcast':
-        window.open(item.extra?.audio || item.url, '_blank', 'noopener');
+        if (item.extra?.audio) tune(podcastEpisode(item));
+        else if (item.url) window.open(item.url, '_blank', 'noopener');
         return;
       default:
         if (item.url?.startsWith('/')) {

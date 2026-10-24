@@ -871,8 +871,11 @@
 .grille {
   display: grid;
   place-items: center;
+  align-content: center;
+  gap: 10px;
   flex: 1 1 auto;
   min-height: 58px;
+  padding: 10px 0;
   border-radius: 14px;
   background:
     repeating-linear-gradient(to bottom, color-mix(in srgb, var(--paper) 8%, transparent) 0 2px, transparent 2px 6px),
