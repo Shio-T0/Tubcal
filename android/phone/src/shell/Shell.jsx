@@ -8,6 +8,8 @@ import { createPortal } from 'react-dom';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ChevronLeft, LayoutGrid, Newspaper, Clapperboard, Radio, RotateCw, Tv } from 'lucide-react';
 
+import { hasModule } from '@pc/lib/modules.js';
+
 import { haptic } from '../lib/bridge.js';
 import { useBack } from './back.js';
 import s from './shell.module.css';
@@ -60,13 +62,18 @@ export function IconBtn({ label, onClick, children, active = false, className, .
 
 // ── the tab bar ──────────────────────────────────────────────────────────────
 
+// A tab is there when this phone has its room (`tubcal phone` chose the rooms);
+// Read opens on the first of its three that's here.
+const READ_ROOMS = [['hackernews', '/hackernews'], ['reddit', '/reddit'], ['github', '/github']]
+  .filter(([id]) => hasModule(id));
+
 export const TABS = [
-  { key: 'today', label: 'Today', root: '/edition', Icon: Newspaper, match: (p) => p.startsWith('/edition') },
-  { key: 'watch', label: 'Watch', root: '/youtube', Icon: Clapperboard, match: (p) => p.startsWith('/youtube') },
-  { key: 'anime', label: 'Anime', root: '/anime', Icon: Tv, match: (p) => p.startsWith('/anime') },
-  { key: 'read', label: 'Read', root: '/hackernews', Icon: Radio, match: (p) => /^\/(hackernews|reddit|github)/.test(p) },
-  { key: 'more', label: 'More', root: '/more', Icon: LayoutGrid, match: (p) => /^\/(more|archive|dev|saved|settings|search)/.test(p) },
-];
+  { key: 'today', label: 'Today', root: '/edition', Icon: Newspaper, match: (p) => p.startsWith('/edition'), here: hasModule('edition') },
+  { key: 'watch', label: 'Watch', root: '/youtube', Icon: Clapperboard, match: (p) => p.startsWith('/youtube'), here: hasModule('youtube') },
+  { key: 'anime', label: 'Anime', root: '/anime', Icon: Tv, match: (p) => p.startsWith('/anime'), here: hasModule('anime') },
+  { key: 'read', label: 'Read', root: READ_ROOMS[0]?.[1], Icon: Radio, match: (p) => /^\/(hackernews|reddit|github)/.test(p), here: READ_ROOMS.length > 0 },
+  { key: 'more', label: 'More', root: '/more', Icon: LayoutGrid, match: (p) => /^\/(more|archive|dev|saved|settings|search)/.test(p), here: true },
+].filter((t) => t.here);
 const LAST_KEY = 'tubcal.phone.lastPath';
 
 function loadLast() {
@@ -106,7 +113,7 @@ export function TabBar({ badges = {}, hidden = false }) {
 
   const idx = cur ? TABS.findIndex((t) => t.key === cur.key) : -1;
   return (
-    <nav className={`${s.tabs} ${hidden ? s.tabsHidden : ''}`} aria-label="Sections">
+    <nav className={`${s.tabs} ${hidden ? s.tabsHidden : ''}`} aria-label="Sections" style={{ '--tn': TABS.length }}>
       {/* the lit pill glides to the tab you pick, stretching as it goes */}
       <span className={s.track} aria-hidden="true">
         <span className={s.pill} style={{ '--ti': Math.max(0, idx), opacity: idx < 0 ? 0 : 1 }}>

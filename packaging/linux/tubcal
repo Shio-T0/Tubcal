@@ -303,10 +303,22 @@ cmd_rooms() {
   exec bash "$APP_DIR/install.sh" --list
 }
 
-# tubcal phone: the installer finds the phone, waits for it if it has to, then
-# downloads the latest Tubcal for Android and installs it over adb.
+# tubcal phone: the installer finds the phone, waits for it if it has to, asks
+# which rooms it gets, then downloads the latest Tubcal for Android and installs
+# it over adb. `tubcal phone rooms|add|remove` are the phone's `tubcal rooms|add|remove`.
 cmd_phone() {
   [[ -f $APP_DIR/install.sh ]] || die "can't find $APP_DIR/install.sh"
+  case ${1:-} in
+    rooms|modules|list) shift; exec bash "$APP_DIR/install.sh" --phone --list "$@" ;;
+    add|install|remove|rm)
+      local how=add rooms=() flags=() a
+      [[ $1 == remove || $1 == rm ]] && how=remove
+      shift
+      for a in "$@"; do case $a in -*) flags+=("$a") ;; *) rooms+=("$a") ;; esac; done
+      ((${#rooms[@]})) || die "usage: tubcal phone $how ROOM…" "\`tubcal phone rooms\` lists them."
+      local IFS=,
+      exec bash "$APP_DIR/install.sh" --phone "--$how" "${rooms[*]}" "${flags[@]}" ;;
+  esac
   exec bash "$APP_DIR/install.sh" --phone "$@"
 }
 
@@ -326,7 +338,11 @@ usage() {
   tubcal add ROOM…     add rooms you left out (downloads only those)
   tubcal remove ROOM…  take rooms out (what you saved stays)
   tubcal phone         put Tubcal for Android on a phone plugged in over USB
-                       (or update it); the phone needs USB debugging on
+                       (or update it), with the rooms you pick for it; the
+                       phone needs USB debugging on
+  tubcal phone rooms   the rooms the phone has
+  tubcal phone add|remove ROOM…
+                       change the phone's rooms
   tubcal autostart on|off
   tubcal uninstall     remove the launcher, menu entry and private tools
   tubcal run           run in the foreground (what the service runs)

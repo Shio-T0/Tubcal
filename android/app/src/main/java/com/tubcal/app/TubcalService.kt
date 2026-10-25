@@ -56,33 +56,41 @@ class TubcalService : Service() {
     private fun bootServerAsync() {
         Thread {
             try {
-                val webDir = copyWebAssets()
+                val webDir = copyAssets("web")
+                // the rooms installed as split APKs (tools/rooms.py): their Python
+                val roomsDir = copyAssets("rooms")
                 val dataDir = File(filesDir, "data").apply { mkdirs() }.absolutePath
                 if (!Python.isStarted()) Python.start(AndroidPlatform(this))
                 // start() runs Flask and blocks, so this thread *is* the server.
                 Python.getInstance()
                     .getModule("android_main")
-                    .callAttr("start", dataDir, webDir, PORT)
+                    .callAttr("start", dataDir, webDir, PORT, roomsDir)
             } catch (e: Throwable) {
                 e.printStackTrace()
             }
         }.apply { isDaemon = true; name = "tubcal-server" }.start()
     }
 
-    /** Copy bundled frontend (assets/web) to a real dir Flask can send_from_directory. */
-    private fun copyWebAssets(): String {
-        val dest = File(filesDir, "web")
+    /**
+     * Copy an assets folder to a real dir: web/ (the phone UI, for Flask's
+     * send_from_directory) or rooms/ (each installed room's Python). Android merges
+     * the assets of the core APK and of every installed split, so a room's files
+     * are here exactly when its split is installed.
+     */
+    private fun copyAssets(name: String): String {
+        val dest = File(filesDir, name)
         val stamp = File(dest, ".version")
-        // Version + install time: any reinstall re-extracts, even at the same
-        // versionCode (a dev build that only changed the UI).
+        // Version + install time + the splits: any reinstall, and any room added or
+        // taken away, re-extracts, even at the same versionCode.
         val current = packageManager.getPackageInfo(packageName, 0).let {
             val code = if (Build.VERSION.SDK_INT >= 28) it.longVersionCode.toString() else @Suppress("DEPRECATION") it.versionCode.toString()
-            "$code-${it.lastUpdateTime}"
+            "$code-${it.lastUpdateTime}-${it.splitNames?.sorted()?.joinToString(",").orEmpty()}"
         }
         if (dest.isDirectory && stamp.isFile && stamp.readText() == current) return dest.absolutePath
         dest.deleteRecursively()
-        copyAssetTree("web", dest)
-        stamp.parentFile?.mkdirs()
+        dest.mkdirs()
+        // (an empty listing: no such folder, as rooms/ is with no room installed)
+        for (child in assets.list(name).orEmpty()) copyAssetTree("$name/$child", File(dest, child))
         stamp.writeText(current)
         return dest.absolutePath
     }

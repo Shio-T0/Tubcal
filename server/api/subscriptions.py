@@ -16,7 +16,7 @@ PLATFORMS = ("youtube", "reddit", "github")
 
 def _source(platform):
     if not modules.has(platform):
-        raise LookupError(f"{platform} isn't installed here (tubcal add {platform})")
+        raise LookupError(f"{platform} isn't installed here ({modules.add_hint(platform)})")
     return importlib.import_module(f"server.sources.{platform}")
 
 
@@ -36,7 +36,7 @@ def add_sub():
     if platform not in PLATFORMS or not raw:
         return err("platform ('youtube'|'reddit'|'github') and input are required")
     if not modules.has(platform):
-        return err(f"{platform} isn't installed here (tubcal add {platform})", 404)
+        return err(f"{platform} isn't installed here ({modules.add_hint(platform)})", 404)
     try:
         src = _source(platform)
         if platform == "youtube":

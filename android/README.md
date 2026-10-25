@@ -65,7 +65,8 @@ The same rooms and the same data as the desktop, redrawn for a phone:
   - Seasons, Schedule, Ledger, Community, Channel and Social are the desktop's
     own views, refitted.
 - **Read**: The Wire, The Dispatch and GitHub, switched from the bar. Rooms
-  you've turned off in Settings stay hidden.
+  you've turned off in Settings, or left off the phone, stay hidden. A tab whose
+  rooms are all left off the phone isn't shown at all.
   - Tap a story for the article and the comment pill for the discussion.
   - Discussions, Reddit posts and repos open as slide-in pages (swipe from the
     left edge or press Back).
@@ -190,30 +191,64 @@ hand on the phone yet.
 
 ```bash
 cd android
-ANDROID_HOME=~/Android/Sdk ./gradlew :app:assembleDebug
-adb install -r app/build/outputs/apk/debug/app-debug.apk
+ANDROID_HOME=~/Android/Sdk ./gradlew :app:assembleDebug   # the core APK, then one APK per room
+adb install-multiple app/build/outputs/apk/debug/app-debug.apk app/build/outputs/rooms/*.apk
 ```
 
+That installs every room. For some of them, name only their `room_<id>.apk` files,
+or use `tools/release.sh --dry-run` and `tubcal phone --apk app/build/release`.
+
 Without building: `tubcal phone` (the desktop launcher) installs the latest GitHub
-release, or updates the copy on the phone. It's `install.sh --phone`, and the
+release with the rooms you pick, or updates the copy on the phone. It's `install.sh --phone`, and the
 installer offers the same when it sees a phone. It finds the phone in sysfs and adb,
 says what to do while it isn't ready (USB debugging off, "Allow USB debugging?" not
 yet tapped, missing udev rules), checks the phone's Android version and ABI against
 the release, then downloads the APK, checks its SHA-256 and runs `adb install -r`.
-`tubcal phone --apk FILE` installs your own build the same way.
+`tubcal phone --apk app/build/release` installs your own build the same way, from
+the folder `tools/release.sh --dry-run` writes.
+
+### Rooms on the phone
+
+The phone picks its rooms the way a desktop install does (`modules.ini`). `tubcal
+phone` shows the same menu, and `tubcal phone rooms|add|remove` (or `--rooms`,
+`--with`, `--without`) changes them later. A room you leave out isn't installed on
+the phone at all. Rooms marked `phone = no` there, the Composing Room and By topic,
+are never in the app.
+
+- **One APK per room.** The app is a core APK plus one split APK per room
+  (Android installs splits beside an app's main APK). A room's split holds its
+  Python (server files, its vendored code, its pip packages: modules.ini
+  `phone_pip`) and its share of the phone UI. The core APK holds none of it.
+- **Building.** Gradle leaves the rooms' files out of the core APK.
+  `tools/rooms.py` gathers each room's Python, and `phone/rooms.mjs` sets each
+  room's UI files aside: an output file that only one room's screens can reach
+  is that room's. After the core APK, `tools/rooms.py apks` makes
+  `app/build/outputs/rooms/room_<id>.apk`, signed with the same key.
+- **Installing.** `tubcal phone` streams the core APK and the chosen splits from
+  the GitHub release into Android's installer over adb. Nothing is saved on the
+  computer, and each file's SHA-256 is checked before the install is committed.
+  Adding or removing a room installs or uninstalls just that split, and a room's
+  data on the phone stays.
+- **On the phone.** Android shows the app its installed splits' files.
+  `TubcalService` copies their Python out, and `android_main.add_rooms()` puts it
+  on the import path. The server sees exactly the installed rooms, and the phone
+  UI shows only those: no tab, route, More tile or search scope for a missing room.
+  Settings → Rooms lists the missing ones with the command that adds each back.
 
 ### Publishing a release
 
 ```bash
-tools/release.sh --dry-run   # build; write app/build/release/tubcal-phone.{apk,txt}
+tools/release.sh --dry-run   # build; write app/build/release/ (the APKs and tubcal-phone.txt)
 tools/release.sh             # build, then publish GitHub release phone-v<versionName>
 ```
 
 - Raise `versionCode` and `versionName` in `app/build.gradle.kts` first. A phone
   only takes an update with a higher `versionCode`, and the script refuses a code that
   isn't above the last release's.
-- `tubcal-phone.txt` gives the version, code, SHA-256, size, minimum SDK and ABIs,
-  read from the APK with `aapt2`. `install.sh` reads it line by line from
+- The release holds `tubcal-phone-core.apk`, a `tubcal-phone-room-<id>.apk` per
+  room, and `tubcal-phone.txt`. That file gives the version, code, the core's
+  SHA-256 and size, minimum SDK and ABIs (read from the APK with `aapt2`), the
+  rooms, and each room APK's SHA-256 and size. `install.sh` reads it line by line from
   `releases/latest/download/`, so the release is marked latest.
 - The tag points at HEAD, which must be committed and pushed, so every published
   APK's source is on GitHub.
@@ -223,13 +258,16 @@ tools/release.sh             # build, then publish GitHub release phone-v<versio
   release on the same machine. A copy signed with another key can only be replaced:
   `tubcal phone --replace`, which deletes the phone's Tubcal data.
 
-Before every build, Gradle runs two steps of its own (`app/build.gradle.kts`):
-- `syncDesktopPython` copies `../server` and `../main.py` (as `desktop_main.py`)
-  into `app/build/generated/desktop-python`, which Chaquopy packs beside
-  `app/src/main/python`.
+Gradle runs these steps of its own (`app/build.gradle.kts`):
+- `syncDesktopPython` copies `../server`, `../main.py` (as `desktop_main.py`) and
+  `app/src/main/python` into `app/build/generated/desktop-python`, leaving out every
+  room's files. That folder is all the Python Chaquopy packs into the core APK.
+- `gatherRoomPython` (`tools/rooms.py python`) gathers each room's Python and pip
+  packages into `app/build/generated/room-python/<id>`.
 - `buildPhoneUi` refreshes the Python licence list (`tools/gen-licenses.py`),
   runs `npm ci` if `phone/node_modules` is missing, then builds the phone UI into
-  the APK's assets.
+  the APK's assets, with each room's files set aside in `app/build/generated/phone-rooms/<id>`.
+- `assembleRooms` (`tools/rooms.py apks`), after the core APK: one split APK per room.
 
 - The first Gradle build pip-installs the Python deps into the APK, which is
   slow once.
@@ -271,7 +309,9 @@ imports. So, outside `server/`:
 - **`app/src/main/python/Levenshtein.py`**: a pure-Python shim (`ratio`/`distance`
   via `difflib`).
 - **`app/src/main/python/weeb_cli/`**: the second scraper, vendored the same way.
-- `app/build.gradle.kts` pip-installs only the pure or available runtime deps.
+- The anime room's split carries only the pure runtime deps the scraper uses
+  (modules.ini `phone_pip`); `pycryptodomex`, the one native package, is in the
+  core APK.
 
 The fuzzy search fallback (`rapidfuzz`) has no wheel and degrades to a no-op, which is harmless.
 

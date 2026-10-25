@@ -3,29 +3,35 @@
 // (YouTube, anime, Hacker News, Reddit, GitHub). Recent searches are kept on the
 // phone, one tap to repeat, long-press to forget.
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { History, Search as SearchIcon, X } from 'lucide-react';
 
 import { api, useApi } from '@pc/api/client.js';
 import { useDebounced } from '@pc/components/layout/Section.jsx';
 import { compact } from '@pc/lib/format.js';
+import { hasModule, moduleLazy, moduleLazyNamed } from '@pc/lib/modules.js';
 import { ago } from '@pc/lib/time.js';
 import { useParamState } from '@pc/lib/urlState.js';
 
 import { AppBar, Chips, Empty, ErrorNote, Loading, SectionTitle, Sentinel, Skeleton, useLongPress } from '../shell/Shell.jsx';
-import { Poster } from './animeKit.jsx';
 import { useOpener } from './discuss.jsx';
 import { VideoRow } from './video.jsx';
 import r from './search.module.css';
 
+// the rooms on this phone (`tubcal phone` chose them)
 const SCOPES = [
   { key: 'all', label: 'Everything' },
-  { key: 'videos', label: 'YouTube' },
-  { key: 'anime', label: 'Anime' },
-  { key: 'hn', label: 'Hacker News' },
-  { key: 'reddit', label: 'Reddit' },
-  { key: 'github', label: 'GitHub' },
-];
+  { key: 'videos', label: 'YouTube', room: 'youtube', name: 'videos' },
+  { key: 'anime', label: 'Anime', room: 'anime', name: 'anime' },
+  { key: 'hn', label: 'Hacker News', room: 'hackernews', name: 'Hacker News' },
+  { key: 'reddit', label: 'Reddit', room: 'reddit', name: 'Reddit' },
+  { key: 'github', label: 'GitHub', room: 'github', name: 'GitHub' },
+].filter((x) => !x.room || hasModule(x.room));
+const NAMES = SCOPES.filter((x) => x.name).map((x) => x.name);
+const SEARCHES = NAMES.length > 1 ? `${NAMES.slice(0, -1).join(', ')} and ${NAMES.at(-1)}` : NAMES[0];
+// the anime results are the Anime room's (searchAnime.jsx, in its split APK)
+const AnimeResults = moduleLazy('anime', () => import('./searchAnime.jsx'));
+const AnimeStrip = moduleLazyNamed('anime', () => import('./searchAnime.jsx'), 'AnimeStrip');
 const RECENT = 'tubcal.phone.recent';
 const loadRecent = () => { try { return JSON.parse(localStorage.getItem(RECENT)) || []; } catch { return []; } };
 
@@ -91,28 +97,9 @@ function useVideoSearch(q) {
   return { items, loading, more, error, hasMore: !!last?.has_more, loadMore };
 }
 
-function AnimeResults({ q }) {
-  const [page, setPage] = useState(1);
-  const [items, setItems] = useState([]);
-  const res = useApi(`/anime/search?q=${encodeURIComponent(q)}&page=${page}`, !!q);
-  useEffect(() => { setPage(1); setItems([]); }, [q]);
-  useEffect(() => {
-    if (!res.data) return;
-    setItems((prev) => (page === 1 ? res.data.items : [...prev, ...res.data.items.filter((x) => !prev.some((y) => y.id === x.id))]));
-  }, [res.data]); // eslint-disable-line react-hooks/exhaustive-deps
-  return (
-    <>
-      {res.error && <ErrorNote message={res.error} />}
-      {res.loading && !items.length && <Skeleton kind="posters" n={9} />}
-      {res.data && !items.length && <Empty Icon={SearchIcon} title="No anime" text={`Nothing on AniList matches “${q}”.`} />}
-      <div className={r.wall}>{items.map((m) => <Poster key={m.id} media={m} />)}</div>
-      <Sentinel onReach={() => setPage((p) => p + 1)} active={!!res.data?.has_next && !res.loading} />
-    </>
-  );
-}
-
 export default function Search() {
-  const [scope, setScope] = useParamState('in', 'all');
+  const [asked, setScope] = useParamState('in', 'all');
+  const scope = SCOPES.some((x) => x.key === asked) ? asked : 'all';
   const [q, setQ] = useParamState('q', '');
   const [text, setText] = useState(q);
   const dq = useDebounced(text.trim(), 450);
@@ -136,7 +123,7 @@ export default function Search() {
 
   const live = q.length >= 2;
   const all = useApi(`/search/all?q=${encodeURIComponent(q)}`, live && scope === 'all');
-  const allAnime = useApi(`/anime/search?q=${encodeURIComponent(q)}&page=1`, live && scope === 'all');
+  const allAnime = useApi(`/anime/search?q=${encodeURIComponent(q)}&page=1`, live && scope === 'all' && hasModule('anime'));
   const vids = useVideoSearch(live && scope === 'videos' ? q : '');
   const hn = useApi(`/hackernews/search?q=${encodeURIComponent(q)}`, live && scope === 'hn');
   const rd = useApi(`/reddit/search?q=${encodeURIComponent(q)}`, live && scope === 'reddit');
@@ -175,7 +162,7 @@ export default function Search() {
             <SectionTitle action="clear" onAction={() => { setRecent([]); try { localStorage.removeItem(RECENT); } catch { /* fine */ } }}>Recent</SectionTitle>
             <Recent list={recent} onPick={(s) => setText(s)} onForget={forget} />
           </>
-        ) : <Empty Icon={SearchIcon} title="Search Tubcal" text="Videos, anime, Hacker News, Reddit and GitHub — all from one box." />
+        ) : <Empty Icon={SearchIcon} title="Search Tubcal" text={SEARCHES ? `${SEARCHES[0].toUpperCase()}${SEARCHES.slice(1)} — all from one box.` : 'None of the rooms on this phone can be searched.'} />
       )}
 
       {live && scope === 'all' && (
@@ -190,7 +177,7 @@ export default function Search() {
           {allAnime.data?.items?.length > 0 && (
             <>
               <SectionTitle action="more" onAction={() => setScope('anime')}>Anime</SectionTitle>
-              <div className={r.strip}>{allAnime.data.items.slice(0, 10).map((m) => <Poster key={m.id} media={m} />)}</div>
+              <Suspense fallback={null}><AnimeStrip items={allAnime.data.items} /></Suspense>
             </>
           )}
           {a.hackernews?.length > 0 && (
@@ -225,7 +212,7 @@ export default function Search() {
           {vids.more && <Loading label="more results" />}
         </>
       )}
-      {live && scope === 'anime' && <AnimeResults q={q} />}
+      {live && scope === 'anime' && <Suspense fallback={<Skeleton kind="posters" n={9} />}><AnimeResults q={q} /></Suspense>}
       {live && one && (
         <>
           {one.error && <ErrorNote message={one.error} />}

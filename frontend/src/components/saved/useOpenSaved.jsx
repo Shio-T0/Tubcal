@@ -12,7 +12,7 @@ import { useNavigate } from 'react-router-dom';
 
 import { kindOf, podcastEpisode } from '../../lib/saveable.js';
 import { tune } from '../../lib/radio.js';
-import { hasModule, moduleLazy, moduleLazyNamed } from '../../lib/modules.js';
+import { addCommand, hasModule, moduleLazy, moduleLazyNamed } from '../../lib/modules.js';
 import { anyRoomOfPath, getRoomById, roomOfPath } from '../../lib/rooms.js';
 import { usePlayer, useToast } from '../../state.jsx';
 import { itemPath } from '../../lib/gh.js';
@@ -42,7 +42,7 @@ export function useOpenSaved() {
   const close = useCallback(() => setModal(null), []);
 
   const openItem = useCallback((item) => {
-    const absent = (room) => toast(`${room.label} isn't installed here. Add it with: tubcal add ${room.id}`);
+    const absent = (room) => toast(`${room.label} isn't installed here. Add it with: ${addCommand(room.id)}`);
     const needs = NEEDS[kindOf(item)];
     if (needs && !hasModule(needs)) {
       const url = webUrl(item);

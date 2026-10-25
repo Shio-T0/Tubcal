@@ -15,8 +15,7 @@ import {
 } from 'lucide-react';
 
 import { api, useApi } from '@pc/api/client.js';
-import { splitKind } from '@pc/components/wire/HNReader.jsx';
-import { compact } from '@pc/lib/format.js';
+import { compact, splitKind } from '@pc/lib/format.js';
 import { ago } from '@pc/lib/time.js';
 import { useParamState } from '@pc/lib/urlState.js';
 import { usePlayer, useSaved, useToast } from '@pc/state.jsx';

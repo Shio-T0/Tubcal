@@ -76,7 +76,41 @@ module's files aren't on disk (install.sh's sparse checkout), so:
 - `tests/test_modules.py` keeps it honest: manifest paths exist and don't overlap, rooms
   = modules = blueprints, the installer's embedded copy equals `modules.ini`, and no
   static/module-level import crosses into a module from outside (frontend and server).
-- The phone build (no plugin, no `modules.ini` in its Python) always has every module.
+- The phone has modules too: each room it can have is a split APK of its own beside
+  a core APK, so a room left off a phone isn't on it at all. `phone = no` (the
+  Composing Room, By topic) keeps a room out of the phone app. A room's phone files
+  are in its `paths` too (screens in `android/phone/src`, the vendored scrapers and
+  the yt-dlp shim in `android/app/src/main/python`); `phone_pip` lists the pip
+  packages its split carries.
+  - Gradle (`app/build.gradle.kts`) leaves every room's paths out of the core APK's
+    Python (`roomPaths`/`roomExcludes`, read from modules.ini) and packs
+    `modules.ini` inside `server/`; the core's pip list has only core packages.
+    `tools/rooms.py python` gathers each room's Python (its files + `phone_pip`
+    installed as pure-Python wheels for 3.11) into `build/generated/room-python/<id>`.
+  - The phone UI builds every phone room (modules plugin, `chosen`), then
+    `android/phone/rooms.mjs` follows Rollup's chunk graph: a file only one room's
+    screens reach goes to `build/generated/phone-rooms/<id>/web`; it fails the build
+    when a room's file is reached without `import()` (moduleLazy, or a route behind
+    `hasModule`). Mixed screens are split by room: Read (`readWire/readDispatch/
+    readGithub.jsx` + `readKit.jsx`), the readers (`hnPage/redditPage/repoPage.jsx`,
+    opened by `discuss.jsx`'s `useOpener`), Search's anime results
+    (`searchAnime.jsx`), the player's Archive tab (`player/ArchiveTab.jsx`).
+  - `assembleDebug` is finalized by `assembleRooms` (`tools/rooms.py apks`): one
+    `room_<id>.apk` per room in `build/outputs/rooms/` (aapt2 link of an asset-only
+    feature split, `split="room_<id>"`, same version, zipalign, apksigner with the
+    debug key). Assets: `rooms/<id>/` (Python) and `web/` (UI).
+  - On the phone Android merges the splits' assets into the app's. `TubcalService`
+    copies `web/` and `rooms/` out (stamp: version, install time, split names), and
+    `android_main.add_rooms` puts `rooms/<id>` on `sys.path` and its `server/…`
+    folders on the server packages' `__path__`. `server/modules.py` reads the packed
+    manifest (`pkgutil.get_data`) and counts a module present when its server files
+    import (`_importable`), so the installed splits are the installed modules.
+    `modules.ADD_COMMAND` is `tubcal phone add`.
+  - The UI asks `hasModule` (build ∩ server): tabs, routes, More, Read, Search,
+    Saved, the player's Archive tabs; `useOpener` opens a left-out room's item on
+    the web. Settings → Rooms lists what isn't installed with `addCommand(id)`.
+  - `tests/test_modules.py` checks the phone's seams too
+    (`test_the_phone_app_reaches_a_room_only_through_import`).
 Saved and Settings belong to no channel: `DeskFrame` (a bar with "Back to <the room
 you came from>", remembered per tab in sessionStorage by `useRememberPlace`).
 Every frame shares `components/channels/common.jsx`: `ChannelKnobs` (1 2 3),
@@ -187,12 +221,16 @@ before "where to?":
 - Heavy optional imports stay lazy (Chaquopy has no wheels for many).
 - `android/app/src/main/python/` holds only the Android shims and the vendored
   anipy_api/weeb_cli, with their LICENSE and NOTICE.
-- Build: `cd android && ANDROID_HOME=~/Android/Sdk ./gradlew :app:assembleDebug`.
+- Build: `cd android && ANDROID_HOME=~/Android/Sdk ./gradlew :app:assembleDebug`
+  (the core APK, then a split APK per room in `app/build/outputs/rooms/`). Every
+  room: `adb install-multiple app/build/outputs/apk/debug/app-debug.apk
+  app/build/outputs/rooms/*.apk`; chosen rooms: `tools/release.sh --dry-run`, then
+  `tubcal phone --apk android/app/build/release`.
 - `android/tools/sync-data.sh` moves user data between the desktop and phone
   databases.
-- `android/tools/release.sh` publishes the debug APK as GitHub release
-  `phone-v<versionName>` (marked latest), which `tubcal phone` installs. Raise
-  `versionCode`/`versionName` first. Every release must come from the same machine's
+- `android/tools/release.sh` publishes the core APK, the rooms' APKs and
+  `tubcal-phone.txt` as GitHub release `phone-v<versionName>` (marked latest),
+  which `tubcal phone` installs from. Raise `versionCode`/`versionName` first. Every release must come from the same machine's
   debug key, or phones can't update in place.
 
 ## The Linux installer
@@ -243,10 +281,10 @@ self-test: the Flask test client against a temp `DATA_DIR`, as in
 **The phone.** `install.sh --phone` (what `tubcal phone` runs, and what an
 interactive install offers at the end when it sees a phone) puts Tubcal for Android
 on a phone over adb:
-- From the repo's latest GitHub release: `tubcal-phone.apk` and `tubcal-phone.txt`
-  (version, code, sha256, size, min_sdk, abis; read line by line and checked, never
-  sourced), both written by `android/tools/release.sh`. `TUBCAL_PHONE_URL` points
-  elsewhere; `--apk FILE` installs a local build.
+- From the repo's latest GitHub release: the core APK, one APK per room and
+  `tubcal-phone.txt` (version, code, sha256, size, min_sdk, abis, rooms; read line
+  by line and checked, never sourced), all written by `android/tools/release.sh`.
+  `TUBCAL_PHONE_URL` points elsewhere.
 - Phones are found in sysfs (an ff/42/01 interface: USB debugging on; an "MTP"
   interface only: off) and in `adb devices -l`. During an install adb is asked only
   when sysfs shows a debugging phone or adb's server already runs; a server the run
@@ -254,10 +292,30 @@ on a phone over adb:
 - `phone_ready` waits (q stops it, five minutes at most) and says what to do for
   each state: debugging off, unauthorized, no permissions (udev), no adb (the distro
   package, asked first). Several ready phones: a chooser, or `ANDROID_SERIAL`.
-- The phone's SDK and ABIs are checked against the release before the download, the
-  APK against its sha256 (kept in `~/.cache/tubcal` until it's installed). Then
-  `adb install -r`, and adb's failure codes become sentences. `--replace` uninstalls
-  first (a copy signed with another key; it deletes the phone's data).
+- The phone's SDK and ABIs are checked against the release before anything is
+  sent, and adb's failure codes become sentences. `--replace` uninstalls first (a
+  copy signed with another key; it deletes the phone's data).
+- Rooms, as on the desktop: the same menu (minus `phone = no` rooms and the
+  options), needs and flags. With `--phone`, `--rooms/--with/--without/--add/
+  --remove/--list` are the phone's (`tubcal phone rooms|add|remove`). The choice
+  starts from the splits installed (`pm path`: `split_room_<id>.apk`), else every
+  room (a Tubcal older than `PHONE_SPLIT_SINCE`, 16), else this computer's install
+  record, else every room but the Archive and GitHub. The install-time offer gives
+  a phone without Tubcal this computer's rooms; one with Tubcal keeps its own.
+- Nothing is downloaded to the computer: `phone_stream` pipes each APK from the
+  release (curl) into `adb shell pm install-write -S <size> <session> <name> -`,
+  taking its sha256 on the way (checked before `pm install-commit`; any failure
+  abandons the session). A phone without this release gets one session with the
+  core and the chosen rooms (`pm install-create -r`); one that has it only gets
+  the rooms added (written) and taken away (`pm install-remove`) in an inherit
+  session (`-p com.tubcal.app`). Rooms can't be added to a phone with another
+  version (splits must match the core's versionCode). Android stops the app for
+  the change; one that was running is started again.
+- `tubcal-phone.txt` has `rooms=` and `room.<id>=<sha256> <size>`; the files are
+  `tubcal-phone-core.apk` and `tubcal-phone-room-<id>.apk` (so an older installer
+  asking for `tubcal-phone.apk` fails instead of installing a roomless app).
+  `--apk DIR` installs from the folder `release.sh --dry-run` writes (a `file://`
+  base for the same code).
 
 `packaging/linux/` holds the templates it renders (`@TUBCAL_HOME@`, `@BIN@`):
 - `tubcal` is the launcher: open/start/stop/status/logs/update/rooms/add/remove/

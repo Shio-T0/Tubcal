@@ -10,8 +10,8 @@ Runtime:
   androidx.core:core-ktx 1.13.1 (Apache-2.0)
   Kotlin standard library 1.9.22 (Apache-2.0)
 Vendored:
-  anipy-api (vendored in app/src/main/python/anipy_api) 3.8.21 (GPL-3.0)
-  weeb-cli (vendored in app/src/main/python/weeb_cli) 3.0.0 (GPL-3.0-only)
+  anipy-api (vendored in app/src/main/python/anipy_api; with the anime room) 3.8.21 (GPL-3.0)
+  weeb-cli (vendored in app/src/main/python/weeb_cli; with the anime room) 3.0.0 (GPL-3.0-only)
 Installed by pip (28):
   beautifulsoup4 4.15.0 (MIT License)
   blinker 1.9.0 (MIT License)
@@ -349,7 +349,7 @@ Source: https://kotlinlang.org/
 Copyright JetBrains s.r.o. and Kotlin Programming Language contributors. Licensed under the Apache License, Version 2.0: https://www.apache.org/licenses/LICENSE-2.0
 
 ------------------------------------------------------------------------------
-anipy-api (vendored in app/src/main/python/anipy_api) 3.8.21
+anipy-api (vendored in app/src/main/python/anipy_api; with the anime room) 3.8.21
 Licence: GPL-3.0
 Source: https://github.com/sdaqo/anipy-cli
 
@@ -1044,7 +1044,7 @@ Public License instead of this License.  But first, please read
 <https://www.gnu.org/licenses/why-not-lgpl.html>.
 
 ------------------------------------------------------------------------------
-weeb-cli (vendored in app/src/main/python/weeb_cli) 3.0.0
+weeb-cli (vendored in app/src/main/python/weeb_cli; with the anime room) 3.0.0
 Licence: GPL-3.0-only
 Source: https://github.com/ewgsta/weeb-cli
 

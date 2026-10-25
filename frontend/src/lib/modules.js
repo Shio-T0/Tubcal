@@ -4,8 +4,10 @@
 // Two sources agree on it. The build says what it compiled (__TUBCAL_MODULES__,
 // set by build/modules.mjs: the modules chosen at install whose files are on
 // disk), and the server says what it serves (window.__TUBCAL_MODULES__, stamped
-// into index.html). A module is here when both have it. With neither (the phone
-// build, the dev server before the API answers) every module is here.
+// into index.html). A module is here when both have it. The phone app's build
+// makes every room the phone can have, the phone gets the split APKs of the
+// rooms `tubcal phone` installed, and its server says which those are. With
+// neither (the dev server before the API answers) every module is here.
 //
 //   hasModule('youtube')                    is it here?
 //   moduleLazy('anime', () => import(…))    a lazy component that renders nothing
@@ -17,10 +19,11 @@
 
 import { lazy } from 'react';
 
-/* global __TUBCAL_MODULES__ */
+/* global __TUBCAL_MODULES__, __TUBCAL_APP__ */
 const BUILT = typeof __TUBCAL_MODULES__ !== 'undefined' ? __TUBCAL_MODULES__ : null;
 const SERVED = typeof window !== 'undefined' && Array.isArray(window.__TUBCAL_MODULES__)
   ? window.__TUBCAL_MODULES__ : null;
+const PHONE = typeof __TUBCAL_APP__ !== 'undefined' && !!__TUBCAL_APP__.phone;
 
 /** Every module id there is, installed or not. */
 export const KNOWN_MODULES = BUILT ? BUILT.known : [];
@@ -31,9 +34,16 @@ export function hasModule(id) {
   return BUILT.on.includes(id) && (!SERVED || SERVED.includes(id));
 }
 
-/** The modules this copy leaves out, by id. */
+/** The modules this copy leaves out, by id. On the phone, only those the app
+ *  can have (not the Composing Room): the ones `tubcal phone` left out. */
 export function missingModules() {
-  return KNOWN_MODULES.filter((id) => !hasModule(id));
+  return KNOWN_MODULES.filter((id) => !hasModule(id) && (!PHONE || BUILT.on.includes(id)));
+}
+
+/** What to type to add a left-out module back: `tubcal add anime`, or from the
+ *  phone app `tubcal phone add anime` (on the computer, with the phone plugged in). */
+export function addCommand(id) {
+  return `${PHONE ? 'tubcal phone add' : 'tubcal add'} ${id}`;
 }
 
 function Nothing() {

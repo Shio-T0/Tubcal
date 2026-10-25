@@ -5,6 +5,8 @@ That is:
 - every package Chaquopy's pip installs into the app, read from its build output
   (`app/build/python/pip/<variant>/`): name, version, declared licence, and the
   licence files each package ships in its dist-info;
+- the packages the rooms' split APKs carry (tools/rooms.py puts them in
+  `app/build/generated/room-python/<room>/`), the same way, marked with their room;
 - the two packages vendored into app/src/main/python (anipy_api, weeb_cli);
 - the runtime underneath: CPython 3.11 under the PSF licence, Chaquopy, and the
   Android libraries (androidx.core, the Kotlin standard library).
@@ -23,6 +25,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 PIP = ROOT / "app" / "build" / "python" / "pip"
+ROOM_PY = ROOT / "app" / "build" / "generated" / "room-python"
 PY_SRC = ROOT / "app" / "src" / "main" / "python"
 OUT = ROOT / "app" / "src" / "main" / "legal" / "python-licenses.txt"
 PSF = Path("/usr/lib") / f"python3.{sys.version_info.minor}" / "LICENSE.txt"
@@ -67,15 +70,17 @@ def _texts(dist):
 
 def pip_packages(variant):
     found = {}
-    base = PIP / variant
-    for dist in sorted(base.glob("*/*.dist-info")):
+    dists = [(d, None) for d in sorted((PIP / variant).glob("*/*.dist-info"))]
+    dists += [(d, d.parent.name) for d in sorted(ROOM_PY.glob("*/*.dist-info"))]
+    for dist, room in dists:
         meta = email.message_from_string((dist / "METADATA").read_text(errors="replace"))
         name, version = meta.get("Name"), meta.get("Version")
         key = (name or dist.name).lower()
         if key in found:
             continue
         found[key] = {
-            "name": name, "version": version, "licence": _licence_of(meta),
+            "name": f"{name} (with the {room} room)" if room else name,
+            "version": version, "licence": _licence_of(meta),
             "source": meta.get("Home-page") or next(
                 (u.split(",", 1)[1].strip() for u in meta.get_all("Project-URL") or []
                  if u.lower().startswith(("source", "repository", "homepage", "home"))), ""),
@@ -92,7 +97,7 @@ def vendored():
     ):
         d = PY_SRC / pkg
         texts = [(d / f).read_text().strip() for f in ("NOTICE", "LICENSE") if (d / f).is_file()]
-        out.append({"name": f"{name} (vendored in app/src/main/python/{pkg})", "version": version,
+        out.append({"name": f"{name} (vendored in app/src/main/python/{pkg}; with the anime room)", "version": version,
                     "licence": licence, "source": source, "texts": texts})
     return out
 

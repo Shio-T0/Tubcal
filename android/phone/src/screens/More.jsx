@@ -7,6 +7,7 @@ import {
   Bookmark, BrainCircuit, ChevronRight, History, ListVideo, Palette, Search, Settings, Wrench, X,
 } from 'lucide-react';
 
+import { hasModule } from '@pc/lib/modules.js';
 import { DEFAULT_ACTIVE_ROOMS } from '@pc/lib/rooms.js';
 import { skinsFor } from '@pc/lib/themes.js';
 import { usePlayer, useSaved, useSettings } from '@pc/state.jsx';
@@ -20,6 +21,9 @@ const ROOMS = [
   { id: 'archive', to: '/archive', label: 'The Archive', blurb: 'Ask everything you’ve watched', Icon: BrainCircuit, c: 'var(--signal)' },
   { id: 'dev', to: '/dev', label: 'The Workbench', blurb: 'One language per service manual', Icon: Wrench, c: 'var(--c-dev)' },
 ];
+
+// the rooms Search looks in
+const SEARCHABLE = ['youtube', 'anime', 'hackernews', 'reddit', 'github'];
 
 export default function More() {
   const { settings, updateSettings } = useSettings();
@@ -51,10 +55,10 @@ export default function More() {
     <div className={m.screen}>
       <AppBar title={<h1 className={m.word}>Tub<i>cal</i></h1>} sub={version ? `v${version} · running on this phone` : 'running on this phone'} />
 
-      <Link to="/search" className={m.search} data-reveal="fade"><Search size={18} /> Search everything…</Link>
+      {SEARCHABLE.some(hasModule) && <Link to="/search" className={m.search} data-reveal="fade"><Search size={18} /> Search everything…</Link>}
 
       <div className={m.rooms}>
-        {ROOMS.filter((r) => active.includes(r.id)).map(({ id, to, label, blurb, Icon, c }) => (
+        {ROOMS.filter((r) => hasModule(r.id) && active.includes(r.id)).map(({ id, to, label, blurb, Icon, c }) => (
           <Link key={id} to={to} className={m.room} style={{ '--c': c }} data-reveal="pop">
             <span className={m.roomIcon}><Icon size={22} /></span>
             <b>{label}</b>
@@ -65,7 +69,7 @@ export default function More() {
 
       <div className={m.list}>
         <Link to="/saved" data-reveal="side"><Bookmark size={19} /> Saved {nSaved > 0 && <em key={nSaved} className="ph-pop">{nSaved}</em>}<ChevronRight size={18} /></Link>
-        <Link to="/youtube/history" data-reveal="side"><History size={19} /> Watch history<ChevronRight size={18} /></Link>
+        {hasModule('youtube') && <Link to="/youtube/history" data-reveal="side"><History size={19} /> Watch history<ChevronRight size={18} /></Link>}
         <Link to="/settings" data-reveal="side"><Settings size={19} /> Settings<ChevronRight size={18} /></Link>
       </div>
 

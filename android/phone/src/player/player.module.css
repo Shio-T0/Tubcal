@@ -775,63 +775,6 @@
 .chapOn b {
   color: var(--signal) !important;
 }
-.invite {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-  padding: 24px 10px;
-  text-align: center;
-  color: var(--paper-faint);
-}
-.invite p {
-  margin: 0;
-  color: var(--paper-dim);
-}
-.invite button {
-  min-height: 42px;
-  padding: 0 20px;
-  border-radius: var(--r-pill);
-  background: var(--signal);
-  color: var(--ink);
-  font-weight: 650;
-}
-.summary {
-  font-size: 15px;
-  line-height: 1.7;
-  white-space: pre-wrap;
-  color: var(--text-secondary);
-}
-.transcript {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.tSeg {
-  display: grid;
-  grid-template-columns: 48px 1fr;
-  gap: 10px;
-  padding: 9px 8px;
-  border-radius: 10px;
-  text-align: left;
-}
-.tSeg span {
-  font-family: var(--font-mono);
-  font-size: 11.5px;
-  color: var(--signal);
-}
-.tSeg p {
-  margin: 0;
-  font-size: 14.5px;
-  line-height: 1.55;
-  color: var(--text-secondary);
-}
-.tSegOn {
-  background: color-mix(in srgb, var(--signal) 13%, transparent);
-}
-.tSegOn p {
-  color: var(--paper);
-}
 .queue {
   margin: 0;
   padding: 0;

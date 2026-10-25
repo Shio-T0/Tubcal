@@ -6,19 +6,20 @@
 //
 // Routes keep the desktop's URL scheme (/youtube/c/…, /anime/…, /anime/user/…),
 // so the desktop components the phone reuses link to the right phone screens.
+// A room `tubcal phone` left out has no tab, no route and no screen here.
 
 import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Navigate, Route, Routes, useLocation, useNavigate, useNavigationType } from 'react-router-dom';
 
 import { api } from '@pc/api/client.js';
-import CurtainCallHost from '@pc/components/anime/CurtainCallHost.jsx';
 import { useChannelFeed, useSeen } from '@pc/components/screening/feed.js';
 import { AppProviders, usePlayer, useSettings, useSubscriptions } from '@pc/state.jsx';
+import { hasModule, moduleLazy } from '@pc/lib/modules.js';
 import { THEMES } from '@pc/lib/themes.js';
 
 import { setLightBars } from './lib/bridge.js';
 import PhonePlayer from './player/PhonePlayer.jsx';
-import { Loading, TabBar, tabOf } from './shell/Shell.jsx';
+import { Loading, TABS, TabBar, tabOf } from './shell/Shell.jsx';
 
 const Today = lazy(() => import('./screens/Today.jsx'));
 const Watch = lazy(() => import('./screens/Watch.jsx'));
@@ -26,18 +27,23 @@ const Channel = lazy(() => import('./screens/Channel.jsx'));
 const Playlist = lazy(() => import('./screens/Playlist.jsx'));
 const History = lazy(() => import('./screens/History.jsx'));
 const Read = lazy(() => import('./screens/Read.jsx'));
-const Subreddit = lazy(() => import('./screens/Read.jsx').then((m) => ({ default: m.Subreddit })));
+const Subreddit = lazy(() => import('./screens/readDispatch.jsx').then((m) => ({ default: m.Subreddit })));
 const AnimeHub = lazy(() => import('./screens/AnimeHub.jsx'));
 const AnimeTitle = lazy(() => import('./screens/AnimeTitle.jsx'));
 const More = lazy(() => import('./screens/More.jsx'));
 const Search = lazy(() => import('./screens/Search.jsx'));
 const Saved = lazy(() => import('./screens/Saved.jsx'));
 const Reused = lazy(() => import('./screens/Reused.jsx'));
+const CurtainCallHost = moduleLazy('anime', () => import('@pc/components/anime/CurtainCallHost.jsx'));
 
-/** Where a fresh launch lands: the tab you were on last time. */
+/** Where a fresh launch lands: the tab you were on last time, if its room is
+ *  still on this phone; otherwise the first tab. */
 function Start() {
-  let to = '/edition';
-  try { to = localStorage.getItem('tubcal.phone.lastTab') || to; } catch { /* fine */ }
+  let to = TABS[0].root;
+  try {
+    const last = localStorage.getItem('tubcal.phone.lastTab');
+    if (last && TABS.some((t) => t.match(last))) to = last;
+  } catch { /* fine */ }
   return <Navigate to={to} replace />;
 }
 
@@ -80,6 +86,7 @@ function useBadges() {
   const watch = subs.youtube.length ? newCount(feed.data?.items) : 0;
   const [anime, setAnime] = useState(0);
   useEffect(() => {
+    if (!hasModule('anime')) return undefined;
     let alive = true;
     const poll = () => api('/anime/notifications/count').then((d) => alive && setAnime(d.unread || 0)).catch(() => {});
     const t0 = setTimeout(poll, 4000); // after the first screen has had the network
@@ -140,25 +147,37 @@ function Shell() {
           <PageTransition>
           <Routes>
             <Route path="/" element={<Start />} />
-            <Route path="/edition" element={<Today />} />
-            <Route path="/youtube" element={<Watch />} />
-            <Route path="/youtube/c/:channelId" element={<Channel />} />
-            <Route path="/youtube/playlist/:playlistId" element={<Playlist />} />
-            <Route path="/youtube/history" element={<History />} />
-            <Route path="/hackernews" element={<Read room="wire" />} />
-            <Route path="/reddit" element={<Read room="dispatch" />} />
-            <Route path="/reddit/r/:sub" element={<Subreddit />} />
-            <Route path="/github" element={<Read room="github" />} />
-            <Route path="/anime" element={<AnimeHub />} />
-            <Route path="/anime/voice/:id" element={<Reused page="voice" />} />
-            <Route path="/anime/character/:id" element={<Reused page="character" />} />
-            <Route path="/anime/studio/:id" element={<Reused page="studio" />} />
-            <Route path="/anime/user/:name" element={<Reused page="user" />} />
-            <Route path="/anime/thread/:id" element={<Reused page="thread" />} />
-            <Route path="/anime/activity/:id" element={<Reused page="activity" />} />
-            <Route path="/anime/:id" element={<AnimeTitle />} />
-            <Route path="/archive" element={<Reused page="archive" />} />
-            <Route path="/dev" element={<Reused page="dev" />} />
+            {hasModule('edition') && <Route path="/edition" element={<Today />} />}
+            {hasModule('youtube') && (
+              <>
+                <Route path="/youtube" element={<Watch />} />
+                <Route path="/youtube/c/:channelId" element={<Channel />} />
+                <Route path="/youtube/playlist/:playlistId" element={<Playlist />} />
+                <Route path="/youtube/history" element={<History />} />
+              </>
+            )}
+            {hasModule('hackernews') && <Route path="/hackernews" element={<Read room="wire" />} />}
+            {hasModule('reddit') && (
+              <>
+                <Route path="/reddit" element={<Read room="dispatch" />} />
+                <Route path="/reddit/r/:sub" element={<Subreddit />} />
+              </>
+            )}
+            {hasModule('github') && <Route path="/github" element={<Read room="github" />} />}
+            {hasModule('anime') && (
+              <>
+                <Route path="/anime" element={<AnimeHub />} />
+                <Route path="/anime/voice/:id" element={<Reused page="voice" />} />
+                <Route path="/anime/character/:id" element={<Reused page="character" />} />
+                <Route path="/anime/studio/:id" element={<Reused page="studio" />} />
+                <Route path="/anime/user/:name" element={<Reused page="user" />} />
+                <Route path="/anime/thread/:id" element={<Reused page="thread" />} />
+                <Route path="/anime/activity/:id" element={<Reused page="activity" />} />
+                <Route path="/anime/:id" element={<AnimeTitle />} />
+              </>
+            )}
+            {hasModule('archive') && <Route path="/archive" element={<Reused page="archive" />} />}
+            {hasModule('dev') && <Route path="/dev" element={<Reused page="dev" />} />}
             <Route path="/settings" element={<Reused page="settings" />} />
             <Route path="/saved" element={<Saved />} />
             <Route path="/search" element={<Search />} />
@@ -170,7 +189,7 @@ function Shell() {
       </div>
       <PhonePlayer />
       <TabBar badges={badges} hidden={immersive} />
-      <CurtainCallHost />
+      {hasModule('anime') && <Suspense fallback={null}><CurtainCallHost /></Suspense>}
     </>
   );
 }

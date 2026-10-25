@@ -15,7 +15,7 @@
 //
 // The <video> element never remounts between those states, so nothing restarts.
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   AlertTriangle, AudioLines, BookOpen, Bookmark, BookmarkCheck, CalendarClock, Captions, Check, ChevronDown,
@@ -26,6 +26,7 @@ import {
 
 import { api, useApi } from '@pc/api/client.js';
 import { compact } from '@pc/lib/format.js';
+import { hasModule, moduleLazy } from '@pc/lib/modules.js';
 import { ago, clock, formatWhen, timeUntil } from '@pc/lib/time.js';
 import { useVideoControls } from '@pc/lib/useVideoControls.js';
 import { usePlayer, useProgress, useSaved, useSettings, useToast } from '@pc/state.jsx';
@@ -439,65 +440,8 @@ function SubtitleStyleSheet({ open, onClose }) {
 
 // ── under the picture ────────────────────────────────────────────────────────
 
-const PENDING = new Set(['queued', 'transcribing', 'embedding']);
-
-function Archive({ item, view, pos, ctx }) {
-  const status = useApi('/brain/status');
-  const [doc, setDoc] = useState({ loading: true });
-  const [busy, setBusy] = useState(false);
-  const load = useCallback(() => {
-    api(`/brain/doc/${encodeURIComponent(item.id)}`)
-      .then((d) => setDoc({ d }))
-      .catch((e) => setDoc({ error: e.message }));
-  }, [item.id]);
-  useEffect(() => { load(); }, [load]);
-  useEffect(() => {
-    if (!PENDING.has(doc.d?.status)) return undefined;
-    const t = setInterval(load, 4000);
-    return () => clearInterval(t);
-  }, [doc.d?.status, load]);
-  const run = async (path, body) => {
-    setBusy(true);
-    try { await api(path, { method: 'POST', ...(body ? { body: JSON.stringify(body) } : {}) }); load(); } catch { /* shown on reload */ }
-    setBusy(false);
-  };
-  const brain = status.data;
-  if (doc.loading) return <p className={p.muted}>Checking the Archive…</p>;
-  if (!doc.d) {
-    if (brain && !brain.whisper) return <p className={p.muted}>The Archive is resting on this phone — its transcription engine lives on the desktop. Transcripts made there show up here once your data is synced.</p>;
-    return (
-      <div className={p.invite}>
-        <BookOpen size={22} />
-        <p>Not in the Archive yet.</p>
-        <button type="button" onClick={() => run('/brain/index', { item })} disabled={busy}>{busy ? 'Adding…' : 'Add to the Archive'}</button>
-      </div>
-    );
-  }
-  if (PENDING.has(doc.d.status)) return <p className={p.muted}>In the Archive's queue — {doc.d.status}…</p>;
-  if (doc.d.status === 'error') return <p className={p.muted}>Couldn't archive this one: {doc.d.error}</p>;
-  if (view === 'summary') {
-    if (doc.d.summary) return <div className={p.summary}>{doc.d.summary}</div>;
-    return (
-      <div className={p.invite}>
-        <Sparkles size={22} />
-        <p>Archived, but not summarized yet.</p>
-        <button type="button" onClick={() => run(`/brain/summarize/${encodeURIComponent(item.id)}`)} disabled={busy || (brain && !brain.llm_ready)}>{busy ? 'Summarizing…' : 'Write a summary'}</button>
-      </div>
-    );
-  }
-  const chunks = doc.d.chunks || [];
-  const cur = chunks.reduce((acc, c, i) => (c.t_start <= pos + 0.5 ? i : acc), -1);
-  return (
-    <div className={p.transcript}>
-      {chunks.map((c, i) => (
-        <button key={c.idx} type="button" className={`${p.tSeg} ${i === cur ? p.tSegOn : ''}`} onClick={() => ctx.onSeek(c.t_start)}>
-          <span>{clock(c.t_start)}</span>
-          <p>{c.text}</p>
-        </button>
-      ))}
-    </div>
-  );
-}
+// The Transcript and Summary tabs are the Archive's (ArchiveTab.jsx, in its split APK).
+const Archive = moduleLazy('archive', () => import('./ArchiveTab.jsx'));
 
 function UpNextList() {
   const { queue, dequeue } = usePlayer();
@@ -546,8 +490,8 @@ function WatchPage({ item, pb, pageRef }) {
     { id: 'about', label: 'About', Icon: BookOpen },
     info.chapters?.length ? { id: 'chapters', label: 'Chapters', Icon: ListOrdered } : null,
     { id: 'comments', label: info.comment_count ? `Comments ${compact(info.comment_count)}` : 'Comments', Icon: MessageSquare },
-    { id: 'transcript', label: 'Transcript', Icon: FileText },
-    { id: 'summary', label: 'Summary', Icon: Sparkles },
+    hasModule('archive') ? { id: 'transcript', label: 'Transcript', Icon: FileText } : null,
+    hasModule('archive') ? { id: 'summary', label: 'Summary', Icon: Sparkles } : null,
     { id: 'next', label: queue.length ? `Up next ${queue.length}` : 'Up next', Icon: ListVideo },
   ].filter(Boolean) : [{ id: 'next', label: queue.length ? `Up next ${queue.length}` : 'Up next', Icon: ListVideo }];
   const curTab = tabs.some((t) => t.id === tab) ? tab : tabs[0].id;
@@ -657,7 +601,9 @@ function WatchPage({ item, pb, pageRef }) {
             channelFace={face}
           />
         )}
-        {(curTab === 'transcript' || curTab === 'summary') && <Archive item={item} view={curTab} pos={pos} ctx={ctx} />}
+        {(curTab === 'transcript' || curTab === 'summary') && (
+          <Suspense fallback={<p className={p.muted}>Checking the Archive…</p>}><Archive item={item} view={curTab} pos={pos} ctx={ctx} /></Suspense>
+        )}
         {curTab === 'next' && <UpNextList />}
       </div>
     </div>

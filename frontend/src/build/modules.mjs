@@ -59,11 +59,14 @@ export function resolveModules(manifest, root, chosenEnv = process.env.TUBCAL_MO
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 
-export default function modules({ root = REPO } = {}) {
+/** `chosen`: a comma list in place of TUBCAL_MODULES (the phone app's build
+ *  passes every room the phone can have, then splits them up: phone/rooms.mjs;
+ *  `null` builds them all). */
+export default function modules({ root = REPO, chosen = process.env.TUBCAL_MODULES } = {}) {
   const file = path.join(root, 'modules.ini');
   const manifest = fs.existsSync(file) ? readManifest(file) : {};
   const known = Object.keys(manifest);
-  const on = resolveModules(manifest, root);
+  const on = resolveModules(manifest, root, chosen);
   const off = known.filter((id) => !on.includes(id));
 
   // owned path (relative to the repo, '/' separated) → module id, for the off ones

@@ -10,6 +10,12 @@
 // reuses without touching the desktop source. The build lands in the Android
 // build's generated assets (android/app/build/generated/phone-web/web), and Gradle
 // runs it before every APK build (app/build.gradle.kts → buildPhoneUi).
+//
+// The build makes every room the phone app can have (modules.ini, all but those
+// marked `phone = no`), then rooms.mjs moves each room's files out of it into
+// app/build/generated/phone-rooms/<id>/: the core APK gets the rest, and each room
+// becomes a split APK of its own (tools/rooms.py). On the phone, the server says
+// which rooms are installed and the screens leave out the rest (hasModule).
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -17,10 +23,15 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
 import legal from '../../frontend/src/build/legal.mjs';
+import modules, { readManifest } from '../../frontend/src/build/modules.mjs';
+import rooms from './rooms.mjs';
 
 const REPO = path.resolve(__dirname, '../..');
 const PC = path.join(REPO, 'frontend', 'src') + path.sep;
 const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, 'package.json'), 'utf8'));
+const PHONE_MODULES = Object.values(readManifest(path.join(REPO, 'modules.ini')))
+  .filter((m) => (m.phone || '').toLowerCase() !== 'no')
+  .map((m) => m.id);
 
 function scopedName(name, filename) {
   const file = path.basename(filename).replace(/\.module\.css$/, '').replace(/\W/g, '_');
@@ -49,6 +60,10 @@ export default defineConfig({
   },
   plugins: [
     react(),
+    // __TUBCAL_MODULES__: every room the phone can have, whatever TUBCAL_MODULES says
+    modules({ root: REPO, chosen: PHONE_MODULES.join(',') }),
+    // each room's files into its split APK's folder
+    rooms({ root: REPO, rooms: PHONE_MODULES, out: path.resolve(__dirname, '../app/build/generated/phone-rooms') }),
     // legal/: the licence, the notices, the Python side's list (tools/gen-licenses.py)
     // and every npm package in the bundle — Settings → About shows them.
     legal({

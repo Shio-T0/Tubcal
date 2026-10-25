@@ -8,6 +8,7 @@ import { useCallback, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Bookmark, BookmarkX, Play } from 'lucide-react';
 
+import { hasModule } from '@pc/lib/modules.js';
 import { KINDS, kindOf } from '@pc/lib/saveable.js';
 import { ago } from '@pc/lib/time.js';
 import { useSaved } from '@pc/state.jsx';
@@ -93,7 +94,8 @@ export default function Saved() {
   const items = Object.values(saved).filter((i) => !DESKTOP_ONLY.has(kindOf(i))).reverse();
   const counts = items.reduce((m, i) => ({ ...m, [i.platform]: (m[i.platform] || 0) + 1 }), {});
   const shown = room === 'all' ? items : items.filter((i) => i.platform === room);
-  const videos = shown.filter((i) => kindOf(i) === 'video');
+  // without the Screening Room on this phone, a saved video opens on YouTube
+  const videos = hasModule('youtube') ? shown.filter((i) => kindOf(i) === 'video') : [];
 
   return (
     <div>
@@ -108,7 +110,7 @@ export default function Saved() {
       )}
       {shown.map((item) => (
         <Swipe key={item.id} onRemove={() => toggleSaved(item)}>
-          {kindOf(item) === 'video'
+          {kindOf(item) === 'video' && videos.length
             ? <VideoRow item={item} />
             : <TextCard item={item} onOpen={open} onMenu={setMenu} />}
         </Swipe>

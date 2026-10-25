@@ -18,7 +18,7 @@
 # self-updating yt-dlp (with the Screening Room) → the `tubcal` launcher,
 # app-menu entry and optional login autostart → a self-test against a
 # throwaway database → if a phone is plugged in, an offer to put Tubcal for
-# Android on it too (what `tubcal phone` does any time).
+# Android on it too (what `tubcal phone` does any time, with rooms of its own).
 #
 # Fedora (Fedora Asahi Remix on Apple Silicon included), RHEL/Alma/Rocky,
 # Debian/Ubuntu/Mint/Pop!_OS, Arch/Manjaro/EndeavourOS/CachyOS, openSUSE,
@@ -60,7 +60,8 @@ CONF=$TUBCAL_HOME/install.conf
 # ── arguments ────────────────────────────────────────────────────────────────
 
 MODE=install YES=0 NO_SUDO=0 PURGE=0 ANIM=1 NOCOLOR_FLAG=0 CLONE_DIR="" EXACT=""
-APK_FILE="" REPLACE=0 # --phone: --apk FILE, --replace
+APK_FILE="" REPLACE=0 # --phone: --apk DIR, --replace
+TO_PHONE=0 WANT_LIST=0 # --phone, --list: with --phone, the room flags are the phone's
 declare -A FORCE=()
 CHANGE_ADD=() CHANGE_REMOVE=() # --add / --remove: rooms, as typed
 
@@ -85,8 +86,13 @@ Options
       --remove LIST    take rooms out of it (`tubcal remove`)
       --list           the rooms, and which are installed (`tubcal rooms`)
       --phone          put Tubcal for Android on a phone connected over USB
-                       (`tubcal phone`); it needs USB debugging on
-      --apk FILE       with --phone: install this APK instead of the latest release
+                       (`tubcal phone`), with the rooms you pick for it; it needs
+                       USB debugging on. With --rooms, --with, --without, --add,
+                       --remove or --list: the phone's rooms, not this computer's
+                       (`tubcal phone rooms|add|remove`)
+      --apk DIR        with --phone: install from this folder (the one
+                       android/tools/release.sh --dry-run writes) instead of the
+                       latest release
       --replace        with --phone: uninstall a Tubcal signed with another key
                        first (this deletes its data on the phone)
       --uninstall      remove the launcher, menu entry, service and private tools
@@ -107,6 +113,7 @@ Rooms (a room you leave out isn't downloaded)
   youtube     The Screening Room: YouTube (also: screening)
   anime       The Anime: anime and your AniList list
   archive     The Archive: local transcription (~300 MB; needs youtube)
+  The phone app has all of these but editor and topics.
 
 Options
   desktop    an app-menu entry and icon
@@ -122,8 +129,8 @@ Environment
   TUBCAL_HOME                  installer-owned files (default ~/.local/share/tubcal)
   TUBCAL_BIN_DIR               where `tubcal` goes (default ~/.local/bin)
   TUBCAL_SYSTEMD=0             manage the server without systemd --user
-  TUBCAL_PHONE_URL             where --phone downloads from (default: the latest
-                               GitHub release of TUBCAL_REPO)
+  TUBCAL_PHONE_URL             where --phone streams the APKs from (default: the
+                               latest GitHub release of TUBCAL_REPO)
   ANDROID_SERIAL               the phone to use, when several are connected
 EOF
 }
@@ -145,14 +152,13 @@ parse_args() {
       --rooms|--modules) [[ $# -ge 2 ]] || { echo "$1 needs a list" >&2; exit 2; }; EXACT=${2//,/ }; [[ -n $EXACT ]] || EXACT=" "; shift ;;
       --add|--remove)
         [[ $# -ge 2 ]] || { echo "$1 needs a list of rooms" >&2; exit 2; }
-        MODE=change
         local IFS=,
         for c in $2; do [[ $1 == --add ]] && CHANGE_ADD+=("$c") || CHANGE_REMOVE+=("$c"); done
         shift ;;
       --with=*|--without=*|--rooms=*|--modules=*|--add=*|--remove=*) set -- "${1%%=*}" "${1#*=}" "${@:2}"; continue ;;
-      --list) MODE=list ;;
-      --phone) MODE=phone ;;
-      --apk) [[ $# -ge 2 ]] || { echo "--apk needs a file" >&2; exit 2; }; APK_FILE=$2; shift ;;
+      --list) WANT_LIST=1 ;;
+      --phone) TO_PHONE=1 ;;
+      --apk) [[ $# -ge 2 ]] || { echo "--apk needs a folder" >&2; exit 2; }; APK_FILE=$2; shift ;;
       --apk=*) APK_FILE=${1#*=} ;;
       --replace) REPLACE=1 ;;
       --dir) [[ $# -ge 2 ]] || { echo "--dir needs a path" >&2; exit 2; }; CLONE_DIR=$2; shift ;;
@@ -168,6 +174,10 @@ parse_args() {
     esac
     shift
   done
+  if ((TO_PHONE)); then MODE=phone
+  elif ((WANT_LIST)); then MODE=list
+  elif ((${#CHANGE_ADD[@]} + ${#CHANGE_REMOVE[@]})); then MODE=change
+  fi
 }
 
 # ── terminal ─────────────────────────────────────────────────────────────────
@@ -576,7 +586,13 @@ module_id() { # module_id WORD → REPLY: the room it names (its id, an alias or
 
 bad_room() {
   echo "unknown room: $1" >&2
-  echo "rooms: ${MOD_IDS[*]}  (\`tubcal rooms\` lists them)" >&2
+  if [[ $MODE == phone ]]; then
+    local id ids=()
+    for id in "${MOD_IDS[@]}"; do phone_can "$id" && ids+=("$id"); done
+    echo "the phone's rooms: ${ids[*]}  (\`tubcal phone rooms\` lists them)" >&2
+  else
+    echo "rooms: ${MOD_IDS[*]}  (\`tubcal rooms\` lists them)" >&2
+  fi
   exit 2
 }
 
@@ -727,6 +743,7 @@ extras_desc() { # → REPLY: what the extras would bring, for the rooms chosen
 }
 
 side_note() { # side_note ROW → REPLY: the menu's right-hand column
+  [[ $MODE == phone ]] && { REPLY=""; return; } # the APK holds every room: nothing to weigh
   case $1 in
     desktop|3d) REPLY="" ;;
     autostart) ((SYSTEMD)) && REPLY="systemd --user" || REPLY="XDG autostart" ;;
@@ -749,9 +766,13 @@ menu_rows() { # → ROWS: "h:TITLE" headers, room ids and options, in menu order
   ROWS=()
   for ch in social coding video; do
     ROWS+=("h:${ch^^}")
-    for id in "${MOD_IDS[@]}"; do [[ ${MAN[$id.channel]} == "$ch" ]] && ROWS+=("$id"); done
+    for id in "${MOD_IDS[@]}"; do
+      [[ ${MAN[$id.channel]} == "$ch" ]] || continue
+      [[ $MODE == phone ]] && ! phone_can "$id" && continue # not in the phone app
+      ROWS+=("$id")
+    done
   done
-  ROWS+=("h:ON THIS MACHINE" "${OPTS[@]}")
+  [[ $MODE == phone ]] || ROWS+=("h:ON THIS MACHINE" "${OPTS[@]}")
 }
 
 row_label() { if [[ -n ${LABEL[$1]:-} ]]; then REPLY=${LABEL[$1]}; else REPLY=${MAN[$1.name]}; fi; }
@@ -806,9 +827,10 @@ _menu_draw() {
 _menu_static() {
   local id on=() off=() also=()
   for id in "${MOD_IDS[@]}"; do
+    [[ $MODE == phone ]] && ! phone_can "$id" && continue
     if ((ON[$id])); then on+=("$id"); else off+=("$id"); fi
   done
-  for id in "${OPTS[@]}"; do ((ON[$id])) && also+=("${LABEL[$id],}"); done
+  [[ $MODE == phone ]] || for id in "${OPTS[@]}"; do ((ON[$id])) && also+=("${LABEL[$id],}"); done
   room_names "${on[@]}"; kv "Rooms" "$REPLY"
   if ((${#off[@]})); then room_names "${off[@]}"; kv "Left out" "$REPLY"; fi
   if ((${#also[@]})); then local IFS=';'; REPLY="${also[*]}"; kv "Also" "${REPLY//;/, }"; fi
@@ -850,8 +872,8 @@ _menu_toggle() {
 
 _menu_all() { # a: every room on, or (when they all are) every room off
   local id all=1
-  for id in "${MOD_IDS[@]}"; do ((ON[$id])) || all=0; done
-  for id in "${MOD_IDS[@]}"; do ON[$id]=$((1 - all)); done
+  for id in "${MOD_IDS[@]}"; do ((LOCKED[$id] == 1 || ON[$id])) || all=0; done
+  for id in "${MOD_IDS[@]}"; do ((LOCKED[$id] == 1)) || ON[$id]=$((1 - all)); done
   extras_lock
 }
 
@@ -863,7 +885,12 @@ choose_components() {
     ((YES)) || note "No terminal to ask on, so these are the defaults (--rooms, --with and --without change them)."
     return
   fi
-  note "Pick the rooms to install. One you leave out isn't downloaded."
+  if [[ $MODE == phone ]]; then
+    note "Pick the rooms for the phone. One you leave out isn't installed there."
+    [[ $P_FROM == computer ]] && note "The rooms this computer has are picked to start with."
+  else
+    note "Pick the rooms to install. One you leave out isn't downloaded."
+  fi
   printf '\n'
   CUR=0 MSG=""
   _menu_step 1
@@ -879,7 +906,10 @@ choose_components() {
       space) _menu_toggle "${ROWS[CUR]}" ;;
       all) _menu_all ;;
       enter) rooms_on && break; MSG="Pick at least one room." ;;
-      quit) show_cursor; printf '\n'; say "Off air. Nothing was installed."; exit 0 ;;
+      quit)
+        show_cursor; printf '\n'
+        if [[ $MODE == phone ]]; then say "Off air. Nothing was changed on the phone."; else say "Off air. Nothing was installed."; fi
+        exit 0 ;;
     esac
     printf '\e[%dA' "$n"
     _menu_draw
@@ -1021,9 +1051,10 @@ run() {
     printf '\n%s' "$EL"
   elif ((soft)); then
     _last_line "$slog"
+    local why=$REPLY # (step_line's vlen takes REPLY)
     step_line "$AMBER$G_WARN$RST" "$label" "$took"
     printf '\n%s' "$EL"
-    [[ -n $REPLY ]] && printf '          %s%s%s\n' "$DIM" "$REPLY" "$RST"
+    [[ -n $why ]] && printf '          %s%s%s\n' "$DIM" "$why" "$RST"
   else
     step_line "$BAD$G_BAD$RST" "$label" "$took"
     printf '\n%s' "$EL"
@@ -1463,18 +1494,22 @@ PY
 
 # ── the phone ────────────────────────────────────────────────────────────────
 #
-# Tubcal for Android (android/) is published as a GitHub release of two files:
-# the APK and tubcal-phone.txt, which gives its version, checksum, size, the
-# oldest Android it runs on and the CPUs it's built for (android/tools/release.sh
-# writes both). It goes on over adb, so the phone needs USB debugging on (or
+# Tubcal for Android (android/) is published as a GitHub release: a core APK, one
+# split APK per room (android/tools/rooms.py), and tubcal-phone.txt, which gives
+# the version, each APK's checksum and size, the oldest Android it runs on and the
+# CPUs it's built for (android/tools/release.sh writes them all). The core and the
+# chosen rooms' splits stream from GitHub straight into Android's installer over
+# adb (a `pm install-create` session), so nothing is stored on this computer and
+# a room left out never reaches the phone. The phone needs USB debugging on (or
 # wireless debugging, paired and connected with adb first).
 
 PHONE_PKG=com.tubcal.app
-PHONE_CACHE=${XDG_CACHE_HOME:-$HOME/.cache}/tubcal
+PHONE_SPLIT_SINCE=16 # the first Tubcal for Android made of a core APK and one per room
+PHONE_CACHE=${XDG_CACHE_HOME:-$HOME/.cache}/tubcal # (where APKs were kept before they were streamed)
 ADB="" ADB_STARTED=0 WHY_FILE=""
 P_SERIAL=() P_STATE=() P_NAME=() PI=-1 # what phone_scan found; PI: the one to use
 PHONE="" PHONE_NAME="" PHONE_WANT=${ANDROID_SERIAL:-}
-P_SDK="" P_ANDROID="" P_ABIS="" P_HAS="" P_HAS_CODE=""
+P_SDK="" P_ANDROID="" P_ABIS="" P_HAS="" P_HAS_CODE="" P_SPLITS=""
 declare -A REL=() # tubcal-phone.txt
 PHONE_DONE="" PHONE_SEEN=0
 
@@ -1718,19 +1753,22 @@ record_pkgs() { # the install record keeps what came from the distro (uninstall 
   done <"$CONF" >"$CONF.new" && mv "$CONF.new" "$CONF"
 }
 
-phone_base() { # → REPLY: where the release's files are
+phone_base() { # → REPLY: where the release's files are (a URL; file:// for --apk's folder)
+  if [[ -n $APK_FILE ]]; then REPLY="file://$APK_FILE"; return 0; fi
   if [[ -n ${TUBCAL_PHONE_URL:-} ]]; then REPLY=${TUBCAL_PHONE_URL%/}; return 0; fi
   local re='github\.com[:/]+([^/]+)/([^/]+)$' r=${TUBCAL_REPO%/}
   [[ $r =~ $re ]] || return 1
   REPLY="https://github.com/${BASH_REMATCH[1]}/${BASH_REMATCH[2]%.git}/releases/latest/download"
 }
 
-# tubcal-phone.txt → REL[version code sha256 size min_sdk abis]. It's read
-# line by line and checked, never sourced.
+# tubcal-phone.txt → REL[version code sha256 size min_sdk abis rooms] and, for
+# each room, REL[room.<id>]="<sha256> <size>". It's read line by line and
+# checked, never sourced.
 phone_release() {
   [[ -n ${REL[version]:-} ]] && return 0
   local txt k v ok
   local word='^[0-9A-Za-z.+_-]{1,40}$' num='^[0-9]{1,12}$' hex='^[0-9a-f]{64}$' abis='^[a-z0-9_ -]{1,80}$'
+  local room='^room\.[a-z0-9_]{1,30}$' split='^[0-9a-f]{64} [0-9]{1,12}$' ids='^[a-z0-9_ ]{0,300}$'
   phone_base || return 1
   txt=$(curl -fsSL --retry 2 --max-time 30 "$REPLY/tubcal-phone.txt" 2>/dev/null) || return 1
   while IFS='=' read -r k v; do
@@ -1740,67 +1778,40 @@ phone_release() {
       code|size|min_sdk) [[ $v =~ $num ]] && ok=1 ;;
       sha256) [[ $v =~ $hex ]] && ok=1 ;;
       abis) [[ $v =~ $abis ]] && ok=1 ;;
+      rooms) [[ $v =~ $ids ]] && ok=1 ;;
+      *) [[ $k =~ $room && $v =~ $split ]] && ok=1 ;;
     esac
     ((ok)) && REL[$k]=$v
   done <<<"$txt"
   [[ -n ${REL[version]:-} && -n ${REL[code]:-} && -n ${REL[sha256]:-} ]] || { REL=(); return 1; }
 }
 
-phone_facts() { # → P_SDK P_ANDROID P_ABIS PHONE_NAME, and P_HAS / P_HAS_CODE when Tubcal is on it
+# → P_SDK P_ANDROID P_ABIS PHONE_NAME; with Tubcal on it, P_HAS / P_HAS_CODE and
+# P_SPLITS (the rooms installed as split APKs, from `pm path`)
+phone_facts() {
   local out l model=""
-  out=$(adbq -s "$PHONE" shell "getprop ro.build.version.sdk; getprop ro.build.version.release; getprop ro.product.cpu.abilist; getprop ro.product.model; pm path $PHONE_PKG >/dev/null 2>&1 && dumpsys package $PHONE_PKG | grep -m2 -E 'versionCode=|versionName='" 2>/dev/null) || [[ -n $out ]] || return 1
+  out=$(adbq -s "$PHONE" shell "getprop ro.build.version.sdk; getprop ro.build.version.release; getprop ro.product.cpu.abilist; getprop ro.product.model; pm path $PHONE_PKG 2>/dev/null && dumpsys package $PHONE_PKG | grep -m2 -E 'versionCode=|versionName='" 2>/dev/null) || [[ -n $out ]] || return 1
   out=${out//$'\r'/}
   { read -r P_SDK; read -r P_ANDROID; read -r P_ABIS; read -r model; } <<<"$out"
   [[ $P_SDK =~ ^[0-9]+$ ]] || return 1
-  P_HAS="" P_HAS_CODE=""
+  P_HAS="" P_HAS_CODE="" P_SPLITS=""
   [[ $out =~ versionCode=([0-9]+) ]] && P_HAS_CODE=${BASH_REMATCH[1]}
   [[ $out =~ versionName=([^[:space:]]+) ]] && P_HAS=${BASH_REMATCH[1]}
   [[ -n $P_HAS_CODE && -z $P_HAS ]] && P_HAS="(build $P_HAS_CODE)"
+  while IFS= read -r l; do
+    [[ $l =~ /split_room_([a-z0-9_]+)\.apk$ ]] && P_SPLITS+="${P_SPLITS:+ }${BASH_REMATCH[1]}"
+  done <<<"$out"
   [[ -n $model && $PHONE != emulator-* ]] && PHONE_NAME=$model
   return 0
 }
 
-mb() { REPLY="$((($1 + 524288) / 1048576)) MB"; } # mb BYTES
+mb() { if (($1 < 1048576)); then REPLY="$((($1 + 512) / 1024)) KB"; else REPLY="$((($1 + 524288) / 1048576)) MB"; fi; } # mb BYTES
 yours() { if [[ $1 == "the "* ]]; then REPLY=$1; else REPLY="your $1"; fi; } # "your Pixel 9a", "the emulator"
-
-phone_download() { # phone_download BASE FILE: the release's APK, checked against its sha256
-  local f=$2 sum="${REL[sha256]}"
-  mkdir -p "$PHONE_CACHE" || return 1
-  if [[ -f $f ]] && echo "$sum  $f" | sha256sum -c - >/dev/null 2>&1; then
-    note_out "already here $SEP sha256 ok"
-    return 0
-  fi
-  rm -f "$PHONE_CACHE"/tubcal-phone-*.apk "$PHONE_CACHE"/tubcal-phone-*.part
-  curl -fL --retry 3 --progress-bar -o "$f.part" "$1/tubcal-phone.apk" || return 1
-  if ! echo "$sum  $f.part" | sha256sum -c - >/dev/null 2>&1; then
-    rm -f "$f.part"
-    echo "the download doesn't match its checksum; run this again"
-    return 1
-  fi
-  mv "$f.part" "$f"
-  mb "$(stat -c %s "$f" 2>/dev/null || wc -c <"$f")"
-  note_out "$REPLY $SEP sha256 ok"
-}
-
-phone_push() { # phone_push APK: adb install, keeping the app's data (unless --replace)
-  local out
-  if ((REPLACE)) && [[ -n $P_HAS ]]; then
-    "$ADB" -s "$PHONE" uninstall "$PHONE_PKG" || return 1
-  fi
-  # (some adb builds log their own internals to stderr: "I0000 … adb_install.cpp")
-  out=$("$ADB" -s "$PHONE" install -r "$1" 2>&1 | grep -vE '^(I[0-9]{4} |WARNING: All log messages)' | tee /dev/stderr)
-  if [[ $out == *Success* && $out != *Failure* ]]; then
-    note_out "${REL[version]:-installed}"
-    return 0
-  fi
-  phone_failure "$out" >"$WHY_FILE"
-  return 1
-}
 
 phone_failure() { # phone_failure ADB-OUTPUT → stdout: what went wrong, in words
   local f
   case $1 in
-    *UPDATE_INCOMPATIBLE*|*SHARED_USER_INCOMPATIBLE*|*"signatures do not match"*)
+    *UPDATE_INCOMPATIBLE*|*SHARED_USER_INCOMPATIBLE*|*"signatures do not match"*|*INCONSISTENT_CERTIFICATES*)
       echo "The Tubcal already on the phone was signed with a different key (a build"
       echo "of your own?), so it can't be updated in place. \`tubcal phone --replace\`"
       echo "uninstalls it first, which deletes Tubcal's data on the phone." ;;
@@ -1821,89 +1832,303 @@ phone_failure() { # phone_failure ADB-OUTPUT → stdout: what went wrong, in wor
   esac
 }
 
-# phone_put: Tubcal for Android on the phone phone_ready found: the latest
-# release (or --apk FILE), unless it's already there.
-phone_put() {
-  local apk base label
-  if ! phone_facts; then
+# phone_check: what's on the phone, the release and whether it fits it; under
+# --phone, said as it's found. → NEED_APK: 0 when the phone has this release
+# (or a newer one) already.
+phone_check() {
+  local base
+  if [[ -z $P_SDK ]] && ! phone_facts; then
     say "Couldn't read ${PHONE_NAME}'s details over adb."
     say "Unplug it, plug it back in and try again."
     return 1
   fi
   android_name "$P_SDK"; local android="Android ${P_ANDROID:-$REPLY}"
   yours "$PHONE_NAME"; local on=$REPLY # "your Pixel 9a"
-  if [[ -n $APK_FILE ]]; then
-    apk=$APK_FILE label="Installing $(basename "$APK_FILE") on $on"
-  else
-    if ! phone_release; then
-      if phone_base; then base="$REPLY/tubcal-phone.txt"; else base="nowhere: TUBCAL_REPO isn't on GitHub (set TUBCAL_PHONE_URL)"; fi
-      say "Couldn't get Tubcal for Android's release details from"
-      note "$base"
-      note "Check this computer's internet connection and try again."
+  if ! phone_release; then
+    if [[ -n $APK_FILE ]]; then base="$APK_FILE/tubcal-phone.txt (a folder android/tools/release.sh wrote?)"
+    elif phone_base; then base="$REPLY/tubcal-phone.txt"
+    else base="nowhere: TUBCAL_REPO isn't on GitHub (set TUBCAL_PHONE_URL)"; fi
+    say "Couldn't get Tubcal for Android's release details from"
+    note "$base"
+    [[ -n $APK_FILE ]] || note "Check this computer's internet connection and try again."
+    return 1
+  fi
+  if [[ -z ${REL[rooms]+set} ]]; then
+    say "That release of Tubcal for Android is from before its rooms were split up,"
+    say "so this installer can't put it on. Publish a newer one (android/tools/release.sh)."
+    return 1
+  fi
+  if ((P_SDK < ${REL[min_sdk]:-26})); then
+    android_name "${REL[min_sdk]:-26}"
+    say "Tubcal for Android needs Android $REPLY or newer, and $on has $android."
+    return 1
+  fi
+  if [[ -n ${REL[abis]:-} ]]; then
+    local a fits=0
+    for a in ${P_ABIS//,/ }; do [[ " ${REL[abis]} " == *" $a "* ]] && fits=1; done
+    if ((!fits)); then
+      say "Tubcal for Android is built for ${REL[abis]// / and } processors, and"
+      say "$on has ${P_ABIS%%,*}."
       return 1
-    fi
-    phone_base; base=$REPLY
-    if ((P_SDK < ${REL[min_sdk]:-26})); then
-      android_name "${REL[min_sdk]:-26}"
-      say "Tubcal for Android needs Android $REPLY or newer, and $on has $android."
-      return 1
-    fi
-    if [[ -n ${REL[abis]:-} ]]; then
-      local a fits=0
-      for a in ${P_ABIS//,/ }; do [[ " ${REL[abis]} " == *" $a "* ]] && fits=1; done
-      if ((!fits)); then
-        say "Tubcal for Android is built for ${REL[abis]// / and } processors, and"
-        say "$on has ${P_ABIS%%,*}."
-        return 1
-      fi
     fi
   fi
   if [[ $MODE == phone ]]; then
     kv "Phone" "$PHONE_NAME $SEP $android $SEP ${P_ABIS%%,*}"
     if [[ -n $P_HAS ]]; then kv "On it" "Tubcal $P_HAS"; else kv "On it" "no Tubcal yet"; fi
-    if [[ -z $APK_FILE ]]; then mb "${REL[size]:-0}"; kv "Release" "Tubcal for Android ${REL[version]} $SEP $REPLY"; fi
-    printf '\n'
+    mb "${REL[size]:-0}"; kv "Release" "Tubcal for Android ${REL[version]} $SEP $REPLY without rooms"
   fi
-  if [[ -z $APK_FILE && -n $P_HAS_CODE ]] && ((!REPLACE)); then
-    if ((P_HAS_CODE == ${REL[code]})); then
-      step_done "Tubcal for Android ${REL[version]}" "already on $on"
-      return 0
-    elif ((P_HAS_CODE > ${REL[code]})); then
-      step_done "Tubcal for Android" "${on^} has a newer one ($P_HAS)"
-      return 0
+  NEED_APK=1
+  if [[ -n $P_HAS_CODE ]] && ((!REPLACE && P_HAS_CODE >= ${REL[code]})); then NEED_APK=0; fi
+  return 0
+}
+
+# ── the phone's rooms ────────────────────────────────────────────────────────
+#
+# The phone picks its rooms the way this computer does: the same manifest, menu,
+# needs and flags, less the rooms the Android app doesn't have (`phone = no`).
+# Each room is a split APK (room_<id>) beside the core APK, so a room is on the
+# phone exactly when its split is installed: `pm path` says which are, and the
+# app finds its rooms' files the same way.
+
+P_BEFORE="" P_FROM="" P_WANT="" P_PUT=0 P_CHANGED=0 P_RESTARTED=0 NEED_APK=1
+
+phone_can() { [[ ${MAN[$1.phone]:-} != no ]]; } # can the phone app have this room?
+phone_split() { [[ -n $P_HAS_CODE ]] && ((P_HAS_CODE >= PHONE_SPLIT_SINCE)); } # rooms as splits?
+
+# phone_choices → ON[]: the phone's rooms. The ones installed on it; a Tubcal
+# from before rooms were splits has every room; a phone without Tubcal starts
+# from this computer's rooms (or the defaults, with no install here). Then
+# --rooms, --with, --without, --add and --remove. → P_BEFORE: the rooms the
+# phone has now.
+phone_choices() {
+  local id w
+  for id in "${MOD_IDS[@]}" "${OPTS[@]}"; do LOCKED[$id]=0; done
+  if [[ -n $P_HAS ]] && phone_split; then
+    P_FROM=phone
+    for id in "${MOD_IDS[@]}"; do if [[ " $P_SPLITS " == *" $id "* ]]; then ON[$id]=1; else ON[$id]=0; fi; done
+  elif [[ -n $P_HAS ]]; then
+    P_FROM=all
+    for id in "${MOD_IDS[@]}"; do ON[$id]=1; done
+  else
+    load_previous
+    if ((PREV_LOADED)); then P_FROM=computer; else P_FROM=defaults; fi
+    for id in "${MOD_IDS[@]}"; do
+      [[ -n ${ON[$id]:-} ]] && continue
+      case $id in archive|github) ON[$id]=0 ;; *) ON[$id]=1 ;; esac # as in a fresh clone
+    done
+  fi
+  for id in "${MOD_IDS[@]}"; do phone_can "$id" || ON[$id]=0 LOCKED[$id]=1; done
+  P_BEFORE=""
+  [[ -n $P_HAS ]] && { rooms_on; P_BEFORE=$REPLY; }
+  apply_force
+  for w in "${CHANGE_ADD[@]}"; do module_id "$w"; mod_on "$REPLY"; done
+  for w in "${CHANGE_REMOVE[@]}"; do module_id "$w"; mod_off "$REPLY"; done
+  rooms_on || die "That would leave the phone no rooms at all." "Keep one, or uninstall Tubcal on the phone itself."
+}
+
+phone_flagged() { [[ -n $EXACT ]] || ((${#FORCE[@]} + ${#CHANGE_ADD[@]} + ${#CHANGE_REMOVE[@]})); }
+
+# phone_words: the rooms named in flags are rooms the phone app has (checked
+# before waiting for the phone).
+phone_words() {
+  local w
+  for w in $EXACT "${CHANGE_ADD[@]}" "${CHANGE_REMOVE[@]}" "${!FORCE[@]}"; do
+    case $w in desktop|autostart|extras|3d) die "\`$w\` is an option for this computer; the phone only has rooms." ;; esac
+    module_id "$w" || bad_room "$w"
+  done
+  for w in $EXACT "${CHANGE_ADD[@]}"; do
+    module_id "$w"; phone_can "$REPLY" || die "${MAN[$REPLY.name]} isn't in the phone app."
+  done
+  for w in "${!FORCE[@]}"; do
+    ((FORCE[$w])) || continue
+    module_id "$w"; phone_can "$REPLY" || die "${MAN[$REPLY.name]} isn't in the phone app."
+  done
+}
+
+# phone_programme: the menu (or, with room flags or no terminal, the list), and
+# what that changes on a phone that has Tubcal already.
+phone_programme() {
+  local before=" $P_BEFORE " after id added=() removed=()
+  if phone_flagged || ((!CAN_ASK)); then
+    rule "PROGRAMME"
+    _menu_static
+    [[ $P_FROM == computer ]] && note "Starting from the rooms this computer has."
+  else
+    choose_components
+  fi
+  phone_rooms_on; P_WANT=$REPLY
+  [[ -n $P_HAS ]] || return 0
+  rooms_on; after=" $REPLY "
+  for id in "${MOD_IDS[@]}"; do
+    if [[ $before != *" $id "* && $after == *" $id "* ]]; then added+=("$id")
+    elif [[ $before == *" $id "* && $after != *" $id "* ]]; then removed+=("$id"); fi
+  done
+  if ((${#added[@]})); then room_names "${added[@]}"; kv "Adding" "$REPLY"; fi
+  if ((${#removed[@]})); then
+    room_names "${removed[@]}"; kv "Removing" "$REPLY"
+    note "Their files leave the phone. What you saved, followed and watched there"
+    note "stays in Tubcal's data on the phone and comes back if you add them again."
+  fi
+  # --add / --remove that change nothing: said, and nothing else is done
+  if ((${#CHANGE_ADD[@]} + ${#CHANGE_REMOVE[@]} && ${#added[@]} + ${#removed[@]} == 0)); then
+    local w
+    printf '\n'
+    for w in "${CHANGE_ADD[@]}"; do module_id "$w"; room_names "$REPLY"; say "$REPLY is already on the phone."; done
+    for w in "${CHANGE_REMOVE[@]}"; do module_id "$w"; room_names "$REPLY"; say "$REPLY isn't on the phone."; done
+    printf '\n'
+    exit 0
+  fi
+  # --add / --remove brought others along (a room comes and goes with what it needs)
+  if ((${#CHANGE_ADD[@]} + ${#CHANGE_REMOVE[@]})); then
+    local w asked=" " implied=()
+    for w in "${CHANGE_ADD[@]}" "${CHANGE_REMOVE[@]}"; do module_id "$w"; asked+="$REPLY "; done
+    for id in "${added[@]}" "${removed[@]}"; do [[ $asked == *" $id "* ]] || implied+=("$id"); done
+    if ((${#implied[@]})); then
+      room_names "${implied[@]}"
+      note "$REPLY $( ((${#implied[@]} == 1)) && echo goes || echo go) along: a room comes and goes with the rooms it needs."
+      if ((CAN_ASK)) && ! ask "Go ahead?" Y; then printf '\n'; exit 0; fi
     fi
+  fi
+}
+
+phone_rooms_on() { # → REPLY: the chosen rooms the phone app can have
+  local id out=()
+  for id in "${MOD_IDS[@]}"; do ((ON[$id])) && phone_can "$id" && out+=("$id"); done
+  REPLY="${out[*]}"
+}
+
+# phone_stream SESSION NAME FILE SHA256 SIZE (a step): one APK from the release
+# into the install session, streamed (no copy on this computer), its checksum
+# taken on the way and checked before the session is committed.
+phone_stream() {
+  local sum out i
+  sum=$(mktemp "${TMPDIR:-/tmp}/tubcal-sum.XXXXXX")
+  phone_base
+  out=$(curl -fsSL --retry 3 "$REPLY/$3" | tee >(sha256sum | cut -c1-64 >"$sum") |
+    "$ADB" -s "$PHONE" shell "pm install-write -S $5 $1 $2 -" 2>&1)
+  for i in {1..50}; do [[ -s $sum ]] && break; sleep 0.1; done
+  local got
+  got=$(<"$sum"); rm -f "$sum"
+  if [[ $out != *Success* ]]; then echo "${out:-the download or the phone stopped}"; return 1; fi
+  if [[ $got != "$4" ]]; then echo "$3 doesn't match its checksum; run this again"; return 1; fi
+  mb "$5"; note_out "$REPLY $SEP sha256 ok"
+}
+
+phone_commit() { # phone_commit SESSION (a step): install what the session holds
+  local out
+  # (some adb builds log their own internals to stderr: "I0000 … adb_install.cpp")
+  out=$("$ADB" -s "$PHONE" shell pm install-commit "$1" 2>&1 | grep -vE '^(I[0-9]{4} |WARNING: All log messages)')
+  echo "$out"
+  if [[ $out == *Success* && $out != *Failure* ]]; then note_out "${REL[version]:-done}"; return 0; fi
+  phone_failure "$out" >"$WHY_FILE"
+  return 1
+}
+
+phone_size() { # phone_size ROOM → REPLY: its split's size in bytes (0 when the release lacks it)
+  local v=${REL[room.$1]:-}
+  REPLY=${v#* }
+  [[ -n $v ]] || REPLY=0
+}
+
+# phone_put: the release onto the phone phone_check looked at. A phone without
+# this release gets the core APK and the chosen rooms' splits in one session; a
+# phone that has it only gets the rooms added and taken away. → P_PUT=1 when the
+# core went on, P_CHANGED=1 when only the rooms changed.
+phone_put() {
+  local id add=() remove=() sid out running label n
+  yours "$PHONE_NAME"; local on=$REPLY
+  for id in $P_WANT; do
+    [[ -n ${REL[room.$id]:-} ]] || { say "The release has no ${MAN[$id.name]:-$id}, so it can't go on the phone."; return 1; }
+  done
+  if ((!NEED_APK)); then
+    phone_split || P_SPLITS="" # a Tubcal from before rooms were splits has none to take away
+    for id in $P_WANT; do [[ " $P_SPLITS " == *" $id "* ]] || add+=("$id"); done
+    for id in $P_SPLITS; do [[ " $P_WANT " == *" $id "* ]] || remove+=("$id"); done
+    if ((P_HAS_CODE == ${REL[code]})); then step_done "Tubcal for Android ${REL[version]}" "already on $on"
+    else step_done "Tubcal for Android" "${on^} has a newer one ($P_HAS)"; fi
+    if ((${#add[@]})) && ((P_HAS_CODE != ${REL[code]})); then
+      room_names "${add[@]}"
+      say "$REPLY can't be added from this release: a room has to match the version"
+      say "of the Tubcal on the phone ($P_HAS), and the release is ${REL[version]}."
+      return 1
+    fi
+    ((${#add[@]} + ${#remove[@]})) || return 0
   fi
   if ((REPLACE)) && [[ -n $P_HAS ]]; then
     say "--replace uninstalls the Tubcal on $on first, and with it the"
     say "phone's Tubcal data: subscriptions, sign-ins, history and saved things."
     if ((CAN_ASK)) && ! ask "Replace it?" N; then return 1; fi
+    "$ADB" -s "$PHONE" uninstall "$PHONE_PKG" >/dev/null 2>&1 || { say "Couldn't uninstall the Tubcal on $on."; return 1; }
   fi
-  if [[ -z $APK_FILE ]]; then
-    apk="$PHONE_CACHE/tubcal-phone-${REL[version]}.apk"
-    run "Downloading Tubcal for Android ${REL[version]}" phone_download "$base" "$apk" || {
-      say "The download failed. Check this computer's internet connection and try again."
-      return 1
-    }
-    label="Installing it on $on"
-    [[ -n $P_HAS ]] && label="Updating Tubcal on $on (was $P_HAS)"
+  running=$(adbq -s "$PHONE" shell pidof "$PHONE_PKG" 2>/dev/null | tr -d '\r')
+  # a session: the whole app, or (keeping the core) only the rooms that change
+  if ((NEED_APK)); then out=$(adbq -s "$PHONE" shell pm install-create -r 2>&1)
+  else out=$(adbq -s "$PHONE" shell pm install-create -p "$PHONE_PKG" 2>&1); fi
+  [[ $out =~ \[([0-9]+)\] ]] || { say "The phone wouldn't start an install: ${out:-no answer}"; return 1; }
+  sid=${BASH_REMATCH[1]}
+  if ((NEED_APK)); then
+    label="Tubcal for Android ${REL[version]}"
+    run "$label" phone_stream "$sid" base.apk tubcal-phone-core.apk "${REL[sha256]}" "${REL[size]}" || { phone_abandon "$sid"; return 1; }
+    add=($P_WANT)
   fi
+  for id in "${add[@]}"; do
+    phone_size "$id"; n=$REPLY
+    run "${MAN[$id.name]}" phone_stream "$sid" "room_$id.apk" "tubcal-phone-room-$id.apk" "${REL[room.$id]%% *}" "$n" ||
+      { phone_abandon "$sid"; return 1; }
+  done
+  for id in "${remove[@]}"; do
+    out=$(adbq -s "$PHONE" shell pm install-remove "$sid" "room_$id" 2>&1)
+    [[ $out == *Success* ]] || { say "The phone wouldn't take ${MAN[$id.name]} away: $out"; phone_abandon "$sid"; return 1; }
+  done
+  if ((NEED_APK)); then label="Installing it on $on"; [[ -n $P_HAS ]] && label="Updating Tubcal on $on (was $P_HAS)"
+  else label="Changing the rooms on $on"; fi
   ((REPLACE)) && [[ -n $P_HAS ]] && label="Replacing the Tubcal on $on"
   : >"$WHY_FILE"
   note "If the phone asks about installing Tubcal, allow it."
-  if ! run --soft "$label" phone_push "$apk"; then
+  if ! run --soft "$label" phone_commit "$sid"; then
     local l
     while IFS= read -r l; do say "$l"; done <"$WHY_FILE"
+    phone_abandon "$sid"
     return 1
   fi
-  # The copy downloaded is on the phone now; the next one is downloaded fresh.
-  [[ -z $APK_FILE ]] && rm -f "$apk"
+  if ((NEED_APK)); then P_PUT=1; else P_CHANGED=1; fi
+  # Android stopped the app to change it; one that was open opens again
+  if [[ -n $running ]] && adbq -s "$PHONE" shell am start -n "$PHONE_PKG/.MainActivity" >/dev/null 2>&1; then P_RESTARTED=1; fi
   return 0
 }
 
+phone_abandon() { adbq -s "$PHONE" shell pm install-abandon "$1" >/dev/null 2>&1; return 0; } # phone_abandon SESSION
+
+# phone_list (--phone --list): the phone's rooms, by channel.
+phone_list() {
+  local ch id box alias
+  printf '\n'
+  for ch in social coding video; do
+    printf '  %s%s%s\n' "$DIM" "${ch^^}" "$RST"
+    for id in "${MOD_IDS[@]}"; do
+      [[ ${MAN[$id.channel]} == "$ch" ]] && phone_can "$id" || continue
+      if [[ -z $P_HAS ]]; then box=" "; elif ((ON[$id])); then box="$GOOD$G_ON$RST"; else box="$DIM$G_OFF$RST"; fi
+      alias=${MAN[$id.aliases]:-}
+      printf '   %s  %-20s %-11s %s%s%s\n' "$box" "${MAN[$id.name]}" "$id" "$DIM" "${alias:+also: ${alias// /, }}" "$RST"
+    done
+  done
+  printf '\n'
+  if [[ -z $P_HAS ]]; then
+    yours "$PHONE_NAME"; note "There's no Tubcal on $REPLY yet: \`tubcal phone\` puts it there."
+  else
+    note "$G_ON on the phone   $G_OFF not on it"
+    [[ $P_FROM == all ]] && note "This Tubcal is from before rooms could be picked, so it has them all."
+    note "tubcal phone add ROOM   tubcal phone remove ROOM   (its id or any of its names)"
+  fi
+  printf '\n'
+}
+
 # During an install: a phone that's plugged in is offered Tubcal for Android.
+# A new one gets the rooms just picked for this computer; one that has Tubcal
+# keeps its own.
 phone_offer() {
   [[ $MODE == install ]] || return 0
-  local t
+  local t id
   for t in 1 2 3 4; do # adb's first look at a phone can lag by a second
     phone_scan
     [[ " ${P_STATE[*]} " == *" connecting "* ]] || break
@@ -1927,29 +2152,54 @@ phone_offer() {
     if [[ $name == "the emulator" ]]; then q="The Android emulator is running."
     elif [[ -n $name ]]; then q="Your $name is plugged in."
     else q="A phone is plugged in."; fi
-    q+=" Put Tubcal for Android on it too?"
+    q+=" Put Tubcal for Android on it too, with the same rooms?"
   fi
   ask "$q" Y || return 0
-  phone_ready && phone_put && PHONE_DONE=$PHONE_NAME
+  phone_ready && phone_check || return 0
+  if [[ -z $P_HAS ]]; then phone_rooms_on # this computer's rooms
+  elif phone_split; then REPLY=$P_SPLITS
+  else REPLY=""; for id in "${MOD_IDS[@]}"; do phone_can "$id" && REPLY+="${REPLY:+ }$id"; done; fi
+  P_WANT=$REPLY
+  phone_put && PHONE_DONE=$PHONE_NAME
   return 0 # the phone never fails the install
 }
 
 do_phone() {
   detect_system
+  locate_app
+  load_manifest
   [[ -r $CONF ]] && PKGS_ADDED=$(. "$CONF" >/dev/null 2>&1; printf '%s' "${PKGS_ADDED:-}")
   if [[ -n $APK_FILE ]]; then
-    [[ -f $APK_FILE ]] || die "There's no file $APK_FILE."
-    APK_FILE=$(cd "$(dirname "$APK_FILE")" && pwd -P)/$(basename "$APK_FILE")
+    # a folder android/tools/release.sh wrote (or a file in it)
+    [[ -f $APK_FILE ]] && APK_FILE=$(dirname "$APK_FILE")
+    [[ -f $APK_FILE/tubcal-phone.txt ]] || die "There's no tubcal-phone.txt in $APK_FILE." \
+      "--apk takes the folder android/tools/release.sh --dry-run writes (android/app/build/release)."
+    APK_FILE=$(cd "$APK_FILE" && pwd -P)
   fi
+  phone_words
   printf '\n  %sTubcal%s %s for Android %s\n' "$BOLD$AMBER" "$RST" "$DIM" "$RST"
   rule "THE PHONE"
   phone_ready || { printf '\n'; exit 1; }
+  if ! phone_facts; then
+    say "Couldn't read ${PHONE_NAME}'s details over adb."
+    say "Unplug it, plug it back in and try again."
+    printf '\n'; exit 1
+  fi
+  phone_choices
+  if ((WANT_LIST)); then phone_list; return; fi
+  phone_check || { printf '\n'; exit 1; }
+  phone_programme
+  rule "ON THE FLOOR"
   phone_put || { printf '\n'; exit 1; }
-  if [[ -n $P_HAS_CODE && -z $APK_FILE ]] && ((P_HAS_CODE >= ${REL[code]:-0} && !REPLACE)); then printf '\n'; return; fi
-  yours "$PHONE_NAME"
-  printf '\n  %s%s%s Tubcal for Android%s is on %s. Open it from the app drawer.\n' "$GOOD" "$G_OK" "$RST" \
-    "${REL[version]:+ ${REL[version]}}" "$REPLY"
-  note "It keeps its own subscriptions and sign-ins, separate from this computer's."
+  yours "$PHONE_NAME"; local on=$REPLY
+  if ((P_PUT)); then
+    printf '\n  %s%s%s Tubcal for Android%s is on %s. Open it from the app drawer.\n' "$GOOD" "$G_OK" "$RST" \
+      "${REL[version]:+ ${REL[version]}}" "$on"
+    note "It keeps its own subscriptions and sign-ins, separate from this computer's."
+  elif ((P_CHANGED)); then
+    printf '\n  %s%s%s The rooms on %s are changed.\n' "$GOOD" "$G_OK" "$RST" "$on"
+    ((P_RESTARTED)) || note "Tubcal there starts with them the next time it opens."
+  fi
   printf '\n'
 }
 
@@ -2364,6 +2614,7 @@ extras = edition
 groups =
 tools =
 packages =
+phone_pip =
 
 [hackernews]
 name = The Wire
@@ -2376,6 +2627,7 @@ extras =
 groups =
 tools =
 packages =
+phone_pip =
 
 # Not a room: a page of the Wire's, shown in the Social bar with 3D objects on.
 [topics]
@@ -2389,6 +2641,7 @@ extras =
 groups =
 tools =
 packages =
+phone = no
 
 [reddit]
 name = The Dispatch
@@ -2401,6 +2654,7 @@ extras =
 groups =
 tools =
 packages =
+phone_pip =
 
 [editor]
 name = The Composing Room
@@ -2413,6 +2667,7 @@ extras = editor
 groups =
 tools =
 packages = ripgrep
+phone = no
 
 [dev]
 name = The Workbench
@@ -2425,6 +2680,7 @@ extras =
 groups =
 tools =
 packages =
+phone_pip =
 
 [github]
 name = GitHub
@@ -2437,6 +2693,7 @@ extras =
 groups =
 tools =
 packages =
+phone_pip =
 
 [youtube]
 name = The Screening Room
@@ -2449,6 +2706,7 @@ extras =
 groups =
 tools = yt-dlp
 packages = notify
+phone_pip = yt-dlp
 
 [anime]
 name = The Anime
@@ -2461,6 +2719,7 @@ extras =
 groups = anime
 tools =
 packages =
+phone_pip = beautifulsoup4 dataclasses-json m3u8 pycountry simpleeval
 
 [archive]
 name = The Archive
@@ -2473,6 +2732,7 @@ extras = brain
 groups =
 tools =
 packages =
+phone_pip =
 MODULES_INI
 }
 

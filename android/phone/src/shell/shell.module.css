@@ -119,7 +119,7 @@
   bottom: 0;
   z-index: 40;
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(var(--tn, 5), 1fr); /* --tn: the tabs this phone's rooms make */
   padding: 4px max(6px, var(--sa-left)) calc(4px + var(--sa-bottom)) max(6px, var(--sa-right));
   background: color-mix(in srgb, var(--ink-2, var(--ink)) 94%, transparent);
   backdrop-filter: blur(16px) saturate(1.2);
@@ -182,7 +182,7 @@
   inset: 0 auto 0 0;
   display: grid;
   place-items: center;
-  width: 20%;
+  width: calc(100% / var(--tn, 5));
   transform: translate3d(calc(var(--ti) * 100%), 0, 0);
   transition: transform 0.55s var(--e-spring), opacity 0.25s ease;
 }

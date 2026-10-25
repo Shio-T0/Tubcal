@@ -293,3 +293,133 @@ def test_a_new_database_without_a_choice_keeps_the_defaults(only):
     assert db.note_modules(["github", "hackernews"], chosen=False) == []
     assert "github" not in db.get_setting("active_rooms")  # GitHub ships off
     assert db.note_modules(["github", "hackernews", "edition"]) == ["edition"]  # later additions still count
+
+
+# ── the phone ─────────────────────────────────────────────────────────────────
+#
+# The Android app packs modules.ini inside server/ (no checkout there) and
+# imports its files from the APK. Each room is a split APK of its own beside the
+# core one (android/tools/rooms.py); android_main.py puts the installed rooms'
+# files on the import path, so a room is there exactly when its split is.
+
+def _android_main():
+    import importlib.util
+    path = ROOT / "android/app/src/main/python/android_main.py"
+    spec = importlib.util.spec_from_file_location("android_main", path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def test_the_phone_app_has_every_room_but_those_marked_off():
+    phoneless = sorted(m for m, row in MANIFEST.items() if not modules.on_phone(row))
+    assert phoneless == ["editor", "topics"]  # the Composing Room; By topic needs 3D objects
+    for mid in phoneless:
+        assert mid not in {n for row in MANIFEST.values() if modules.on_phone(row) for n in row["needs"]}
+
+
+def test_a_packed_manifest_counts_importable_files(monkeypatch):
+    """No modules.ini on disk: the copy inside the server package, and a module is
+    there when its server files import (Chaquopy reads them from the APK)."""
+    text = (ROOT / "modules.ini").read_text()
+    monkeypatch.setattr(modules, "MANIFEST", ROOT / "nowhere" / "modules.ini")
+    monkeypatch.setattr(modules.pkgutil, "get_data", lambda pkg, name: text.encode() if (pkg, name) == ("server", "modules.ini") else None)
+    monkeypatch.setattr(modules, "_present", lambda m: False)  # nothing "on disk"
+    monkeypatch.setenv("TUBCAL_MODULES", "hackernews,edition,youtube")
+    modules.reload()
+    try:
+        assert modules.known() == list(MANIFEST)
+        assert modules.installed() == ["edition", "hackernews", "youtube"]
+        # a module whose files don't import isn't there
+        assert not modules._importable({"paths": ["server/api/not_a_file.py"]})
+        assert modules._importable(MANIFEST["editor"])  # a package folder: server/editor/
+    finally:
+        monkeypatch.delenv("TUBCAL_MODULES")
+        modules.reload()
+
+
+def test_without_any_manifest_everything_is_here(monkeypatch):
+    monkeypatch.setattr(modules, "MANIFEST", ROOT / "nowhere" / "modules.ini")
+    monkeypatch.setattr(modules, "_packed_manifest", lambda: None)
+    modules.reload()
+    try:
+        assert modules.has("youtube") and modules.installed() == [] and modules.known() == []
+    finally:
+        modules.reload()
+
+
+def test_the_phone_loads_the_rooms_installed(tmp_path, monkeypatch):
+    """A room's split puts its files in rooms/<id>/ (TubcalService copies them
+    there): its packages join sys.path, its server files the server packages."""
+    import sys
+    import server.api
+    am = _android_main()
+    room = tmp_path / "rooms" / "zzroom"
+    (room / "server" / "api").mkdir(parents=True)
+    (room / "server" / "api" / "zz_room_api.py").write_text("ANSWER = 42\n")
+    (room / "zzroompkg").mkdir()
+    (room / "zzroompkg" / "__init__.py").write_text("NAME = 'zz'\n")
+    monkeypatch.setattr(sys, "path", list(sys.path))
+    for pkg in ("server", "server.api"):
+        monkeypatch.setattr(sys.modules[pkg], "__path__", list(sys.modules[pkg].__path__))
+    try:
+        assert am.add_rooms(tmp_path / "rooms") == ["zzroom"]
+        import importlib
+        assert importlib.import_module("server.api.zz_room_api").ANSWER == 42
+        assert importlib.import_module("zzroompkg").NAME == "zz"
+        assert am.add_rooms(None) == []  # no rooms folder: the core alone
+    finally:
+        for name in ("server.api.zz_room_api", "zzroompkg"):
+            sys.modules.pop(name, None)
+
+
+def _resolve_phone_js(src, spec):
+    if spec.startswith("@pc/"):
+        return _resolve_js(ROOT / "frontend/src/x.js", "./" + spec[4:])
+    return _resolve_js(src, spec)
+
+
+PHONE_IMPORT = re.compile(
+    r"""^\s*(?:import|export)\s(?:[^'"]*?\sfrom\s)?['"]((?:\.|@pc/)[^'"]+)['"]""", re.M)
+
+
+def test_the_phone_app_reaches_a_room_only_through_import():
+    """As on the desktop: a room's files are in its split APK, so nothing outside
+    the room imports them statically (phone/rooms.mjs fails the build too)."""
+    bad = []
+    src = ROOT / "android/phone/src"
+    for f in list(src.rglob("*.js")) + list(src.rglob("*.jsx")):
+        rel = f.relative_to(ROOT).as_posix()
+        mine = owner_of(rel)
+        for spec in PHONE_IMPORT.findall(f.read_text()):
+            target = _resolve_phone_js(f, spec)
+            if not may_import(mine, owner_of(target)):
+                bad.append(f"{rel} imports {target} ({owner_of(target)})")
+    assert not bad, "load it with moduleLazy / import() (@pc/lib/modules.js):\n" + "\n".join(bad)
+
+
+def test_a_room_takes_its_python_packages_to_the_phone():
+    """phone_pip names what a room's split carries; the core APK's pip list
+    (app/build.gradle.kts) has none of them."""
+    gradle = (ROOT / "android/app/build.gradle.kts").read_text()
+    core = set(re.findall(r'install\("([^"]+)"\)', gradle))
+    assert {"flask", "requests"} <= core
+    for mid, m in MANIFEST.items():
+        assert not set(m["phone_pip"]) & core, mid
+    assert MANIFEST["youtube"]["phone_pip"] == ["yt-dlp"]
+
+
+def test_the_phone_build_splits_the_rooms_out():
+    cfg = (ROOT / "android/phone/vite.config.js").read_text()
+    assert "modules({" in cfg and "rooms({" in cfg  # every phone room built, then set aside
+    gradle = (ROOT / "android/app/build.gradle.kts").read_text()
+    assert re.search(r'from\(File\(tubcalRoot, "modules\.ini"\)\) \{ into\("server"\) \}', gradle)
+    assert 'exclude(roomExcludes("server/"))' in gradle  # the core APK has no room's files
+    assert "finalizedBy(assembleRooms)" in gradle
+
+
+def test_a_phone_says_how_to_add_a_room_from_the_computer(only, monkeypatch):
+    c = only("hackernews")
+    monkeypatch.setattr(modules, "ADD_COMMAND", "tubcal phone add")
+    r = c.post("/api/subscriptions", json={"platform": "youtube", "input": "@x"})
+    assert "tubcal phone add youtube" in r.get_json()["error"]

@@ -24,7 +24,7 @@ import AddSubscriptionModal from '../components/modals/AddSubscriptionModal.jsx'
 import { useSettings, useSubscriptions, useToast } from '../state.jsx';
 import { THEMES, skinsFor } from '../lib/themes.js';
 import { ALL_FIXED, ALL_PAGES, ALL_ROOMS, CHANNELS, ROOMS, getRoomById, knownActiveIds } from '../lib/rooms.js';
-import { hasModule, missingModules, moduleLazy } from '../lib/modules.js';
+import { addCommand, hasModule, missingModules, moduleLazy } from '../lib/modules.js';
 import { latestParams } from '../lib/urlState.js';
 import { subtitleStyle, SUBTITLE_FONTS } from '../lib/subtitleStyle.js';
 import { SubtitleStyleEditor } from '../components/player/Subtitles.jsx';
@@ -591,7 +591,7 @@ function RoomsSection() {
           </Group>
         );
       })}
-      {!APP.phone && <NotInstalled />}
+      <NotInstalled />
     </>
   );
 }
@@ -605,11 +605,13 @@ function NotInstalled() {
   return (
     <Group
       title="Not installed"
-      note="These were left out when Tubcal was installed, so none of their files are on this machine. Add one from a terminal, then reload this page."
+      note={APP.phone
+        ? 'These were left out when Tubcal was put on this phone. To add one, plug the phone into your computer and run the command there, then open Tubcal again.'
+        : 'These were left out when Tubcal was installed, so none of their files are on this machine. Add one from a terminal, then reload this page.'}
     >
       {missing.map((room) => (
         <Row key={room.id} label={<span className={s.room} style={{ '--room-c': room.color }} data-off="">{room.label}</span>}>
-          <code className={s.cmd}>tubcal add {room.id}</code>
+          <code className={s.cmd}>{addCommand(room.id)}</code>
         </Row>
       ))}
     </Group>

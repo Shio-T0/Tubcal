@@ -165,7 +165,8 @@ curl -fsSL …/install.sh | bash -s -- --yes        # flags work through curl to
 | `tubcal rooms` | every room, and which ones are installed |
 | `tubcal add ROOM…` | add rooms you left out: downloads their files and packages, rebuilds, restarts |
 | `tubcal remove ROOM…` | take rooms out again; what you saved, followed and watched stays in your database |
-| `tubcal phone` | put Tubcal for Android on a phone plugged in over USB, or update it ([On a phone](#-on-a-phone)) |
+| `tubcal phone` | put Tubcal for Android on a phone plugged in over USB, or update it, with the rooms you pick for it ([On a phone](#-on-a-phone)) |
+| `tubcal phone rooms` · `add ROOM…` · `remove ROOM…` | the same as `rooms`, `add` and `remove`, for the phone |
 | `tubcal autostart on\|off` | start at login, or don't |
 | `tubcal uninstall` | remove the launcher, menu entry, service and the private tools |
 
@@ -549,12 +550,22 @@ tubcal phone
 ```
 
 It finds the phone (and waits while you tap Allow on its "Allow USB debugging?"
-question), downloads the latest release from GitHub, checks its SHA-256, and
-installs it with adb, or updates the copy already there. Without adb it offers your
-distro's package. If a phone is plugged in while `install.sh` runs, the installer
-asks whether to do the same. `tubcal phone --apk FILE` installs a build of your
-own instead. The app keeps its own data; `android/tools/sync-data.sh` copies yours
-across.
+question) and asks which rooms the phone gets. Then it streams the latest release
+from GitHub straight to the phone over adb: the core app plus the APKs of the
+chosen rooms, each checked against its SHA-256. Nothing is saved on your computer.
+It installs Tubcal, or updates the copy already there. Without adb it offers your distro's package. If a phone is plugged in while
+`install.sh` runs, the installer asks whether to do the same, with the rooms you
+just picked. `tubcal phone --apk DIR` installs a build of your own instead (the folder
+`android/tools/release.sh --dry-run` writes). The app
+keeps its own data; `android/tools/sync-data.sh` copies yours across.
+
+The phone's rooms work like the computer's: the same menu, and a room comes with
+the rooms it needs. The phone app has every room except the Composing Room and By
+topic. `tubcal phone rooms` lists what the phone has, and `tubcal phone add anime`
+or `tubcal phone remove reddit` changes it (`--rooms`, `--with` and `--without`
+work too). Each room is an APK of its own, so a room you leave out isn't on the
+phone at all, and adding or removing one installs or uninstalls only that room.
+An update brings the rooms the phone has.
 
 ## License
 
