@@ -325,6 +325,10 @@
   backdrop-filter: blur(4px);
   animation: fade 0.2s ease both;
 }
+/* a video played from the thread is up: out of sight, but kept (and its scroll) */
+.sheetAway {
+  visibility: hidden;
+}
 @keyframes fade {
   from {
     opacity: 0;

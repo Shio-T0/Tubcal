@@ -100,6 +100,13 @@
 .domain {
   color: color-mix(in srgb, var(--c-hn) 70%, var(--paper-dim));
 }
+/* a YouTube story: its headline plays in the Screening Room's player */
+.playMark {
+  display: inline-block;
+  margin-right: 5px;
+  vertical-align: -0.5px;
+  color: var(--c-youtube);
+}
 .readMark {
   color: color-mix(in srgb, var(--success, #6fae9f) 80%, var(--paper-faint));
 }

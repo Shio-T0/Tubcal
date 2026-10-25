@@ -2,10 +2,12 @@
 // it: rank, headline (straight to the article), where it's from, who and when,
 // points with a little heat gauge (points per hour, so a rising story reads
 // hot), and the comment count with how many arrived since you last read the
-// thread. Stories you've read go quiet. Pressing the line opens its discussion.
+// thread. Stories you've read go quiet. Pressing the line opens its discussion;
+// the headline of a YouTube story plays it in the player.
 
-import { Flame, MessageSquare } from 'lucide-react';
+import { Flame, MessageSquare, Play } from 'lucide-react';
 
+import { playableHere, usePlayLink } from '../player/watchLinks.js';
 import { SaveButton } from '../ui/ItemActions.jsx';
 import { compact, splitKind } from '../../lib/format.js';
 import { timeAgo } from '../../lib/time.js';
@@ -25,6 +27,8 @@ export default function StoryLine({ item, rank, open, onOpen, seen, fresh, tight
   const heat = heatOf(item);
   const domain = item.extra?.domain;
   const linkOut = item.url && !item.url.includes('news.ycombinator.com/item');
+  const video = linkOut && !!playableHere(item.url);
+  const playLink = usePlayLink();
   return (
     <div
       className={`${s.line} ${read ? s.lineRead : ''} ${open ? s.lineOpen : ''} ${tight ? s.tight : ''}`}
@@ -40,7 +44,14 @@ export default function StoryLine({ item, rank, open, onOpen, seen, fresh, tight
         <div className={s.headline}>
           {kind && <span className={s.kind}>{kind}</span>}
           {linkOut ? (
-            <a href={item.url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} title="Open the article">
+            <a
+              href={item.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => { e.stopPropagation(); playLink(item.url, e); }}
+              onKeyDown={(e) => { if (e.key === 'Enter') e.stopPropagation(); }}
+              title={video ? 'Play it here' : 'Open the article'}
+            >
               {rest}
             </a>
           ) : (
@@ -48,7 +59,7 @@ export default function StoryLine({ item, rank, open, onOpen, seen, fresh, tight
           )}
         </div>
         <div className={s.meta}>
-          {domain && <span className={s.domain}>{domain}</span>}
+          {domain && <span className={s.domain}>{video && <Play size={9} fill="currentColor" className={s.playMark} />}{domain}</span>}
           {!tight && item.author && <span>{item.author}</span>}
           {item.published_at ? <span>{timeAgo(item.published_at)}</span> : null}
           {read && <span className={s.readMark}>read</span>}

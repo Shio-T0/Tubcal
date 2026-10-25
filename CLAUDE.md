@@ -801,7 +801,13 @@ fold, fold-all, and comments new since your last visit marked with a chip that
 walks through them (`components/wire/seen.js`, localStorage `tubcal.wire.seen`).
 HN HTML goes through `HnHtml.jsx` (allow-list walk, ">" paragraphs drawn as quotes,
 HN item links opened in the reader). A story line is `components/wire/StoryLine.jsx`
-(shared with By topic). Tests: `tests/test_wire.py`.
+(shared with By topic). A YouTube link (a story's headline or reader button, a
+comment's, an Edition HN story's, a Reddit link post's) plays in the player through
+`usePlayLink`/`playableHere` (`components/player/watchLinks.js`, only with the
+Screening Room) once its details are in (history keeps its title and channel; a
+dead one offers YouTube instead); Ctrl/middle-click still go out. A `ReaderSheet`
+(z 60, over the player) hides while the player is expanded and leaves it Esc. Tests:
+`tests/test_wire.py`.
 
 **By topic** (`/hackernews/topics`, `pages/ByTopic.jsx`; the `topics` module, which needs
 the Wire; only with 3D objects on, otherwise one line saying so) sorts the front page's 100

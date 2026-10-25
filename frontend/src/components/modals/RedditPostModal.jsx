@@ -1,8 +1,9 @@
-import { ArrowUpRight, ExternalLink, MessageCircle, TrendingUp } from 'lucide-react';
+import { ArrowUpRight, ExternalLink, MessageCircle, Play, TrendingUp } from 'lucide-react';
 
 import { useApi } from '../../api/client.js';
 import { compact } from '../../lib/format.js';
 import { timeAgo } from '../../lib/time.js';
+import { playableHere, usePlayLink } from '../player/watchLinks.js';
 import { Spinner } from '../ui/index.jsx';
 import { SaveButton } from '../ui/ItemActions.jsx';
 import CommentThread from './CommentThread.jsx';
@@ -15,10 +16,12 @@ export default function RedditPostModal({ item, onClose }) {
     item ? `/reddit/post/${item.extra.subreddit}/${item.extra.post_id}` : '',
     !!item,
   );
+  const playLink = usePlayLink();
 
   if (!item) return null;
   const post = data?.post || item;
   const showImage = item.thumbnail && !item.extra.is_self;
+  const linkPlays = !!playableHere(item.extra.link_url);
 
   return (
     <Modal open={!!item} onClose={onClose} label={item.title} maxWidth={780}>
@@ -55,8 +58,10 @@ export default function RedditPostModal({ item, onClose }) {
             href={item.extra.link_url}
             target="_blank"
             rel="noopener noreferrer"
+            onClick={(e) => { if (playLink(item.extra.link_url, e)) onClose(); }}
+            title={linkPlays ? 'Play it here' : undefined}
           >
-            <ArrowUpRight size={13} />
+            {linkPlays ? <Play size={12} fill="currentColor" /> : <ArrowUpRight size={13} />}
             {item.extra.link_url.replace(/^https?:\/\/(www\.)?/, '').slice(0, 80)}
           </a>
         )}

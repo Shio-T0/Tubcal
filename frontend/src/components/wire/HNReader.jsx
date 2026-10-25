@@ -6,19 +6,21 @@
 // that branch), a quick "fold all" to skim the top-level takes, and — if you've
 // been here before — the comments that arrived since your last visit marked, with
 // a chip that walks you through them. Used beside the Wire's board, and as a
-// sheet over the Edition.
+// sheet over the Edition. A YouTube link, the story's or a comment's, plays in
+// the player.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  ArrowDownToLine, Bookmark, BookmarkCheck, ChevronsDownUp, ChevronsUpDown, ExternalLink, Link2, MessageSquare, X,
+  ArrowDownToLine, Bookmark, BookmarkCheck, ChevronsDownUp, ChevronsUpDown, ExternalLink, Link2, MessageSquare, Play, X,
 } from 'lucide-react';
 
 import { useApi } from '../../api/client.js';
 import { compact } from '../../lib/format.js';
 import { ago } from '../../lib/time.js';
-import { useSaved, useToast } from '../../state.jsx';
+import { usePlayer, useSaved, useToast } from '../../state.jsx';
 import { Receiving } from '../layout/Section.jsx';
+import { playableHere, usePlayLink } from '../player/watchLinks.js';
 import { HnHtml } from './HnHtml.jsx';
 import { lastVisit, visit } from './seen.js';
 import { splitKind } from '../../lib/format.js';
@@ -40,7 +42,7 @@ function flatten(nodes, out = []) {
   return out;
 }
 
-function Comment({ c, op, since, folded, onFold, onItem }) {
+function Comment({ c, op, since, folded, onFold, onItem, onLink }) {
   const isFolded = folded.has(c.id);
   const fresh = since && c.created_at > since;
   const below = countAll(c.children);
@@ -66,11 +68,11 @@ function Comment({ c, op, since, folded, onFold, onItem }) {
         </header>
         {!isFolded && (
           <>
-            <HnHtml html={c.body_html} onItem={onItem} />
+            <HnHtml html={c.body_html} onItem={onItem} onLink={onLink} />
             {c.children?.length > 0 && (
               <div className={r.children}>
                 {c.children.map((k) => (
-                  <Comment key={k.id} c={k} op={op} since={since} folded={folded} onFold={onFold} onItem={onItem} />
+                  <Comment key={k.id} c={k} op={op} since={since} folded={folded} onFold={onFold} onItem={onItem} onLink={onLink} />
                 ))}
               </div>
             )}
@@ -94,6 +96,7 @@ export function HNReader({ item, hnId: idProp, onClose, onItem, variant = 'pane'
   const [prev] = useState(() => lastVisit(hnId));
   const [folded, setFolded] = useState(() => new Set());
   const [walk, setWalk] = useState(0);
+  const playLink = usePlayLink();
 
   useEffect(() => {
     if (res.data) visit(hnId, res.data.story?.comments_count ?? countAll(res.data.comments));
@@ -107,6 +110,8 @@ export function HNReader({ item, hnId: idProp, onClose, onItem, variant = 'pane'
 
   const { kind, rest } = splitKind(story.title);
   const isLink = story.url && !story.url.includes('news.ycombinator.com/item');
+  const video = isLink && !!playableHere(story.url);
+  const watch = (e) => playLink(story.url, e);
   const hnUrl = `https://news.ycombinator.com/item?id=${hnId}`;
   const isSaved = !!saved[story.id];
   const total = comments ? countAll(comments) : story.comments_count;
@@ -147,7 +152,7 @@ export function HNReader({ item, hnId: idProp, onClose, onItem, variant = 'pane'
           )}
         </div>
         <h2 className={r.title}>
-          {isLink ? <a href={story.url} target="_blank" rel="noopener noreferrer">{rest}</a> : rest}
+          {isLink ? <a href={story.url} target="_blank" rel="noopener noreferrer" onClick={watch}>{rest}</a> : rest}
         </h2>
         <div className={r.meta}>
           {story.score != null && <span className={r.points}>▲ {compact(story.score)} points</span>}
@@ -157,9 +162,9 @@ export function HNReader({ item, hnId: idProp, onClose, onItem, variant = 'pane'
         </div>
         <div className={r.actions}>
           {isLink && (
-            <a className={r.primary} href={story.url} target="_blank" rel="noopener noreferrer">
-              Read the article <ExternalLink size={13} />
-              {story.extra?.domain && <em>{story.extra.domain}</em>}
+            <a className={r.primary} href={story.url} target="_blank" rel="noopener noreferrer" onClick={watch}>
+              {video ? <><Play size={12} fill="currentColor" /> Watch here</> : <>Read the article <ExternalLink size={13} /></>}
+              {!video && story.extra?.domain && <em>{story.extra.domain}</em>}
             </a>
           )}
           <button type="button" className={`${r.act} ${isSaved ? r.actOn : ''}`} onClick={() => toggleSaved(story)}>
@@ -168,7 +173,7 @@ export function HNReader({ item, hnId: idProp, onClose, onItem, variant = 'pane'
           <button type="button" className={r.act} onClick={copy} title="Copy the HN discussion link"><Link2 size={14} /> Link</button>
           <a className={r.act} href={hnUrl} target="_blank" rel="noopener noreferrer">HN <ExternalLink size={12} /></a>
         </div>
-        {story.text_html && <HnHtml html={story.text_html} className={r.text} onItem={onItem} />}
+        {story.text_html && <HnHtml html={story.text_html} className={r.text} onItem={onItem} onLink={playLink} />}
       </header>
 
       <div className={r.toolbar}>
@@ -192,7 +197,7 @@ export function HNReader({ item, hnId: idProp, onClose, onItem, variant = 'pane'
       {comments && comments.length > 0 && (
         <div className={r.thread}>
           {comments.map((c) => (
-            <Comment key={c.id} c={c} op={story.author} since={since} folded={folded} onFold={fold} onItem={onItem} />
+            <Comment key={c.id} c={c} op={story.author} since={since} folded={folded} onFold={fold} onItem={onItem} onLink={playLink} />
           ))}
         </div>
       )}
@@ -200,10 +205,15 @@ export function HNReader({ item, hnId: idProp, onClose, onItem, variant = 'pane'
   );
 }
 
-/** The reader as a sheet sliding over the page (the Edition, a narrow Wire). */
+/** The reader as a sheet sliding over the page (the Edition, a narrow Wire).
+ *  While a video played from it fills the screen, the sheet keeps out of sight
+ *  (your place in the thread kept) and leaves Esc to the player. */
 export function ReaderSheet({ item, hnId, onClose, onItem }) {
+  const { expandedId } = usePlayer();
+  const away = useRef(false);
+  useEffect(() => { away.current = !!expandedId; }, [expandedId]);
   useEffect(() => {
-    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    const onKey = (e) => { if (e.key === 'Escape' && !away.current) onClose(); };
     document.addEventListener('keydown', onKey);
     const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
@@ -213,7 +223,7 @@ export function ReaderSheet({ item, hnId, onClose, onItem }) {
     };
   }, [onClose]);
   return createPortal(
-    <div className={r.sheetBackdrop} onMouseDown={onClose}>
+    <div className={`${r.sheetBackdrop} ${expandedId ? r.sheetAway : ''}`} onMouseDown={onClose}>
       <div className={r.sheetBox} onMouseDown={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Discussion">
         <HNReader key={hnId || item?.id} item={item} hnId={hnId} onClose={onClose} onItem={onItem} variant="sheet" />
       </div>

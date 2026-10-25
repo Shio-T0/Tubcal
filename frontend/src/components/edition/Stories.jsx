@@ -13,6 +13,7 @@ import {
   ExternalLink, FileText, ListPlus, MessageSquare, Play,
 } from 'lucide-react';
 
+import { playableHere, usePlayLink } from '../player/watchLinks.js';
 import { SaveButton } from '../ui/ItemActions.jsx';
 import { compact, splitKind } from '../../lib/format.js';
 import { timeAgo } from '../../lib/time.js';
@@ -103,6 +104,7 @@ function Copy({ story, item, lead = false }) {
  *  else a quiet line of text actions, so a page of them doesn't shout. */
 function Acts({ item, on, big = false }) {
   const { enqueue } = usePlayer();
+  const playLink = usePlayLink();
   if (!item) return null;
   const cls = big ? e.act : e.link;
   const main = `${cls} ${big ? e.actMain : e.linkMain}`;
@@ -127,11 +129,18 @@ function Acts({ item, on, big = false }) {
     );
   }
   const external = item.url && !item.url.includes('news.ycombinator.com/item');
+  const video = external && !!playableHere(item.url);
   return (
     <div className={big ? e.acts : e.links}>
       {external && (
-        <a className={main} href={item.url} target="_blank" rel="noopener noreferrer" onClick={() => on.touched(item)}>
-          Read <ExternalLink size={big ? 13 : 11} />
+        <a
+          className={main}
+          href={item.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(ev) => { on.touched(item); playLink(item.url, ev); }}
+        >
+          {video ? <><Play size={big ? 14 : 12} fill="currentColor" /> Watch</> : <>Read <ExternalLink size={big ? 13 : 11} /></>}
         </a>
       )}
       <button type="button" className={external ? cls : main} onClick={() => on.discuss(item)}>
@@ -160,12 +169,15 @@ function AlsoOn({ items, on }) {
 
 /** The headline as the story's main door. */
 function Headline({ story, item, on, as: Tag = 'h3', className }) {
+  const playLink = usePlayLink();
   const text = story.headline || item?.title;
   const inner = <span className={e.ink}>{text}</span>;
   if (item?.platform === 'hackernews' && item.url && !item.url.includes('news.ycombinator.com/item')) {
     return (
       <Tag className={className}>
-        <a href={item.url} target="_blank" rel="noopener noreferrer" onClick={() => on.touched(item)}>{inner}</a>
+        <a href={item.url} target="_blank" rel="noopener noreferrer" onClick={(ev) => { on.touched(item); playLink(item.url, ev); }}>
+          {inner}
+        </a>
       </Tag>
     );
   }

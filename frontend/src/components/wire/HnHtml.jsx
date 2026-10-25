@@ -4,10 +4,13 @@
 // stranger's HTML, so it's walked with an allow-list into React elements and
 // never injected. A paragraph that opens with ">" is HN's quoting convention and
 // is drawn as a quote. A link to another HN item opens it in the reader when the
-// page offers that (`onItem`); every other link goes out in a new tab.
+// page offers that (`onItem`), and a YouTube link plays when it offers `onLink`
+// (the reader's `usePlayLink`); every other link goes out in a new tab.
 
 import { Fragment } from 'react';
+import { Play } from 'lucide-react';
 
+import { playableHere } from '../player/watchLinks.js';
 import h from './hnhtml.module.css';
 
 const HN_ITEM = /^https?:\/\/news\.ycombinator\.com\/item\?id=(\d+)/;
@@ -32,8 +35,18 @@ function walk(node, ctx, key) {
       );
     }
     if (!/^https?:\/\//i.test(href)) return <Fragment key={key}>{label}</Fragment>;
+    const video = ctx.onLink && playableHere(href);
     return (
-      <a key={key} className={h.link} href={href} target="_blank" rel="noopener noreferrer nofollow" onClick={(e) => e.stopPropagation()}>
+      <a
+        key={key}
+        className={h.link}
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer nofollow"
+        onClick={(e) => { e.stopPropagation(); ctx.onLink?.(href, e); }}
+        title={video ? 'Play it here' : undefined}
+      >
+        {video && <Play size={10} fill="currentColor" className={h.playMark} />}
         {label}
       </a>
     );
@@ -49,7 +62,7 @@ function walk(node, ctx, key) {
   return <Fragment key={key}>{kids(node, ctx, key)}</Fragment>;
 }
 
-export function HnHtml({ html, className, onItem }) {
+export function HnHtml({ html, className, onItem, onLink }) {
   if (!html) return null;
   // HN's first paragraph has no <p>: wrap the text before the first one so it
   // gets the same spacing as the rest.
@@ -57,7 +70,7 @@ export function HnHtml({ html, className, onItem }) {
   const doc = new DOMParser().parseFromString(`<body>${src}</body>`, 'text/html');
   return (
     <div className={`${h.hn} ${className || ''}`}>
-      {Array.from(doc.body.childNodes).map((n, i) => <Fragment key={i}>{walk(n, { onItem }, `n${i}`)}</Fragment>)}
+      {Array.from(doc.body.childNodes).map((n, i) => <Fragment key={i}>{walk(n, { onItem, onLink }, `n${i}`)}</Fragment>)}
     </div>
   );
 }

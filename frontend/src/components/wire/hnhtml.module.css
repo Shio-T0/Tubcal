@@ -54,6 +54,12 @@
 .link:hover {
   text-decoration-color: currentColor;
 }
+.playMark {
+  display: inline-block;
+  margin-right: 4px;
+  vertical-align: baseline;
+  color: var(--c-youtube);
+}
 .item {
   display: inline;
   padding: 0;
