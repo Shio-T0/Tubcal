@@ -13,34 +13,34 @@ Vendored:
   anipy-api (vendored in app/src/main/python/anipy_api; with the anime room) 3.8.21 (GPL-3.0)
   weeb-cli (vendored in app/src/main/python/weeb_cli; with the anime room) 3.0.0 (GPL-3.0-only)
 Installed by pip (28):
-  beautifulsoup4 4.15.0 (MIT License)
+  beautifulsoup4 (with the anime room) 4.15.0 (MIT License)
   blinker 1.9.0 (MIT License)
-  certifi 2026.7.22 (MPL-2.0)
+  certifi 2026.10.23 (MPL-2.0)
   charset-normalizer 3.5.2 (MIT)
   click 8.5.0 (BSD-3-Clause)
-  dataclasses-json 0.6.7 (MIT)
+  dataclasses-json (with the anime room) 0.6.7 (MIT)
   feedparser 6.0.14 (BSD-2-Clause)
   feedparser-sgmllib 2.1.0 (PSF-2.0)
   Flask 3.1.3 (BSD-3-Clause)
   idna 3.20 (BSD-3-Clause)
   itsdangerous 2.2.0 (BSD License)
   Jinja2 3.1.6 (BSD License)
-  m3u8 6.0.0 (MIT)
+  m3u8 (with the anime room) 6.0.0 (MIT)
   MarkupSafe 3.0.3 (BSD-3-Clause)
-  marshmallow 3.26.2 (MIT License)
-  mypy_extensions 1.1.0 (MIT)
-  packaging 26.3 (Apache-2.0 OR BSD-2-Clause)
-  pycountry 26.2.16 (LGPL-2.1-only)
+  marshmallow (with the anime room) 3.26.2 (MIT License)
+  mypy_extensions (with the anime room) 1.1.0 (MIT)
+  packaging (with the anime room) 26.3 (Apache-2.0 OR BSD-2-Clause)
+  pycountry (with the anime room) 26.2.16 (LGPL-2.1-only)
   pycryptodomex 3.21.0 (BSD, Public Domain)
   python-dotenv 1.2.4 (BSD-3-Clause)
   requests 2.34.2 (Apache-2.0)
-  simpleeval 1.0.8 (MIT)
-  soupsieve 2.10 (MIT)
-  typing-inspect 0.9.0 (MIT)
-  typing_extensions 4.16.0 (PSF-2.0)
+  simpleeval (with the anime room) 1.0.8 (MIT)
+  soupsieve (with the anime room) 2.10 (MIT)
+  typing-inspect (with the anime room) 0.9.0 (MIT)
+  typing_extensions (with the anime room) 4.16.0 (PSF-2.0)
   urllib3 2.8.0 (MIT)
   Werkzeug 3.1.9 (BSD-3-Clause)
-  yt-dlp 2026.8.19 (Unlicense)
+  yt-dlp (with the youtube room) 2026.10.21 (Unlicense)
 
 ------------------------------------------------------------------------------
 CPython 3.11 (Chaquopy build)
@@ -1741,7 +1741,7 @@ Public License instead of this License.  But first, please read
 <https://www.gnu.org/licenses/why-not-lgpl.html>.
 
 ------------------------------------------------------------------------------
-beautifulsoup4 4.15.0
+beautifulsoup4 (with the anime room) 4.15.0
 Licence: MIT License
 Source: https://www.crummy.com/software/BeautifulSoup/bs4/
 
@@ -1854,7 +1854,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ------------------------------------------------------------------------------
-certifi 2026.7.22
+certifi 2026.10.23
 Licence: MPL-2.0
 Source: https://github.com/certifi/python-certifi
 
@@ -1940,7 +1940,7 @@ NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ------------------------------------------------------------------------------
-dataclasses-json 0.6.7
+dataclasses-json (with the anime room) 0.6.7
 Licence: MIT
 Source: https://github.com/lidatong/dataclasses-json
 
@@ -2437,7 +2437,7 @@ NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ------------------------------------------------------------------------------
-m3u8 6.0.0
+m3u8 (with the anime room) 6.0.0
 Licence: MIT
 Source: https://github.com/globocom/m3u8
 
@@ -2517,7 +2517,7 @@ NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ------------------------------------------------------------------------------
-marshmallow 3.26.2
+marshmallow (with the anime room) 3.26.2
 Licence: MIT License
 Source: https://github.com/marshmallow-code/marshmallow
 
@@ -2542,7 +2542,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 
 ------------------------------------------------------------------------------
-mypy_extensions 1.1.0
+mypy_extensions (with the anime room) 1.1.0
 Licence: MIT
 Source: https://github.com/python/mypy_extensions
 
@@ -2575,7 +2575,7 @@ DEALINGS IN THE SOFTWARE.
 = = = = =
 
 ------------------------------------------------------------------------------
-packaging 26.3
+packaging (with the anime room) 26.3
 Licence: Apache-2.0 OR BSD-2-Clause
 Source: https://github.com/pypa/packaging
 
@@ -2785,7 +2785,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ------------------------------------------------------------------------------
-pycountry 26.2.16
+pycountry (with the anime room) 26.2.16
 Licence: LGPL-2.1-only
 Source: https://github.com/pycountry/pycountry
 
@@ -3584,7 +3584,7 @@ Requests
 Copyright 2019 Kenneth Reitz
 
 ------------------------------------------------------------------------------
-simpleeval 1.0.8
+simpleeval (with the anime room) 1.0.8
 Licence: MIT
 Source: https://github.com/danthedeckie/simpleeval
 
@@ -3611,7 +3611,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 
 ------------------------------------------------------------------------------
-soupsieve 2.10
+soupsieve (with the anime room) 2.10
 Licence: MIT
 Source: https://github.com/facelessuser/soupsieve
 
@@ -3638,7 +3638,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ------------------------------------------------------------------------------
-typing-inspect 0.9.0
+typing-inspect (with the anime room) 0.9.0
 Licence: MIT
 Source: https://github.com/ilevkivskyi/typing_inspect
 
@@ -3664,7 +3664,7 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ------------------------------------------------------------------------------
-typing_extensions 4.16.0
+typing_extensions (with the anime room) 4.16.0
 Licence: PSF-2.0
 Source: https://github.com/python/typing_extensions
 
@@ -4009,7 +4009,7 @@ NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ------------------------------------------------------------------------------
-yt-dlp 2026.8.19
+yt-dlp (with the youtube room) 2026.10.21
 Licence: Unlicense
 Source: https://github.com/yt-dlp/yt-dlp
 
