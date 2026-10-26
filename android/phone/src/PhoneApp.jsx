@@ -26,6 +26,7 @@ const Watch = lazy(() => import('./screens/Watch.jsx'));
 const Channel = lazy(() => import('./screens/Channel.jsx'));
 const Playlist = lazy(() => import('./screens/Playlist.jsx'));
 const History = lazy(() => import('./screens/History.jsx'));
+const YoutubeLink = lazy(() => import('@pc/pages/YoutubeLink.jsx'));
 const Read = lazy(() => import('./screens/Read.jsx'));
 const Subreddit = lazy(() => import('./screens/readDispatch.jsx').then((m) => ({ default: m.Subreddit })));
 const AnimeHub = lazy(() => import('./screens/AnimeHub.jsx'));
@@ -154,6 +155,7 @@ function Shell() {
                 <Route path="/youtube/c/:channelId" element={<Channel />} />
                 <Route path="/youtube/playlist/:playlistId" element={<Playlist />} />
                 <Route path="/youtube/history" element={<History />} />
+                <Route path="/youtube/open" element={<YoutubeLink />} />
               </>
             )}
             {hasModule('hackernews') && <Route path="/hackernews" element={<Read room="wire" />} />}

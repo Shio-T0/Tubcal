@@ -805,6 +805,32 @@ new counts). Tiles carry an up-next button (`QueueButton`) that feeds `usePlayer
 queue, which auto-advances when a video ends. Channel, playlist and history pages keep
 their tab/sort/search in the URL too.
 
+**YouTube links from other apps** (Settings → Playback → "Open YouTube links here"; the
+Screening Room's module) open in Tubcal:
+- `server/youtube_links.py` is stdlib-only and is also the handler itself. Switching on
+  (`POST /api/youtube/links`) copies it to `~/.local/share/tubcal/links/open-link.py`
+  with a `links.json` (the browser that had the links, the port), writes
+  `tubcal-links.desktop` and makes it the `xdg-mime` default for `x-scheme-handler/http`
+  and `/https`. The desktop then runs that copy with the system's python3 for every web
+  link another app opens: `tubcal_path(url)` maps a YouTube link Tubcal can show to a
+  Tubcal address, and the link opens there in the old browser when `/api/health` answers
+  with the Screening Room; anything else goes to that browser unchanged. Links clicked
+  inside a browser never reach it. `main.py` refreshes the copy at start; switching off
+  (and `install.sh` on uninstall or when the Screening Room goes: `links_off`) restores
+  the old default. Keep the file importable on its own and Python 3.8-compatible, and
+  the Exec line unquoted where it can be: xdg-open's own reader (bspwm and other bare
+  window managers) takes quotes literally and silently falls back to `$BROWSER`.
+- `/youtube/open?v=&t=` / `?channel=@handle` (`pages/YoutubeLink.jsx`) is where a link
+  lands: it plays the video over the Screening Room or looks up the handle, then replaces
+  itself.
+- The phone: the `.YoutubeLinks` activity-alias in the manifest (disabled until the
+  switch, which talks to `window.TubcalAndroid.youtubeLinks/setYoutubeLinks`) catches
+  YouTube addresses; Android 12+ also wants the user's OK under "Open by default".
+  `MainActivity` asks `GET /api/youtube/link?url=` for the route and hands on what Tubcal
+  can't show; while the alias is on, its own YouTube links go to the YouTube app or the
+  browser by package so they can't loop back. `MainActivity` is `singleTask`, so a link
+  reaches the running app. Tests: `tests/test_youtube_links.py`.
+
 The Edition (`pages/Edition.jsx`, stories in `components/edition/Stories.jsx`) is
 laid out as a front page:
 - **Nameplate:** issue and date in one ear. The other ear shows your reading: a ring

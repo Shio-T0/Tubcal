@@ -29,6 +29,7 @@ const ScreeningRoom = lazy(() => import('./pages/ScreeningRoom.jsx'));
 const ChannelPage = lazy(() => import('./pages/ScreeningRoom.jsx').then(m => ({ default: m.ChannelPage })));
 const PlaylistPage = lazy(() => import('./pages/ScreeningRoom.jsx').then(m => ({ default: m.PlaylistPage })));
 const HistoryPage = lazy(() => import('./pages/ScreeningRoom.jsx').then(m => ({ default: m.HistoryPage })));
+const YoutubeLink = lazy(() => import('./pages/YoutubeLink.jsx'));
 const Dispatch = lazy(() => import('./pages/Dispatch.jsx'));
 const SubredditPage = lazy(() => import('./pages/Dispatch.jsx').then(m => ({ default: m.SubredditPage })));
 const Wire = lazy(() => import('./pages/Wire.jsx'));
@@ -127,6 +128,7 @@ export default function App() {
                   <Route path="/youtube/c/:channelId" element={<ChannelPage />} />
                   <Route path="/youtube/playlist/:playlistId" element={<PlaylistPage />} />
                   <Route path="/youtube/history" element={<HistoryPage />} />
+                  <Route path="/youtube/open" element={<YoutubeLink />} />
                 </>
               )}
               {has('archive') && <Route path="/archive" element={<Archive />} />}

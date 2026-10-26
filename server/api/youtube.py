@@ -12,7 +12,7 @@ from flask import Blueprint, Response, request
 
 from . import err, ok
 from .relay import relay
-from .. import cache, config, db, httpc
+from .. import cache, config, db, httpc, youtube_links
 from ..sources import fmp4, invidious, youtube
 
 youtube_bp = Blueprint("youtube", __name__, url_prefix="/api")
@@ -516,3 +516,30 @@ def _history_row_to_item(r):
 def youtube_continue():
     rows = db.get_continue_watching()
     return ok({"items": [_history_row_to_item(r) for r in rows]})
+
+
+# ── YouTube links from other apps (server/youtube_links.py) ─────────────────
+
+
+@youtube_bp.get("/youtube/links")
+def youtube_links_status():
+    """Is Tubcal this desktop's handler for web links (Settings → Playback)?"""
+    return ok(youtube_links.status())
+
+
+@youtube_bp.post("/youtube/links")
+def youtube_links_switch():
+    on = bool((request.get_json(force=True, silent=True) or {}).get("on"))
+    try:
+        if on:
+            return ok(youtube_links.enable(f"http://{config.HOST}:{config.PORT}"))
+        return ok(youtube_links.disable())
+    except youtube_links.LinkError as e:
+        return err(str(e), 409)
+
+
+@youtube_bp.get("/youtube/link")
+def youtube_link_path():
+    """Where a YouTube link opens in Tubcal: `{path}`, or `{path: null}` for one
+    it can't show. The phone asks this for a link another app handed it."""
+    return ok({"path": youtube_links.tubcal_path(request.args.get("url", ""))})

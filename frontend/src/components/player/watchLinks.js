@@ -16,7 +16,7 @@ import { youtubeTarget } from './richText.jsx';
 export const metaPath = (videoId) => `/youtube/video/${videoId}`;
 
 /** A playable item for a video id and its details (what `metaPath` answers). */
-function videoItem(id, d = {}) {
+export function videoItem(id, d = {}) {
   return {
     id: `yt:${id}`,
     platform: 'youtube',

@@ -33,6 +33,17 @@ def _backfill_avatars():
     threading.Thread(target=run, daemon=True).start()
 
 
+def _refresh_link_handler():
+    """When YouTube links from other apps open here (Settings → Playback), keep
+    the handler the desktop runs current with this code and this port."""
+    from server import youtube_links
+
+    try:
+        youtube_links.refresh(f"http://{config.HOST}:{config.PORT}")
+    except Exception as e:  # never stop the server over it
+        print(f"  (couldn't refresh the YouTube link handler: {e})")
+
+
 def main():
     # Pull the latest anime-scraper fixes before anything imports it: allanime
     # changes its crypto every so often and the fix ships as an anipy-api
@@ -49,6 +60,7 @@ def main():
         _warm_caches()
         _backfill_avatars()
         notifier.start()
+        _refresh_link_handler()
     brain.start()
     housekeeping.start()
     print(f"\n  Tubcal — private social hub")

@@ -76,7 +76,7 @@ function Row({ label, hint, children, stack = false }) {
   );
 }
 
-function Switch({ checked, onChange, label }) {
+function Switch({ checked, onChange, label, disabled = false }) {
   return (
     <button
       type="button"
@@ -84,6 +84,7 @@ function Switch({ checked, onChange, label }) {
       aria-checked={checked}
       aria-label={label}
       className={s.switch}
+      disabled={disabled}
       onClick={() => onChange(!checked)}
     >
       <span className={s.switchKnob} />
@@ -631,6 +632,95 @@ const QUIET_OPTIONS = [
 const quietKey = (span) => (Array.isArray(span) ? `${span[0]}-${span[1]}` : 'off');
 const quietSpan = (key) => (key === 'off' ? null : key.split('-').map(Number));
 
+// YouTube links other apps open, played here. The desktop: Tubcal becomes the
+// handler for web links and passes on the rest (server/youtube_links.py). The
+// phone: the Android shell's link filter, which Android also asks you to approve.
+const androidShell = () => (typeof window !== 'undefined' ? window.TubcalAndroid : null);
+
+function readAndroidLinks() {
+  try {
+    return JSON.parse(androidShell()?.youtubeLinks?.() || 'null');
+  } catch {
+    return null;
+  }
+}
+
+function useAndroidLinks() {
+  const [st, setSt] = useState(readAndroidLinks);
+  useEffect(() => {
+    // back from Android's own settings page
+    const again = () => { if (document.visibilityState === 'visible') setSt(readAndroidLinks()); };
+    document.addEventListener('visibilitychange', again);
+    window.addEventListener('focus', again);
+    return () => {
+      document.removeEventListener('visibilitychange', again);
+      window.removeEventListener('focus', again);
+    };
+  }, []);
+  const set = (on) => {
+    androidShell()?.setYoutubeLinks?.(on);
+    setSt(readAndroidLinks());
+  };
+  return { st, set, approve: () => androidShell()?.openLinkSettings?.() };
+}
+
+function PhoneLinksGroup() {
+  const { st, set, approve } = useAndroidLinks();
+  if (!st) return null;
+  const browser = st.browser || 'your browser';
+  let hint = `Play YouTube links that other apps open here, instead of in ${browser}.`;
+  if (st.on && st.approved) hint = `YouTube links that other apps open play here. Tubcal’s own YouTube button still opens ${browser}.`;
+  else if (st.on) hint = 'Android needs your OK too: on the page this opens, tap “Add link” and tick the YouTube addresses.';
+  return (
+    <Group title="Links from other apps">
+      <Row label="Open YouTube links here" hint={hint}>
+        <Switch label="Open YouTube links here" checked={!!st.on} onChange={set} />
+      </Row>
+      {st.on && !st.approved && (
+        <Row label="Approve the links" hint={`Still waiting for: ${(st.pending || []).join(', ')}`}>
+          <button type="button" className={s.btnGhost} onClick={approve}><ExternalLink size={14} /> Open Android settings</button>
+        </Row>
+      )}
+    </Group>
+  );
+}
+
+function DesktopLinksGroup() {
+  const toast = useToast();
+  const links = useApi('/youtube/links');
+  const [busy, setBusy] = useState(false);
+  const st = links.data;
+  if (!st) return null;
+  const browser = st.browser || 'your browser';
+  const flip = async (on) => {
+    setBusy(true);
+    try {
+      const now = await api('/youtube/links', { method: 'POST', body: JSON.stringify({ on }) });
+      toast(on ? `YouTube links from other apps now open here. Other links go to ${now.browser}.` : `Links go straight to ${now.browser || 'your browser'} again.`, 'success');
+      links.reload();
+    } catch (e) {
+      toast(e.message, 'error');
+    } finally {
+      setBusy(false);
+    }
+  };
+  let hint;
+  if (!st.available) hint = st.reason;
+  else if (st.on) hint = `YouTube links that other apps open (chat, mail, the terminal) play here, and every other link goes on to ${browser}. While Tubcal isn’t running, YouTube links go to ${browser} too.`;
+  else if (st.lost) hint = `${browser} has made itself the default for links again, so they skip Tubcal. Switch this on to take them back.`;
+  else hint = `Play YouTube links that other apps open (chat, mail, the terminal) here instead of on youtube.com. Every other link still goes to ${browser}.`;
+  return (
+    <Group
+      title="Links from other apps"
+      note="Tubcal becomes this computer’s handler for web links and passes on everything that isn’t YouTube. Links you click inside a browser stay in that browser."
+    >
+      <Row label="Open YouTube links here" hint={hint}>
+        <Switch label="Open YouTube links here" checked={!!st.on} onChange={flip} disabled={busy || !st.available} />
+      </Row>
+    </Group>
+  );
+}
+
 function PlaybackSection() {
   const { settings, updateSettings } = useSettings();
   const quiet = quietKey(settings?.quiet_hours);
@@ -673,6 +763,7 @@ function PlaybackSection() {
           />
         </Row>
       </Group>
+      {hasModule('youtube') && (APP.phone ? <PhoneLinksGroup /> : <DesktopLinksGroup />)}
     </>
   );
 }

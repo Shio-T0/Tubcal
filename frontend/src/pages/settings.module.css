@@ -381,6 +381,10 @@
   background: var(--signal);
   box-shadow: none;
 }
+.switch:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
 .switchKnob {
   position: absolute;
   top: 3px;

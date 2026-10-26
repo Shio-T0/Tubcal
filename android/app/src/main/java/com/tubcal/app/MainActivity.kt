@@ -4,6 +4,7 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.ActivityNotFoundException
+import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
@@ -13,7 +14,10 @@ import android.net.http.SslError
 import android.os.Build
 import android.os.Bundle
 import android.os.Message
+import android.provider.Settings
 import android.util.Base64
+import android.content.pm.verify.domain.DomainVerificationManager
+import android.content.pm.verify.domain.DomainVerificationUserState
 import android.view.HapticFeedbackConstants
 import android.view.OrientationEventListener
 import android.view.View
@@ -30,8 +34,11 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.FrameLayout
 import android.widget.Toast
+import org.json.JSONArray
+import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
+import java.net.URLEncoder
 
 /**
  * The phone shell around Tubcal's phone UI (built from android/phone, served
@@ -39,7 +46,7 @@ import java.net.URL
  * does what a web page can't do for itself on a phone, through `window.TubcalAndroid`:
  * the system share sheet, opening links in their own apps, rotation for fullscreen
  * video, keeping the screen awake, haptics, status-bar icon colour, immersive mode,
- * and saving exported files. It also:
+ * and saving exported files, and YouTube links from other apps. It also:
  *  - passes the system-bar insets in as CSS vars (--sa-top/bottom/left/right) so
  *    the app bar clears the status bar and the tab bar clears the gesture bar;
  *  - shrinks the WebView above the keyboard (and flags `html[data-kb]`), so bottom
@@ -137,7 +144,7 @@ class MainActivity : Activity() {
         webView.webChromeClient = ShellChromeClient()
 
         showSplash()
-        waitForServerThenLoad()
+        waitForServerThenLoad(takeLink(intent))
     }
 
     override fun onDestroy() {
@@ -155,12 +162,94 @@ class MainActivity : Activity() {
     }
 
     /** A link out of the app: YouTube, Reddit, Crunchyroll… open in their own app
-     *  when one is installed (Android picks), else the browser. */
+     *  when one is installed (Android picks), else the browser. While Tubcal holds
+     *  YouTube links itself, a YouTube link goes to the YouTube app or the browser
+     *  by name, so it can't come straight back here. */
     private fun openOutside(uri: Uri) {
+        val view = Intent(Intent.ACTION_VIEW, uri).addCategory(Intent.CATEGORY_BROWSABLE)
+        if (linksOn() && uri.host?.lowercase()?.removePrefix("www.") in LINK_HOSTS) {
+            handOnTo(view)?.let { view.setPackage(it) }
+        }
         try {
-            startActivity(Intent(Intent.ACTION_VIEW, uri).addCategory(Intent.CATEGORY_BROWSABLE))
+            startActivity(view)
         } catch (_: ActivityNotFoundException) {
             Toast.makeText(this, "No app can open that link", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun handOnTo(view: Intent): String? {
+        if (packageManager.resolveActivity(Intent(view).setPackage(YOUTUBE_APP), 0) != null) return YOUTUBE_APP
+        return browser()?.activityInfo?.packageName
+    }
+
+    /** The default browser, else any browser that isn't Tubcal. */
+    private fun browser(): android.content.pm.ResolveInfo? {
+        val probe = Intent(Intent.ACTION_VIEW, Uri.parse("https://example.org/")).addCategory(Intent.CATEGORY_BROWSABLE)
+        val pm = packageManager
+        pm.resolveActivity(probe, PackageManager.MATCH_DEFAULT_ONLY)
+            ?.takeIf { it.activityInfo.packageName != "android" && it.activityInfo.packageName != packageName }
+            ?.let { return it }
+        return pm.queryIntentActivities(probe, PackageManager.MATCH_ALL)
+            .firstOrNull { it.activityInfo.packageName != "android" && it.activityInfo.packageName != packageName }
+    }
+
+    // ---- YouTube links from other apps (the YoutubeLinks alias, off until Settings turns it on) ----
+
+    private val linksAlias get() = ComponentName(packageName, "$packageName.YoutubeLinks")
+
+    private fun linksOn() =
+        packageManager.getComponentEnabledSetting(linksAlias) == PackageManager.COMPONENT_ENABLED_STATE_ENABLED
+
+    /** The link of a VIEW intent another app sent, taken off the intent so it's handled once. */
+    private fun takeLink(intent: Intent?): Uri? {
+        if (intent?.action != Intent.ACTION_VIEW) return null
+        val uri = intent.data ?: return null
+        intent.action = Intent.ACTION_MAIN
+        intent.data = null
+        return uri.takeIf { !isLocal(it) }
+    }
+
+    /** Where `uri` opens in Tubcal, as the server says; null when Tubcal can't
+     *  show it (or this phone has no Screening Room). Network: not on the main thread. */
+    private fun linkRoute(uri: Uri): String? = try {
+        val c = URL("${TubcalService.BASE_URL}/api/youtube/link?url=" + URLEncoder.encode(uri.toString(), "UTF-8"))
+            .openConnection() as HttpURLConnection
+        c.connectTimeout = 2000; c.readTimeout = 5000
+        val body = try { c.inputStream.bufferedReader().use { it.readText() } } finally { c.disconnect() }
+        val data = JSONObject(body).optJSONObject("data")
+        if (data == null || data.isNull("path")) null else data.optString("path").takeIf { it.startsWith("/") }
+    } catch (_: Throwable) { null }
+
+    /** What Settings shows: on (the alias), approved (Android 12+ wants the user's
+     *  OK per address, under "Open by default"), what's still waiting, and the browser. */
+    private fun linksState(): JSONObject {
+        val pending = JSONArray()
+        var allowed = true
+        if (Build.VERSION.SDK_INT >= 31) {
+            val user = getSystemService(DomainVerificationManager::class.java)?.getDomainVerificationUserState(packageName)
+            val states = user?.hostToStateMap ?: emptyMap()
+            allowed = user?.isLinkHandlingAllowed != false
+            for (host in APPROVE_HOSTS) {
+                val st = states[host]
+                if (st == null || st == DomainVerificationUserState.DOMAIN_STATE_NONE) pending.put(host)
+            }
+        }
+        return JSONObject()
+            .put("on", linksOn())
+            .put("approved", allowed && pending.length() == 0)
+            .put("pending", pending)
+            .put("browser", browser()?.loadLabel(packageManager)?.toString())
+    }
+
+    /** Android's own page for which links this app opens. */
+    private fun openLinkSettings() {
+        val pkg = Uri.parse("package:$packageName")
+        val page = if (Build.VERSION.SDK_INT >= 31) Intent(Settings.ACTION_APP_OPEN_BY_DEFAULT_SETTINGS, pkg)
+        else Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, pkg)
+        try {
+            startActivity(page)
+        } catch (_: ActivityNotFoundException) {
+            startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, pkg))
         }
     }
 
@@ -251,7 +340,8 @@ class MainActivity : Activity() {
         )
     }
 
-    private fun waitForServerThenLoad() {
+    /** `link`: a YouTube link another app launched Tubcal with. */
+    private fun waitForServerThenLoad(link: Uri?) {
         Thread {
             val deadline = System.currentTimeMillis() + 90_000
             var up = false
@@ -259,9 +349,17 @@ class MainActivity : Activity() {
                 if (ping("${TubcalService.BASE_URL}/api/health")) { up = true; break }
                 try { Thread.sleep(400) } catch (_: InterruptedException) { break }
             }
+            val route = if (up && link != null) linkRoute(link) else null
             runOnUiThread {
                 if (up) {
-                    if (!openRoute(intent)) webView.loadUrl(TubcalService.BASE_URL)
+                    when {
+                        openRoute(intent) -> {}
+                        route != null -> webView.loadUrl(TubcalService.BASE_URL + route)
+                        else -> {
+                            webView.loadUrl(TubcalService.BASE_URL)
+                            if (link != null) openOutside(link)
+                        }
+                    }
                     pageReady = true
                 } else {
                     webView.loadDataWithBaseURL(
@@ -466,6 +564,26 @@ class MainActivity : Activity() {
             runOnUiThread { this@MainActivity.saveFile(name ?: "tubcal-download", mime ?: "", bytes) }
         }
 
+        /** JSON: {on, approved, pending: [hosts], browser}. */
+        @JavascriptInterface
+        fun youtubeLinks(): String = linksState().toString()
+
+        @JavascriptInterface
+        fun setYoutubeLinks(on: Boolean) {
+            packageManager.setComponentEnabledSetting(
+                linksAlias,
+                if (on) PackageManager.COMPONENT_ENABLED_STATE_ENABLED else PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+                PackageManager.DONT_KILL_APP,
+            )
+            if (on && !linksState().optBoolean("approved")) runOnUiThread {
+                Toast.makeText(this@MainActivity, "Tap “Add link”, then tick the YouTube addresses", Toast.LENGTH_LONG).show()
+                this@MainActivity.openLinkSettings()
+            }
+        }
+
+        @JavascriptInterface
+        fun openLinkSettings() = runOnUiThread { this@MainActivity.openLinkSettings() }
+
         @JavascriptInterface
         fun version(): String = try {
             packageManager.getPackageInfo(packageName, 0).versionName ?: ""
@@ -518,21 +636,31 @@ class MainActivity : Activity() {
         hideSystemBars(false)
     }
 
-    // ---- deep links (a notification opens a route) ----
+    // ---- deep links (a notification opens a route, another app a YouTube link) ----
 
     private var pageReady = false
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        openRoute(intent)
+        if (openRoute(intent)) return
+        val link = takeLink(intent) ?: return
+        Thread {
+            val route = linkRoute(link)
+            runOnUiThread { if (route != null) goTo(route) else openOutside(link) }
+        }.apply { isDaemon = true }.start()
     }
 
-    /** Navigate the page to the intent's route: in place when the app is up (no
-     *  reload, the player keeps playing), else as the first load. */
+    /** Navigate the page to the intent's route (a notification's). */
     private fun openRoute(intent: Intent?): Boolean {
         val path = intent?.getStringExtra(EXTRA_PATH)?.takeIf { it.startsWith("/") } ?: return false
         intent.removeExtra(EXTRA_PATH)
+        goTo(path)
+        return true
+    }
+
+    /** In place when the app is up (no reload, the player keeps playing), else as the first load. */
+    private fun goTo(path: String) {
         if (pageReady) {
             webView.evaluateJavascript(
                 "(window.tubcalNavigate ? (window.tubcalNavigate(" + jsString(path) + "), 'ok') : 'no')",
@@ -540,11 +668,14 @@ class MainActivity : Activity() {
         } else {
             webView.loadUrl(TubcalService.BASE_URL + path)
         }
-        return true
     }
 
     companion object {
         private const val REQ_SAVE = 41
         const val EXTRA_PATH = "com.tubcal.app.PATH"
+        private const val YOUTUBE_APP = "com.google.android.youtube"
+        // The YoutubeLinks alias's addresses (www. dropped), and the ones Settings waits on approval for.
+        private val LINK_HOSTS = setOf("youtube.com", "m.youtube.com", "music.youtube.com", "youtu.be")
+        private val APPROVE_HOSTS = listOf("youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be")
     }
 }

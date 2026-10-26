@@ -1394,6 +1394,17 @@ install_ytdlp() {
   note_out "$("$UV_TOOL_BIN_DIR/yt-dlp" --version)"
 }
 
+# YouTube links from other apps (server/youtube_links.py): when Settings has made
+# Tubcal the desktop's handler for web links, give them back to the browser that
+# had them. Its own copy does it, since the checkout may not have the file any more.
+LINKS_HANDLER=$XDG_DATA/tubcal/links/open-link.py
+links_off() {
+  [[ -f $LINKS_HANDLER ]] || return 0
+  local py
+  py=$(command -v python3) || { rm -f "$APPS_DIR/tubcal-links.desktop"; return 0; }
+  "$py" -I "$LINKS_HANDLER" --off
+}
+
 remove_ytdlp() { # the Screening Room was removed: its yt-dlp goes too
   UV_TOOL_DIR="$TUBCAL_HOME/tools" UV_TOOL_BIN_DIR="$TUBCAL_HOME/bin" NO_COLOR=1 \
     "$UV" tool uninstall yt-dlp || rm -rf "$TUBCAL_HOME/tools/yt-dlp" "$TUBCAL_HOME/bin/yt-dlp"
@@ -2443,6 +2454,9 @@ do_install() {
   elif [[ -e $TUBCAL_HOME/bin/yt-dlp ]]; then
     run --soft "yt-dlp (the Screening Room's) removed" remove_ytdlp || true
   fi
+  if ((!${ON[youtube]:-0})) && [[ -f $LINKS_HANDLER ]]; then
+    run --soft "YouTube links handed back to the browser" links_off || true
+  fi
   run "Launcher & app-menu entry" install_launcher || die "Couldn't install the launcher."
   : >"$WARN_FILE"
   run "Test transmission" self_test || die "The self-test failed." "Tubcal is installed but didn't answer correctly; the log above says why."
@@ -2561,6 +2575,7 @@ do_uninstall() {
     ask "Sign off?" N || { printf '\n'; exit 0; }
   fi
   [[ -x $BIN_DIR/tubcal ]] && "$BIN_DIR/tubcal" stop >/dev/null 2>&1
+  links_off >/dev/null 2>&1
   if has systemctl && [[ -f $UNIT_DIR/tubcal.service ]]; then
     systemctl --user disable --now tubcal.service >/dev/null 2>&1
     rm -f "$UNIT_DIR/tubcal.service"
