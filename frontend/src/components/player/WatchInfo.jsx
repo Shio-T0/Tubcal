@@ -1,12 +1,12 @@
 // The strip under the big screen: what you're watching and whose it is. Title in
 // the display face, the channel with its face, subscriber count and a Subscribe
 // button, the headline numbers, and the few things you do with a video — save
-// it, copy a link to this very moment, open it on YouTube — plus the window
-// controls (notes, tuck into the corner, close).
+// it, copy its link (plain, or starting at this very moment), open it on
+// YouTube — plus the window controls (notes, tuck into the corner, close).
 
 import { useNavigate } from 'react-router-dom';
 import {
-  BadgeCheck, Bookmark, BookmarkCheck, ExternalLink, Link2, Minimize2, PanelRightClose, PanelRightOpen, Radio, X,
+  BadgeCheck, Bookmark, BookmarkCheck, ExternalLink, Link2, Minimize2, PanelRightClose, PanelRightOpen, Radio, Timer, X,
 } from 'lucide-react';
 
 import { compact } from '../../lib/format.js';
@@ -35,8 +35,9 @@ export default function WatchInfo({ item, info, isLive, getTime, notes, onMinimi
   const title = info?.title || item.title;
   const isSaved = !!saved[item.id];
 
-  const copy = async () => {
-    const t = Math.floor(getTime?.() || 0);
+  // `here`: the link starts where the video is now (a live stream has no "here").
+  const copy = async (here) => {
+    const t = here ? Math.floor(getTime?.() || 0) : 0;
     const url = vid ? `https://youtu.be/${vid}${t > 3 ? `?t=${t}` : ''}` : item.url;
     try {
       await navigator.clipboard.writeText(url);
@@ -108,9 +109,14 @@ export default function WatchInfo({ item, info, isLive, getTime, notes, onMinimi
           <button type="button" className={`${w.act} ${isSaved ? w.actOn : ''}`} onClick={() => toggleSaved(item)} title={isSaved ? 'Remove from Saved' : 'Save for later'}>
             {isSaved ? <BookmarkCheck size={15} /> : <Bookmark size={15} />} <span>{isSaved ? 'Saved' : 'Save'}</span>
           </button>
-          <button type="button" className={w.act} onClick={copy} title="Copy a link that starts right here">
+          <button type="button" className={w.act} onClick={() => copy(false)} title="Copy the video's link">
             <Link2 size={15} /> <span>Link</span>
           </button>
+          {vid && !isLive && (
+            <button type="button" className={w.act} onClick={() => copy(true)} title="Copy a link that starts right here">
+              <Timer size={15} /> <span>From here</span>
+            </button>
+          )}
           {item.url && (
             <a className={w.act} href={item.url} target="_blank" rel="noopener noreferrer" title={youtube ? 'Open on YouTube' : 'Open the source'}>
               <ExternalLink size={14} /> <span>{youtube ? 'YouTube' : 'Source'}</span>
