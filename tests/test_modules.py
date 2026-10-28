@@ -161,6 +161,40 @@ def test_the_server_imports_a_module_only_where_it_may():
     assert not bad, "import it inside the function, behind modules.has():\n" + "\n".join(bad)
 
 
+# ── the seams: the terminal client ───────────────────────────────────────────
+
+def test_the_terminal_imports_a_room_only_where_it_may():
+    """tui/ reaches a room's screen only through importlib (tui.rooms.load_screen),
+    and never the server's code at all: it's a client of the API like the browser."""
+    bad = []
+    for f in (ROOT / "tui").rglob("*.py"):
+        rel = f.relative_to(ROOT).as_posix()
+        mine = owner_of(rel)
+        for node in _module_level_imports(ast.parse(f.read_text())):
+            for target in _py_targets(rel, node):
+                if target.startswith("server/") or target == "main.py":
+                    bad.append(f"{rel}:{node.lineno} imports the server ({target})")
+                elif not may_import(mine, owner_of(target)):
+                    bad.append(f"{rel}:{node.lineno} imports {target} ({owner_of(target)})")
+    assert not bad, "\n".join(bad)
+
+
+def test_the_terminal_has_the_webs_rooms():
+    """Same ids, channels and order as frontend/src/lib/rooms.js, so the numbers match."""
+    from tui.rooms import ALL_ROOMS, CHANNELS
+    js = (ROOT / "frontend/src/lib/rooms.js").read_text()
+    web_channels = {cid: ids.replace("'", "").replace(" ", "").split(",")
+                    for cid, ids in re.findall(r"\{ id: '(\w+)', key: '\w', label: '\w+', color: [^,]+, rooms: \[([^\]]*)\]", js)}
+    assert {cid: ids for cid, _label, _key, ids in CHANNELS} == web_channels
+    room_ids = {r.id for r in ALL_ROOMS}
+    rooms_block = js.split("export const ALL_ROOMS", 1)[1].split("];", 1)[0]
+    assert room_ids == set(re.findall(r"\{ id: '(\w+)',\s*label:", rooms_block)) | {"anime"}
+    for room in ALL_ROOMS:
+        if room.built:
+            assert (ROOT / "tui" / "rooms" / room.id / "__init__.py").exists(), room.id
+            assert any(p == f"tui/rooms/{room.id}/" for p in MANIFEST[room.id]["paths"]), room.id
+
+
 # ── the seams: frontend ───────────────────────────────────────────────────────
 
 STATIC_IMPORT = re.compile(

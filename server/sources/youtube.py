@@ -348,20 +348,34 @@ def _pick_audio(formats):
     return [c[2] for c in cands]
 
 
+# yt-dlp reads the user's own config too; one that loads browser cookies would make
+# every resolve here signed in. These keep it anonymous whatever that config says.
+YTDLP_ANON = ["--no-cookies", "--no-cookies-from-browser", "--no-mark-watched"]
+
+
 def _collect_live_streams(formats):
     """Live broadcasts are HLS-only — keep every muxed m3u8 rung, and on a
-    multi-language stream keep only the creator's original-audio renditions."""
+    multi-language stream keep only the creator's original-audio renditions.
+
+    Since late 2026 YouTube serves most broadcasts *demuxed*: video-only m3u8
+    rungs plus one or two audio-only playlists. With no muxed rung, each video
+    rung is paired with the best audio playlist (`audio_url`, `live_demuxed`),
+    and api/youtube.py serves a master tying the two together."""
     multi_audio = any(
         "original" in (f.get("format_note") or "").lower() for f in formats
     )
+    hls = [
+        f for f in formats
+        if f.get("url") and (f.get("protocol") or "").startswith("m3u8")
+        and not (multi_audio and "original" not in (f.get("format_note") or "").lower())
+    ]
+
+    def has(f, key):
+        return f.get(key) not in (None, "none")
+
     streams = []
-    for f in formats:
-        if f.get("vcodec") in (None, "none") or f.get("acodec") in (None, "none"):
-            continue
-        if not f.get("url") or not (f.get("protocol") or "").startswith("m3u8"):
-            continue
-        note = (f.get("format_note") or "").lower()
-        if multi_audio and "original" not in note:
+    for f in hls:
+        if not (has(f, "vcodec") and has(f, "acodec")):
             continue
         h = f.get("height") or 0
         streams.append({
@@ -372,6 +386,35 @@ def _collect_live_streams(formats):
             "type": "video/mp4",
             "height": h,
         })
+    if not streams:
+        # yt-dlp reports a live audio playlist as vcodec "none" with no acodec and
+        # no bitrate, only a note ("Default, low" = itag 233, "Default, high" = 234)
+        audio = [f for f in hls if f.get("vcodec") == "none"]
+        audio.sort(key=lambda f: (
+            "high" in (f.get("format_note") or "").lower(),
+            f.get("abr") or f.get("tbr") or 0,
+            int(f["format_id"]) if str(f.get("format_id")).isdigit() else 0,
+        ), reverse=True)
+        if audio:
+            a = audio[0]
+            for f in hls:
+                if not has(f, "vcodec") or has(f, "acodec"):
+                    continue
+                h = f.get("height") or 0
+                streams.append({
+                    "url": f["url"],
+                    "audio_url": a["url"],
+                    "live_demuxed": True,
+                    "quality": f"{h}p" if h else (f.get("format_note") or ""),
+                    "itag": str(f.get("format_id")),
+                    "kind": "hls",
+                    "type": "video/mp4",
+                    "height": h,
+                    "width": f.get("width"),
+                    "vcodec": f.get("vcodec") or "",
+                    "acodec": a.get("acodec") if has(a, "acodec") else "mp4a.40.2",
+                    "bandwidth": int(((f.get("tbr") or 0) + (a.get("tbr") or 0)) * 1000),
+                })
     streams.sort(key=lambda s: s["height"], reverse=True)
     return streams
 
@@ -457,7 +500,7 @@ def _ytdlp_info(video_id):
     # yt-dlp would otherwise abort ("Premieres in N hours") with no JSON — we still
     # want its metadata (live_status=is_upcoming + release_timestamp).
     proc = subprocess.run(
-        [exe, "-J", "--no-warnings", "--no-playlist", "--ignore-no-formats-error", url],
+        [exe, "-J", "--no-warnings", "--no-playlist", "--ignore-no-formats-error", *YTDLP_ANON, url],
         capture_output=True, text=True, timeout=60,
     )
     if proc.returncode != 0 or not proc.stdout.strip():
@@ -634,7 +677,7 @@ def _ytdlp_flat_tab(channel_id, tab, limit=12):
     url = f"https://www.youtube.com/channel/{channel_id}{tab}"
     try:
         proc = subprocess.run(
-            [exe, "-J", "--flat-playlist", "--no-warnings", "--playlist-end", str(limit), url],
+            [exe, "-J", "--flat-playlist", "--no-warnings", "--playlist-end", str(limit), *YTDLP_ANON, url],
             capture_output=True, text=True, timeout=60,
         )
         if proc.returncode != 0 or not proc.stdout.strip():
@@ -855,7 +898,7 @@ def _ytdlp_playlist(plid):
         raise RuntimeError("yt-dlp not installed")
     url = f"https://www.youtube.com/playlist?list={plid}"
     proc = subprocess.run(
-        [exe, "-J", "--flat-playlist", "--no-warnings",
+        [exe, "-J", "--flat-playlist", "--no-warnings", *YTDLP_ANON,
          "--add-header", f"Cookie:{_CONSENT_COOKIE_FULL}", url],
         capture_output=True, text=True, timeout=120,
     )

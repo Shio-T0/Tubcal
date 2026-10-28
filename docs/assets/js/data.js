@@ -101,6 +101,7 @@ window.TUBCAL = {
     { id: 'anime', title: 'The Anime', sub: 'Your list, the Reckoner, the curtain call', chord: 'a', c: 'var(--accent-strong)' },
     { id: 'ai', title: 'Optional AI', sub: 'The Archive and the written paper', chord: 'e', c: 'var(--c-dev)' },
     { id: 'keyboard', title: 'Keyboard', sub: 'All shortcuts, with a search', chord: 'k', c: 'var(--c-hn)' },
+    { id: 'terminal', title: 'In a terminal', sub: 'tubcal tui, vim keys, mpv', chord: 'c', c: 'var(--c-editor)' },
     { id: 'settings', title: 'Settings', sub: 'What you can change', chord: 's', c: 'var(--c-editor)' },
     { id: 'accounts', title: 'Accounts', sub: 'Connecting AniList, Reddit, YouTube and GitHub', chord: 'o', c: 'var(--c-reddit)' },
     { id: 'privacy', title: 'Privacy & your data', sub: 'What’s sent, and where data is kept', chord: 'v', c: 'var(--c-dev)' },

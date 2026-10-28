@@ -40,9 +40,17 @@ anime = [
     "anipy-api>=3.8.21",
     "weeb-cli>=3.0.0",
 ]
+# Tubcal in the terminal (`python -m tui`). A group so a plain `uv sync` / `uv run`
+# brings it; install.sh adds `--group tui` with its `tui` option.
+tui = [
+    "textual>=8.2,<9",
+    "textual-image>=0.14",
+    "pillow>=11",
+    "httpx>=0.28",
+]
 
 [tool.uv]
-default-groups = ["dev", "anime"]
+default-groups = ["dev", "anime", "tui"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]

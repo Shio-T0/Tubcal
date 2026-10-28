@@ -286,10 +286,52 @@ def _adaptive_master(video_id, itag, video):
     return _hls_response(master)
 
 
+def _live_master(video_id, itag, target):
+    """A master for a demuxed live broadcast: the video rung plus the live audio
+    playlist as its alternate group, both served by `_live_media`."""
+    return _hls_response(fmp4.master_playlist(
+        f"/api/youtube/hls/{video_id}/{itag}/v.m3u8",
+        f"/api/youtube/hls/{video_id}/{itag}/a.m3u8",
+        vcodec=target.get("vcodec") or "",
+        acodec=target.get("acodec") or "",
+        width=target.get("width"),
+        height=target.get("height"),
+        bandwidth=target.get("bandwidth") or 0,
+    ))
+
+
+def _live_media(video_id, itag, track):
+    """One half of a demuxed live broadcast: YouTube's own media playlist for the
+    video rung ('v') or the audio ('a'), fetched afresh on every reload and
+    rewritten through the segment proxy. A dead manifest URL re-resolves once."""
+    last_err = None
+    for attempt in range(2):
+        src = _find_stream(video_id, itag, kind="hls")
+        url = (src or {}).get("url" if track == "v" else "audio_url")
+        if not url:
+            return err("No live stream", 404)
+        try:
+            resp = httpc.anon_session.get(url, headers={"User-Agent": config.BROWSER_UA}, timeout=20)
+            if resp.status_code == 200 and resp.text.lstrip().startswith("#EXTM3U"):
+                return _hls_response(_rewrite_hls(resp.text, url))
+            last_err = f"HTTP {resp.status_code}"
+        except Exception as e:
+            last_err = str(e)
+        if attempt == 0:
+            cache.invalidate(youtube.info_key(video_id))
+    return err(f"HLS playlist fetch failed: {last_err}", 502)
+
+
 def _adaptive_media(video_id, itag, track):
     """A byte-range HLS media playlist for the video ('v') or audio ('a') half of
     an adaptive stream. Every segment addresses the one googlevideo URL through
     the shared segment proxy, which forwards hls.js's per-fragment Range header."""
+    try:
+        src = _find_stream(video_id, itag, kind="hls")
+    except Exception as e:
+        return err(f"Stream resolve failed: {e}", 502)
+    if src and src.get("live_demuxed"):
+        return _live_media(video_id, itag, track)
     if track == "v":
         src = _find_stream(video_id, itag, kind="hls")
         url = src.get("url") if src and src.get("adaptive") else None
@@ -345,6 +387,8 @@ def youtube_hls_playlist(video_id, itag):
             return err("No HLS stream", 404)
         if target.get("adaptive"):
             return _adaptive_master(video_id, itag, target)
+        if target.get("live_demuxed"):
+            return _live_master(video_id, itag, target)
         try:
             resp = httpc.anon_session.get(
                 target["url"], headers={"User-Agent": config.BROWSER_UA}, timeout=20
@@ -373,7 +417,8 @@ def youtube_hls_segment():
         url = base64.urlsafe_b64decode(token.encode()).decode()
     except Exception:
         return err("bad token")
-    if "googlevideo.com" not in (urlparse(url).hostname or ""):  # only proxy YouTube CDN
+    host = (urlparse(url).hostname or "").lower()
+    if host != "googlevideo.com" and not host.endswith(".googlevideo.com"):  # only proxy YouTube CDN
         return err("forbidden host", 403)
     video_id = request.args.get("v")
     if video_id and not re.fullmatch(r"[\w-]{6,20}", video_id):

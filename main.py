@@ -1,3 +1,7 @@
+import logging
+import os
+import re
+
 from server import brain, cache, config, db, housekeeping, modules
 from server import create_app
 
@@ -44,6 +48,27 @@ def _refresh_link_handler():
         print(f"  (couldn't refresh the YouTube link handler: {e})")
 
 
+class _QuietAccessLog:
+    """A filter for Werkzeug's request log, which otherwise writes every path with its
+    query string (searches, video ids, whole CDN URLs in segment requests) into a log
+    file other local users can often read. Requests that worked aren't logged; failures
+    are, without their query strings. TUBCAL_ACCESS_LOG=1 keeps the full log."""
+
+    def filter(self, record):
+        if record.msg != '"%s" %s %s' or not isinstance(record.args, tuple) or len(record.args) != 3:
+            return True
+        line, code, size = record.args
+        if str(code)[:1] in "123":
+            return False
+        record.args = (re.sub(r"\?\S*", "", str(line), count=1), code, size)
+        return True
+
+
+def _quiet_access_log():
+    if os.environ.get("TUBCAL_ACCESS_LOG") != "1":
+        logging.getLogger("werkzeug").addFilter(_QuietAccessLog())
+
+
 def main():
     # Pull the latest anime-scraper fixes before anything imports it: allanime
     # changes its crypto every so often and the fix ships as an anipy-api
@@ -55,6 +80,7 @@ def main():
     db.note_modules(modules.installed(), chosen=modules.chosen_explicitly())
     db.note_install({"objects_3d": config.INSTALL_3D})
     app = create_app()
+    _quiet_access_log()
     if modules.has("youtube"):
         from server import notifier
         _warm_caches()

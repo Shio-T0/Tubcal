@@ -31,11 +31,12 @@ def register_blueprints(app):
 
     from .. import modules
     from .feeds import feeds_bp
+    from .img import img_bp
     from .oauth import oauth_bp
     from .settings import settings_bp
     from .subscriptions import subs_bp
 
-    for bp in (feeds_bp, subs_bp, settings_bp, oauth_bp):
+    for bp in (feeds_bp, subs_bp, settings_bp, oauth_bp, img_bp):
         app.register_blueprint(bp)
     for module_id, (name, bps) in MODULE_BLUEPRINTS.items():
         if modules.has(module_id):

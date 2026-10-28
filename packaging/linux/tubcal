@@ -190,6 +190,20 @@ cmd_run() {
   exec "$APP_DIR/.venv/bin/python" main.py
 }
 
+# tubcal tui [ROOM | LINK] [--private]: Tubcal in this terminal. It starts the server
+# itself when it isn't on (through `tubcal start`), so its frame draws at once.
+# tubcal play LINK: a YouTube link in mpv, without the interface.
+cmd_tui() {
+  local py=$APP_DIR/.venv/bin/python
+  [[ -x $py ]] || die "the app's Python is missing" "Run Tubcal's install.sh again."
+  "$py" -c 'import textual' 2>/dev/null ||
+    die "the terminal interface isn't installed" "Add it with: bash $APP_DIR/install.sh --with tui"
+  has mpv || printf '  %s! mpv isn'\''t installed: the terminal can show everything but play nothing%s\n' "$AMBER" "$RST" >&2
+  export TUBCAL_PORT=$PORT
+  cd "$APP_DIR" || exit 1
+  exec "$py" -m tui "$@"
+}
+
 cmd_status() {
   # --quiet: exit 0 = ours and running, 2 = Tubcal answering but started by hand, 1 = off
   if [[ ${1:-} == -q || ${1:-} == --quiet ]]; then
@@ -224,6 +238,7 @@ cmd_status() {
     row "Rooms" "all of them"
   fi
   row "Autostart" "$( ((${AUTOSTART:-0})) && echo on || echo off)"
+  row "Terminal" "$( ((${TUI:-0})) && echo "tubcal tui" || echo "not installed (install.sh --with tui)")"
   if use_systemd; then row "Logs" "tubcal logs (journald)"; else row "Logs" "${LOG/#$HOME/\~}"; fi
   printf '\n'
 }
@@ -337,6 +352,9 @@ usage() {
   tubcal rooms         the rooms there are, and which are installed
   tubcal add ROOM…     add rooms you left out (downloads only those)
   tubcal remove ROOM…  take rooms out (what you saved stays)
+  tubcal tui [ROOM]    Tubcal in this terminal (a room by name: wire, anime…;
+                       a YouTube link plays; --private records nothing)
+  tubcal play LINK     play a YouTube link in mpv, without the interface
   tubcal phone         put Tubcal for Android on a phone plugged in over USB
                        (or update it), with the rooms you pick for it; the
                        phone needs USB debugging on
@@ -363,6 +381,8 @@ case ${1:-open} in
   remove|rm) shift; cmd_rooms_change remove "$@" ;;
   rooms|modules|list) cmd_rooms ;;
   phone|android) shift; cmd_phone "$@" ;;
+  tui|term|terminal) shift; cmd_tui "$@" ;;
+  play) shift; cmd_tui play "$@" ;;
   autostart) shift; cmd_autostart "$@" ;;
   uninstall) shift; cmd_uninstall "$@" ;;
   -h|--help|help) usage ;;
