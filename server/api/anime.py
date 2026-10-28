@@ -833,6 +833,11 @@ def stream(key):
 
 
 # ── byte/playlist proxy (forwards the source's Referer; relays Range) ─────────
+# The URLs come from the sources' playlists, so they go through
+# `httpc.public_session`: no cookies, and nothing on this machine or the local
+# network (checked as each connection opens).
+
+_INSIDE = "that address is on this machine or your own network"
 
 _URI_RE = re.compile(r'URI="([^"]+)"')
 
@@ -859,10 +864,10 @@ def _open(url, referer=None, *, timeout=(6, 25)):
     retried, and `reopen(range)` resumes a body that breaks mid-way, so a flaky
     host doesn't surface as a stalled episode."""
     headers = _fwd(referer)
-    upstream = httpc.stream_get(url, headers=headers, timeout=timeout)
+    upstream = httpc.stream_get(url, headers=headers, public_only=True, timeout=timeout)
 
     def reopen(rng):
-        return httpc.stream_get(url, headers={**headers, "Range": rng}, timeout=timeout)
+        return httpc.stream_get(url, headers={**headers, "Range": rng}, public_only=True, timeout=timeout)
 
     return upstream, reopen
 
@@ -873,8 +878,10 @@ def _playlist(url, referer, attempts=3):
     last = None
     for i in range(attempts):
         try:
-            return httpc.get(url, headers=_fwd(referer), timeout=25).text
+            return httpc.get(url, headers=_fwd(referer), timeout=25, public_only=True).text
         except Exception as e:  # noqa: BLE001 — retried, then reported
+            if httpc.refused(e):
+                raise
             last = e
             if i < attempts - 1:
                 time.sleep(0.4 * (i + 1))
@@ -925,7 +932,7 @@ def hls(key, itag):
     try:
         text = _playlist(src["url"], referer)
     except Exception as e:
-        return err(f"playlist fetch failed: {e}", 502)
+        return err(_INSIDE, 403) if httpc.refused(e) else err(f"playlist fetch failed: {e}", 502)
     return Response(_rewrite(text, src["url"], referer), content_type="application/vnd.apple.mpegurl")
 
 
@@ -938,7 +945,7 @@ def hls_pl():
     try:
         text = _playlist(url, referer)
     except Exception as e:
-        return err(f"playlist fetch failed: {e}", 502)
+        return err(_INSIDE, 403) if httpc.refused(e) else err(f"playlist fetch failed: {e}", 502)
     return Response(_rewrite(text, url, referer), content_type="application/vnd.apple.mpegurl")
 
 
@@ -951,7 +958,7 @@ def hls_seg():
     try:
         upstream, reopen = _open(url, referer)
     except Exception as e:
-        return err(f"segment fetch failed: {e}", 502)
+        return err(_INSIDE, 403) if httpc.refused(e) else err(f"segment fetch failed: {e}", 502)
     return relay(upstream, reopen=reopen, default_ct="video/mp2t")
 
 
@@ -971,7 +978,7 @@ def stream_data(key):
     try:
         upstream, reopen = _open(src["url"], referer)
     except Exception as e:
-        return err(f"stream fetch failed: {e}", 502)
+        return err(_INSIDE, 403) if httpc.refused(e) else err(f"stream fetch failed: {e}", 502)
     return relay(upstream, reopen=reopen, default_ct="video/mp4")
 
 
@@ -984,7 +991,7 @@ def sub():
     if r:
         headers["Referer"] = _unb64(r)
     try:
-        upstream = httpc.stream_get(_unb64(u), headers=headers, timeout=(6, 20))
+        upstream = httpc.stream_get(_unb64(u), headers=headers, public_only=True, timeout=(6, 20))
     except Exception as e:
-        return err(f"subtitle fetch failed: {e}", 502)
+        return err(_INSIDE, 403) if httpc.refused(e) else err(f"subtitle fetch failed: {e}", 502)
     return relay(upstream, default_ct="text/vtt")
