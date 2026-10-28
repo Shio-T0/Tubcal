@@ -24,7 +24,7 @@ from ...api import ApiError, seg
 from ...keys import Bind
 from ...ui.chrome import Winbar
 from ...ui.itemlist import Head, ItemList, RowParts
-from ...ui.paint import style
+from ...ui.paint import style, who
 from ...ui.preview import Preview
 from ..base import RoomView
 
@@ -388,7 +388,8 @@ class Archive(RoomView):
         ready = row.get("status") == "ready"
         st = (g.error, "hue:red") if row.get("status") == "error" else \
             (g.watched, "faint") if ready else (g.upcoming, "mark:yellow")
-        meta = [(fmt.clean(row.get("source_name") or ""), "dim")]
+        src = fmt.clean(row.get("source_name") or "")
+        meta = [(src, who(src))]
         if not ready:
             meta.append((f" {g.dot} {row.get('status') or ''}", "hue:yellow"))
         if row.get("indexed_at") or row.get("added_at"):

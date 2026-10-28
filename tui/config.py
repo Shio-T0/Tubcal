@@ -3,6 +3,7 @@ browser and the phone (playback rate, volume, subtitles, auto-skip, rooms switch
 stays in the server's settings.
 
     icons = "auto"            # auto | nerd | unicode | ascii
+    spacing = "comfy"         # comfy (room between things) | compact (as much as fits)
     images = "auto"           # auto | kitty | sixel | halfcell | off
     youtube_player = "server" # server | ytdl (mpv's own yt-dlp: 4K, VP9, captions)
     video_max_height = 0      # 0 = the best there is
@@ -26,6 +27,7 @@ from pathlib import Path
 
 DEFAULTS = {
     "icons": "auto",
+    "spacing": "comfy",
     "images": "auto",
     "youtube_player": "server",
     "video_max_height": 0,

@@ -255,6 +255,13 @@ don't name: use `--all-extras`); install.sh adds `--group tui` with its `tui` op
   surface it sits on (dim 4.5, faint 3, rule 1.6, surfaces 1.15/1.28; hues lifted in
   OKLab until readable), never a fixed mix. No palette → ANSI names, reverse, bold.
   A rice switch recolours st live (`xrdb -merge`, USR1), so focus-in re-reads xrdb.
+  Each hue also has tinted surfaces (`wash:`/`wash2:` in `ui/paint.style`, as light as
+  surface/surface2, so the tones solved for those still read) and a tinted rule
+  (`rule:<hue>`): the selection band takes the room's tint, headings its hue. Names
+  (channels, subreddits, sites, repos, commenters) get a steady hue of their own
+  (`theme.source_hue`, `paint.who(name)`). Spacing is `spacing` in tui.toml: comfy (the
+  default: a blank line after each two-line item, under the tabline and the winbars,
+  over the statusline, padding in panes) or compact; `paint.LOOK`, set by the app.
 - **Keys** (`keys.py`): one table of sequences → actions, counts, no prefix that is
   also an action (so nothing waits for a timeout), which-key after 300 ms, rooms push
   a layer. Textual's own bindings are off (`inherit_bindings=False`, no palette). Don't

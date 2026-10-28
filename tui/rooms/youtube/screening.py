@@ -26,7 +26,7 @@ from ...keys import Bind
 from ...media.player import COMPLETE, item_video_id
 from ...ui.chrome import Winbar
 from ...ui.itemlist import Head, ItemList, RowParts
-from ...ui.paint import style
+from ...ui.paint import style, who
 from ...ui.preview import Preview
 from ..base import RoomView
 
@@ -268,9 +268,12 @@ class ScreeningRoom(RoomView):
         on = (row.get("_view") == self.view and not self.channel) or \
              ("_chan" in row and row["_chan"] == (self.channel or "") and self.view == "latest" and self.channel)
         n = row.get("_n")
+        name = fmt.clean(row["title"])
+        # a channel in its own colour, as in the list; the views in the room's
+        role = who(name) if row.get("_chan") else "fg"
         return RowParts(sign=("•" if on else " ", "mark:red"),
-                        title=[(fmt.clean(row["title"]), "fg+bold" if on else "fg")],
-                        figure=[(str(n), "dim")] if n else [])
+                        title=[(name, role + ("+bold" if on else ""))],
+                        figure=[(str(n), "hue:red" if row.get("_chan") else "dim")] if n else [])
 
     def _row(self, item: dict) -> RowParts:
         g = self.app.glyphs
@@ -279,7 +282,8 @@ class ScreeningRoom(RoomView):
         frac = self.app.player.fraction(iid)
         live = extra.get("live_status")
         title = fmt.clean(item.get("title"))
-        meta = [(fmt.clean(item.get("source") or item.get("author") or ""), "dim")]
+        src = fmt.clean(item.get("source") or item.get("author") or "")
+        meta = [(src, who(src))]
         figure: list = []
         if live == "is_live":
             sign = (g.live, "mark:red")
@@ -344,7 +348,7 @@ class ScreeningRoom(RoomView):
         t.append(fmt.clean(item.get("title")) + "\n", style(r, "fg+bold"))
         src = fmt.clean(item.get("source") or "")
         when = item.get("published_at")
-        t.append(src, style(r, "fg"))
+        t.append(src, style(r, who(src, "+bold")))
         if when:
             word = "watched " if self.view == "history" else ""
             t.append(f" {g.dot} {word}{fmt.ago_long(when)}", style(r, "dim"))

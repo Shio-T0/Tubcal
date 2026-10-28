@@ -237,10 +237,10 @@ class AnimeRoom(RoomView):
             meta.append((f" {g.dot} rewatching", "dim"))
         mark: list = []
         if e.get("score"):
-            mark.append((f"{e['score']:g}", "dim"))
+            mark.append((f"{e['score']:g}", "hue:yellow"))
         if f"anime:{m['id']}" in self.app.saved:
             mark.append((f" {g.saved}", "mark:blue"))
-        figure = [(f"{w['watched']}/{total}", "dim")] if status != "PLANNING" else \
+        figure = [(f"{w['watched']}", f"hue:{HUE}"), (f"/{total}", "dim")] if status != "PLANNING" else \
             [(f"{w['total']} eps" if w["total"] else "", "faint")]
         return RowParts(sign=sign, title=[(fmt.clean(m.get("title")), "fg")], figure=figure, meta=meta, mark=mark)
 

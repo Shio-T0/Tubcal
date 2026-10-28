@@ -21,7 +21,7 @@ from ...api import ApiError
 from ...keys import Bind
 from ...ui.chrome import Winbar
 from ...ui.itemlist import Head, ItemList, RowParts
-from ...ui.paint import style
+from ...ui.paint import style, who
 from ..base import RoomView
 
 HUE = "green"
@@ -155,7 +155,7 @@ class Composing(RoomView):
         st = it.get("_git")
         sign = (g.playing, f"mark:{HUE}") if it.get("_active") else \
             ((st or "?")[:1], "hue:yellow" if st not in ("??", "A") else f"mark:{HUE}") if st else (" ", "fg")
-        meta = [(it.get("source") or "", "dim")]
+        meta = [(it.get("source") or "", who(it.get("source") or ""))]
         if st:
             meta.append((f" {g.dot} {GIT.get(st, GIT.get(st[:1], st))}", "faint"))
         mark = [(g.saved, "mark:blue")] if it["id"] in self.app.saved else []

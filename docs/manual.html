@@ -438,7 +438,7 @@
             <li><b>What the terminal remembers</b> is the room you were in, which stories you've read and where you stopped in podcasts. <code>:history clear</code> forgets the stories and podcasts. Your watch history is the same as in the browser; you can clear it in Settings.</li>
           </ul>
           <h3>Its own settings</h3>
-          <p>Almost everything is shared with the browser. The few things only the terminal uses go in <code>~/.config/tubcal/tui.toml</code>, for example <code>editor = "hx"</code> for another editor, <code>images = "off"</code> for no pictures, or <code>icons = "unicode"</code> if your font has no Nerd Font icons. <code>:checkhealth</code> shows what works in your terminal.</p>
+          <p>Almost everything is shared with the browser. The few things only the terminal uses go in <code>~/.config/tubcal/tui.toml</code>, for example <code>editor = "hx"</code> for another editor, <code>images = "off"</code> for no pictures, or <code>icons = "unicode"</code> if your font has no Nerd Font icons, or <code>spacing = "compact"</code> to fit more on the screen. <code>:checkhealth</code> shows what works in your terminal.</p>
           <p>You can change keys there too, written the way vim writes them. Under <code>[keys]</code>, the line <code>"&lt;C-n&gt;" = "down"</code> makes <kbd>Ctrl</kbd><kbd>N</kbd> move down, and <code>"K" = ""</code> turns <kbd>K</kbd> off. A room's own keys go under its name, for example <code>[keys.youtube]</code>. <code>:map</code> lists every key with the name of its action. If something in the file can't work, Tubcal says what when it starts, and <code>:messages</code> keeps the list.</p>
         </div>
       </section>

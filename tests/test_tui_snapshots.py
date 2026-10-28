@@ -224,3 +224,10 @@ def test_the_wire_reading_a_thread(make_app, palette):
             return capture(app, palette)
     compare(f"wire-{palette}", *asyncio.run(go()))
 
+
+
+def test_compact_spacing(make_app, tmp_path):
+    """`spacing = "compact"`: no blank lines between items, under the bars or around
+    the panes."""
+    (tmp_path / "xdg_config_home" / "tubcal" / "tui.toml").write_text('images = "off"\nspacing = "compact"\n')
+    compare("screening-compact-everforest", *screening("everforest", make_app))

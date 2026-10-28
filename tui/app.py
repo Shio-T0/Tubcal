@@ -35,12 +35,13 @@ from .rooms import CHANNELS, HOME, ROOM_BY_ID, Registry, load_screen
 from .rooms.base import RoomView, WebRoom
 from .state import State
 from .terminal import TermInfo
-from .theme import gamma_ok, solve, textual_variables
+from .theme import ROOM_HUES, gamma_ok, solve, textual_variables
 from .saved import kind_of
 from .ui.chrome import Statusline, Tabline, WhichKey
 from .ui.drawer import VIEWS, SavedDrawer
 from .ui.finder import Finder
 from .ui.itemlist import ItemList
+from .ui import paint
 from .ui.paint import style
 
 COMMANDS = ["q", "quit", "qa", "open", "play", "yt", "hn", "r", "ar", "ask", "sleep", "radio", "private",
@@ -97,6 +98,7 @@ class TubcalApp(App, inherit_bindings=False):
         # the colour roles first: Textual reads our CSS variables inside App.__init__
         self.term = term
         self.cfg, cfg_problem = config_mod.load()
+        paint.LOOK["comfy"] = self.cfg["spacing"] != "compact"   # before any widget is made
         self.glyphs = choose_glyphs(self.cfg["icons"])
         self.roles = solve(term.palette)
         super().__init__()
@@ -324,6 +326,7 @@ class TubcalApp(App, inherit_bindings=False):
         sl = self.statusline
         sl.mode = self.mode
         sl.crumbs = room.crumbs() if room else []
+        sl.hue = "blue" if self.drawer.display else ROOM_HUES.get(self.room_id, "blue")
         if self.drawer.display:
             sl.crumbs = ["Saved", dict(VIEWS).get(self.drawer.view, "")]
         lst = self.active_list()

@@ -18,7 +18,7 @@ from ..keys import Bind
 from ..saved import CHANNEL_LABEL, CHANNEL_ORDER, KIND_ORDER, KINDS, TONE, channel_of, kind_of
 from .chrome import Winbar
 from .itemlist import Head, ItemList, RowParts
-from .paint import style
+from .paint import style, who
 
 VIEWS = [("todo", "To do"), ("done", "Done"), ("all", "All")]
 
@@ -106,7 +106,7 @@ class SavedDrawer(Vertical, can_focus=False):
         meta = []
         src = fmt.clean(it.get("source") or it.get("author") or "")
         if src:
-            meta.append((src, "dim"))
+            meta.append((src, who(src)))
         if it.get("saved_at"):
             meta.append(((f" {g.dot} " if src else "") + f"saved {fmt.ago(it['saved_at'])} ago", "faint"))
         if it.get("note"):

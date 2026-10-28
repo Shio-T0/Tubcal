@@ -23,7 +23,7 @@ from ...keys import Bind
 from ...ui.chrome import Winbar
 from ...ui.html import parse, wrap
 from ...ui.itemlist import Head, ItemList, RowParts
-from ...ui.paint import style
+from ...ui.paint import style, who
 from ...ui.preview import Preview
 from ..base import RoomView
 from . import calendar
@@ -237,7 +237,7 @@ class Github(RoomView):
             kind = t.get("kind")
             figure = {"pull": f"PR #{t.get('number')}", "issue": f"#{t.get('number')}", "checks": "checks",
                       "release": "release", "commit": (t.get("sha") or "")[:7], "discussion": "discussion"}.get(kind, "")
-            meta = [(row.get("repo") or "", "dim")]
+            meta = [(row.get("repo") or "", who(row.get("repo") or ""))]
             reason = REASONS.get(row.get("reason"), (row.get("reason") or "").replace("_", " "))
             if reason:
                 meta.append((f" {g.dot} {reason}", "faint"))
@@ -249,7 +249,8 @@ class Github(RoomView):
                             figure=[(figure, f"hue:{HUE}" if kind == "pull" else "dim")], meta=meta)
         extra = row.get("extra") or {}
         state = extra.get("state") or "open"
-        meta = [(extra.get("repo") or row.get("source") or "", "dim"), (f" {g.dot} {state}", "faint")]
+        repo = extra.get("repo") or row.get("source") or ""
+        meta = [(repo, who(repo)), (f" {g.dot} {state}", "hue:green" if state == "open" else "faint")]
         if extra.get("draft"):
             meta.append((f" {g.dot} draft", "faint"))
         if row.get("published_at"):
@@ -284,7 +285,8 @@ class Github(RoomView):
         else:
             t.append(fmt.clean(row.get("title")) + "\n", style(r, "fg+bold"))
             repo = row.get("repo") or (row.get("extra") or {}).get("repo") or ""
-            t.append(repo + (f" #{th[1]}" if th else "") + "\n\n", style(r, "dim"))
+            t.append(repo, style(r, who(repo, "+bold")))
+            t.append((f" #{th[1]}" if th else "") + "\n\n", style(r, "dim"))
             if th:
                 t.append("⏎  reads the conversation here" + ("   i  comments" if self._can_comment() else "") + "\n",
                          style(r, "faint"))

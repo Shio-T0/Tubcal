@@ -23,8 +23,16 @@ from .. import fmt
 from ..glyphs import Glyphs
 from ..media.player import NowState
 from ..rooms import ROOM_BY_ID, Registry
-from ..theme import MODE_HUES, Roles
-from .paint import style
+from ..theme import CHANNEL_HUES, MODE_HUES, ROOM_HUES, Roles
+from .paint import comfy, style
+
+
+def _breathe(widget: Widget, *, below: int = 0, above: int = 0) -> None:
+    """Comfy spacing: a blank line under (or over) a one-line bar."""
+    if comfy():
+        widget.styles.height = 1 + below
+        widget.styles.padding = (0, 0, below, 0)
+        widget.styles.margin = (above, 0, 0, 0)
 
 
 def _block(roles: Roles, glyphs: Glyphs, label: str, hue: str) -> Text:
@@ -53,6 +61,7 @@ class Tabline(Widget, can_focus=False):
         self.server_down = False
         self.starting = ""
         self.built: set[str] = set()
+        _breathe(self, below=1)
 
     def render(self) -> Text:
         r = self.roles
@@ -92,8 +101,9 @@ class Tabline(Widget, can_focus=False):
             on = cid == cur_ch
             if not on and not all_channels:
                 continue
-            t.append(f"{n} ", style(r, "faint" if not on else "dim"))
-            t.append(label, style(r, "fg+bold" if on else "dim"))
+            hue = CHANNEL_HUES.get(cid, "blue")
+            t.append(f"{n} ", style(r, f"hue:{hue}" if on else "faint"))
+            t.append(label, style(r, f"hue:{hue}+bold" if on else "dim"))
             t.append("  ")
         if self.room_id == "home":
             t.append(f"{g.rule_v}  ", style(r, "rule"))
@@ -111,7 +121,7 @@ class Tabline(Widget, can_focus=False):
                     t.append_text(_block(r, g, f"{n} {name}", _hue_of(room.id)))
                 else:
                     t.append(f"{n} ", style(r, "faint"))
-                    t.append(name, style(r, "dim"))
+                    t.append(name, style(r, f"hue:{_hue_of(room.id)}"))
                     if web:
                         t.append(web, style(r, "faint"))
                 t.append("  " if short else "   ")
@@ -128,7 +138,6 @@ class Tabline(Widget, can_focus=False):
 
 
 def _hue_of(room_id: str) -> str:
-    from ..theme import ROOM_HUES
     return ROOM_HUES.get(room_id, "blue")
 
 
@@ -160,6 +169,8 @@ class Statusline(Widget, can_focus=False):
         self.radio = NowState()   # the bench radio
         self.radio_show = ""
         self.sleep = ""           # the sleep timer: "23m", "end"
+        self.hue = "blue"         # the room's: the breadcrumb sits on its tint
+        _breathe(self, above=1)
 
     def say(self, text: str, level: str = "info") -> None:
         dur = {"info": 4, "warn": 8}.get(level, 0)
@@ -198,8 +209,14 @@ class Statusline(Widget, can_focus=False):
             priv = Text(f" {g.private}PRIV ", style(r, "fg+bold") + _reverse())
             t.append_text(priv)
         t.append(" ")
-        crumb = " › ".join(c for c in self.crumbs if c)
-        t.append(f" {crumb} ", style(r, "dim", "surface") if r.truecolor else style(r, "dim"))
+        parts = [c for c in self.crumbs if c]
+        on = f"wash:{self.hue}" if r.truecolor else None
+        t.append(" ", style(r, "fg", on))
+        for i, c in enumerate(parts):
+            if i:
+                t.append(" › ", style(r, f"hue:{self.hue}", on))
+            t.append(c, style(r, "fg" if i == len(parts) - 1 else "dim", on))
+        t.append(" ", style(r, "fg", on))
         left_w = cell_len(t.plain)
         # the right side: playing │ queue │ pending keys │ position │ clock
         right = Text(no_wrap=True)
@@ -303,17 +320,22 @@ class Winbar(Widget, can_focus=False):
         self.right = ""
         self.busy = False
         self.hue = "blue"
+        _breathe(self, below=1)
 
     def render(self) -> Text:
         r = self.roles
         t = Text(no_wrap=True, overflow="crop")
-        t.append("  ")
+        t.append(" ")
         for vid, label, n in self.views:
             on = vid == self.current
-            t.append(label, style(r, f"hue:{self.hue}+bold" if on else "dim"))
+            # the view you're on is a chip in the room's tint
+            chip = f"wash2:{self.hue}" if on and r.truecolor else None
+            t.append(" ", style(r, "fg", chip))
+            t.append(label, style(r, f"hue:{self.hue}+bold" if on else "dim", chip))
             if n:
-                t.append(f" {n}", style(r, "dim" if on else "faint"))
-            t.append("   ")
+                t.append(f" {n}", style(r, f"hue:{self.hue}" if on else "faint", chip))
+            t.append(" ", style(r, "fg", chip))
+            t.append("  ")
         if self.busy:
             t.append("⠿ ", style(r, "faint"))
         right = Text(self.right + "  ", style(r, "dim"))

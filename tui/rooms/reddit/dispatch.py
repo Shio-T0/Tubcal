@@ -20,6 +20,7 @@ from ...api import ApiError
 from ...keys import Bind
 from ...ui.chrome import Winbar
 from ...ui.itemlist import Head, ItemList, RowParts
+from ...ui.paint import who
 from ...ui.thread import ThreadView
 from ..base import RoomView
 
@@ -208,13 +209,14 @@ class Dispatch(RoomView):
 
     def _index_row(self, row: dict) -> RowParts:
         on = row.get("_sub", "") == (self.sub or "")
+        role = who(row["title"]) if row.get("_sub") else "fg"
         return RowParts(sign=("•" if on else " ", f"mark:{HUE}"),
-                        title=[(row["title"], "fg+bold" if on else "fg")])
+                        title=[(row["title"], role + ("+bold" if on else ""))])
 
     def _row(self, item: dict) -> RowParts:
         g = self.app.glyphs
         extra = item.get("extra") or {}
-        meta = [(item.get("source") or "", f"hue:{HUE}")]
+        meta = [(item.get("source") or "", who(item.get("source") or ""))]
         if item.get("author"):
             meta.append((f" {g.dot} {item['author']}", "faint"))
         if item.get("published_at"):

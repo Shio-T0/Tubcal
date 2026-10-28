@@ -23,6 +23,7 @@ from ...api import ApiError
 from ...keys import Bind
 from ...ui.chrome import Winbar
 from ...ui.itemlist import Head, ItemList, RowParts
+from ...ui.paint import who
 from ...ui.thread import ThreadView
 from ..base import RoomView
 
@@ -225,7 +226,7 @@ class Wire(RoomView):
                   (" " + cells[min(len(cells) - 1, int(heat * len(cells)))], f"mark:{HUE}" if heat > 0.3 else "faint")]
         meta = []
         if extra.get("domain"):
-            meta.append(((f"{g.playing} " if is_youtube(item.get("url")) else "") + extra["domain"], "dim"))
+            meta.append(((f"{g.playing} " if is_youtube(item.get("url")) else "") + extra["domain"], who(extra["domain"])))
         if item.get("author"):
             meta.append(((f" {g.dot} " if meta else "") + item["author"], "faint"))
         if item.get("published_at"):

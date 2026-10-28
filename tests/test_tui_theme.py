@@ -103,3 +103,29 @@ def test_truecolor_is_declared_for_kitty_terminals(monkeypatch):
     terminal.prepare_env(terminal.TermInfo(palette=None, kitty=True, term="xterm"))
     import os
     assert os.environ["COLORTERM"] == "truecolor"
+
+
+@pytest.mark.parametrize("name", list(PALETTES))
+def test_a_hues_tinted_band_reads_like_the_grey_one(name):
+    """A selection band tinted with a room's hue is as light as `surface2` (and the
+    unselected one as `surface`), so the text tones solved for those read on it too."""
+    p = PALETTES[name]
+    r = solve(p)
+    bg = p.bg
+    for hue in ("red", "green", "yellow", "blue", "magenta", "cyan", "dispatch"):
+        for kind, surf in (("wash", "surface"), ("wash2", "surface2")):
+            wash = parse_hex(r.tint(kind, hue).get_truecolor().hex)
+            assert contrast(wash, bg) == pytest.approx(contrast(parse_hex(r.hex[surf]), bg), abs=0.03)
+            suffix = "_s2" if kind == "wash2" else "_s"
+            assert contrast(parse_hex(r.hex[f"dim{suffix}"]), wash) >= TEXT - 0.1
+            assert contrast(parse_hex(r.hex[f"faint{suffix}"]), wash) >= MARK - 0.1
+        assert contrast(parse_hex(r.tint("rule", hue).get_truecolor().hex), bg) >= RULE - 0.02
+
+
+def test_a_name_keeps_its_hue_and_names_spread_over_all_of_them():
+    from collections import Counter
+
+    from tui.theme import SOURCE_HUES, source_hue
+    assert source_hue("Ado") == source_hue(" ado ")
+    spread = Counter(source_hue(f"channel {i}") for i in range(600))
+    assert set(spread) == set(SOURCE_HUES) and min(spread.values()) > 60

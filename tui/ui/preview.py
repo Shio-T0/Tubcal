@@ -15,7 +15,7 @@ from textual.widgets import Static
 
 from ..glyphs import Glyphs
 from ..theme import Roles
-from .paint import style
+from .paint import comfy, style
 
 
 def well_size(width: int, ratio: float, cell_px: tuple[int, int]) -> tuple[int, int]:
@@ -69,6 +69,8 @@ class Preview(Vertical, can_focus=False):
         self.well = Well(roles, glyphs, backend=backend)
         self.slate = self.well.slate
         self.body = Static("", id="body")
+        if comfy():
+            self.styles.padding = (1, 2, 0, 2)
 
     def compose(self):
         yield self.well
