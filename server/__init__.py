@@ -43,8 +43,10 @@ def create_app():
             resp.headers["Cache-Control"] = "no-store"
         elif request.path.startswith("/assets/"):
             resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
-        # No other site may show Tubcal in a frame and steer clicks in it.
-        resp.headers["Content-Security-Policy"] = "frame-ancestors 'self'"
+        # No other site may show Tubcal in a frame and steer clicks in it. A response
+        # with a policy of its own (/api/img's sandbox) keeps it, with this added.
+        own = resp.headers.get("Content-Security-Policy")
+        resp.headers["Content-Security-Policy"] = f"{own}; frame-ancestors 'self'" if own else "frame-ancestors 'self'"
         return resp
 
     def serve_index(dist):
