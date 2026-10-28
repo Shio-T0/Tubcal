@@ -109,7 +109,8 @@
             <table>
               <thead><tr><th>Option</th><th>What it gives you</th><th>At first</th></tr></thead>
               <tbody>
-                <tr><td class="nowrap"><b>App-menu entry</b></td><td>Adds Tubcal to your app menu.</td><td>on</td></tr>
+                <tr><td class="nowrap"><b>Web interface</b></td><td>Tubcal in your browser. Turn it off to have only the terminal interface (see <a href="#terminal-only">Only in a terminal</a>).</td><td>on</td></tr>
+                <tr><td class="nowrap"><b>App-menu entry</b></td><td>Adds Tubcal to your app menu. Without the web interface, the menu entry opens Tubcal in a terminal window.</td><td>on</td></tr>
                 <tr><td class="nowrap"><b>Start when I log in</b></td><td>Starts Tubcal in the background when you log in.</td><td>off</td></tr>
                 <tr><td class="nowrap"><b>Distro extras</b></td><td>A desktop notification shortly before a channel you follow goes live (with the Screening Room), and faster search in the code editor (with the Composing Room).</td><td>on</td></tr>
                 <tr><td class="nowrap"><b>Terminal interface</b></td><td>Tubcal in a terminal window as well as in the browser: <code>tubcal tui</code>. Videos and episodes play in <b>mpv</b>, which the distro extras install if it's missing. See <a href="#terminal">In a terminal</a>.</td><td>on if mpv is installed</td></tr>
@@ -117,7 +118,7 @@
               </tbody>
             </table>
           </div>
-          <p>To add a room later, type <code>tubcal add</code> and its name, for example <code>tubcal add anime</code>. <code>tubcal remove</code> takes one out again; what you saved, followed and watched there is kept, and comes back if you add the room again. To change the options, run the install command again: your earlier choices are already selected, and your data isn't touched.</p>
+          <p>To add a room later, type <code>tubcal add</code> and its name, for example <code>tubcal add anime</code>. <code>tubcal remove</code> takes one out again; what you saved, followed and watched there is kept, and comes back if you add the room again. <code>tubcal add web</code> and <code>tubcal add tui</code> add the web or terminal interface the same way. To change the other options, run the install command again: your earlier choices are already selected, and your data isn't touched.</p>
 
           <h3 id="phone">On your phone</h3>
           <p>Tubcal also comes as an Android app, laid out for a phone, and it runs entirely on the phone. If your phone is plugged in while you install, the installer offers to put the app on it. You can also do it any time with <code>tubcal phone</code>, which installs the newest version, or updates the one already on the phone with the rooms it has.</p>
@@ -161,7 +162,7 @@
             <table>
               <thead><tr><th>Command</th><th>What it does</th></tr></thead>
               <tbody>
-                <tr><td class="nowrap"><code>tubcal</code></td><td>Starts Tubcal if it isn't running, and opens it in your browser.</td></tr>
+                <tr><td class="nowrap"><code>tubcal</code></td><td>Starts Tubcal if it isn't running, and opens it in your browser. If you installed only the terminal interface, it opens Tubcal in the terminal instead.</td></tr>
                 <tr><td class="nowrap"><code>tubcal stop</code></td><td>Stops Tubcal. Closing the browser tab doesn't stop it; it keeps running in the background so it opens quickly next time.</td></tr>
                 <tr><td class="nowrap"><code>tubcal restart</code></td><td>Stops it and starts it again.</td></tr>
                 <tr><td class="nowrap"><code>tubcal status</code></td><td>Tells you whether it's running, and at which address.</td></tr>
@@ -374,6 +375,29 @@
         <div class="prose">
           <h3>Getting it</h3>
           <p>It's the installer's <b>Terminal interface</b> option. If you didn't pick it, run the install command again and switch it on; your other choices stay as they were. To play anything it needs <b>mpv</b>: with <b>Distro extras</b> on, the installer installs it for you.</p>
+          <h3 id="terminal-only">Only in a terminal</h3>
+          <p>If you don't want the browser version at all, install the terminal interface on its own:</p>
+          <div class="codeblock">
+            <div class="cb-head"><span>paste into a terminal</span><button class="copy"></button></div>
+<pre><span class="k">curl -fsSL https://raw.githubusercontent.com/Shio-T0/Tubcal/main/install.sh | bash -s -- --tui-only</span></pre>
+          </div>
+          <p>You can also turn off <b>Web interface</b> in the installer's list. Tubcal then doesn't download or build the browser version. It still needs Node.js if you have the Screening Room, which uses it to read YouTube. <code>tubcal</code> and the app-menu entry open the terminal interface, and <code>tubcal add web</code> adds the browser version later.</p>
+          <p>Some of what the browser version's Settings does is a command here:</p>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Type</th><th>What it does</th></tr></thead>
+              <tbody>
+                <tr><td class="nowrap"><code>:follow @name</code></td><td>Follows a YouTube channel (its @name or a link). <code>:follow r/linux</code> follows a subreddit. On its own, <code>:follow</code> follows the channel of the selected video, or the subreddit you're reading.</td></tr>
+                <tr><td class="nowrap"><code>:unfollow</code></td><td>Stops following the selected video's channel, or the subreddit you're reading. Add a name to pick another one.</td></tr>
+                <tr><td class="nowrap"><code>:link anilist</code></td><td>Connects your AniList account; <code>:link reddit</code> connects Reddit. The first time, Tubcal explains how to get the key the site asks for. Then your browser asks you to approve Tubcal, and you come back to the terminal.</td></tr>
+                <tr><td class="nowrap"><code>:link github</code></td><td>Connects GitHub through the GitHub CLI's sign-in, or with a token you add after it.</td></tr>
+                <tr><td class="nowrap"><code>:room on github</code></td><td>Shows a room in the tabs. <code>:room off</code> hides it.</td></tr>
+                <tr><td class="nowrap"><code>:settings</code></td><td>Your accounts, what you follow and which rooms are shown. <kbd>Space</kbd> <kbd>,</kbd> opens it too.</td></tr>
+                <tr><td class="nowrap"><code>:about</code></td><td>Tubcal's licence, and the projects it builds on.</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p>The rest of Settings, such as playback, subtitles, quiet hours and backups of your data, is only in the browser version.</p>
           <h3>Opening it</h3>
           <div class="table-wrap">
             <table>

@@ -26,6 +26,10 @@ TTL_BRAIN_DIGEST = 1800  # digest is expensive — cache it (SWR)
 # TUBCAL_3D=1 or 0). Unset when Tubcal wasn't started by the launcher: then the
 # setting is whatever Settings → Appearance says. db.note_install applies it.
 INSTALL_3D = {"1": True, "0": False}.get(os.environ.get("TUBCAL_3D", "").strip())
+# The web interface. An install with only the terminal one (install.sh's `web`
+# option off; the launcher sets TUBCAL_WEB=0) serves a short page instead of the
+# app, and /api/health says so, so the terminal can tell you rather than open it.
+WEB = os.environ.get("TUBCAL_WEB", "1").strip() != "0"
 
 HOST = "127.0.0.1"
 PORT = int(os.environ.get("TUBCAL_PORT", "5000"))

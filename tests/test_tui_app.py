@@ -830,3 +830,102 @@ def test_map_lists_the_keys_with_their_action_names(make_app):
             await pilot.press("q")
             assert not app.info.display
     run(go())
+
+
+# ── an install with only the terminal interface ─────────────────────────────
+
+def test_without_the_web_interface_settings_is_a_sheet_and_O_says_why(make_app, monkeypatch):
+    from server import config as server_config
+    monkeypatch.setattr(server_config, "WEB", False)
+    opened = []
+    from tui import links
+    monkeypatch.setattr(links, "open_url", lambda url, browser="": opened.append(url))
+
+    async def go():
+        app = make_app()
+        async with app.run_test(size=(140, 40)) as pilot:
+            await ready(app, pilot)
+            assert app.web is False
+            assert next(b.help for b in app.global_binds if b.action == "settings") == "Settings"
+            await pilot.press("O")
+            assert "no web interface" in app.statusline.message.text and opened == []
+            await pilot.press("space", ",")
+            await until(pilot, lambda: app.info.display)
+            text = str(app.info.render())
+            assert "Accounts" in text and ":link anilist" in text and "Following" in text
+            assert "1 channel" in text and "Channel 1" in text and ":room on github" in text
+            assert "tubcal add web" in text
+            await pilot.press("q")
+            await pilot.press(":", *"about", "enter")
+            assert "GNU General Public License" in str(app.info.render())
+    run(go())
+
+
+def test_follow_and_unfollow_from_the_terminal(make_app, monkeypatch):
+    from server.sources import reddit, youtube
+    monkeypatch.setattr(youtube, "resolve_channel", lambda raw: {"channel_id": "UCnewnewnewnewnewnewnew1",
+                                                                  "title": "New Channel", "thumbnail": None})
+    monkeypatch.setattr(reddit, "validate_subreddit", lambda raw: {"name": "linux", "title": "r/linux", "icon": None})
+
+    async def go():
+        app = make_app()
+        async with app.run_test(size=(140, 40)) as pilot:
+            await ready(app, pilot)
+            subs = lambda: app.api.get("/subscriptions")   # noqa: E731
+            await pilot.press(":", *"follow @newchannel", "enter")
+            await until(pilot, lambda: any(s["display_name"] == "New Channel" for s in subs()["youtube"]))
+            await until(pilot, lambda: "Following New Channel" in app.statusline.message.text)
+            await pilot.press(":", *"follow r/linux", "enter")
+            await until(pilot, lambda: [s["source_id"] for s in subs()["reddit"]] == ["linux"])
+            await pilot.press(":", *"follow r/linux", "enter")
+            await until(pilot, lambda: "already follow" in app.statusline.message.text)
+            # alone: the selected video's channel (Channel 1 is followed, from the fixture)
+            lst = app.room.list
+            n = next(i for i, it in enumerate(lst.items) if it["extra"]["channel_id"] == "UC1")
+            lst.go(n)
+            await pilot.press(":", *"unfollow", "enter")
+            await until(pilot, lambda: not any(s["source_id"] == "UC1" for s in subs()["youtube"]))
+            await pilot.press(":", *"unfollow new channel", "enter")
+            await until(pilot, lambda: subs()["youtube"] == [])
+            await pilot.press(":", *"unfollow nobody", "enter")
+            await until(pilot, lambda: "don't follow" in app.statusline.message.text)
+    run(go())
+
+
+def test_linking_accounts_and_rooms_from_the_terminal(make_app, monkeypatch):
+    import time as real_time
+
+    from server import db
+    from server.sources import github
+    from tui import accounts, links
+    opened = []
+    monkeypatch.setattr(links, "open_url", lambda url, browser="": opened.append(url))
+    nap = real_time.sleep
+    monkeypatch.setattr(accounts.time, "sleep", lambda s: nap(0.05))
+    monkeypatch.setattr(github, "link_gh_cli", lambda: {"linked": True, "login": "me"})
+
+    async def go():
+        app = make_app()
+        async with app.run_test(size=(140, 40)) as pilot:
+            await ready(app, pilot)
+            # no API client yet: the steps, with this server's redirect URL
+            await pilot.press(":", *"link anilist", "enter")
+            await until(pilot, lambda: app.info.display)
+            assert "/api/oauth/anilist/callback" in str(app.info.render())
+            await pilot.press("q")
+            await pilot.press(":", *"link anilist abc s3cret", "enter")
+            await until(pilot, lambda: opened)
+            assert opened[0].endswith("/api/oauth/anilist/start")
+            assert db.get_oauth("anilist")["client_id"] == "abc"
+            db.set_oauth_tokens("anilist", "tok", None, int(real_time.time()) + 86400)   # approved in the browser
+            await until(pilot, lambda: "AniList is connected" in app.statusline.message.text)
+            await pilot.press(":", *"link github", "enter")
+            await until(pilot, lambda: "GitHub linked as me" in app.statusline.message.text)
+            await pilot.press(":", *"room on github", "enter")
+            await until(pilot, lambda: "github" in app.api.get("/settings")["active_rooms"])
+            assert "github" in app.registry.active
+            await pilot.press(":", *"room off wire", "enter")
+            await until(pilot, lambda: "hackernews" not in app.api.get("/settings")["active_rooms"])
+            await pilot.press(":", *"room on anime", "enter")
+            assert "always on" in app.statusline.message.text
+    run(go())

@@ -336,3 +336,25 @@ def test_calendar_lines_read_without_colour():
     assert set("".join(text[2:])) <= set("·░▒▓█ MonWedFri")
     assert all(role == "faint" for s, role in out[2][1:] if s.startswith("·"))   # none: faint, not a colour
     assert "Oct" in text[1] and "Sep" in text[1]
+
+
+# ── starting the server ──────────────────────────────────────────────────────
+
+def test_the_launcher_is_found_off_path(tmp_path, monkeypatch):
+    """`tubcal start` gives the server the install's choices (no web interface…), so
+    the terminal finds the launcher even where ~/.local/bin isn't on PATH."""
+    from tui import bootstrap
+    monkeypatch.setenv("PATH", str(tmp_path / "nowhere"))
+    monkeypatch.delenv("TUBCAL_LAUNCHER", raising=False)
+    monkeypatch.setenv("TUBCAL_BIN_DIR", str(tmp_path / "bin"))
+    assert bootstrap.launcher() is None
+    (tmp_path / "bin").mkdir()
+    exe = tmp_path / "bin" / "tubcal"
+    exe.write_text("#!/bin/sh\n")
+    exe.chmod(0o755)
+    assert bootstrap.launcher() == str(exe)
+    other = tmp_path / "started-us"
+    other.write_text("#!/bin/sh\n")
+    other.chmod(0o755)
+    monkeypatch.setenv("TUBCAL_LAUNCHER", str(other))
+    assert bootstrap.launcher() == str(other)

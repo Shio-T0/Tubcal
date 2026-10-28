@@ -40,6 +40,8 @@ if [[ -z $PORT && -f $APP_DIR/.env ]]; then
 fi
 PORT=${PORT:-5000}
 URL="http://127.0.0.1:$PORT"
+# The interfaces installed: a record from before there was a choice had the web one.
+WEB=${WEB:-1} TUI=${TUI:-0}
 
 has() { command -v "$1" >/dev/null 2>&1; }
 
@@ -83,6 +85,8 @@ server_env() {
   # The installer's "3D objects" answer; the server applies it when it changes
   # (db.note_install), so a switch flipped in Settings stays flipped.
   if [[ -n ${OBJECTS_3D:-} ]]; then export TUBCAL_3D=$OBJECTS_3D; fi
+  # Without the web interface the server says so instead of serving the app.
+  export TUBCAL_WEB=$WEB
 }
 
 # yt-dlp breaks whenever YouTube changes something, and the fix ships as a
@@ -157,6 +161,8 @@ open_url() {
 }
 
 cmd_open() {
+  ((WEB)) || die "this Tubcal has only the terminal interface" "Open it with: tubcal tui" \
+    "To use it in the browser as well: tubcal add web"
   cmd_start
   open_url
   [[ -t 1 ]] && printf '  %s●%s %son air%s  %s\n' "$KAKI" "$RST" "$BOLD" "$RST" "$URL"
@@ -197,9 +203,10 @@ cmd_tui() {
   local py=$APP_DIR/.venv/bin/python
   [[ -x $py ]] || die "the app's Python is missing" "Run Tubcal's install.sh again."
   "$py" -c 'import textual' 2>/dev/null ||
-    die "the terminal interface isn't installed" "Add it with: bash $APP_DIR/install.sh --with tui"
+    die "the terminal interface isn't installed" "Add it with: tubcal add tui"
   has mpv || printf '  %s! mpv isn'\''t installed: the terminal can show everything but play nothing%s\n' "$AMBER" "$RST" >&2
-  export TUBCAL_PORT=$PORT
+  # the terminal starts the server through this launcher, with the install's choices
+  export TUBCAL_PORT=$PORT TUBCAL_LAUNCHER=$SELF
   cd "$APP_DIR" || exit 1
   exec "$py" -m tui "$@"
 }
@@ -238,7 +245,8 @@ cmd_status() {
     row "Rooms" "all of them"
   fi
   row "Autostart" "$( ((${AUTOSTART:-0})) && echo on || echo off)"
-  row "Terminal" "$( ((${TUI:-0})) && echo "tubcal tui" || echo "not installed (install.sh --with tui)")"
+  row "Browser" "$( ((WEB)) && echo "$URL" || echo "no web interface (tubcal add web)")"
+  row "Terminal" "$( ((TUI)) && echo "tubcal tui" || echo "not installed (tubcal add tui)")"
   if use_systemd; then row "Logs" "tubcal logs (journald)"; else row "Logs" "${LOG/#$HOME/\~}"; fi
   printf '\n'
 }
@@ -302,12 +310,13 @@ cmd_uninstall() {
   exec bash "$APP_DIR/install.sh" --uninstall "$@"
 }
 
-# tubcal add|remove ROOM…: the installer changes the rooms, rebuilds and restarts.
+# tubcal add|remove ROOM…: the installer changes the rooms (or the options: web,
+# tui, desktop…), rebuilds and restarts.
 cmd_rooms_change() {
   local how=$1; shift
   local rooms=() flags=() a
   for a in "$@"; do case $a in -*) flags+=("$a") ;; *) rooms+=("$a") ;; esac; done
-  ((${#rooms[@]})) || die "usage: tubcal $how ROOM…" "\`tubcal rooms\` lists them."
+  ((${#rooms[@]})) || die "usage: tubcal $how ROOM…" "\`tubcal rooms\` lists them; web and tui are the interfaces."
   [[ -f $APP_DIR/install.sh ]] || die "can't find $APP_DIR/install.sh"
   local IFS=,
   exec bash "$APP_DIR/install.sh" "--$how" "${rooms[*]}" "${flags[@]}"
@@ -338,11 +347,13 @@ cmd_phone() {
 }
 
 usage() {
+  local first="start it (if needed) and open it in the browser"
+  ((WEB)) || first="open it in this terminal (only the terminal interface is installed)"
   cat <<EOF
 
   ${BOLD}${AMBER}tubcal${RST}  your private broadcast station  ${DIM}$URL${RST}
 
-  tubcal               start it (if needed) and open it in the browser
+  tubcal               $first
   tubcal start         start the server in the background
   tubcal stop          stop it
   tubcal restart       stop, then start
@@ -350,8 +361,9 @@ usage() {
   tubcal logs          follow the server's log
   tubcal update        pull the latest, re-sync, rebuild, restart
   tubcal rooms         the rooms there are, and which are installed
-  tubcal add ROOM…     add rooms you left out (downloads only those)
-  tubcal remove ROOM…  take rooms out (what you saved stays)
+  tubcal add ROOM…     add rooms you left out (downloads only those); also
+                       web or tui, the browser and terminal interfaces
+  tubcal remove ROOM…  take rooms out (what you saved stays); also web or tui
   tubcal tui [ROOM]    Tubcal in this terminal (a room by name: wire, anime…;
                        a YouTube link plays; --private records nothing)
   tubcal play LINK     play a YouTube link in mpv, without the interface
@@ -368,7 +380,10 @@ usage() {
 EOF
 }
 
-case ${1:-open} in
+# Plain `tubcal` opens the interface there is: the browser's, else the terminal's.
+if [[ -z ${1:-} ]]; then if ((WEB)); then set -- open; else set -- tui; fi; fi
+
+case $1 in
   open) cmd_open ;;
   start) cmd_start ;;
   stop) cmd_stop ;;

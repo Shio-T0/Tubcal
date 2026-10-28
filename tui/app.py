@@ -19,14 +19,14 @@ from textual.screen import Screen
 from textual.theme import Theme
 from textual.widgets import Static
 
+from . import accounts, fmt, links
 from . import config as config_mod
-from . import fmt, links
 from .api import Api, ApiError, seg, server_port
 from .bootstrap import REPO, log_path, start_server
 from .glyphs import choose as choose_glyphs
 from .anime import Shows
 from .images import Pictures
-from .keys import GLOBAL, VISUAL, Hit, Keys, remap, token_of
+from .keys import GLOBAL, VISUAL, Bind, Hit, Keys, remap, token_of
 from .media.player import Player
 from .media.radio import Radio, episode_of
 from .media.sleep import SleepTimer
@@ -44,7 +44,8 @@ from .ui.itemlist import ItemList
 from .ui.paint import style
 
 COMMANDS = ["q", "quit", "qa", "open", "play", "yt", "hn", "r", "ar", "ask", "sleep", "radio", "private",
-            "checkhealth", "messages", "map", "theme", "refresh", "set", "cache", "history"]
+            "checkhealth", "messages", "map", "theme", "refresh", "set", "cache", "history", "follow",
+            "unfollow", "link", "unlink", "room", "settings", "about"]
 SEARCH_ROOMS = {"yt": "youtube", "hn": "hackernews", "r": "reddit", "ar": "archive"}
 # the keys that stretch a VISUAL range instead of ending it
 MOVES = {"down", "up", "top", "bottom", "half_down", "half_up", "page_down", "page_up", "center", "to_top",
@@ -141,6 +142,7 @@ class TubcalApp(App, inherit_bindings=False):
         self.jumps: list[Jump] = []
         self.messages: list[tuple[float, str, str]] = []
         self.live = 0
+        self.web = True   # the server has the web interface (/api/health says)
         self.ready = False
         self._whichkey_timer = None
         self.tabline = Tabline(self.roles, self.glyphs)
@@ -221,6 +223,10 @@ class TubcalApp(App, inherit_bindings=False):
         self.say(text, "error")
 
     def _on_server_ready(self, health: dict) -> None:
+        self.web = health.get("web", True) is not False
+        if not self.web:   # nothing to open in a browser: Settings is a sheet here
+            self.global_binds = [Bind(b.keys, b.action, b.help.removesuffix(" ↗")) for b in self.global_binds]
+            self.keys = Keys(self.global_binds)
         self.registry = Registry(health.get("modules"), self.settings.get("active_rooms"))
         self.tabline.registry = self.registry
         self.tabline.built = {r.id for r in ROOM_BY_ID.values() if r.built and self.registry.has(r.id)}
@@ -267,7 +273,7 @@ class TubcalApp(App, inherit_bindings=False):
             self.open_drawer()
             return
         if room_id == "settings":
-            self._open_web("/settings")
+            self._settings()
             return
         if not self.registry:
             return
@@ -582,7 +588,7 @@ class TubcalApp(App, inherit_bindings=False):
         elif action == "saved":
             self.open_drawer()
         elif action == "settings":
-            self._open_web("/settings")
+            self._settings()
         elif action.startswith("player_"):
             self._player_action(action)
         elif action.startswith("radio_"):
@@ -739,8 +745,9 @@ class TubcalApp(App, inherit_bindings=False):
                                 "_match": f"{room.label} {room.short} {room.id} {label}".lower()})
         out += [{"id": "place:saved", "title": "Saved", "_place": True, "_go": "saved", "_sub": "drawer",
                  "_match": "saved bookmarks later"},
-                {"id": "place:settings", "title": "Settings", "_place": True, "_go": "settings", "_web": True,
-                 "_sub": "in the web UI", "_match": "settings preferences options"}]
+                {"id": "place:settings", "title": "Settings", "_place": True, "_go": "settings", "_web": self.web,
+                 "_sub": "in the web UI" if self.web else "accounts, following, rooms",
+                 "_match": "settings preferences options accounts follow"}]
         return out
 
     def open_finder(self) -> None:
@@ -1021,7 +1028,17 @@ class TubcalApp(App, inherit_bindings=False):
             self.copy_to_clipboard(text)
         self.say(said or f"Copied {fmt.cut(text, 60)}")
 
+    def _settings(self) -> None:
+        if self.web:
+            self._open_web("/settings")
+        else:
+            accounts.settings_sheet(self)
+
     def _open_web(self, route: str) -> None:
+        if not self.web:
+            self.say("This Tubcal has no web interface (tubcal add web adds it); o opens a thing on its "
+                     "own site.", "warn")
+            return
         problem = links.open_url(self.api.url(route), self.cfg["browser"])
         self.say(problem or f"Opened {route} in the web UI {self.glyphs.web}", "error" if problem else "info")
 
@@ -1172,6 +1189,20 @@ class TubcalApp(App, inherit_bindings=False):
                 self.room.reload(force=True)
         elif cmd == "set":
             self._set(arg)
+        elif cmd == "follow":
+            accounts.follow(self, arg)
+        elif cmd == "unfollow":
+            accounts.unfollow(self, arg)
+        elif cmd == "link":
+            accounts.link(self, arg)
+        elif cmd == "unlink":
+            accounts.unlink(self, arg)
+        elif cmd == "room":
+            accounts.room(self, arg)
+        elif cmd == "settings":
+            accounts.settings_sheet(self)
+        elif cmd == "about":
+            accounts.about(self)
         elif cmd:
             self.say(f"Not a command: {cmd}", "error")
 
@@ -1352,8 +1383,14 @@ class TubcalApp(App, inherit_bindings=False):
                         ("set ytdl=on", "YouTube through mpv's own yt-dlp"),
                         ("sleep 30 | end | off", "the sleep timer"), ("radio off", "switch the radio off"),
                         ("ask <question>", "ask the Archive"),
-                        ("history clear", "forget the terminal's read marks and podcast places")):
-            t.append(f"  :{c:<18}", style(r, "hue:yellow"))
+                        ("history clear", "forget the terminal's read marks and podcast places"),
+                        ("follow @name | r/sub", "follow a channel or subreddit (alone: the selected one's)"),
+                        ("unfollow [name]", "stop following it"),
+                        ("link anilist|reddit|github", "link an account"), ("unlink …", "unlink it"),
+                        ("room on|off <room>", "a room in the tabs or not"),
+                        ("settings", "accounts, what you follow, the rooms"),
+                        ("about", "the licence and what Tubcal builds on")):
+            t.append(f"  :{c:<28}", style(r, "hue:yellow"))
             t.append(f"{what}\n", style(r, "fg"))
         self._show_info(t)
 

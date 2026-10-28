@@ -392,14 +392,37 @@ re-execs itself from `sh`, and it keeps its own state in `$TUBCAL_HOME`
 
 The menu lists the rooms by channel (from `modules.ini`; piped from curl, from the
 copy in `embedded_manifest` at the end of install.sh, which must match) and the
-options `desktop`/`autostart`/`extras`/`3d`/`tui`. Picking a room brings what it needs; dropping
+options `web`/`tui`/`desktop`/`autostart`/`extras`/`3d`. Picking a room brings what it needs; dropping
 one drops what needs it. Defaults: every room but the Archive, and GitHub is off in a
 clone (on in your own checkout). Flags: `--rooms LIST` (exact), `--with`/`--without`
 (rooms or options), `--add`/`--remove` (what `tubcal add/remove` run), `--list`. The
 `tui` option (record `TUI`; on by default where mpv already is) adds `--group tui` to
 the sync, mpv to the extras (`extras_packages`; not on EL, where it's third-party
 only) and a `check_tui` step that imports textual, Pillow and httpx but only looks
-textual-image up (importing it queries the terminal). The files:
+textual-image up (importing it queries the terminal).
+
+**Only the terminal interface** (`--tui-only` = `--with tui --without web`; record
+`WEB=0`; a record without `WEB` had the web interface):
+- `interfaces()` keeps one of `web`/`tui` on (in the menu, switching one off brings
+  the other back; `tubcal remove` refuses instead) and locks `3d` off without web.
+- No frontend build; the sparse patterns leave out `frontend/` but
+  `frontend/public/icon.svg` (the menu entry's icon); in a clone the git-ignored
+  `node_modules`/`dist` go too (`remove_web_build`).
+- Node.js only when `needs_node` (web, or the Screening Room's yt-dlp, whose YouTube
+  challenges run on it); a private Node nothing needs is removed.
+- The launcher exports `TUBCAL_WEB=0`: `config.WEB` is False, every non-API path is a
+  short page pointing at `tubcal tui` (also where `:link`'s OAuth lands,
+  `/settings?connected=`), and `/api/health` has `web: false`. Plain `tubcal` runs
+  `tubcal tui`, `tubcal open` says why not, and the menu entry is `tubcal tui` with
+  `Terminal=true` (`@OPEN@`/`@TERMINAL@` in the template).
+- `tubcal add|remove` take the options too (`web`, `tui`, `desktop`…; `option_id`).
+- Settings' essentials are in the terminal (`tui/accounts.py`): `:follow`/`:unfollow`,
+  `:link`/`:unlink` (AniList, Reddit: OAuth through the browser; GitHub: the gh CLI or
+  a token), `:room on|off`, `:settings` (the sheet `Space ,` opens without the web
+  interface) and `:about` (the licence and THIRD_PARTY_NOTICES.md, for GPL §5d).
+  Tests: `tests/test_terminal_only.py` and the pilot tests in `tests/test_tui_app.py`.
+
+The files:
 - A clone is `git clone --filter=blob:none --no-checkout --depth 1`, then
   `apply_rooms` writes non-cone sparse patterns (`/*` minus each left-out room's
   paths, minus `[elsewhere]` = android/ and docs/) and checks out. Adding a room
@@ -459,7 +482,8 @@ on a phone over adb:
   base for the same code).
 
 `packaging/linux/` holds the templates it renders (`@TUBCAL_HOME@`, `@BIN@`):
-- `tubcal` is the launcher: open/start/stop/status/logs/update/rooms/add/remove/tui/play/
+- `tubcal` is the launcher (plain `tubcal`: `open`, or `tui` without the web interface):
+  open/start/stop/status/logs/update/rooms/add/remove/tui/play/
   phone/autostart/uninstall/run. It exports `TUBCAL_MODULES` from the record for the server.
   It uses systemd `--user` when available (`TUBCAL_SYSTEMD=0` opts out), else a
   pidfile plus `setsid`. It identifies a running Tubcal by `/api/health`.

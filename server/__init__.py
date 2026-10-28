@@ -71,6 +71,29 @@ def create_app():
             html = html.replace("</head>", f"<script>window.__TUBCAL_MODULES__={stamp}</script></head>", 1)
         return html, 200, {"Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store"}
 
+    def terminal_only_page():
+        """The page of an install without the web interface. An account connected
+        from the terminal (`:link`) lands here too, on /settings?connected=…"""
+        from html import escape
+        connected, failed = request.args.get("connected"), request.args.get("oauth_error")
+        if connected:
+            news = f"<p><b>{escape(connected.capitalize())} is connected.</b> You can close this tab.</p>"
+        elif failed:
+            news = f"<p><b>That didn't connect</b> ({escape(failed)}). Try <code>:link</code> again.</p>"
+        else:
+            news = ""
+        body = (
+            "<!doctype html><html lang=en><meta charset=utf-8><title>Tubcal</title>"
+            "<meta name=viewport content='width=device-width'>"
+            "<style>body{font:16px/1.5 system-ui,sans-serif;max-width:34em;margin:4em auto;padding:0 1em;"
+            "color:#222;background:#fafafa}@media(prefers-color-scheme:dark){body{color:#ddd;background:#1b1b1b}}"
+            "code{font-size:.95em}</style>"
+            f"<h1>Tubcal</h1>{news}"
+            "<p>This Tubcal has only the terminal interface. Open it with <code>tubcal tui</code>.</p>"
+            "<p>To use it in the browser as well: <code>tubcal add web</code>.</p></html>"
+        )
+        return body, 200, {"Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store"}
+
     @app.route("/", defaults={"path": ""})
     @app.route("/<path:path>")
     def spa(path):
@@ -79,6 +102,8 @@ def create_app():
         if path == "api" or path.startswith("api/"):
             from .api import err
             return err(f"no such endpoint: /{path}", 404)
+        if not config.WEB:
+            return terminal_only_page()
         dist = config.FRONTEND_DIST
         if path and (dist / path).is_file():
             return send_from_directory(dist, path)

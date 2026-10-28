@@ -10,7 +10,9 @@
 # You pick the rooms to install (modules.ini lists them); a room left out is
 # never downloaded: the clone is sparse and partial, so its files, its Python
 # packages and its pages stay off this machine. `tubcal add <room>` and
-# `tubcal remove <room>` change the choice later.
+# `tubcal remove <room>` change the choice later. The same goes for the web
+# interface: `--tui-only` installs the terminal one alone, without the web app's
+# files, its build or (unless YouTube's yt-dlp needs it) Node.js.
 #
 # In order: distro packages (listed and asked about first; sudo is used for
 # nothing else) → Tubcal itself (only the rooms you picked) → uv → Node.js →
@@ -77,13 +79,17 @@ Options
       --rooms LIST     install exactly these rooms, comma-separated (see below)
       --with LIST      switch on rooms or options, comma-separated
       --without LIST   switch off any of the same
+      --tui-only       only the terminal interface: no web interface, so no web
+                       build and no Node.js unless the Screening Room's yt-dlp
+                       needs it (the same as --with tui --without web)
       --dir DIR        where to clone Tubcal when not run from a checkout
                        (default ~/.local/share/tubcal/app)
       --no-sudo        never ask for root: user-space installs only
       --update         re-sync, rebuild and restart with the saved choices
                        (what `tubcal update` runs after pulling)
-      --add LIST       add rooms to an installed Tubcal (`tubcal add`)
-      --remove LIST    take rooms out of it (`tubcal remove`)
+      --add LIST       add rooms (or the options below) to an installed Tubcal
+                       (`tubcal add`)
+      --remove LIST    take them out of it (`tubcal remove`)
       --list           the rooms, and which are installed (`tubcal rooms`)
       --phone          put Tubcal for Android on a phone connected over USB
                        (`tubcal phone`), with the rooms you pick for it; it needs
@@ -116,16 +122,20 @@ Rooms (a room you leave out isn't downloaded)
   The phone app has all of these but editor and topics.
 
 Options
-  desktop    an app-menu entry and icon
+  web        the web interface, in your browser at 127.0.0.1:5000 (on unless
+             --tui-only); Tubcal needs this one or tui
+  tui        Tubcal in the terminal: `tubcal tui` opens the rooms there, with vim
+             keys; videos and episodes play in mpv (with "extras": the distro's
+             mpv, when it isn't here yet)
+  desktop    an app-menu entry and icon (without the web interface it opens
+             `tubcal tui` in a terminal)
   autostart  start the server when you log in
   extras     distro packages the rooms use: notify-send (live-stream pings),
              ripgrep (the editor's search), mpv (with tui: it plays the videos)
   3d         3D objects: the home screen is a box you turn, with the TV on the
              front and a channel on each other side, and By topic sorts Hacker
-             News into five topics with the local AI (Settings changes it later)
-  tui        Tubcal in the terminal: `tubcal tui` opens the rooms there, with vim
-             keys; videos and episodes play in mpv (with "extras": the distro's
-             mpv, when it isn't here yet)
+             News into five topics with the local AI (Settings changes it later;
+             the web interface's)
 
 Environment
   TUBCAL_REPO, TUBCAL_BRANCH   what to clone (default: GitHub, main)
@@ -159,6 +169,7 @@ parse_args() {
         for c in $2; do [[ $1 == --add ]] && CHANGE_ADD+=("$c") || CHANGE_REMOVE+=("$c"); done
         shift ;;
       --with=*|--without=*|--rooms=*|--modules=*|--add=*|--remove=*) set -- "${1%%=*}" "${1#*=}" "${@:2}"; continue ;;
+      --tui-only) FORCE[tui]=1 FORCE[web]=0 ;;
       --list) WANT_LIST=1 ;;
       --phone) TO_PHONE=1 ;;
       --apk) [[ $# -ge 2 ]] || { echo "--apk needs a folder" >&2; exit 2; }; APK_FILE=$2; shift ;;
@@ -631,17 +642,18 @@ room_list() { # room_list KEY → REPLY: the KEY values (extras, groups, tools, 
 }
 wants_tool() { room_list tools; [[ " $REPLY " == *" $1 "* ]]; }
 
-OPTS=(desktop autostart extras 3d tui)
+OPTS=(web tui desktop autostart extras 3d)
 PREV_CLONED=""
 declare -A ON=() LOCKED=()
 PREV_LOADED=0
 PREV_PKGS=""
 PREV_ROOMS="" # what the install record says is installed now (for --add / --remove)
+PREV_WEB=1
 
 load_previous() {
   [[ -r $CONF ]] || return 0
   local here=$APP_DIR id
-  local EDITOR_X="" ARCHIVE="" DESKTOP="" AUTOSTART="" EXTRAS="" OBJECTS_3D="" TUI="" APP_DIR="" CLONED=0
+  local EDITOR_X="" ARCHIVE="" DESKTOP="" AUTOSTART="" EXTRAS="" OBJECTS_3D="" TUI="" WEB="" APP_DIR="" CLONED=0
   local MODULES="" KNOWN_MODULES="" HAS_ROOMS=0
   local UV="" NODE_BIN="" BIN_DIR="" SYSTEMD="" PKGS_ADDED="" INSTALLED_AT=""
   # shellcheck source=/dev/null
@@ -665,6 +677,8 @@ load_previous() {
   [[ -n $EXTRAS ]] && ON[extras]=$EXTRAS
   [[ -n $OBJECTS_3D ]] && ON[3d]=$OBJECTS_3D
   [[ -n $TUI ]] && ON[tui]=$TUI
+  [[ -n $WEB ]] && ON[web]=$WEB # a record without it had the web interface
+  PREV_WEB=${WEB:-1}
   rooms_on; PREV_ROOMS=$REPLY
   return 0
 }
@@ -688,12 +702,36 @@ default_choices() {
   : "${ON[autostart]:=0}"
   : "${ON[extras]:=$CAN_PKG}"
   : "${ON[3d]:=0}"
+  : "${ON[web]:=1}"
   # The terminal interface: on where mpv already is (it plays the videos there).
   if [[ -z ${ON[tui]:-} ]]; then if has mpv; then ON[tui]=1; else ON[tui]=0; fi; fi
   apply_force
+  if ((!ON[web] && !ON[tui])) && [[ ${FORCE[web]:-} == 0 && ${FORCE[tui]:-} == 0 ]]; then
+    die "That leaves Tubcal with no way in." "Keep the web interface (web) or the terminal one (tui)."
+  fi
+  interfaces
   for id in "${MOD_IDS[@]}"; do ((ON[$id])) && mod_on "$id"; done
   extras_lock
 }
+
+# The two ways in: the browser (web) and the terminal (tui). One of them stays on:
+# switching one off brings the other back. 3D objects are the web interface's, so
+# without it they're off and can't be picked.
+interfaces() { # interfaces [THE ONE JUST SWITCHED]
+  if ((!ON[web] && !ON[tui])); then
+    if [[ ${1:-} == tui ]]; then ON[web]=1; MSG="The web interface stays: Tubcal needs one way in."
+    else ON[tui]=1; MSG="The terminal interface comes on: Tubcal needs one way in."; fi
+  fi
+  if ((ON[web])); then LOCKED[3d]=0; else ON[3d]=0 LOCKED[3d]=1; fi
+  local id # rooms only the web interface shows (modules.ini `terminal = no`)
+  for id in "${MOD_IDS[@]}"; do
+    [[ ${MAN[$id.terminal]:-} == no ]] || continue
+    if ((ON[web])); then LOCKED[$id]=0; else mod_off "$id"; LOCKED[$id]=1; fi
+  done
+}
+
+# Node.js builds the web interface and runs yt-dlp's YouTube challenges.
+needs_node() { ((ON[web])) || wants_tool yt-dlp; }
 
 apply_force() { # --rooms, --with and --without
   local w
@@ -703,7 +741,7 @@ apply_force() { # --rooms, --with and --without
   fi
   for w in "${!FORCE[@]}"; do
     case $w in
-      desktop|autostart|extras|3d|tui) ON[$w]=${FORCE[$w]} ;;
+      desktop|autostart|extras|3d|tui|web) ON[$w]=${FORCE[$w]} ;;
       *)
         module_id "$w" || bad_room "$w"
         if ((FORCE[$w])); then mod_on "$REPLY"; else mod_off "$REPLY"; fi ;;
@@ -734,6 +772,7 @@ extras_lock() {
 }
 
 declare -A LABEL=(
+  [web]="Web interface (in the browser)"
   [desktop]="App-menu entry & icon"
   [autostart]="Start when I log in"
   [extras]="Distro extras for the rooms"
@@ -741,6 +780,7 @@ declare -A LABEL=(
   [tui]="Terminal interface (tubcal tui)"
 )
 declare -A DESC=(
+  [web]="The rooms in your browser at 127.0.0.1:5000. Off: the terminal interface alone, and the web app isn't downloaded or built."
   [desktop]="Launch Tubcal from your app menu like any other app."
   [autostart]="The server waits in the background, so the app opens at once."
   [3d]="Home becomes a box you turn: the TV in front, a channel on each other side. The Wire gets By topic, sorted by the local AI."
@@ -764,7 +804,7 @@ extras_desc() { # → REPLY: what the extras would bring, for the rooms chosen
 side_note() { # side_note ROW → REPLY: the menu's right-hand column
   [[ $MODE == phone ]] && { REPLY=""; return; } # the APK holds every room: nothing to weigh
   case $1 in
-    desktop|3d) REPLY="" ;;
+    desktop|3d|web) REPLY="" ;;
     tui) if has mpv; then REPLY="mpv here"; else REPLY="needs mpv"; fi ;;
     autostart) ((SYSTEMD)) && REPLY="systemd --user" || REPLY="XDG autostart" ;;
     extras)
@@ -800,10 +840,11 @@ row_label() { if [[ -n ${LABEL[$1]:-} ]]; then REPLY=${LABEL[$1]}; else REPLY=${
 row_desc() { # row_desc ROW → REPLY: the line under the menu for the row the cursor is on
   case $1 in
     extras) extras_desc ;;
-    desktop|autostart|3d|tui) REPLY=${DESC[$1]} ;;
+    desktop|autostart|3d|tui|web) REPLY=${DESC[$1]} ;;
     *)
       local about=${MAN[$1.about]:-}
       if [[ -n ${MAN[$1.needs]:-} ]]; then room_names ${MAN[$1.needs]}; about+=" Comes with $REPLY."; fi
+      [[ ${MAN[$1.terminal]:-} == no ]] && ((!ON[web])) && about+=" Only the web interface shows it, and that's off."
       REPLY=$about ;;
   esac
 }
@@ -870,7 +911,8 @@ _menu_toggle() {
   ((LOCKED[$row] == 1)) && return
   case $row in
     desktop|autostart|extras|3d) ON[$row]=$((1 - ON[$row])) ;;
-    tui) ON[tui]=$((1 - ON[tui])); extras_lock ;;
+    web) ON[web]=$((1 - ON[web])); interfaces web ;;
+    tui) ON[tui]=$((1 - ON[tui])); interfaces tui; extras_lock ;;
     *)
       rooms_on; before=$REPLY
       if ((ON[$row])); then mod_off "$row"; else mod_on "$row"; fi
@@ -1136,7 +1178,7 @@ plan_packages() {
   has curl || want curl
   has tar || want tar
   [[ $FAMILY == apt && ! -e /etc/ssl/certs/ca-certificates.crt ]] && want certs
-  if ! find_node; then want node; want npm; fi
+  if needs_node && ! find_node; then want node; want npm; fi
   find_uv || want uv
   # Fedora's own Python 3.13 (on Asahi, a native aarch64 build), unless uv
   # already has one; elsewhere uv brings its own.
@@ -1157,11 +1199,11 @@ plan_packages() {
 preflight() {
   local need=() t
   if ((!CAN_PKG)) || [[ $MODE == update ]]; then
-    { find_uv && find_node; } || need+=(curl)
-    find_node || need+=(tar)
+    { find_uv && { ! needs_node || find_node; }; } || need+=(curl)
+    needs_node && ! find_node && need+=(tar)
     ((CLONED)) && [[ ! -d $APP_DIR/.git ]] && need+=(git)
     for t in "${need[@]}"; do has "$t" || MISSING+=("$t"); done
-    ((MUSL)) && ! find_node && MISSING+=("Node.js $NODE_MIN+ (nodejs.org has no musl build)")
+    ((MUSL)) && needs_node && ! find_node && MISSING+=("Node.js $NODE_MIN+ (nodejs.org has no musl build)")
   fi
   ((${#MISSING[@]} == 0)) || die "Missing ${MISSING[*]}, and there's no way to install it from here." \
     "Install it with your package manager, then run this again."
@@ -1279,6 +1321,8 @@ reload_manifest() {
 sparse_patterns() { # → stdout: non-cone patterns, everything but what's left out
   local id p
   echo "/*"
+  # Without the web interface, none of frontend/ but the icon the menu entry uses.
+  ((ON[web])) || printf '%s\n' '!/frontend/*' '/frontend/public/' '!/frontend/public/*' '/frontend/public/icon.svg'
   for id in "${MOD_IDS[@]}"; do
     ((ON[$id])) && continue
     for p in ${MAN[$id.paths]:-}; do echo "!/$p"; done
@@ -1322,10 +1366,26 @@ apply_rooms() {
     # changes only what's on disk; files with local changes stay, with a warning
     git sparse-checkout reapply || return 1
   fi
-  local out=0 id
+  local out=0 id what
   for id in "${MOD_IDS[@]}"; do ((ON[$id])) || out=$((out + 1)); done
-  if ((out)); then note_out "$out room$( ((out == 1)) || echo s) left out"; else note_out "every room"; fi
+  if ((out)); then what="$out room$( ((out == 1)) || echo s) left out"; else what="every room"; fi
+  ((ON[web])) || what+=" $SEP no web interface"
+  note_out "$what"
 }
+
+# The web interface went: its build and packages are git-ignored, so the sparse
+# checkout leaves them. In a clone made here they go too (node_modules is the
+# bulk of it); your own checkout is yours.
+web_leftovers() { [[ -d $APP_DIR/frontend/node_modules || -d $APP_DIR/frontend/dist ]]; }
+remove_web_build() {
+  local size
+  size=$(du -sh "$APP_DIR/frontend" 2>/dev/null | cut -f1)
+  rm -rf "$APP_DIR/frontend/node_modules" "$APP_DIR/frontend/dist" || return 1
+  note_out "${size:-?} freed"
+}
+
+# Tubcal's private Node.js, once nothing needs it (no web interface, no yt-dlp).
+remove_node() { rm -rf "$TUBCAL_HOME/node"; }
 
 install_uv() {
   has curl || { echo "curl is needed to fetch uv"; return 1; }
@@ -1449,20 +1509,23 @@ render() { # render TEMPLATE → stdout, with @TOKENS@ filled
   t=${t//@TUBCAL_HOME@/"$TUBCAL_HOME"}
   t=${t//@BIN@/"$BIN_DIR"}
   t=${t//@APP_DIR@/"$APP_DIR"}
+  # the menu entry: the browser, or (with only the terminal interface) a terminal
+  if ((${ON[web]:-1})); then t=${t//@OPEN@/open} t=${t//@TERMINAL@/false}
+  else t=${t//@OPEN@/tui} t=${t//@TERMINAL@/true}; fi
   printf '%s\n' "$t"
 }
 
 write_conf() {
   mkdir -p "$TUBCAL_HOME"
   local MODULES KNOWN_MODULES="${MOD_IDS[*]}" DESKTOP=${ON[desktop]}
-  local AUTOSTART=${ON[autostart]} EXTRAS=${ON[extras]} OBJECTS_3D=${ON[3d]} TUI=${ON[tui]} INSTALLED_AT k
+  local AUTOSTART=${ON[autostart]} EXTRAS=${ON[extras]} OBJECTS_3D=${ON[3d]} TUI=${ON[tui]} WEB=${ON[web]} INSTALLED_AT k
   rooms_on; MODULES=$REPLY
   INSTALLED_AT=$(date '+%Y-%m-%d %H:%M')
   {
     echo "# Tubcal's install record: written by install.sh, read by \`tubcal\`."
     echo "# Re-run install.sh (or \`tubcal update\`, \`tubcal add\`) rather than editing this."
     echo "# MODULES: the rooms installed; KNOWN_MODULES: every room there was to pick."
-    for k in APP_DIR CLONED UV NODE_BIN BIN_DIR MODULES KNOWN_MODULES DESKTOP AUTOSTART EXTRAS OBJECTS_3D TUI SYSTEMD PKGS_ADDED INSTALLED_AT; do
+    for k in APP_DIR CLONED UV NODE_BIN BIN_DIR MODULES KNOWN_MODULES DESKTOP AUTOSTART EXTRAS OBJECTS_3D TUI WEB SYSTEMD PKGS_ADDED INSTALLED_AT; do
       printf '%s=%q\n' "$k" "${!k}"
     done
   } >"$CONF.new" && mv "$CONF.new" "$CONF"
@@ -1498,7 +1561,7 @@ install_launcher() {
 self_test() {
   cd "$APP_DIR" || return 1
   rooms_on
-  TUBCAL_AUTO_UPDATE=0 TUBCAL_MODULES=${REPLY// /,} .venv/bin/python - "$WARN_FILE" "$REPLY" <<'PY' || return 1
+  TUBCAL_AUTO_UPDATE=0 TUBCAL_MODULES=${REPLY// /,} TUBCAL_WEB=${ON[web]} .venv/bin/python - "$WARN_FILE" "$REPLY" <<'PY' || return 1
 import importlib, pathlib, shutil, sys, tempfile
 
 from server import config
@@ -1515,7 +1578,11 @@ try:
     rooms, chosen = health.get_json()["data"].get("modules"), sys.argv[2].split()
     assert rooms == chosen, f"the server has rooms {rooms}, not the ones chosen ({chosen})"
     page = client.get("/")
-    assert page.status_code == 200 and b'id="root"' in page.data, "the built frontend isn't being served"
+    if config.WEB:
+        assert page.status_code == 200 and b'id="root"' in page.data, "the built frontend isn't being served"
+    else:
+        assert health.get_json()["data"]["web"] is False, "the server doesn't know it has no web interface"
+        assert b"tubcal tui" in page.data, "the terminal-only page isn't being served"
 finally:
     shutil.rmtree(tmp, ignore_errors=True)
 
@@ -1532,7 +1599,7 @@ with open(sys.argv[1], "w") as out:
 print("ok")
 PY
   if wants_tool yt-dlp; then "$TUBCAL_HOME/bin/yt-dlp" --version >/dev/null || { echo "yt-dlp doesn't run"; return 1; }; fi
-  note_out "page + API answer"
+  if ((ON[web])); then note_out "page + API answer"; else note_out "API answers"; fi
 }
 
 # ── the phone ────────────────────────────────────────────────────────────────
@@ -2281,7 +2348,8 @@ running_order() {
   if find_uv; then bits+=("uv $UV_VER")
   elif planned uv; then bits+=("uv ${DIM}(distro)${RST}")
   else bits+=("uv ${DIM}(download)${RST}"); fi
-  if find_node; then bits+=("Node $NODE_VER")
+  if ! needs_node; then :
+  elif find_node; then bits+=("Node $NODE_VER")
   elif planned node; then bits+=("Node ${DIM}(distro)${RST}")
   else bits+=("Node $NODE_MAJOR LTS ${DIM}(private download)${RST}"); fi
   bits+=("Python 3.13 via uv")
@@ -2294,7 +2362,7 @@ running_order() {
   room_list groups; bits2+=($REPLY)
   ((ON[tui])) && bits2+=(tui)
   ((${#bits2[@]})) && x+=" + ${bits2[*]}"
-  x+=" $SEP frontend"
+  ((ON[web])) && x+=" $SEP web interface"
   wants_tool yt-dlp && x+=" $SEP yt-dlp ${DIM}(private, refreshed daily)${RST}"
   kv "Build" "$x"
   tilde "$BIN_DIR"; local b=$REPLY
@@ -2303,6 +2371,7 @@ running_order() {
   ((ON[autostart])) && l+=" $SEP autostart"
   kv "Launcher" "$l"
   ((ON[3d])) && kv "Home" "3D objects: a box you turn, the TV in front"
+  ((ON[web])) || kv "Browser" "${DIM}no web interface: \`tubcal\` opens the terminal one${RST}"
   if ((ON[tui])); then
     if has mpv || planned mpv; then kv "Terminal" "tubcal tui $SEP videos in mpv"
     else kv "Terminal" "tubcal tui $SEP ${DIM}no mpv: install it for videos (or take the extras)${RST}"; fi
@@ -2318,7 +2387,7 @@ files_plan() {
   local id out=()
   for id in "${MOD_IDS[@]}"; do ((ON[$id])) || out+=("$id"); done
   if ((CLONED)); then
-    kv "Files" "a partial clone with only these rooms' files"
+    kv "Files" "a partial clone with only these rooms' files$( ((ON[web])) || echo ", and none of the web interface's")"
   elif ((${#out[@]} == 0)); then
     kv "Files" "this checkout as it is"
   elif [[ -d $APP_DIR/.git ]]; then
@@ -2352,18 +2421,21 @@ on_air() {
     lines+=("           It's on $REPLY too.")
   fi
   lines+=("")
-  lines+=("$(printf '%-*s' "$cw" "$cmd")${DIM}start it and open the browser${RST}")
+  if ((ON[web])); then lines+=("$(printf '%-*s' "$cw" "$cmd")${DIM}start it and open the browser${RST}")
+  else lines+=("$(printf '%-*s' "$cw" "$cmd")${DIM}start it in this terminal${RST}"); fi
   lines+=("$(printf '%-*s' "$cw" "$cmd stop")${DIM}stop the server${RST}")
   lines+=("$(printf '%-*s' "$cw" "$cmd status")${DIM}what's on, where, which versions${RST}")
   lines+=("$(printf '%-*s' "$cw" "$cmd update")${DIM}pull, rebuild, restart${RST}")
   lines+=("$(printf '%-*s' "$cw" "$cmd add ROOM")${DIM}add a room you left out${RST}")
-  ((ON[tui])) && lines+=("$(printf '%-*s' "$cw" "$cmd tui")${DIM}the rooms in this terminal${RST}")
+  ((ON[tui] && ON[web])) && lines+=("$(printf '%-*s' "$cw" "$cmd tui")${DIM}the rooms in this terminal${RST}")
   lines+=("$(printf '%-*s' "$cw" "$cmd phone")${DIM}put Tubcal on your Android phone${RST}")
   lines+=("$(printf '%-*s' "$cw" "$cmd uninstall")${DIM}take it all down again${RST}")
   lines+=("")
   local tailline="$AMBER$url$RST"
-  ((ON[desktop])) && tailline+="  ${DIM}$SEP also in your app menu${RST}"
+  ((ON[web])) || tailline="${DIM}the server: $url (the terminal talks to it)${RST}"
+  ((ON[desktop] && ON[web])) && tailline+="  ${DIM}$SEP also in your app menu${RST}"
   lines+=("$tailline")
+  ((ON[desktop] && !ON[web])) && lines+=("${DIM}also in your app menu (it opens a terminal)${RST}")
   lines+=("")
   rep "$hz" "$inner"
   printf '\n  %s%s%s%s%s\n' "$AMBER" "$tl" "$REPLY" "$tr" "$RST"
@@ -2390,7 +2462,7 @@ on_air() {
     for l in "${notes[@]}"; do note "$l"; done
   fi
   if ((CAN_ASK)) && ask "Tune in now?" Y; then
-    "$BIN_DIR/tubcal" open
+    if ((ON[web])); then "$BIN_DIR/tubcal" open; else "$BIN_DIR/tubcal" tui; fi
   fi
   printf '\n'
 }
@@ -2454,7 +2526,12 @@ do_install() {
     find_uv || die "uv installed but doesn't run here."
   fi
 
-  if find_node; then
+  if ! needs_node; then
+    # nothing here builds the web interface or runs yt-dlp
+    if [[ -d $TUBCAL_HOME/node ]]; then run --soft "Node.js (not needed any more) removed" remove_node || true; fi
+    NODE_BIN="" NODE_VER="" NPM_BIN="" # (steps run in a subshell: forget it here)
+    find_node || true
+  elif find_node; then
     where "$NODE_BIN"; step_done "Node.js" "$NODE_VER $SEP $REPLY"
   else
     run "Node.js $NODE_MAJOR LTS (private)" install_node || die "Couldn't set up Node.js $NODE_MIN+." "Install nodejs and npm from your distro, then run this again."
@@ -2490,7 +2567,11 @@ do_install() {
     run --soft "Terminal interface" check_tui ||
       warn "The terminal interface didn't load; \`tubcal\` and the web UI are unaffected."
   fi
-  run "Building the frontend" build_frontend || die "The frontend build failed."
+  if ((ON[web])); then
+    run "Building the web interface" build_frontend || die "The web interface's build failed."
+  elif ((CLONED)) && web_leftovers; then
+    run --soft "The web interface's build removed" remove_web_build || true
+  fi
   if wants_tool yt-dlp; then
     run "yt-dlp (private, self-updating)" install_ytdlp || die "Couldn't install yt-dlp."
   elif [[ -e $TUBCAL_HOME/bin/yt-dlp ]]; then
@@ -2525,14 +2606,49 @@ do_install() {
 
 # ── tubcal add / remove / rooms ──────────────────────────────────────────────
 
-CH_ADDED=() CH_REMOVED=()
+CH_ADDED=() CH_REMOVED=() CH_OPT_ON=() CH_OPT_OFF=()
 
-# --add / --remove: change the record's rooms, with what each needs, and say so.
+option_id() { # option_id WORD → REPLY: the option it names (web, tui, desktop…), or false
+  case ${1,,} in
+    browser) REPLY=web ;; terminal) REPLY=tui ;;
+    *) REPLY=${1,,}; [[ " ${OPTS[*]} " == *" $REPLY "* ]] ;;
+  esac
+}
+
+# --add / --remove: change the record's rooms (with what each needs) and options,
+# and say so.
 apply_change() {
   [[ -r $CONF ]] || die "No install record at $CONF." "Run install.sh first."
-  local w id asked=" " before after implied=()
-  for w in "${CHANGE_ADD[@]}"; do module_id "$w" || bad_room "$w"; mod_on "$REPLY"; asked+="$REPLY "; done
-  for w in "${CHANGE_REMOVE[@]}"; do module_id "$w" || bad_room "$w"; mod_off "$REPLY"; asked+="$REPLY "; done
+  local w id asked=" " before after implied=() opt_before=() o
+  for o in "${OPTS[@]}"; do opt_before+=("${ON[$o]:-0}"); done
+  for w in "${CHANGE_ADD[@]}"; do
+    if option_id "$w"; then ON[$REPLY]=1; [[ $REPLY == 3d ]] && ON[web]=1; continue; fi
+    module_id "$w" || bad_room "$w"; mod_on "$REPLY"; asked+="$REPLY "
+  done
+  for w in "${CHANGE_REMOVE[@]}"; do
+    if option_id "$w"; then ON[$REPLY]=0; asked+="opt:$REPLY "; continue; fi
+    module_id "$w" || bad_room "$w"; mod_off "$REPLY"; asked+="$REPLY "
+  done
+  for w in "${CHANGE_ADD[@]}"; do
+    option_id "$w" && continue
+    module_id "$w"
+    if [[ ${MAN[$REPLY.terminal]:-} == no ]] && ((!ON[web])); then
+      die "${MAN[$REPLY.name]} is only in the web interface, which isn't installed." "Add both: tubcal add web $REPLY"
+    fi
+  done
+  # Unlike the menu, a command doesn't quietly bring the other interface in.
+  if ((!ON[web] && !ON[tui])); then
+    die "That leaves Tubcal with no way in." \
+      "Add the other one first (tubcal add web, or tubcal add tui), or take Tubcal off: tubcal uninstall"
+  fi
+  MSG=""
+  interfaces
+  for o in "${!OPTS[@]}"; do
+    w=${OPTS[o]}
+    if ((${ON[$w]:-0} && !opt_before[o])); then CH_OPT_ON+=("$w")
+    elif ((!${ON[$w]:-0} && opt_before[o])); then CH_OPT_OFF+=("$w"); fi
+  done
+  extras_lock
   before=" $PREV_ROOMS "
   rooms_on || die "That would leave no rooms at all." "Keep one, or take Tubcal off with \`tubcal uninstall\`."
   after=" $REPLY "
@@ -2543,17 +2659,35 @@ apply_change() {
     [[ $asked == *" $id "* ]] || implied+=("$id")
   done
   printf '\n'
-  if ((${#CH_ADDED[@]} + ${#CH_REMOVED[@]} == 0)); then
-    for w in "${CHANGE_ADD[@]}"; do module_id "$w"; room_names "$REPLY"; say "$REPLY is already installed."; done
-    for w in "${CHANGE_REMOVE[@]}"; do module_id "$w"; room_names "$REPLY"; say "$REPLY isn't installed."; done
+  if ((${#CH_ADDED[@]} + ${#CH_REMOVED[@]} + ${#CH_OPT_ON[@]} + ${#CH_OPT_OFF[@]} == 0)); then
+    for w in "${CHANGE_ADD[@]}"; do
+      if option_id "$w"; then say "${LABEL[$REPLY]} is already on."; continue; fi
+      module_id "$w"; room_names "$REPLY"; say "$REPLY is already installed."
+    done
+    for w in "${CHANGE_REMOVE[@]}"; do
+      if option_id "$w"; then say "${LABEL[$REPLY]} is already off."; continue; fi
+      module_id "$w"; room_names "$REPLY"; say "$REPLY isn't installed."
+    done
     printf '\n'
     exit 0
   fi
+  if ((${#CH_OPT_ON[@]})); then option_names "${CH_OPT_ON[@]}"; kv "Switching on" "$REPLY"; fi
+  if ((${#CH_OPT_OFF[@]})); then option_names "${CH_OPT_OFF[@]}"; kv "Switching off" "$REPLY"; fi
+  [[ -n $MSG ]] && note "$MSG"
   if ((${#CH_ADDED[@]})); then room_names "${CH_ADDED[@]}"; kv "Adding" "$REPLY"; fi
   if ((${#CH_REMOVED[@]})); then
     room_names "${CH_REMOVED[@]}"; kv "Removing" "$REPLY"
     note "Their files, packages and pages go. What you saved, followed and watched"
     note "stays in your database and comes back if you add them again."
+  fi
+  local webonly=() id2
+  for id2 in "${implied[@]}"; do [[ ${MAN[$id2.terminal]:-} == no ]] && ((!ON[web])) && webonly+=("$id2"); done
+  if ((${#webonly[@]})); then
+    room_names "${webonly[@]}"
+    note "$REPLY $( ((${#webonly[@]} == 1)) && echo goes || echo go) too: only the web interface shows it."
+    local keep=()
+    for id2 in "${implied[@]}"; do [[ " ${webonly[*]} " == *" $id2 "* ]] || keep+=("$id2"); done
+    implied=("${keep[@]}")
   fi
   if ((${#implied[@]})); then
     room_names "${implied[@]}"
@@ -2562,12 +2696,21 @@ apply_change() {
   fi
 }
 
+option_names() { # option_names ID… → REPLY: "web interface (in the browser), …"
+  local id out=""
+  for id in "$@"; do out+="${out:+, }${LABEL[$id]:-$id}"; done
+  REPLY=$out
+}
+
 changed_done() {
   local bits=()
+  if ((${#CH_OPT_ON[@]})); then option_names "${CH_OPT_ON[@]}"; bits+=("Switched on: $REPLY."); fi
+  if ((${#CH_OPT_OFF[@]})); then option_names "${CH_OPT_OFF[@]}"; bits+=("Switched off: $REPLY."); fi
   if ((${#CH_ADDED[@]})); then room_names "${CH_ADDED[@]}"; bits+=("Added $REPLY."); fi
   if ((${#CH_REMOVED[@]})); then room_names "${CH_REMOVED[@]}"; bits+=("Removed $REPLY."); fi
   printf '\n  %s%s%s %s\n' "$GOOD" "$G_OK" "$RST" "${bits[*]}"
-  note "Reload Tubcal in your browser to see the change."
+  if ((ON[web])); then note "Reload Tubcal in your browser to see the change."
+  else note "Open \`tubcal tui\` again to see the change."; fi
   printf '\n'
 }
 
@@ -2589,8 +2732,12 @@ do_list() {
   done
   printf '\n'
   if ((rec)); then
+    local ways=""
+    ((${ON[web]:-1})) && ways="web (the browser)"
+    ((${ON[tui]:-0})) && ways+="${ways:+, }tui (the terminal)"
+    printf '  %s%-9s%s %s\n\n' "$DIM" "Interface" "$RST" "$ways"
     note "$G_ON installed   $G_OFF left out"
-    note "tubcal add ROOM   tubcal remove ROOM   (its id or any of its names)"
+    note "tubcal add ROOM   tubcal remove ROOM   (its id or any of its names; also web, tui)"
   else
     note "Nothing installed yet: install.sh offers these as a menu."
   fi
@@ -2699,6 +2846,7 @@ groups =
 tools =
 packages =
 phone = no
+terminal = no
 
 [reddit]
 name = The Dispatch

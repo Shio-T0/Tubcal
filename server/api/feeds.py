@@ -19,7 +19,7 @@ feeds_bp = Blueprint("feeds", __name__, url_prefix="/api")
 
 @feeds_bp.get("/health")
 def health():
-    return ok({"status": "ok", "version": "0.1.0", "modules": modules.installed()})
+    return ok({"status": "ok", "version": "0.1.0", "modules": modules.installed(), "web": config.WEB})
 
 
 def _source(module_id):

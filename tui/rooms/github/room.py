@@ -17,7 +17,7 @@ from rich.text import Text
 from textual.containers import Vertical
 from textual.widgets import Static
 
-from ... import fmt
+from ... import fmt, links
 from ...api import ApiError, seg
 from ...keys import Bind
 from ...ui.chrome import Winbar
@@ -532,8 +532,12 @@ class Github(RoomView):
             if row:
                 if thread_of(row):
                     self.read_thread(row)
-                else:
+                elif app.web:
                     app._open_web(web_path(row))
+                else:   # no web interface: the thing on github.com
+                    url = (self.item_of(row) or {}).get("url")
+                    problem = links.open_url(url, app.cfg["browser"]) if url else "There's nothing to open."
+                    app.say(problem or "Opened it on github.com.", "error" if problem else "info")
             return True
         if action == "write" and row:
             self.comment(row)
