@@ -348,6 +348,11 @@ def _pick_audio(formats):
     return [c[2] for c in cands]
 
 
+# yt-dlp reads the user's own config too; one that loads browser cookies would make
+# every resolve here signed in. These keep it anonymous whatever that config says.
+YTDLP_ANON = ["--no-cookies", "--no-cookies-from-browser", "--no-mark-watched"]
+
+
 def _collect_live_streams(formats):
     """Live broadcasts are HLS-only — keep every muxed m3u8 rung, and on a
     multi-language stream keep only the creator's original-audio renditions."""
@@ -457,7 +462,7 @@ def _ytdlp_info(video_id):
     # yt-dlp would otherwise abort ("Premieres in N hours") with no JSON — we still
     # want its metadata (live_status=is_upcoming + release_timestamp).
     proc = subprocess.run(
-        [exe, "-J", "--no-warnings", "--no-playlist", "--ignore-no-formats-error", url],
+        [exe, "-J", "--no-warnings", "--no-playlist", "--ignore-no-formats-error", *YTDLP_ANON, url],
         capture_output=True, text=True, timeout=60,
     )
     if proc.returncode != 0 or not proc.stdout.strip():
@@ -634,7 +639,7 @@ def _ytdlp_flat_tab(channel_id, tab, limit=12):
     url = f"https://www.youtube.com/channel/{channel_id}{tab}"
     try:
         proc = subprocess.run(
-            [exe, "-J", "--flat-playlist", "--no-warnings", "--playlist-end", str(limit), url],
+            [exe, "-J", "--flat-playlist", "--no-warnings", "--playlist-end", str(limit), *YTDLP_ANON, url],
             capture_output=True, text=True, timeout=60,
         )
         if proc.returncode != 0 or not proc.stdout.strip():
@@ -855,7 +860,7 @@ def _ytdlp_playlist(plid):
         raise RuntimeError("yt-dlp not installed")
     url = f"https://www.youtube.com/playlist?list={plid}"
     proc = subprocess.run(
-        [exe, "-J", "--flat-playlist", "--no-warnings",
+        [exe, "-J", "--flat-playlist", "--no-warnings", *YTDLP_ANON,
          "--add-header", f"Cookie:{_CONSENT_COOKIE_FULL}", url],
         capture_output=True, text=True, timeout=120,
     )

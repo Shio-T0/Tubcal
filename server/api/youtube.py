@@ -373,7 +373,8 @@ def youtube_hls_segment():
         url = base64.urlsafe_b64decode(token.encode()).decode()
     except Exception:
         return err("bad token")
-    if "googlevideo.com" not in (urlparse(url).hostname or ""):  # only proxy YouTube CDN
+    host = (urlparse(url).hostname or "").lower()
+    if host != "googlevideo.com" and not host.endswith(".googlevideo.com"):  # only proxy YouTube CDN
         return err("forbidden host", 403)
     video_id = request.args.get("v")
     if video_id and not re.fullmatch(r"[\w-]{6,20}", video_id):
