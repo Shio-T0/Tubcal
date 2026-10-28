@@ -233,6 +233,144 @@ before "where to?":
   which `tubcal phone` installs from. Raise `versionCode`/`versionName` first. Every release must come from the same machine's
   debug key, or phones can't update in place.
 
+## The terminal interface (`tui/`)
+
+A third client beside the web UI and the phone: `uv run python -m tui [room | link]`,
+or `tubcal tui` when installed (`play <link>` / `tubcal play` plays without the
+interface; `--private` records nothing). Textual, textual-image, Pillow and httpx come
+from the `tui` dependency group (in `default-groups`; note `uv sync` drops extras you
+don't name: use `--all-extras`); install.sh adds `--group tui` with its `tui` option.
+- **Only a client.** It talks to the local API through `api.LoopbackOnly`, an httpx
+  transport that refuses any non-loopback host, and never imports `server/`
+  (`tests/test_modules.py`). The private session is one gate in `api.Api`
+  (`record_open`/`record_progress`) and `state.State` (which also keeps the radio's
+  places out). `Api.get(path, /, …)`: `path` is positional so a query can be `path=`.
+- **Before Textual starts** (`__main__.py`): `terminal.probe()` sends one burst
+  (OSC 10/11/4, the kitty graphics query, DA1) and reads the replies in raw mode;
+  once Textual runs its input thread would swallow them. `prepare_env` sets
+  `COLORTERM=truecolor` when kitty graphics answer: the user's st (gh0stzk's build
+  has the st-graphics patch) speaks it, doesn't set COLORTERM, and at 256 colours the
+  image id carried in the placeholders' 24-bit colour is rounded away. `ESCDELAY=25`.
+- **Colours** (`theme.py`): every role is solved for a contrast target against the
+  surface it sits on (dim 4.5, faint 3, rule 1.6, surfaces 1.15/1.28; hues lifted in
+  OKLab until readable), never a fixed mix. No palette → ANSI names, reverse, bold.
+  A rice switch recolours st live (`xrdb -merge`, USR1), so focus-in re-reads xrdb.
+- **Keys** (`keys.py`): one table of sequences → actions, counts, no prefix that is
+  also an action (so nothing waits for a timeout), which-key after 300 ms, rooms push
+  a layer. Textual's own bindings are off (`inherit_bindings=False`, no palette). Don't
+  name things after Textual internals: `App._ready`, `App.run_action`,
+  `Widget.loading`, `Widget.query` all broke something once.
+  - VISUAL (`V`/`v` in an `ItemList`): `anchor` + cursor make the range, movement
+    stretches it, any other key ends it first. `s` saves (or, all saved, unsaves),
+    `a` queues (`room.playable_of`), `y` copies links, and `d`/`x` run what `dd`/`x`
+    run in that room (looked up in the key table) on every row via
+    `room.handle_many(action, rows)`. Rows become items through `room.item_of(row)`
+    (None for places). One `u` undoes a batch (`("batch", [...])` on the undo stack).
+  - Your keys: `[keys]` in tui.toml (vim notation, `""` unbinds), `[keys.<room id>]`,
+    `[keys.saved]`, `[keys.visual]`; `keys.remap` checks them (unknown action, digits,
+    a key that hides or is hidden by another) and the app says what was wrong.
+- **Rooms** (`rooms/__init__.py`) mirror `lib/rooms.js` (ids, channels, order, so the
+  numbers match; tested). A room with a terminal screen has `tui/rooms/<id>/` in its
+  module's `paths` and is imported through importlib only when `/api/health` lists
+  it; a room without one would draw `WebRoom` and open in the web UI (`↗`, `O`).
+  Every room has one now:
+  - Home (`rooms/home/`, core; where it opens): the web's pick-up queue
+    (`lineup.js`), Coming up, a line per channel, each part loaded on its own.
+  - The Screening Room (Latest/Live/Continue/History/Search, index pane ≥140
+    columns, preview ≥90).
+  - The Anime (`rooms/anime/`): shelves, a title page with the episode tape and the
+    episodes (titles past your next one veiled), `+`/`−` your place, Sub/Dub per show.
+    `tui/anime.py` mirrors `watching.js`/`episodeList.js`/`animeItem` (tested against
+    episodeList.js under node) and holds `Shows`, the list/details/episode cache both
+    rooms share; it gives the player the next episode (`player.follow`).
+  - The Wire (`rooms/hackernews/`): HN's six lists + search, board beside the reader
+    from 120 columns; heat cell, "+N" comments since your last visit (kept in
+    `tui.json` `wire_seen`, as `seen.js` keeps its own). The Dispatch
+    (`rooms/reddit/`): Hot/New/Top + search, a subreddit index from 140 columns, says
+    when it's on RSS without an account. Both read through `ui/thread.ThreadView`
+    (rails per depth, `za/zM/zR`, `[[ ]]`, `]n [n`), whose bodies go through
+    `ui/html.py` (an allow-list walk like `HnHtml.jsx`; Reddit's escaped HTML undone).
+  - The Edition (`rooms/edition/`): one column ≤76 cells (`ui/units.UnitView`),
+    nameplate + `═`, lede/columns/In Brief by room; Enter opens a story's source where
+    it lives (`3⏎` the third), `]n` next unread (`edition_read` in `tui.json`, a month),
+    `[p ]p` papers.
+  - `Space f` (`ui/finder.py`): rooms and places, saved items, and `/api/search/all`
+    after a pause. `app.open_item` opens anything where it lives; `app.in_room(id, fn)`
+    defers `fn` until a just-opened room has mounted (calling it at once fails).
+  - The Saved drawer (`ui/drawer.py`, `Space s`): To do/Done/All by channel → kind
+    (`tui/saved.py` mirrors `saveable.js`'s KINDS, tested), Enter opens an entry the
+    way the web does (a moment plays its video from `extra.t`, a podcast tunes the
+    radio, a file opens in the Composing Room), `x` done (`done_at`), `i` the note,
+    `dd` with undo.
+  - The Workbench (`rooms/dev/`): per language (index pane, `]l [l`) Podcasts, Talks,
+    Change log, Repos, Manuals; saved shapes mirror `podcastItem`/`devPostItem`/
+    `docItem`. Podcast art is a non-platform host (`/api/img`'s guarded path).
+  - The Archive (`rooms/archive/`): Search (`:ar`), Ask (`:ask`, or `i` in your
+    editor; POST `/brain/ask`, 300 s), Library → a transcript (`/brain/doc/<id>`
+    chunks); any timed row plays from `t_start` or seeks the video already playing;
+    `s` saves a `momentItem`.
+  - GitHub (`rooms/github/`): Inbox (`Space t a` the read ones) and Work; Enter reads
+    `/thread/<n>` in the side pane and marks the notification read, `i` comments
+    (the last comment quoted under the scissors), `x` read, `dd` done sent after 5 s
+    so `u` can take it back (GitHub has no undo). Under the list, when the room has
+    rows to spare, your contribution calendar (`calendar.py`: a column a week, the
+    levels as shades `·░▒▓█`, the year's total and your run of days).
+  - The Composing Room (`rooms/editor/`): the web editor's session tabs (paths
+    relative to `/editor/status` `root`, checked to stay inside it) and git's
+    changes beside them; Enter opens one with `editor.open_file` (your editor as
+    you use it).
+- **Writing** (`tui/editor.py`): `compose()` puts a draft in a 0600 file in the
+  0700 `$XDG_RUNTIME_DIR/tubcal`, runs the editor in `App.suspend()` (`run_editor`,
+  which tests replace), and returns None when the file came back unchanged; context
+  goes under a scissors line and is cut off. Editor: config `editor`, `$VISUAL`,
+  nvim, `$EDITOR`, vi; nvim gets `-n -i NONE`, `setlocal noundofile`, the clipboard
+  cleared (again on LazyVim's VeryLazy) and persistence.nvim stopped. Back from the
+  editor, `app.after_suspend()` redraws every `Well` (the terminal may drop kitty
+  images).
+- **Pictures** come through `GET /api/img?u=` (`server/api/img.py`, core): platform
+  image hosts (exact or dot-suffix) through `anon_session`; any other host only when
+  every address it resolves to is public (`public()`: not loopback, private, CGNAT,
+  link-local, reserved, multicast; IPv4-mapped judged as IPv4), and then fetched by
+  `pinned_get` from that very address (urllib3 pool on the IP, the name kept for SNI,
+  the certificate and Host), so a rebinding name can't steer it inside. Ports 80/443,
+  no credentials, redirects followed by hand and each hop checked the same way,
+  raster only by magic bytes (never SVG/HTML), 5 MB, six at a time, nosniff + a
+  sandbox CSP (`create_app` now appends `frame-ancestors` to a response's own CSP),
+  navigations refused. `tui/images.py` caches in `$XDG_CACHE_HOME/tubcal/img` (0700,
+  sha256 names, 200 MB, a week; memory only in a private session) and cuts each to
+  its well's pixel size (YouTube's hqdefault letterbox cropped). `ui/picture.Well`
+  reserves the size, shows a slate, and loads 120 ms after the selection settles;
+  textual-image draws it (kitty placeholders in st, sixel, else half-blocks), its
+  terminal probe seeded from ours (`terminal.seed_textual_image`).
+- **Playback** (`media/`): one mpv over JSON IPC (socket in `$XDG_RUNTIME_DIR/tubcal`,
+  0700), started at the first play. YouTube plays the server's HLS master (one
+  extraction, healed URLs, mpv only talks to 127.0.0.1); `youtube_player = "ytdl"` is
+  opt-in. `/history` is posted before `/progress` (else the row is filed as YouTube),
+  progress every 5 s and on pause/end; resume at pos−2 under 95 %. `tubcal.lua` sets
+  chapters, shows the skip-opening cue (binds `s` only while shown) and sends `N` back.
+  The user's mpv config and MPRIS script stay; mpv keeps no watch records of its own.
+- **The radio** (`media/radio.py`): podcasts on a second, window-less mpv
+  (`Mpv(name="radio")`, its own socket), audio straight from the podcast's host
+  (http(s) only), as the browser's `<audio>` does. Places as `lib/radio.js` keeps
+  them: 40, newest first, heard = the last 30 s, in `tui.json` `radio`. One sound at a
+  time: each player's `on_audible` pauses the other. `Space r r/l/h/x`, `:radio`.
+- **The sleep timer** (`media/sleep.py`): one for both players. `:sleep 30|1h30|end|off`,
+  `Space p z`. Minutes: the audible mpv fades over the last 12 s (a thread steps the
+  volume), then everything pauses and the volume goes back. `end`: a player's
+  `on_end` returns True and nothing follows (pausing the others from a new thread:
+  an mpv's reader thread can't wait on its own mpv).
+- Local files: `~/.config/tubcal/tui.toml` (terminal-only options), `$XDG_STATE_HOME/
+  tubcal/tui.json` (room, views, seen marks, `wire_seen`, `edition_read`, `radio`; no
+  titles; a key must be in `State`'s defaults to be read back). `:history clear` forgets
+  the read marks and podcast places. Tests: `tests/test_tui_*.py`, `tests/test_img_proxy.py`
+  (the app end to end with Textual's pilot against `create_app()` via
+  `httpx.WSGITransport`). `tests/test_tui_snapshots.py` keeps screens as pictures
+  (`tests/snapshots/tui/<name>.svg` + `.txt`) in four palettes on a frozen clock;
+  `TUBCAL_SNAPSHOTS=update` takes a change. Try it against
+  `.autoloop/tools/harness.py` with `TUBCAL_PORT`; real-terminal shots: a floating
+  `st -c <class>` + `maim -i`, keys through a pty relay reading a FIFO (X key events
+  stopped reaching st on 2026-10-28; see papercuts).
+
 ## The Linux installer
 
 `install.sh` (repo root) installs Tubcal for a user on most distros. Run from a
@@ -254,11 +392,14 @@ re-execs itself from `sh`, and it keeps its own state in `$TUBCAL_HOME`
 
 The menu lists the rooms by channel (from `modules.ini`; piped from curl, from the
 copy in `embedded_manifest` at the end of install.sh, which must match) and the
-options `desktop`/`autostart`/`extras`/`3d`. Picking a room brings what it needs; dropping
+options `desktop`/`autostart`/`extras`/`3d`/`tui`. Picking a room brings what it needs; dropping
 one drops what needs it. Defaults: every room but the Archive, and GitHub is off in a
 clone (on in your own checkout). Flags: `--rooms LIST` (exact), `--with`/`--without`
 (rooms or options), `--add`/`--remove` (what `tubcal add/remove` run), `--list`. The
-files:
+`tui` option (record `TUI`; on by default where mpv already is) adds `--group tui` to
+the sync, mpv to the extras (`extras_packages`; not on EL, where it's third-party
+only) and a `check_tui` step that imports textual, Pillow and httpx but only looks
+textual-image up (importing it queries the terminal). The files:
 - A clone is `git clone --filter=blob:none --no-checkout --depth 1`, then
   `apply_rooms` writes non-cone sparse patterns (`/*` minus each left-out room's
   paths, minus `[elsewhere]` = android/ and docs/) and checks out. Adding a room
@@ -318,7 +459,7 @@ on a phone over adb:
   base for the same code).
 
 `packaging/linux/` holds the templates it renders (`@TUBCAL_HOME@`, `@BIN@`):
-- `tubcal` is the launcher: open/start/stop/status/logs/update/rooms/add/remove/
+- `tubcal` is the launcher: open/start/stop/status/logs/update/rooms/add/remove/tui/play/
   phone/autostart/uninstall/run. It exports `TUBCAL_MODULES` from the record for the server.
   It uses systemd `--user` when available (`TUBCAL_SYSTEMD=0` opts out), else a
   pidfile plus `setsid`. It identifies a running Tubcal by `/api/health`.
@@ -367,7 +508,9 @@ response is wrapped `{ok, data}` / `{ok, error}` by `server/api/__init__.py`'s
 `db.init_db()` → `db.note_modules()` → `create_app()` → with the Screening Room, warm
 the "picked for you" cache, backfill channel avatars and start the notifier →
 `brain.start()` (the Archive's worker and the Edition's press, each if installed) →
-`app.run()`.
+`app.run()`. Werkzeug's access log is filtered (`main._QuietAccessLog`): requests that
+worked aren't logged and failures lose their query strings; `TUBCAL_ACCESS_LOG=1`
+keeps everything.
 Background warming exists so slow shelves are ready before first request.
 `server/updater.py` upgrades `anipy-api` in place from PyPI on startup (allanime
 rotates its site crypto and the fix ships as a release); it must run *before*
@@ -437,7 +580,11 @@ own `<db>.bak-<stamp>` copies beside the DB. Tests: `tests/test_snapshots.py`.
   proxy — no ffmpeg, no account, no third party, native seeking. `_pick_audio`
   keeps only the creator's original track (dubs/DRC dropped). A resolve that
   yields only the 360p floor is cached briefly (self-heals on the next open).
-  Live broadcasts have no DASH, so they stay on YouTube's own muxed HLS.
+  Live broadcasts have no DASH, so they stay on YouTube's own HLS: muxed rungs as
+  they are, and the demuxed kind (video-only rungs + an audio-only playlist, most
+  broadcasts since late 2026) paired by `_collect_live_streams` into a master whose
+  `v.m3u8`/`a.m3u8` are YouTube's live playlists rewritten through the proxy
+  (`_live_master`/`_live_media`; tests/test_youtube_live.py).
   **Playback resilience.** A googlevideo URL is IP-bound and expires, and the
   playlist freezes it in at open time. So:
   - Adaptive segment proxy URLs carry `&v=<video_id>`. When googlevideo refuses
@@ -1102,7 +1249,17 @@ floats/rails otherwise.
   carries the user's own OAuth bearer token. Playback (googlevideo) is anonymous
   too, defensively: that's a different domain so the youtube.com jar never reached
   it, but the property shouldn't depend on that. `tests/test_httpc_anon.py` AST-sweeps
-  `youtube.py` and fails if any call site is neither anonymous nor authenticated.
+  `youtube.py` and fails if any call site is neither anonymous nor authenticated. Every yt-dlp
+  command line carries `YTDLP_ANON` (`--no-cookies --no-cookies-from-browser
+  --no-mark-watched`), so a user yt-dlp config with browser cookies can't sign
+  Tubcal's resolves in (`tests/test_server_privacy.py`).
+- **Addresses a third party chose.** The anime proxies (`/api/anime/hls/*`, `/sub`,
+  `/stream/<key>/data`) fetch whatever a source's playlist names, so they go through
+  `httpc.public_session` (`public_only=True` on `get`/`stream_get`): no cookies, and
+  each new connection resolves the host, refuses unless every address is public
+  (`httpc.public`) and connects to an address it checked, redirect hops included. A
+  refusal raises at once (`httpc.refused(e)`) and the proxy answers 403. A request
+  through the user's own proxy is left to that proxy. Tests: `tests/test_public_fetch.py`.
 - Configuration is env-driven through `server/config.py` (all optional, `.env` copied
   from `.env.example`); user-facing settings that can change at runtime are stored in the
   DB `settings` table and read via `db.get_setting()`.

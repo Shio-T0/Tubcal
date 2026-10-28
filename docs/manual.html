@@ -112,6 +112,7 @@
                 <tr><td class="nowrap"><b>App-menu entry</b></td><td>Adds Tubcal to your app menu.</td><td>on</td></tr>
                 <tr><td class="nowrap"><b>Start when I log in</b></td><td>Starts Tubcal in the background when you log in.</td><td>off</td></tr>
                 <tr><td class="nowrap"><b>Distro extras</b></td><td>A desktop notification shortly before a channel you follow goes live (with the Screening Room), and faster search in the code editor (with the Composing Room).</td><td>on</td></tr>
+                <tr><td class="nowrap"><b>Terminal interface</b></td><td>Tubcal in a terminal window as well as in the browser: <code>tubcal tui</code>. Videos and episodes play in <b>mpv</b>, which the distro extras install if it's missing. See <a href="#terminal">In a terminal</a>.</td><td>on if mpv is installed</td></tr>
                 <tr><td class="nowrap"><b>3D objects</b></td><td>Makes the home screen a box you can turn: the TV is on the front, and each channel has a side with its rooms and links into them. It also adds <b>By topic</b> to the Social channel (see <a href="#ai">Optional AI</a>). You can change this later in Settings, under Appearance.</td><td>off</td></tr>
               </tbody>
             </table>
@@ -168,6 +169,8 @@
                 <tr><td class="nowrap"><code>tubcal rooms</code></td><td>Lists the rooms, and which ones you have.</td></tr>
                 <tr><td class="nowrap"><code>tubcal add anime</code></td><td>Adds a room you left out (here, the Anime), then restarts. Reload the page to see it.</td></tr>
                 <tr><td class="nowrap"><code>tubcal remove anime</code></td><td>Takes a room out again. What you saved there is kept.</td></tr>
+                <tr><td class="nowrap"><code>tubcal tui</code></td><td>Opens Tubcal in the terminal you typed it in, instead of the browser. See <a href="#terminal">In a terminal</a>.</td></tr>
+                <tr><td class="nowrap"><code>tubcal play</code> and a link</td><td>Plays a YouTube link in mpv, without opening anything else.</td></tr>
                 <tr><td class="nowrap"><code>tubcal phone</code></td><td>Puts the Android app on a phone plugged in with a USB cable, or updates it, and asks which rooms it gets. See <a href="#phone">On your phone</a>.</td></tr>
                 <tr><td class="nowrap"><code>tubcal phone add anime</code></td><td>Adds a room to the app on your phone. <code>tubcal phone remove</code> takes one out, and <code>tubcal phone rooms</code> lists them.</td></tr>
                 <tr><td class="nowrap"><code>tubcal autostart on</code></td><td>Starts Tubcal whenever you log in. <code>tubcal autostart off</code> undoes it.</td></tr>
@@ -362,10 +365,64 @@
         <div class="keytables" id="keytables"></div>
       </section>
 
-      <!-- ══ 10 Settings ══════════════════════════════════════════════ -->
+      <!-- ══ 10 In a terminal ═════════════════════════════════════════ -->
+      <section class="msec" id="terminal" data-section>
+        <header class="tc-sectionhead" style="--sec-c: var(--c-editor)">
+          <span class="plate">10</span><span class="kicker">Optional</span><h2>In a terminal</h2>
+          <p class="dek">If you spend your day in a terminal, Tubcal can open there too: the same rooms, moved around with vim's keys, in your terminal's own colours. Videos and episodes play in mpv.</p>
+        </header>
+        <div class="prose">
+          <h3>Getting it</h3>
+          <p>It's the installer's <b>Terminal interface</b> option. If you didn't pick it, run the install command again and switch it on; your other choices stay as they were. To play anything it needs <b>mpv</b>: with <b>Distro extras</b> on, the installer installs it for you.</p>
+          <h3>Opening it</h3>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Type</th><th>What opens</th></tr></thead>
+              <tbody>
+                <tr><td class="nowrap"><code>tubcal tui</code></td><td>The room you were in last time (Home the first time).</td></tr>
+                <tr><td class="nowrap"><code>tubcal tui wire</code></td><td>A room by its name: <code>youtube</code>, <code>anime</code>, <code>wire</code>, <code>dispatch</code>, <code>edition</code>, <code>workbench</code>, <code>github</code>, <code>archive</code>, <code>editor</code>.</td></tr>
+                <tr><td class="nowrap"><code>tubcal tui</code> and a link</td><td>Plays that YouTube video.</td></tr>
+                <tr><td class="nowrap"><code>tubcal tui --private</code></td><td>A session that records nothing (see below).</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p>If Tubcal isn't running yet, it starts it, and says so while it waits.</p>
+          <h3>Moving around</h3>
+          <p><kbd>j</kbd> and <kbd>k</kbd> move down and up, <kbd>g</kbd><kbd>g</kbd> and <kbd>G</kbd> go to the top and the bottom, <kbd>Enter</kbd> or <kbd>l</kbd> opens or plays, <kbd>h</kbd> goes back. <kbd>Tab</kbd> switches between a room's views, and <kbd>H</kbd> and <kbd>L</kbd> between the rooms of a channel. The browser's keys work here too: <kbd>Space</kbd> <kbd>g</kbd> and <kbd>s</kbd>, <kbd>c</kbd> or <kbd>v</kbd> for the channels, <kbd>g</kbd> and a letter for a room. <kbd>Space</kbd> <kbd>f</kbd> finds anything, <kbd>Space</kbd> <kbd>s</kbd> opens Saved, <kbd>/</kbd> searches the list in front of you, and <kbd>?</kbd> lists every key. When you press <kbd>Space</kbd> and wait, a small box shows what can follow.</p>
+          <p>As in vim, <kbd>:</kbd> types a command and <kbd>:q</kbd> quits. <kbd>q</kbd> on its own only closes what's open. <kbd>O</kbd> opens whatever you're looking at in the browser instead.</p>
+          <p>To act on several things at once, press <kbd>V</kbd> in a list and move with <kbd>j</kbd> and <kbd>k</kbd> to mark more rows. Then <kbd>s</kbd> saves them, <kbd>a</kbd> adds them to the queue, <kbd>y</kbd> copies their links, and <kbd>d</kbd> or <kbd>x</kbd> does to each row what <kbd>d</kbd><kbd>d</kbd> or <kbd>x</kbd> does to one. <kbd>u</kbd> undoes saving or removing them all at once, and <kbd>Esc</kbd> leaves without doing anything.</p>
+          <h3>What's there</h3>
+          <p>Every room has a terminal version. Some things are only in the browser, and <kbd>O</kbd> takes you to them: Settings, connecting accounts, the Anime's browsing, seasons and community pages, GitHub's code and changes, and exporting what you saved.</p>
+          <ul class="feature-list">
+            <li><b>The Workbench</b> lists each language's podcasts, talks, change log, popular projects and manuals. <kbd>]</kbd><kbd>l</kbd> goes to the next language.</li>
+            <li><b>The Archive</b> searches what was said in your videos (<code>:ar</code> and some words) and answers questions (<code>:ask</code> and your question). <kbd>Enter</kbd> on a line plays the video from that moment.</li>
+            <li><b>GitHub</b> shows your notifications and the pull requests and issues waiting on you. <kbd>Enter</kbd> reads the conversation beside the list. <kbd>x</kbd> marks a notification read, and <kbd>d</kbd><kbd>d</kbd> marks it done; <kbd>u</kbd> takes that back within five seconds. In a tall enough window, your contributions over the past months are shown under the list.</li>
+            <li><b>The Composing Room</b> lists the files open in the browser's code editor, and the files changed next to them. <kbd>Enter</kbd> opens one in your own editor, and you're back in Tubcal when you quit it.</li>
+          </ul>
+          <h3>Writing</h3>
+          <p>A note on something you saved (<kbd>i</kbd> in Saved), a question for the Archive (<kbd>i</kbd> in the Archive) and a comment on GitHub (<kbd>i</kbd> on an issue or pull request) are written in your own editor: nvim, unless you choose another. What you're writing about is shown below a cut line, and nothing below that line is sent. If you quit without changing the file, nothing is sent at all. The draft is deleted afterwards, and nvim keeps no copy of it, no undo history and nothing in the clipboard.</p>
+          <h3>The radio</h3>
+          <p>A podcast episode from the Workbench, or one you saved, plays on the radio. It keeps playing while you go to other rooms, and it shows at the bottom of the screen. A video pauses it, and the radio pauses a video. <kbd>Space</kbd> <kbd>r</kbd> <kbd>r</kbd> pauses and plays, <kbd>Space</kbd> <kbd>r</kbd> <kbd>l</kbd> skips 30 seconds ahead, <kbd>Space</kbd> <kbd>r</kbd> <kbd>h</kbd> goes back 15, and <kbd>Space</kbd> <kbd>r</kbd> <kbd>x</kbd> switches it off. It remembers where you stopped in each episode.</p>
+          <h3>The sleep timer</h3>
+          <p><code>:sleep 30</code> stops everything in 30 minutes (<code>:sleep 1h30</code> works too). The sound fades out over the last 12 seconds, and your volume is back to normal next time. <code>:sleep end</code> stops when the video, episode or podcast that's playing ends, and <code>:sleep off</code> cancels it.</p>
+          <h3>Pictures and colours</h3>
+          <p>Thumbnails and covers are drawn sharp in terminals that support pictures (the kitty graphics protocol, as in kitty and Ghostty, or sixel, as in foot), and as coloured blocks in other terminals. The colours are your terminal's own. If you change your terminal's theme, Tubcal picks it up when you come back to the window, and <code>:theme</code> reads the colours again.</p>
+          <h3>Privacy</h3>
+          <ul class="feature-list">
+            <li><b>It only talks to Tubcal on your computer.</b> Pictures come through Tubcal, and so do videos: mpv plays them from your own computer. The one exception is the radio, which plays a podcast from the podcast's own site, as the browser does.</li>
+            <li><b>A private session</b> (<code>tubcal tui --private</code>, or <kbd>Space</kbd> <kbd>P</kbd>) records nothing: no history, no place to resume from, no episodes marked on AniList, and pictures aren't saved to disk. <b>PRIV</b> shows at the bottom while it's on.</li>
+            <li><b>What the terminal remembers</b> is the room you were in, which stories you've read and where you stopped in podcasts. <code>:history clear</code> forgets the stories and podcasts. Your watch history is the same as in the browser; you can clear it in Settings.</li>
+          </ul>
+          <h3>Its own settings</h3>
+          <p>Almost everything is shared with the browser. The few things only the terminal uses go in <code>~/.config/tubcal/tui.toml</code>, for example <code>editor = "hx"</code> for another editor, <code>images = "off"</code> for no pictures, or <code>icons = "unicode"</code> if your font has no Nerd Font icons. <code>:checkhealth</code> shows what works in your terminal.</p>
+          <p>You can change keys there too, written the way vim writes them. Under <code>[keys]</code>, the line <code>"&lt;C-n&gt;" = "down"</code> makes <kbd>Ctrl</kbd><kbd>N</kbd> move down, and <code>"K" = ""</code> turns <kbd>K</kbd> off. A room's own keys go under its name, for example <code>[keys.youtube]</code>. <code>:map</code> lists every key with the name of its action. If something in the file can't work, Tubcal says what when it starts, and <code>:messages</code> keeps the list.</p>
+        </div>
+      </section>
+
+      <!-- ══ 11 Settings ══════════════════════════════════════════════ -->
       <section class="msec" id="settings" data-section>
         <header class="tc-sectionhead" style="--sec-c: var(--c-editor)">
-          <span class="plate">10</span><span class="kicker">Using Tubcal</span><h2>Settings</h2>
+          <span class="plate">11</span><span class="kicker">Using Tubcal</span><h2>Settings</h2>
           <p class="dek">Press <b>Settings</b> in any channel's bar, or <kbd>Space</kbd> then <kbd>,</kbd>. A panel opens at the side with the skins, the switches people change most (fast mode, 3D objects, sound, live alerts, skipping anime openings, opening songs) and a link to every section below. The full Settings page shows how each section is set, and <b>Find a setting</b> searches all of them.</p>
         </header>
         <div class="setgrid">
@@ -384,10 +441,10 @@
         </div>
       </section>
 
-      <!-- ══ 11 Accounts ══════════════════════════════════════════════ -->
+      <!-- ══ 12 Accounts ══════════════════════════════════════════════ -->
       <section class="msec" id="accounts" data-section>
         <header class="tc-sectionhead" style="--sec-c: var(--c-reddit)">
-          <span class="plate">11</span><span class="kicker">Setup</span><h2>Accounts</h2>
+          <span class="plate">12</span><span class="kicker">Setup</span><h2>Accounts</h2>
           <p class="dek">YouTube, Reddit and GitHub work without signing in. AniList is the exception: the Anime needs it. Your sign-ins are stored only on your computer.</p>
         </header>
 
@@ -409,10 +466,10 @@
         <div class="accts" id="accts"></div>
       </section>
 
-      <!-- ══ 12 Privacy & your data ═══════════════════════════════════ -->
+      <!-- ══ 13 Privacy & your data ═══════════════════════════════════ -->
       <section class="msec" id="privacy" data-section>
         <header class="tc-sectionhead" style="--sec-c: var(--c-dev)">
-          <span class="plate">12</span><span class="kicker">Your data</span><h2>Privacy &amp; your data</h2>
+          <span class="plate">13</span><span class="kicker">Your data</span><h2>Privacy &amp; your data</h2>
           <p class="dek">What Tubcal sends over the internet, where it keeps your data, and how to back it up.</p>
         </header>
         <div class="prose">
@@ -443,10 +500,10 @@
         </div>
       </section>
 
-      <!-- ══ 13 Troubleshooting ═══════════════════════════════════════ -->
+      <!-- ══ 14 Troubleshooting ═══════════════════════════════════════ -->
       <section class="msec" id="troubleshooting" data-section>
         <header class="tc-sectionhead" style="--sec-c: var(--danger)">
-          <span class="plate">13</span><span class="kicker">Help</span><h2>Troubleshooting</h2>
+          <span class="plate">14</span><span class="kicker">Help</span><h2>Troubleshooting</h2>
           <p class="dek">Most problems go away after <code>tubcal restart</code> or <code>tubcal update</code>. These are the common ones.</p>
         </header>
         <div class="faq">
@@ -466,10 +523,10 @@
         </div>
       </section>
 
-      <!-- ══ 14 Questions ═════════════════════════════════════════════ -->
+      <!-- ══ 15 Questions ═════════════════════════════════════════════ -->
       <section class="msec" id="faq" data-section>
         <header class="tc-sectionhead" style="--sec-c: var(--c-github)">
-          <span class="plate">14</span><span class="kicker">Help</span><h2>Questions</h2>
+          <span class="plate">15</span><span class="kicker">Help</span><h2>Questions</h2>
         </header>
         <div class="faq faq-q">
           <details><summary>Is it free?</summary><p>Yes. There's no paid version and no subscription. It's free software, so you can also share it and change it.</p></details>
@@ -484,10 +541,10 @@
         </div>
       </section>
 
-      <!-- ══ 15 License ═══════════════════════════════════════════════ -->
+      <!-- ══ 16 License ═══════════════════════════════════════════════ -->
       <section class="msec" id="license" data-section>
         <header class="tc-sectionhead" style="--sec-c: var(--paper-faint)">
-          <span class="plate">15</span><span class="kicker">Legal</span><h2>License</h2>
+          <span class="plate">16</span><span class="kicker">Legal</span><h2>License</h2>
         </header>
         <div class="prose">
           <p>Tubcal is free software under the GNU General Public License, version 3 or (at your option) any later version. You can use it, share it and change it, and if you share a changed version, you must share its source code too. It comes with no warranty. See the <a href="https://github.com/Shio-T0/Tubcal/blob/main/LICENSE">licence</a>.</p>

@@ -119,10 +119,13 @@ Options
   desktop    an app-menu entry and icon
   autostart  start the server when you log in
   extras     distro packages the rooms use: notify-send (live-stream pings),
-             ripgrep (the editor's search)
+             ripgrep (the editor's search), mpv (with tui: it plays the videos)
   3d         3D objects: the home screen is a box you turn, with the TV on the
              front and a channel on each other side, and By topic sorts Hacker
              News into five topics with the local AI (Settings changes it later)
+  tui        Tubcal in the terminal: `tubcal tui` opens the rooms there, with vim
+             keys; videos and episodes play in mpv (with "extras": the distro's
+             mpv, when it isn't here yet)
 
 Environment
   TUBCAL_REPO, TUBCAL_BRANCH   what to clone (default: GitHub, main)
@@ -456,6 +459,8 @@ pkgname() {
     zypper:notify) echo libnotify-tools ;;
     *:notify) echo libnotify ;;
     *:ripgrep) echo ripgrep ;;
+    el:mpv) ;; # only in third-party repositories there
+    *:mpv) echo mpv ;;
     apt:adb) echo adb ;; # its udev rules come along (android-sdk-platform-tools-common)
     pacman:adb) echo android-tools android-udev ;;
     fedora:adb|zypper:adb|apk:adb|xbps:adb) echo android-tools ;;
@@ -626,7 +631,7 @@ room_list() { # room_list KEY → REPLY: the KEY values (extras, groups, tools, 
 }
 wants_tool() { room_list tools; [[ " $REPLY " == *" $1 "* ]]; }
 
-OPTS=(desktop autostart extras 3d)
+OPTS=(desktop autostart extras 3d tui)
 PREV_CLONED=""
 declare -A ON=() LOCKED=()
 PREV_LOADED=0
@@ -636,7 +641,7 @@ PREV_ROOMS="" # what the install record says is installed now (for --add / --rem
 load_previous() {
   [[ -r $CONF ]] || return 0
   local here=$APP_DIR id
-  local EDITOR_X="" ARCHIVE="" DESKTOP="" AUTOSTART="" EXTRAS="" OBJECTS_3D="" APP_DIR="" CLONED=0
+  local EDITOR_X="" ARCHIVE="" DESKTOP="" AUTOSTART="" EXTRAS="" OBJECTS_3D="" TUI="" APP_DIR="" CLONED=0
   local MODULES="" KNOWN_MODULES="" HAS_ROOMS=0
   local UV="" NODE_BIN="" BIN_DIR="" SYSTEMD="" PKGS_ADDED="" INSTALLED_AT=""
   # shellcheck source=/dev/null
@@ -659,6 +664,7 @@ load_previous() {
   [[ -n $AUTOSTART ]] && ON[autostart]=$AUTOSTART
   [[ -n $EXTRAS ]] && ON[extras]=$EXTRAS
   [[ -n $OBJECTS_3D ]] && ON[3d]=$OBJECTS_3D
+  [[ -n $TUI ]] && ON[tui]=$TUI
   rooms_on; PREV_ROOMS=$REPLY
   return 0
 }
@@ -682,6 +688,8 @@ default_choices() {
   : "${ON[autostart]:=0}"
   : "${ON[extras]:=$CAN_PKG}"
   : "${ON[3d]:=0}"
+  # The terminal interface: on where mpv already is (it plays the videos there).
+  if [[ -z ${ON[tui]:-} ]]; then if has mpv; then ON[tui]=1; else ON[tui]=0; fi; fi
   apply_force
   for id in "${MOD_IDS[@]}"; do ((ON[$id])) && mod_on "$id"; done
   extras_lock
@@ -695,7 +703,7 @@ apply_force() { # --rooms, --with and --without
   fi
   for w in "${!FORCE[@]}"; do
     case $w in
-      desktop|autostart|extras|3d) ON[$w]=${FORCE[$w]} ;;
+      desktop|autostart|extras|3d|tui) ON[$w]=${FORCE[$w]} ;;
       *)
         module_id "$w" || bad_room "$w"
         if ((FORCE[$w])); then mod_on "$REPLY"; else mod_off "$REPLY"; fi ;;
@@ -705,13 +713,21 @@ apply_force() { # --rooms, --with and --without
 
 pkg_bin() { case $1 in notify) REPLY=notify-send ;; ripgrep) REPLY=rg ;; *) REPLY=$1 ;; esac; }
 
-# "extras" are the distro packages the chosen rooms use. Nothing to offer when
+# The distro packages the extras bring: the chosen rooms', and mpv for the terminal.
+extras_packages() {
+  room_list packages
+  ((${ON[tui]:-0})) && REPLY+="${REPLY:+ }mpv"
+  return 0
+}
+
+# "extras" are the distro packages the chosen rooms use (and mpv, for the
+# terminal interface). Nothing to offer when
 # none of those rooms is chosen, or when there's no package manager to use and
 # they aren't here already.
 extras_lock() {
   local p missing=0
   LOCKED[extras]=0
-  room_list packages
+  extras_packages
   if [[ -z $REPLY ]]; then LOCKED[extras]=1; return; fi
   for p in $REPLY; do pkg_bin "$p"; has "$REPLY" || missing=1; done
   if ((!CAN_PKG && missing)); then ON[extras]=0 LOCKED[extras]=1; fi
@@ -722,20 +738,23 @@ declare -A LABEL=(
   [autostart]="Start when I log in"
   [extras]="Distro extras for the rooms"
   [3d]="3D objects"
+  [tui]="Terminal interface (tubcal tui)"
 )
 declare -A DESC=(
   [desktop]="Launch Tubcal from your app menu like any other app."
   [autostart]="The server waits in the background, so the app opens at once."
   [3d]="Home becomes a box you turn: the TV in front, a channel on each other side. The Wire gets By topic, sorted by the local AI."
+  [tui]="\`tubcal tui\` opens the rooms in your terminal, with vim keys and the terminal's own colours; videos and episodes play in mpv."
 )
 
 extras_desc() { # → REPLY: what the extras would bring, for the rooms chosen
   local out=() p
-  room_list packages
+  extras_packages
   for p in $REPLY; do
     case $p in
       notify) out+=("notify-send pings you before a followed stream goes live") ;;
       ripgrep) out+=("ripgrep speeds up the editor's search") ;;
+      mpv) out+=("mpv plays videos for the terminal interface") ;;
     esac
   done
   if ((${#out[@]} == 0)); then REPLY="Nothing to add for the rooms you picked."
@@ -746,14 +765,15 @@ side_note() { # side_note ROW → REPLY: the menu's right-hand column
   [[ $MODE == phone ]] && { REPLY=""; return; } # the APK holds every room: nothing to weigh
   case $1 in
     desktop|3d) REPLY="" ;;
+    tui) if has mpv; then REPLY="mpv here"; else REPLY="needs mpv"; fi ;;
     autostart) ((SYSTEMD)) && REPLY="systemd --user" || REPLY="XDG autostart" ;;
     extras)
       if ((LOCKED[extras] == 1)); then
-        room_list packages
+        extras_packages
         [[ -n $REPLY ]] && REPLY="needs distro packages" || REPLY="none needed"
       else
         local p out=()
-        room_list packages
+        extras_packages
         for p in $REPLY; do pkg_bin "$p"; out+=("$REPLY"); done
         local IFS=,; REPLY="${out[*]}"; REPLY=${REPLY//,/, }
       fi ;;
@@ -780,7 +800,7 @@ row_label() { if [[ -n ${LABEL[$1]:-} ]]; then REPLY=${LABEL[$1]}; else REPLY=${
 row_desc() { # row_desc ROW → REPLY: the line under the menu for the row the cursor is on
   case $1 in
     extras) extras_desc ;;
-    desktop|autostart|3d) REPLY=${DESC[$1]} ;;
+    desktop|autostart|3d|tui) REPLY=${DESC[$1]} ;;
     *)
       local about=${MAN[$1.about]:-}
       if [[ -n ${MAN[$1.needs]:-} ]]; then room_names ${MAN[$1.needs]}; about+=" Comes with $REPLY."; fi
@@ -850,6 +870,7 @@ _menu_toggle() {
   ((LOCKED[$row] == 1)) && return
   case $row in
     desktop|autostart|extras|3d) ON[$row]=$((1 - ON[$row])) ;;
+    tui) ON[tui]=$((1 - ON[tui])); extras_lock ;;
     *)
       rooms_on; before=$REPLY
       if ((ON[$row])); then mod_off "$row"; else mod_on "$row"; fi
@@ -1124,7 +1145,7 @@ plan_packages() {
     want python
   fi
   if ((ON[extras])); then
-    room_list packages
+    extras_packages
     for p in $REPLY; do pkg_bin "$p"; has "$REPLY" || want "$p"; done
   fi
   ((CAN_PKG)) || PKGS=()
@@ -1350,8 +1371,19 @@ sync_backend() { # sync_backend [EXTRA…]: the chosen rooms' packages, without 
   for x in $REPLY; do [[ $skip == *" $x "* ]] || args+=(--extra "$x"); done
   room_list groups
   for x in $REPLY; do args+=(--group "$x"); done
+  ((${ON[tui]:-0})) && args+=(--group tui)
   NO_COLOR=1 "$UV" "${args[@]}" || return 1
   note_out "Python $(.venv/bin/python -c 'import platform; print(platform.python_version())')"
+}
+
+check_tui() { # the terminal interface's packages import (textual-image isn't: it asks the terminal things)
+  cd "$APP_DIR" && .venv/bin/python -c '
+import importlib.metadata as m, importlib.util as u
+import textual, PIL, httpx  # noqa: F401
+assert u.find_spec("textual_image"), "textual-image is missing"
+print("textual", m.version("textual"))' || return 1
+  if has mpv; then note_out "tubcal tui $SEP $(mpv --version 2>/dev/null | head -n 1 | cut -d' ' -f1-2)"
+  else note_out "tubcal tui $SEP no mpv: it can't play videos yet"; fi
 }
 
 check_archive() {
@@ -1423,14 +1455,14 @@ render() { # render TEMPLATE → stdout, with @TOKENS@ filled
 write_conf() {
   mkdir -p "$TUBCAL_HOME"
   local MODULES KNOWN_MODULES="${MOD_IDS[*]}" DESKTOP=${ON[desktop]}
-  local AUTOSTART=${ON[autostart]} EXTRAS=${ON[extras]} OBJECTS_3D=${ON[3d]} INSTALLED_AT k
+  local AUTOSTART=${ON[autostart]} EXTRAS=${ON[extras]} OBJECTS_3D=${ON[3d]} TUI=${ON[tui]} INSTALLED_AT k
   rooms_on; MODULES=$REPLY
   INSTALLED_AT=$(date '+%Y-%m-%d %H:%M')
   {
     echo "# Tubcal's install record: written by install.sh, read by \`tubcal\`."
     echo "# Re-run install.sh (or \`tubcal update\`, \`tubcal add\`) rather than editing this."
     echo "# MODULES: the rooms installed; KNOWN_MODULES: every room there was to pick."
-    for k in APP_DIR CLONED UV NODE_BIN BIN_DIR MODULES KNOWN_MODULES DESKTOP AUTOSTART EXTRAS OBJECTS_3D SYSTEMD PKGS_ADDED INSTALLED_AT; do
+    for k in APP_DIR CLONED UV NODE_BIN BIN_DIR MODULES KNOWN_MODULES DESKTOP AUTOSTART EXTRAS OBJECTS_3D TUI SYSTEMD PKGS_ADDED INSTALLED_AT; do
       printf '%s=%q\n' "$k" "${!k}"
     done
   } >"$CONF.new" && mv "$CONF.new" "$CONF"
@@ -1944,7 +1976,7 @@ phone_flagged() { [[ -n $EXACT ]] || ((${#FORCE[@]} + ${#CHANGE_ADD[@]} + ${#CHA
 phone_words() {
   local w
   for w in $EXACT "${CHANGE_ADD[@]}" "${CHANGE_REMOVE[@]}" "${!FORCE[@]}"; do
-    case $w in desktop|autostart|extras|3d) die "\`$w\` is an option for this computer; the phone only has rooms." ;; esac
+    case $w in desktop|autostart|extras|3d|tui) die "\`$w\` is an option for this computer; the phone only has rooms." ;; esac
     module_id "$w" || bad_room "$w"
   done
   for w in $EXACT "${CHANGE_ADD[@]}"; do
@@ -2260,6 +2292,7 @@ running_order() {
   local x="backend" bits2=()
   room_list extras; bits2+=($REPLY)
   room_list groups; bits2+=($REPLY)
+  ((ON[tui])) && bits2+=(tui)
   ((${#bits2[@]})) && x+=" + ${bits2[*]}"
   x+=" $SEP frontend"
   wants_tool yt-dlp && x+=" $SEP yt-dlp ${DIM}(private, refreshed daily)${RST}"
@@ -2270,6 +2303,10 @@ running_order() {
   ((ON[autostart])) && l+=" $SEP autostart"
   kv "Launcher" "$l"
   ((ON[3d])) && kv "Home" "3D objects: a box you turn, the TV in front"
+  if ((ON[tui])); then
+    if has mpv || planned mpv; then kv "Terminal" "tubcal tui $SEP videos in mpv"
+    else kv "Terminal" "tubcal tui $SEP ${DIM}no mpv: install it for videos (or take the extras)${RST}"; fi
+  fi
   if ((ON[extras])) && ((!CAN_PKG)); then
     note "notify-send/ripgrep are only used if already installed."
   fi
@@ -2320,6 +2357,7 @@ on_air() {
   lines+=("$(printf '%-*s' "$cw" "$cmd status")${DIM}what's on, where, which versions${RST}")
   lines+=("$(printf '%-*s' "$cw" "$cmd update")${DIM}pull, rebuild, restart${RST}")
   lines+=("$(printf '%-*s' "$cw" "$cmd add ROOM")${DIM}add a room you left out${RST}")
+  ((ON[tui])) && lines+=("$(printf '%-*s' "$cw" "$cmd tui")${DIM}the rooms in this terminal${RST}")
   lines+=("$(printf '%-*s' "$cw" "$cmd phone")${DIM}put Tubcal on your Android phone${RST}")
   lines+=("$(printf '%-*s' "$cw" "$cmd uninstall")${DIM}take it all down again${RST}")
   lines+=("")
@@ -2448,6 +2486,10 @@ do_install() {
     fi
   fi
 
+  if ((ON[tui])); then
+    run --soft "Terminal interface" check_tui ||
+      warn "The terminal interface didn't load; \`tubcal\` and the web UI are unaffected."
+  fi
   run "Building the frontend" build_frontend || die "The frontend build failed."
   if wants_tool yt-dlp; then
     run "yt-dlp (private, self-updating)" install_ytdlp || die "Couldn't install yt-dlp."

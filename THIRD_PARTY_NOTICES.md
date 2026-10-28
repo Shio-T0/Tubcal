@@ -55,6 +55,24 @@ installer, a container image or an app package, ship it under GPL-3.0 as a whole
 The licence text is in [LICENSE](LICENSE) and at
 https://www.gnu.org/licenses/gpl-3.0.txt.
 
+## The terminal interface (`tui/`)
+
+`uv sync` installs these from PyPI for `python -m tui` (the `tui` dependency group in
+`pyproject.toml`). None of their code is copied into this repository.
+
+- [Textual](https://github.com/Textualize/textual): MIT. The interface toolkit.
+- [textual-image](https://github.com/lnqs/textual-image): LGPL-3.0-or-later. Draws
+  pictures in the terminal. Tubcal imports it unmodified; anyone can replace the
+  installed copy with their own build.
+- [Pillow](https://github.com/python-pillow/Pillow): MIT-CMU. Decodes and scales the
+  pictures.
+- [HTTPX](https://github.com/encode/httpx): BSD-3-Clause. Talks to Tubcal's local
+  server.
+
+Videos play in [mpv](https://mpv.io), which you install yourself; Tubcal starts it as
+a separate program and doesn't ship it. `tui/media/tubcal.lua` is Tubcal's own script
+for it, under Tubcal's licence.
+
 ## The Android app (`android/`)
 
 The APK contains Tubcal's own server and web code, plus the following. Settings →
