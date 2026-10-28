@@ -691,7 +691,9 @@ class TubcalApp(App, inherit_bindings=False):
     def save_many(self, items: list[dict]) -> None:
         """`s` on a range: saves the ones not saved yet, or, when every one already is,
         takes them all out. One `u` takes it back."""
-        clean = [{k: v for k, v in i.items() if not k.startswith("_")} for i in items]
+        now = int(time.time())
+        clean = [{**{k: v for k, v in i.items() if not k.startswith("_")}, "saved_at": i.get("saved_at") or now}
+                 for i in items]
         clean = list({i["id"]: i for i in clean}.values())
         if not clean:
             return
@@ -847,6 +849,9 @@ class TubcalApp(App, inherit_bindings=False):
 
             def show():
                 self.saved = {i["id"]: i for i in items}
+                shown = [i.get("id") for i in self.drawer.items]
+                if set(shown) == set(self.saved):   # the same things: no reshuffle under the cursor
+                    items[:] = [self.saved[i] for i in shown]
                 self.drawer.show_items(items)
             self.call_from_thread(show)
         self.run_worker(fetch, thread=True, group="saved", exclusive=True)
@@ -1287,6 +1292,7 @@ class TubcalApp(App, inherit_bindings=False):
             self.say("Removed from Saved · u undo")
         else:
             clean = {k: v for k, v in item.items() if not k.startswith("_")}
+            clean.setdefault("saved_at", int(time.time()))   # listed newest first at once
             self.saved[iid] = clean
             self.undo_stack.append(("save", clean))
             self.run_worker(lambda: self._api_quiet("post", "/saved", {"item": clean}), thread=True)

@@ -929,3 +929,21 @@ def test_linking_accounts_and_rooms_from_the_terminal(make_app, monkeypatch):
             await pilot.press(":", *"room on anime", "enter")
             assert "always on" in app.statusline.message.text
     run(go())
+
+
+def test_a_visual_range_survives_its_list_refreshing(make_app):
+    """A list reloaded in the background (the drawer fetching what's saved) keeps the
+    range when its first row is still there, and drops it when it isn't."""
+    async def go():
+        app = make_app()
+        async with app.run_test(size=(140, 36)) as pilot:
+            await ready(app, pilot)
+            lst = app.room.list
+            await pilot.press("j", "V", "j", "j")
+            lst.set_rows(list(lst.rows))
+            assert app.mode == "VISUAL" and lst.visual_range() == (1, 3)
+            lst.set_rows([r for r in lst.rows if not (isinstance(r, dict) and r is lst.items[1])])
+            assert lst.anchor is None
+            await pilot.press("s")
+            assert app.mode == "NORMAL" and "range is gone" in app.statusline.message.text
+    run(go())

@@ -112,6 +112,9 @@ class ItemList(Widget, can_focus=False):
 
     def set_rows(self, rows: list[Row], *, keep: str | None = None) -> None:
         keep = keep or (self.selected or {}).get("id")
+        anchor_id = None
+        if self.visual_range() is not None:
+            anchor_id = self.rows[self._items[min(self.anchor, len(self._items) - 1)]].get("id")
         self.rows = rows
         self._lines, self._first_line, self._items = [], {}, []
         for i, r in enumerate(rows):
@@ -132,7 +135,10 @@ class ItemList(Widget, can_focus=False):
                     break
         self.cursor = min(self.cursor, max(0, len(self._items) - 1))
         self._item_no = {ri: n for n, ri in enumerate(self._items)}
-        self.anchor = None   # new rows: a range over the old ones means nothing
+        # a VISUAL range keeps its start when that item is still here (a list refreshed
+        # in the background); otherwise it's gone with the rows it covered
+        self.anchor = next((n for n, ri in enumerate(self._items) if anchor_id is not None
+                            and self.rows[ri].get("id") == anchor_id), None)
         self.virtual_size = Size(self.size.width, len(self._lines))
         self._keep_visible()
         self.refresh()
