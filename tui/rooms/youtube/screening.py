@@ -536,6 +536,18 @@ class ScreeningRoom(RoomView):
             return True
         return False
 
+    def show_channel(self, channel_id: str) -> None:
+        """Latest, one channel's uploads (the Following page's Enter)."""
+        self.channel = channel_id or None
+        self.focus_pane = "list"
+        if self.view != "latest":
+            self.set_view("latest")
+        else:
+            self._show()
+        self._mark_focus()
+        self._show_index()
+        self.app.refresh_chrome()
+
     def _pick_index(self) -> None:
         row = self.index.selected or {}
         if "_view" in row:

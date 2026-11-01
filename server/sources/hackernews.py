@@ -45,7 +45,7 @@ def normalize(item):
 
 def _fetch_item(hn_id):
     def fetch():
-        return httpc.get(f"{FIREBASE}/item/{hn_id}.json").json()
+        return httpc.get(f"{FIREBASE}/item/{hn_id}.json", anonymous=True).json()
 
     payload, _ = cache.cached(f"hn:item:{hn_id}", config.TTL_HN_ITEM, fetch)
     return payload
@@ -55,7 +55,7 @@ def get_feed(list_name="top", page=0):
     endpoint = LISTS.get(list_name, LISTS["top"])
 
     def fetch_ids():
-        return httpc.get(f"{FIREBASE}/{endpoint}.json").json()
+        return httpc.get(f"{FIREBASE}/{endpoint}.json", anonymous=True).json()
 
     ids, stale = cache.cached(f"hn:list:{list_name}", config.TTL_HN_LIST, fetch_ids)
     start = page * PAGE_SIZE
@@ -71,7 +71,7 @@ def top_items(n=100):
     decayed by age, so the hottest first). Reads a few ids past `n` to make up
     for dead and deleted ones; each story carries its front-page `rank`."""
     def fetch_ids():
-        return httpc.get(f"{FIREBASE}/{LISTS['top']}.json").json()
+        return httpc.get(f"{FIREBASE}/{LISTS['top']}.json", anonymous=True).json()
 
     ids, _ = cache.cached("hn:list:top", config.TTL_HN_LIST, fetch_ids)
     with ThreadPoolExecutor(max_workers=12) as ex:
@@ -103,7 +103,7 @@ def search(query, sort="relevance", range_=None):
     range_ = range_ if range_ in SEARCH_RANGES else None
 
     def fetch():
-        return httpc.get(search_url(query, sort, range_)).json()
+        return httpc.get(search_url(query, sort, range_), anonymous=True).json()
 
     data, stale = cache.cached(f"hn:search:{sort}:{range_ or 'all'}:{query.lower()}", 300, fetch)
     items = []
@@ -172,7 +172,7 @@ def _norm_comment(node, depth):
 
 def get_item(hn_id):
     def fetch():
-        return httpc.get(f"{ALGOLIA}/items/{hn_id}").json()
+        return httpc.get(f"{ALGOLIA}/items/{hn_id}", anonymous=True).json()
 
     data, stale = cache.cached(f"hn:thread:{hn_id}", config.TTL_HN_COMMENTS, fetch)
 

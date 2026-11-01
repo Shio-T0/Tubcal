@@ -3,6 +3,8 @@
 // Every call has a browser fallback, so the phone UI also runs in a desktop
 // browser at phone width (that's how it's developed and screenshot-tested).
 
+import { webUrl } from '@pc/lib/format.js';
+
 const A = () => (typeof window !== 'undefined' ? window.TubcalAndroid : null);
 
 export const isAndroid = () => !!A();
@@ -15,11 +17,14 @@ export function share({ title = '', url = '', text = '' }) {
   return navigator.clipboard?.writeText(url || text).then(() => 'copied', () => false) ?? Promise.resolve(false);
 }
 
-/** Open a link outside the app — the browser, or the YouTube/Reddit app if installed. */
+/** Open a link outside the app — the browser, or the YouTube/Reddit app if installed.
+ *  Only a web (or mail) address: a feed or a saved entry can carry anything. */
 export function openExternal(url) {
+  const u = webUrl(url);
+  if (!u) return;
   const a = A();
-  if (a?.openExternal) a.openExternal(url);
-  else window.open(url, '_blank', 'noopener');
+  if (a?.openExternal) a.openExternal(u);
+  else window.open(u, '_blank', 'noopener');
 }
 
 /** 'landscape' | 'portrait' | 'auto' — the player locks landscape in fullscreen. */

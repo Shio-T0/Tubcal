@@ -16,6 +16,7 @@ import org.json.JSONObject
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
+import java.security.SecureRandom
 
 /**
  * Foreground service that hosts the embedded Tubcal Flask server (via Chaquopy)
@@ -33,6 +34,23 @@ class TubcalService : Service() {
         private const val ONGOING_ID = 1
         private const val LEAD_SECONDS = 600L   // notify 10 minutes before
         private const val POLL_MS = 90_000L
+
+        /** The server's access key, new each time the app's process starts. Every app
+         *  on a phone can reach 127.0.0.1, so the server answers only requests that
+         *  carry this: the WebView as a cookie, this app's own Kotlin as a header
+         *  (server/localguard.py). It lives only in this process's memory. */
+        val KEY: String by lazy {
+            val bytes = ByteArray(32).also { SecureRandom().nextBytes(it) }
+            bytes.joinToString("") { "%02x".format(it) }
+        }
+        const val KEY_HEADER = "X-Tubcal-Key"
+        const val KEY_COOKIE = "tubcal_key"
+        /** Marks an intent this app made (a notification's), so a route in it is followed. */
+        const val EXTRA_KEY = "com.tubcal.app.KEY"
+
+        /** A connection to the embedded server, carrying the key. */
+        fun open(url: String): HttpURLConnection =
+            (URL(url).openConnection() as HttpURLConnection).apply { setRequestProperty(KEY_HEADER, KEY) }
     }
 
     @Volatile private var started = false
@@ -64,7 +82,7 @@ class TubcalService : Service() {
                 // start() runs Flask and blocks, so this thread *is* the server.
                 Python.getInstance()
                     .getModule("android_main")
-                    .callAttr("start", dataDir, webDir, PORT, roomsDir)
+                    .callAttr("start", dataDir, webDir, PORT, roomsDir, KEY)
             } catch (e: Throwable) {
                 e.printStackTrace()
             }
@@ -171,7 +189,7 @@ class TubcalService : Service() {
         this, requestCode,
         Intent(this, MainActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
-            .apply { if (path != null) putExtra(MainActivity.EXTRA_PATH, path) },
+            .apply { if (path != null) putExtra(MainActivity.EXTRA_PATH, path).putExtra(EXTRA_KEY, KEY) },
         PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
     )
 
@@ -188,7 +206,7 @@ class TubcalService : Service() {
     private fun nm() = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
     private fun httpGet(url: String): String? {
-        val c = (URL(url).openConnection() as HttpURLConnection).apply {
+        val c = open(url).apply {
             connectTimeout = 8000; readTimeout = 120000
         }
         return try {

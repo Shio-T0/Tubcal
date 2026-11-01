@@ -21,6 +21,7 @@ from textual.widgets import Static
 
 from .. import fmt
 from ..glyphs import Glyphs
+from ..keys import GROUPS, shown
 from ..media.player import NowState
 from ..rooms import ROOM_BY_ID, Registry
 from ..theme import CHANNEL_HUES, MODE_HUES, ROOM_HUES, Roles
@@ -347,37 +348,106 @@ class Winbar(Widget, can_focus=False):
 
 
 class WhichKey(Static, can_focus=False):
-    """The float listing what can follow a pending chord (bottom right, rounded)."""
+    """What can follow a pending chord: every key, in columns across the bottom, the
+    chord so far in the top edge.
+
+    ╭ Space › p  player · Screening Room ─────────────────────────────────────────╮
+    │  h → back 10 s        n → next in the queue   q → quality                    │
+    │  l → forward 10 s     p → pause / play        s → stop                       │
+    ╰───────────────────────────────────────────── Bksp back  Esc close  ? every key ╯
+
+    Keys of the room (or page) you're in take its colour, everywhere's are yellow; a
+    group shows how many keys it holds. Columns fill top to bottom, as which-key.nvim's.
+    """
 
     DEFAULT_CSS = """
     WhichKey {
         layer: float; position: absolute; width: auto; height: auto;
-        padding: 0 1; border: round $tc-rule; display: none;
+        padding: 0 1; border: round $tc-rule; display: none; background: $tc-surface;
+        border-title-align: left; border-subtitle-align: right;
     }
     """
+    GAP = 4
 
-    def __init__(self, roles: Roles, **kw):
+    def __init__(self, roles: Roles, glyphs: Glyphs | None = None, **kw):
         super().__init__("", **kw)
         self.roles = roles
+        self.glyphs = glyphs or Glyphs("unicode")
+        self.layout_rows = 0     # what the last show drew (tests read them)
+        self.layout_cols = 0
 
-    def show_keys(self, title: str, keys: list[tuple[str, str]]) -> None:
-        r = self.roles
-        t = Text(no_wrap=True, overflow="ellipsis")
-        t.append(f"{title}\n", style(r, "dim"))
-        rows = keys[:12]
-        kw = max((cell_len(k) for k, _ in rows), default=1)
-        for i, (k, label) in enumerate(rows):
-            t.append(k.replace("space", "␣").rjust(kw) + "  ", style(r, "hue:yellow+bold"))
-            t.append(label, style(r, "hue:blue") if label.startswith("+") else style(r, "fg"))
-            if i < len(rows) - 1:
-                t.append("\n")
-        if len(keys) > 12:
-            t.append(f"\n… {len(keys) - 12} more", style(r, "faint"))
-        self.update(t)
-        # bottom right, just above the statusline
-        lines = t.plain.split("\n")
-        w = max(cell_len(ln) for ln in lines) + 4
-        h = len(lines) + 2
+    def show_keys(self, pending: tuple[str, ...], hints: list, *, here: str = "", hue: str = "blue") -> None:
+        r, g = self.roles, self.glyphs
         size = self.app.size
-        self.styles.offset = (max(0, size.width - w - 1), max(1, size.height - h - 1))
+        plain = g.kind == "ascii"
+        width = max(24, size.width - 2)
+        inner = width - 4                       # the border and the padding
+        keys = [shown(h.key, plain) for h in hints]
+        kw = max((cell_len(k) for k in keys), default=1)
+        arrow = f" {g.arrow} "
+
+        def label_w(h) -> int:
+            return cell_len(h.label) + (2 + len(str(h.count)) if h.group else 0)
+        lw = min(30, max((label_w(h) for h in hints), default=8))
+        n = len(hints)
+        max_rows = max(2, size.height // 2 - 3)
+        while True:
+            colw = kw + cell_len(arrow) + lw
+            cols = max(1, min(n, (inner + self.GAP) // (colw + self.GAP)))
+            rows = -(-n // cols)
+            if rows <= max_rows or lw <= 12:
+                break
+            lw -= 2
+        rows = min(rows, max_rows)
+        shown_n = min(n, rows * cols)
+        t = Text(no_wrap=True, overflow="crop")
+        for row in range(rows):
+            for col in range(cols):
+                i = col * rows + row
+                if i >= shown_n:
+                    break
+                h = hints[i]
+                if col:
+                    t.append(" " * self.GAP)
+                t.append(keys[i].rjust(kw), style(r, f"hue:{hue}+bold" if h.own else "hue:yellow+bold"))
+                t.append(arrow, style(r, "faint"))
+                if h.group:
+                    count = f" {h.count}"
+                    name = fmt.cut(f"+{h.label}", lw - cell_len(count))
+                    t.append(name, style(r, "hue:blue+bold"))
+                    t.append(count, style(r, "faint"))
+                    used = cell_len(name) + cell_len(count)
+                else:
+                    name = fmt.cut(h.label, lw)
+                    t.append(name, style(r, "fg"))
+                    used = cell_len(name)
+                if col < cols - 1:
+                    t.append(" " * (lw - used))
+            if row < rows - 1:
+                t.append("\n")
+        self.update(t)
+        self.layout_rows, self.layout_cols = rows, cols
+        # the chord so far, and where you are
+        title = Text()
+        for i, k in enumerate(pending):
+            if i:
+                title.append(" › ", style(r, "faint"))
+            title.append(shown(k, plain), style(r, "hue:yellow+bold"))
+        group = GROUPS.get(tuple(pending))
+        if group:
+            title.append(f"  {group}", style(r, "hue:blue+bold"))
+        if here and any(h.own for h in hints):
+            title.append(" · ", style(r, "faint"))
+            title.append(here, style(r, f"hue:{hue}"))
+        self.border_title = title
+        foot = Text()
+        if shown_n < n:
+            foot.append(f" {n - shown_n} more: ? ", style(r, "hue:yellow"))
+        for i, (key, what) in enumerate((("Bksp", "back"), ("Esc", "close"), ("?", "every key"))):
+            foot.append(f"{'  ' if i else ''}{key}", style(r, "hue:yellow"))
+            foot.append(f" {what}", style(r, "dim"))
+        self.border_subtitle = foot
+        self.styles.width = width
+        h = rows + 2
+        self.styles.offset = (1, max(1, size.height - h - 1))
         self.display = True

@@ -79,8 +79,22 @@ def browser_command(configured: str = "") -> list[str] | None:
     return ["xdg-open"] if shutil.which("xdg-open") else None
 
 
+def web(url: str) -> bool:
+    """Whether `url` is a web (or mail) address. A feed's link can say anything, and
+    one that starts with `-` would reach the browser as an option (Chromium's
+    `--gpu-launcher=…` runs a command), so nothing else is handed over."""
+    try:
+        parts = urlsplit((url or "").strip())
+    except ValueError:
+        return False
+    return (parts.scheme in ("http", "https") and bool(parts.netloc)) or (parts.scheme == "mailto" and bool(parts.path))
+
+
 def open_url(url: str, configured: str = "") -> str | None:
     """Open `url` in the browser. Returns a problem sentence, or None."""
+    url = (url or "").strip()
+    if not web(url):
+        return "That isn't a web address, so it wasn't opened."
     cmd = browser_command(configured)
     if not cmd:
         return "No browser found; set `browser` in ~/.config/tubcal/tui.toml."

@@ -76,7 +76,7 @@ def extract_audio(video_id):
         raise RuntimeError("no downloadable audio for this video (live or restricted)")
 
     dest = config.BRAIN_DIR / f"{video_id}.mp4"
-    with httpc.get(mp4["url"], stream=True, timeout=120) as r:
+    with httpc.get(mp4["url"], stream=True, timeout=120, anonymous=True) as r:
         with open(dest, "wb") as fh:
             for chunk in r.iter_content(chunk_size=1 << 16):
                 if chunk:

@@ -1390,7 +1390,8 @@ remove_node() { rm -rf "$TUBCAL_HOME/node"; }
 install_uv() {
   has curl || { echo "curl is needed to fetch uv"; return 1; }
   mkdir -p "$TUBCAL_HOME/bin"
-  curl -LsSf https://astral.sh/uv/install.sh |
+  # a script piped into sh: only ever over HTTPS, redirects included
+  curl --proto '=https' --tlsv1.2 -LsSf https://astral.sh/uv/install.sh |
     env UV_INSTALL_DIR="$TUBCAL_HOME/bin" UV_NO_MODIFY_PATH=1 INSTALLER_NO_MODIFY_PATH=1 sh || return 1
   local v
   v=$("$TUBCAL_HOME/bin/uv" --version) || return 1
@@ -1408,12 +1409,12 @@ install_node() {
   ((MUSL)) && { echo "nodejs.org has no musl build; install nodejs and npm from your distro"; return 1; }
   has curl && has tar || { echo "curl and tar are needed to fetch Node.js"; return 1; }
   local base="https://nodejs.org/dist/latest-v${NODE_MAJOR}.x" sums line sha file tmp
-  sums=$(curl -fsSL --retry 3 "$base/SHASUMS256.txt") || return 1
+  sums=$(curl --proto '=https' -fsSL --retry 3 "$base/SHASUMS256.txt") || return 1
   line=$(grep -E " node-v[0-9.]+-linux-${arch}\.tar\.gz$" <<<"$sums") || { echo "no linux-$arch build listed"; return 1; }
   sha=${line%% *} file=${line##* }
   tmp=$(mktemp -d)
   echo "downloading $file"
-  curl -fL --retry 3 -sS -o "$tmp/$file" "$base/$file" || return 1
+  curl --proto '=https' -fL --retry 3 -sS -o "$tmp/$file" "$base/$file" || return 1
   echo "$sha  $tmp/$file" | sha256sum -c - || { echo "checksum mismatch for $file"; return 1; }
   rm -rf "$TUBCAL_HOME/node.new" && mkdir -p "$TUBCAL_HOME/node.new"
   tar -xzf "$tmp/$file" -C "$TUBCAL_HOME/node.new" --strip-components=1 || return 1

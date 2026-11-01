@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 12+. Tubcal has no cloud: its database holds your accounts' tokens and
+     what you watched, so nothing goes into Google's cloud backup. Moving to a new
+     phone (cable or Wi-Fi, phone to phone) still brings everything. -->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="root" path="." />
+        <exclude domain="file" path="." />
+        <exclude domain="database" path="." />
+        <exclude domain="sharedpref" path="." />
+        <exclude domain="external" path="." />
+        <exclude domain="device_root" path="." />
+        <exclude domain="device_file" path="." />
+        <exclude domain="device_database" path="." />
+        <exclude domain="device_sharedpref" path="." />
+    </cloud-backup>
+    <device-transfer>
+        <include domain="file" path="data/" />
+        <include domain="sharedpref" path="." />
+    </device-transfer>
+</data-extraction-rules>

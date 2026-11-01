@@ -171,6 +171,29 @@ class Radio:
         self._keep_place()
         self.mpv.close(quit=True)
 
+    # ── a reload (`ZR`): the radio plays on in the next run ──────────────────
+
+    def hand_over(self) -> dict | None:
+        if not (self.episode and self.mpv.alive):
+            self.shutdown()
+            return None
+        self._keep_place()
+        kept = self.mpv.keep()
+        return {"mpv": kept, "episode": self.episode} if kept else None
+
+    def take_over(self, data: dict | None) -> bool:
+        ep = data.get("episode") if isinstance(data, dict) else None
+        if not isinstance(ep, dict):
+            return False
+        self.episode = ep
+        self.now = NowState(title=ep.get("title") or "", dur=float(ep.get("duration") or 0), active=True)
+        if not self.mpv.adopt(data.get("mpv")):
+            self.episode = None
+            self.now = NowState()
+            return False
+        self.changed()
+        return True
+
     # ── what mpv tells us ────────────────────────────────────────────────────
 
     def _on_event(self, ev: dict) -> None:

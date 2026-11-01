@@ -1,0 +1,40 @@
+ ❯ Tubcal.   1 Social  2 Coding  3 Video  │  1 Screening Room   2 The Anime   3 The Archive
+
+  Keys   Every key, by what it does. The name on the right is what [keys] in tui.toml takes.
+  ⏎ runs it   Tab next section   / filter   q close
+
+ ▎ Here · Screening R…  9 │  Here · Screening Room ────────────────────────────────────────────────────────────────────── [keys.youtube]  ┃
+   Moving              14 │                                                                                                               ┃
+   Rooms and views     20 │▎ Enter / p  play                                                                                        play  ┃
+   Finding              5 │  l          play / open                                                                                right  ┃
+   What you're on       7 │  a          add to the queue                                                                         enqueue  │
+   Pages and drawers    6 │  s          save / unsave                                                                               save  │
+   The player           7 │  u          undo                                                                                        undo  │
+   The radio            4 │  x          mark the channel seen                                                                       seen  │
+   Closing              4 │  dd         remove from History                                                                       remove  │
+   VISUAL               7 │  R          fetch everything again                                                             force_refresh  │
+   The Saved drawer     6 │  Space tw   hide watched videos                                                               toggle_watched  │
+   Pages like this one 10 │                                                                                                               │
+   The command line    11 │  Moving ───────────────────────────────────────────────────────────────────────────────────────────── [keys]  │
+   Space f, the finder  6 │                                                                                                               │
+   In the video window  2 │  A number first repeats a key or picks a row: 5j, 12G, 3⏎.                                                    │
+   Home                 2 │                                                                                                               │
+   The Edition          9 │  j / ↓       down                                                                                       down  │
+   The Wire            14 │  k / ↑       up                                                                                           up  │
+   The Dispatch        12 │  h / ←       back / pane left                                                                           left  │
+   The Composing Room   3 │  l / →       open / pane right                                                                         right  │
+   The Workbench        6 │  gg / Home   first                                                                                       top  │
+   GitHub               7 │  G / End     last                                                                                     bottom  │
+   The Anime            9 │  C-d         half a page down                                                                      half_down  │
+   The Archive          6 │  C-u         half a page up                                                                          half_up  │
+                          │  C-f / PgDn  a page down                                                                           page_down  │
+                          │  C-b / PgUp  a page up                                                                               page_up  │
+                          │  zz          centre the line                                                                          center  │
+                          │  zt          line to the top                                                                          to_top  │
+                          │  zb          line to the bottom                                                                    to_bottom  │
+                          │  C-o         jump back                                                                             jump_back  │
+                          │                                                                                                               │
+                          │  Rooms and views ───────────────────────────────────────────────────────────────────────────────────────────  │
+                          │                                                                                                               │
+
+NORMAL  Keys › Here · Screening Room                                                                                        1/186  12:00

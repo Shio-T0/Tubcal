@@ -25,10 +25,12 @@ import android.view.ViewGroup
 import android.view.WindowInsets
 import android.view.WindowInsetsController
 import android.view.WindowManager
+import android.webkit.CookieManager
 import android.webkit.JavascriptInterface
 import android.webkit.SslErrorHandler
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -36,8 +38,7 @@ import android.widget.FrameLayout
 import android.widget.Toast
 import org.json.JSONArray
 import org.json.JSONObject
-import java.net.HttpURLConnection
-import java.net.URL
+import java.io.ByteArrayInputStream
 import java.net.URLEncoder
 
 /**
@@ -124,6 +125,15 @@ class MainActivity : Activity() {
             setSupportMultipleWindows(true)            // target=_blank → onCreateWindow → outside
             javaScriptCanOpenWindowsAutomatically = true
         }
+        // The server's key, so its API answers this WebView (and no other app).
+        CookieManager.getInstance().apply {
+            setAcceptCookie(true)
+            for (host in listOf("127.0.0.1", "localhost")) {
+                setCookie("http://$host:${TubcalService.PORT}",
+                    "${TubcalService.KEY_COOKIE}=${TubcalService.KEY}; Path=/; HttpOnly; SameSite=Lax")
+            }
+            flush()
+        }
         webView.addJavascriptInterface(Bridge(), "TubcalAndroid")
         webView.webViewClient = object : WebViewClient() {
             override fun onReceivedSslError(view: WebView?, handler: SslErrorHandler?, error: SslError?) {
@@ -136,6 +146,13 @@ class MainActivity : Activity() {
                 openOutside(url)
                 return true
             }
+
+            /** Another app's server on this phone's 127.0.0.1 never hears from this
+             *  WebView: cookies don't keep to a port, so it would get the key. */
+            override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? =
+                if (isLoopback(request.url) && !isOurServer(request.url))
+                    WebResourceResponse("text/plain", "utf-8", 403, "Forbidden", emptyMap(), ByteArrayInputStream(ByteArray(0)))
+                else null
 
             override fun onPageFinished(view: WebView?, url: String?) {
                 applyInsetsToWeb()  // re-apply once the document exists
@@ -154,11 +171,22 @@ class MainActivity : Activity() {
 
     // ---- links ----
 
-    private fun isLocal(uri: Uri): Boolean {
-        val scheme = uri.scheme ?: return true
-        if (scheme == "about" || scheme == "data" || scheme == "blob" || scheme == "javascript") return true
-        val host = uri.host ?: return false
-        return (scheme == "http" || scheme == "https") && (host == "127.0.0.1" || host == "localhost")
+    /** This app's own pages: its server (at its port: another app may run one on
+     *  127.0.0.1 too), a blob it made, the blank page. A data: or javascript: page
+     *  would get the bridge without being ours, so it's nowhere (see openOutside). */
+    private fun isLocal(uri: Uri): Boolean = when (uri.scheme) {
+        "about" -> true
+        "blob" -> isOurServer(Uri.parse(uri.schemeSpecificPart ?: ""))
+        else -> isOurServer(uri)
+    }
+
+    private fun isOurServer(uri: Uri): Boolean =
+        uri.scheme == "http" && (uri.host == "127.0.0.1" || uri.host == "localhost") && uri.port == TubcalService.PORT
+
+    private fun isLoopback(uri: Uri): Boolean {
+        val host = uri.host?.lowercase()?.removePrefix("[")?.removeSuffix("]") ?: return false
+        return host == "localhost" || host.endsWith(".localhost") || host.startsWith("127.") ||
+            host == "::1" || host == "0.0.0.0" || host == "::"
     }
 
     /** A link out of the app: YouTube, Reddit, Crunchyroll… open in their own app
@@ -166,6 +194,9 @@ class MainActivity : Activity() {
      *  YouTube links itself, a YouTube link goes to the YouTube app or the browser
      *  by name, so it can't come straight back here. */
     private fun openOutside(uri: Uri) {
+        // Links people follow: web, mail, phone, maps, the store. Not this app's files
+        // (file:, content:), not a page made of a link (data:, javascript:).
+        if (uri.scheme?.lowercase() !in OUTSIDE_SCHEMES || isLoopback(uri)) return
         val view = Intent(Intent.ACTION_VIEW, uri).addCategory(Intent.CATEGORY_BROWSABLE)
         if (linksOn() && uri.host?.lowercase()?.removePrefix("www.") in LINK_HOSTS) {
             handOnTo(view)?.let { view.setPackage(it) }
@@ -174,6 +205,8 @@ class MainActivity : Activity() {
             startActivity(view)
         } catch (_: ActivityNotFoundException) {
             Toast.makeText(this, "No app can open that link", Toast.LENGTH_SHORT).show()
+        } catch (_: RuntimeException) {
+            Toast.makeText(this, "That link can't be opened", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -212,8 +245,7 @@ class MainActivity : Activity() {
     /** Where `uri` opens in Tubcal, as the server says; null when Tubcal can't
      *  show it (or this phone has no Screening Room). Network: not on the main thread. */
     private fun linkRoute(uri: Uri): String? = try {
-        val c = URL("${TubcalService.BASE_URL}/api/youtube/link?url=" + URLEncoder.encode(uri.toString(), "UTF-8"))
-            .openConnection() as HttpURLConnection
+        val c = TubcalService.open("${TubcalService.BASE_URL}/api/youtube/link?url=" + URLEncoder.encode(uri.toString(), "UTF-8"))
         c.connectTimeout = 2000; c.readTimeout = 5000
         val body = try { c.inputStream.bufferedReader().use { it.readText() } } finally { c.disconnect() }
         val data = JSONObject(body).optJSONObject("data")
@@ -375,7 +407,7 @@ class MainActivity : Activity() {
     }
 
     private fun ping(url: String): Boolean = try {
-        val c = (URL(url).openConnection() as HttpURLConnection)
+        val c = TubcalService.open(url)
         c.connectTimeout = 1000; c.readTimeout = 2000
         val ok = c.responseCode in 200..299
         c.disconnect(); ok
@@ -651,10 +683,15 @@ class MainActivity : Activity() {
         }.apply { isDaemon = true }.start()
     }
 
-    /** Navigate the page to the intent's route (a notification's). */
+    /** Navigate the page to the intent's route (a notification's). Another app can
+     *  start this activity too, so a route is followed only from an intent this app
+     *  made, which carries this process's key. */
     private fun openRoute(intent: Intent?): Boolean {
-        val path = intent?.getStringExtra(EXTRA_PATH)?.takeIf { it.startsWith("/") } ?: return false
+        val path = intent?.getStringExtra(EXTRA_PATH)?.takeIf { it.startsWith("/") && !it.startsWith("//") } ?: return false
+        val mine = intent.getStringExtra(TubcalService.EXTRA_KEY) == TubcalService.KEY
         intent.removeExtra(EXTRA_PATH)
+        intent.removeExtra(TubcalService.EXTRA_KEY)
+        if (!mine) return false
         goTo(path)
         return true
     }
@@ -677,5 +714,6 @@ class MainActivity : Activity() {
         // The YoutubeLinks alias's addresses (www. dropped), and the ones Settings waits on approval for.
         private val LINK_HOSTS = setOf("youtube.com", "m.youtube.com", "music.youtube.com", "youtu.be")
         private val APPROVE_HOSTS = listOf("youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be")
+        private val OUTSIDE_SCHEMES = setOf("http", "https", "mailto", "tel", "sms", "geo", "market")
     }
 }

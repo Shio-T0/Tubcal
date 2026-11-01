@@ -1,0 +1,40 @@
+ ❯ Tubcal.   1 Social  2 Coding  3 Video  │  1 Screening Room   2 The Anime   3 The Archive
+
+  Settings   Accounts, what you follow, the rooms, playback, and this terminal's own
+  ⏎ change   h l step   Tab next section   / filter   q close
+
+ ▎ Accounts             3 │  Accounts ────────────────────────────────────────────────────────────────── the tokens stay on this machine  ┃
+                          │                                                                                                               ┃
+   Following            3 │▎ AniList                                                                                     ○ not connected  ┃
+                          │▎ Your list, the sync, the social pages                                                         :link anilist  ┃
+   Rooms in the tabs    9 │                                                                                                               ┃
+                          │  Reddit                                                                                      ○ not connected  ┃
+   Playback             6 │  Your own front page; without it the Dispatch reads RSS                                         :link reddit  ┃
+                          │                                                                                                               │
+   The Anime            3 │  GitHub                                                                                         ○ not linked  │
+                          │  Your inbox, stars and work: the gh CLI's sign-in or a token                                    :link github  │
+   Where rooms open     2 │                                                                                                               │
+                          │                                                                                                               │
+   This terminal        8 │  Following ─────────────────────────────────────────────────────────────────────────────────────────────────  │
+                          │                                                                                                               │
+   Your data            3 │  YouTube                                                                                          3 channels  │
+                          │  Channel 0, Channel 1, Channel 2                                                      :follow …  :unfollow …  │
+   More                 6 │                                                                                                               │
+                          │  Reddit                                                                                         0 subreddits  │
+                          │  Nothing yet: :follow r/name                                                          :follow …  :unfollow …  │
+                          │                                                                                                               │
+                          │  GitHub                                                                                     0 repo or person  │
+                          │  Nothing yet: :follow owner/repo                                                      :follow …  :unfollow …  │
+                          │                                                                                                               │
+                          │                                                                                                               │
+                          │  Rooms in the tabs ─────────────────────────────────────── a room out of the tabs still opens when asked for  │
+                          │                                                                                                               │
+                          │  The Edition                                                                                            ● on  │
+                          │  Social · ge                                                                               :room off edition  │
+                          │                                                                                                               │
+                          │  The Wire                                                                                               ● on  │
+                          │  Social · gn                                                                            :room off hackernews  │
+                          │                                                                                                               │
+                          │  The Dispatch                                                                                           ● on  │
+
+NORMAL  Settings › Accounts                                                                                                  1/43  12:00

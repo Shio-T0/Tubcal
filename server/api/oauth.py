@@ -7,6 +7,8 @@ SQLite database. Flows use plain requests — no provider SDKs.
 import secrets
 import time
 
+from urllib.parse import quote
+
 from flask import Blueprint, redirect, request
 
 from . import err, ok
@@ -168,10 +170,10 @@ def callback(provider):
         return err(str(e), 404)
     expected_state = db.get_setting(f"_oauth_state_{provider}")
     db.delete_setting(f"_oauth_state_{provider}")
-    if not expected_state or request.args.get("state") != expected_state:
+    if not expected_state or not secrets.compare_digest(request.args.get("state", "").encode(), expected_state.encode()):
         return err("state mismatch — try connecting again", 400)
     if request.args.get("error"):
-        return redirect(f"/settings?oauth_error={request.args['error']}")
+        return redirect(f"/settings?oauth_error={quote(request.args['error'][:80], safe='')}")
     code = request.args.get("code")
     if not code:
         return err("missing code", 400)

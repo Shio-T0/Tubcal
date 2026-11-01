@@ -56,7 +56,7 @@ _CHANNEL_TABS = ("", "featured", "videos", "streams", "shorts", "playlists")
 
 
 def _seconds(raw):
-    m = _STAMP.match(raw or "")
+    m = _STAMP.fullmatch(raw or "")
     if not raw or not m:
         return None
     return int(m.group(1) or 0) * 3600 + int(m.group(2) or 0) * 60 + int(m.group(3) or 0)
@@ -92,7 +92,7 @@ def tubcal_path(url):
         elif len(parts) == 2 and parts[0] in ("shorts", "live", "embed", "v"):
             video = parts[1]
     if video is not None:
-        if not _VIDEO.match(video):
+        if not _VIDEO.fullmatch(video):
             return None
         start = _seconds(arg("t") or arg("start") or (parse_qs(u.fragment).get("t") or [""])[0])
         return "/youtube/open?v=" + video + ("&t=%d" % start if start else "")
@@ -113,9 +113,9 @@ def tubcal_path(url):
     if parts == ["playlist"]:
         lst = arg("list")
         # Watch later and Liked are an account's own; Tubcal has no account there.
-        return "/youtube/playlist/" + lst if _LIST.match(lst) and lst not in ("WL", "LL") else None
+        return "/youtube/playlist/" + lst if _LIST.fullmatch(lst) and lst not in ("WL", "LL") else None
     tab = parts[2] if len(parts) == 3 else ""
-    if parts[0] == "channel" and len(parts) in (2, 3) and _CHANNEL.match(parts[1]) and tab in _CHANNEL_TABS:
+    if parts[0] == "channel" and len(parts) in (2, 3) and _CHANNEL.fullmatch(parts[1]) and tab in _CHANNEL_TABS:
         return "/youtube/c/" + parts[1] + ("?tab=playlists" if tab == "playlists" else "")
     tab = parts[1] if len(parts) == 2 else ""
     if parts[0].startswith("@") and len(parts) <= 2 and tab in _CHANNEL_TABS:
@@ -497,7 +497,8 @@ def _browser_argv(browser, url):
     for cmd in (os.environ.get("BROWSER") or "").split(":"):
         if cmd.strip() and os.path.basename(cmd.split()[0]) not in _LOOPS and shutil.which(cmd.split()[0]):
             if "%s" in cmd:
-                return shlex.split(cmd.replace("%s", url or ""))
+                # the link goes into the split words, so its quotes and spaces stay its own
+                return [w.replace("%s", url or "") for w in shlex.split(cmd)]
             return shlex.split(cmd) + ([url] if url else [])
     return None
 

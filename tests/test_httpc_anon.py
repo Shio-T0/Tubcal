@@ -128,3 +128,34 @@ def test_no_youtube_read_uses_the_shared_jar():
         f"youtube.py lines {offenders} call httpc without anonymous=True and "
         "without an Authorization header — they would replay the shared cookie jar"
     )
+
+
+@pytest.mark.parametrize("module, at_least", [
+    ("server.sources.reddit", 9),       # Reddit's loid would tie logged-out reads to a later login
+    ("server.sources.hackernews", 5),
+    ("server.sources.dev", 2),
+    ("server.sources.animethemes", 1),
+    ("server.sources.anilist", 1),
+    ("server.sources.innertube", 1),
+    ("server.brain.transcribe", 1),
+])
+def test_other_sources_read_without_the_shared_jar(module, at_least):
+    """The same rule for the other platforms: no call goes through the jar that
+    keeps what a host sets (anonymous=True, or public_only=True for an address a
+    third party chose)."""
+    import ast
+    import importlib
+
+    tree = ast.parse(inspect.getsource(importlib.import_module(module)))
+    offenders, checked = [], 0
+    for node in ast.walk(tree):
+        if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+                and node.func.attr in ("get", "post", "request", "stream_get")
+                and isinstance(node.func.value, ast.Name) and node.func.value.id == "httpc"):
+            continue
+        checked += 1
+        kw = {k.arg: k.value for k in node.keywords}
+        if not any(isinstance(kw.get(k), ast.Constant) and kw[k].value is True for k in ("anonymous", "public_only")):
+            offenders.append(node.lineno)
+    assert checked >= at_least, f"only found {checked} httpc call sites in {module}"
+    assert not offenders, f"{module} lines {offenders} go through the shared cookie jar"

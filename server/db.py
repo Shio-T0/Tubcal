@@ -197,7 +197,15 @@ def connect():
     path = config.DB_PATH
     first = path not in _prepared
     if first:
-        config.DATA_DIR.mkdir(exist_ok=True)
+        # The folder is this user's alone: it holds account tokens, what you watched
+        # and the Archive's audio, and SQLite's -wal/-shm files are made with the
+        # umask's permissions before init_db narrows the database's own.
+        config.DATA_DIR.mkdir(mode=0o700, exist_ok=True)
+        try:
+            if config.DATA_DIR.stat().st_mode & 0o077:
+                os.chmod(config.DATA_DIR, 0o700)
+        except OSError:
+            pass
     con = sqlite3.connect(path, timeout=10)
     con.row_factory = sqlite3.Row
     # journal_mode is persisted in the file, so it is set once per path rather than
@@ -412,11 +420,17 @@ def note_install(choices):
     return applied
 
 
+# Settings that hold a credential (an older GitHub link kept its token here): read
+# with get_setting by the code that uses them, never handed to the page.
+SECRET_SETTINGS = {"github_token"}
+
+
 def get_settings():
     con = connect()
     rows = con.execute("SELECT key, value FROM settings").fetchall()
     con.close()
-    return {r["key"]: json.loads(r["value"]) for r in rows if not r["key"].startswith("_")}
+    return {r["key"]: json.loads(r["value"]) for r in rows
+            if not r["key"].startswith("_") and r["key"] not in SECRET_SETTINGS}
 
 
 def get_setting(key, default=None):

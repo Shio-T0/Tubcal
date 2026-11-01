@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft, ArrowRight, Calendar, Check,
@@ -19,6 +19,7 @@ import { Button, EmptyState, SegmentedControl } from '../components/ui/index.jsx
 import { Avatar } from '../components/ui/Avatar.jsx';
 import { ActivityFeed } from '../components/anime/Activity.jsx';
 import { ForumList } from '../components/anime/Forum.jsx';
+import { sanitizeAniHtml } from '../components/anime/RichText.jsx';
 import { SOCIAL_MODES, SocialDesk } from '../components/anime/SocialDesk.jsx';
 import Seasons from '../components/anime/Seasons.jsx';
 import Episodes from '../components/anime/Episodes.jsx';
@@ -1593,8 +1594,9 @@ function DetailDossier({ m, trailer, onTrailer, scoreFormat, connected, rankings
 
 /** The synopsis as a comfy editorial block: a labeled card with a drop-cap, a
  *  graceful "read more" fold for long write-ups, and the title's defining tags. */
-function Synopsis({ html, tags }) {
+function Synopsis({ html: raw, tags }) {
   const [open, setOpen] = useState(false);
+  const html = useMemo(() => sanitizeAniHtml(raw || ''), [raw]);
   // AniList descriptions vary wildly in length; only fold the long ones.
   const longish = (html || '').replace(/<[^>]+>/g, '').length > 480;
   const topTags = (tags || []).filter((t) => (t.rank || 0) >= 60).slice(0, 14);

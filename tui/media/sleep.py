@@ -53,6 +53,7 @@ class SleepTimer:
         self.deadline = 0.0
         self._fading = False
         self._gen = 0             # a new setting stops a fade that's under way
+        self._loud: list = []     # (mpv, the volume it had) while a fade is under way
 
     # ── setting ──────────────────────────────────────────────────────────────
 
@@ -107,10 +108,36 @@ class SleepTimer:
         self.mode = ""
         self.notify("Sleep timer: stopped at the end, as asked.", "info")
         self.changed()
-        # anything else still playing pauses too (from another thread: this one is the
-        # ending player's reader, and asking its own mpv from here would wait forever)
-        threading.Thread(target=self._pause_all, daemon=True).start()
+        # anything else still playing pauses too (this runs on the ending player's events
+        # thread, which may ask any mpv: the readers stay free to bring the answers)
+        self._pause_all()
         return True
+
+    # ── a reload (`ZR`): the timer goes on in the next run ───────────────────
+
+    def hand_over(self) -> dict | None:
+        """Before the players are handed over: a fade under way stops, and the volume
+        goes back now (the next run fades again from there)."""
+        if self.mode == "end":
+            return {"mode": "end"}
+        left = self.left()
+        if left is None:
+            return None
+        self._gen += 1
+        for m, v0 in self._loud:
+            try:
+                m.set("volume", v0)
+            except Exception:
+                pass
+        return {"mode": "time", "left": left}
+
+    def take_over(self, data: dict | None) -> None:
+        if not isinstance(data, dict):
+            return
+        if data.get("mode") == "end":
+            self.set_end()
+        elif data.get("mode") == "time" and isinstance(data.get("left"), (int, float)):
+            self.set_seconds(float(data["left"]))
 
     def _pause_all(self) -> None:
         for m in self.players():
@@ -128,6 +155,7 @@ class SleepTimer:
                     loud.append((m, float(m.get("volume") or 100)))
             except Exception:
                 continue
+        self._loud = loud
         try:
             while gen == self._gen:
                 left = self.left() or 0.0
@@ -148,6 +176,7 @@ class SleepTimer:
                     m.set("volume", v0)
                 except Exception:
                     pass
+            self._loud = []
             self._fading = False
         if gen == self._gen:
             self.mode = ""

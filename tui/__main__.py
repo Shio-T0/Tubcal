@@ -5,6 +5,9 @@
     python -m tui <youtube link>  play it
     python -m tui play <link>     play it in mpv, without the interface
     python -m tui --private       a session that records nothing
+
+`ZR` (or `:reload`) runs it again in place, in the same room, with what's playing still
+playing (tui/reload.py).
 """
 
 from __future__ import annotations
@@ -26,6 +29,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("what", nargs="*", help="a room, a link, or `play <link>`")
     ap.add_argument("--private", action="store_true", help="record nothing this session")
     args = ap.parse_args(argv)
+
+    from . import reload
+    note = reload.take()     # after `ZR`: where the last run was, and what it was playing
 
     words = list(args.what)
     if words[:1] == ["play"]:
@@ -56,7 +62,10 @@ def main(argv: list[str] | None = None) -> int:
             return 2
 
     from .app import TubcalApp
-    TubcalApp(info, start_room=start_room, url=url, private=args.private).run()
+    result = TubcalApp(info, start_room=start_room or note.get("room"), url=url,
+                       private=args.private or bool(note.get("private")), handoff=note).run()
+    if isinstance(result, reload.Reload):
+        return reload.again(result)
     return 0
 
 

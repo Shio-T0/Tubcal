@@ -15,20 +15,20 @@
                          │ ▎  Channel 0 · 16h                                  󰃀   ┃
                          │                                                         ┃
                          │  • Live: the night bus home                             ┃  Fixing a 1970s tape deck
-                         │    Channel 1 · 22h                                      ┃  Channel 0 · 16 hours ago   ╭────────────────────────╮
-                         │                                                         ┃                             │ Space                  │
-                         │  • Why rivers meander                                   ┃  About it, in a sentence.   │ ,  Settings ↗          │
-                         │    Channel 2 · 1d                                       │                             │ /  search the platform │
-                         │                                                         │  K  more about this video   │ 1  channel 1           │
-                         │  • A week of cast-iron bread                            │                             │ 2  channel 2           │
-                         │    Channel 0 · 1d                                       │                             │ 3  channel 3           │
-                         │                                                         │                             │ f  find anything       │
-                         │                                                         │                             │ P  private session     │
-                         │   Monday ────────────────────────────────────────── 4   │                             │ q  the queue           │
-                         │  • Rebuilding the bench vice                            │                             │ s  Saved               │
-                         │    Channel 1 · 1d                                       │                             │ g  +go to              │
-                         │                                                         │                             │ p  +player             │
-                         │  • Notes on a quiet keyboard                            │                             │ r  +radio              │
-                         │    Channel 2 · 1d                                       │                             │ … 1 more               │
-                                                                                                                 ╰────────────────────────╯
+                         │    Channel 1 · 22h                                      ┃  Channel 0 · 16 hours ago
+                         │                                                         ┃
+                         │  • Why rivers meander                                   ┃  About it, in a sentence.
+                         │    Channel 2 · 1d                                       │
+                         │                                                         │  K  more about this video
+                         │  • A week of cast-iron bread                            │
+                         │    Channel 0 · 1d                                       │
+                         │                                                         │
+                         │                                                         │
+ ╭─ Space  leader · Screening Room ───────────────────────────────────────────────────────────────────────────────────────────────────────╮
+ │ , → Settings                        f → find anything                   p → +player 7                                                  │
+ │ / → search the platform             P → private session                 r → +radio 4                                                   │
+ │ 1 → channel 1                       q → what's playing and the queue    t → +toggle 1                                                  │
+ │ 2 → channel 2                       s → Saved                                                                                          │
+ │ 3 → channel 3                       g → +go to 5                                                                                       │
+ ╰──────────────────────────────────────────────────────────────────────────────────────────────────── Bksp back  Esc close  ? every key ─╯
 NORMAL  Latest › Yesterday                                                                                           space   3/14  12:00

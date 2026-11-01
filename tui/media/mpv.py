@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import os
+import queue
 import shutil
 import socket
 import subprocess
@@ -56,7 +57,10 @@ def socket_dir() -> Path:
 
 
 class Mpv:
-    """`on_event(dict)` is called from the reader thread for every mpv event."""
+    """`on_event(dict)` is called for every mpv event, in order, from a thread of its own
+    (one per mpv). Never from the reader: a handler may ask mpv something (the player
+    sets force-window when mpv goes idle, the video and the radio pause each other), and
+    the reader has to stay free to read the answer."""
 
     def __init__(self, on_event: Callable[[dict], None], *, extra_args: list[str] | None = None,
                  mpris: bool = True, binary: str = "mpv", name: str = "mpv"):
@@ -72,6 +76,8 @@ class Mpv:
         self._pending: dict[int, list] = {}
         self._next_id = 0
         self._path: Path | None = None
+        self._pid: int | None = None             # an mpv taken back after a reload (`adopt`)
+        self._letting_go: socket.socket | None = None
 
     @staticmethod
     def available(binary: str = "mpv") -> bool:
@@ -79,7 +85,21 @@ class Mpv:
 
     @property
     def alive(self) -> bool:
-        return self._proc is not None and self._proc.poll() is None and self._sock is not None
+        return self._sock is not None and self._running()
+
+    def _running(self) -> bool:
+        """mpv's process hasn't exited (started here, or taken back after a reload)."""
+        if self._proc is not None:
+            return self._proc.poll() is None
+        if self._pid is None:
+            return False
+        try:
+            done, _ = os.waitpid(self._pid, os.WNOHANG)   # an exited one is reaped here
+        except ChildProcessError:
+            done = self._pid
+        if done:
+            self._pid = None
+        return not done
 
     def ensure(self) -> None:
         if self.alive:
@@ -101,10 +121,56 @@ class Mpv:
         env["no_proxy"] = env["NO_PROXY"] = "127.0.0.1,localhost,::1"
         self._proc = subprocess.Popen(args, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
                                       stderr=subprocess.DEVNULL, env=env, start_new_session=True)
+        self._connect("mpv exited at once; try running `mpv` in a terminal to see why.")
+
+    # ── a reload: the same mpv, playing on, for the next run ─────────────────
+
+    def keep(self) -> dict | None:
+        """Let go of this mpv without stopping it, for the next run of the terminal (a
+        reload runs it again in this very process, so mpv stays its child). `adopt`
+        takes it back. None when there's no mpv to keep."""
+        if not self.alive or self._path is None:
+            return None
+        kept = {"pid": self._proc.pid if self._proc is not None else self._pid, "path": str(self._path)}
+        sock, wfile, self._letting_go = self._sock, self._wfile, self._sock
+        self._sock = self._wfile = self._proc = self._pid = None
+        try:
+            # shutdown, not only close: the reader's file still holds the socket, and the
+            # connection has to end now (mpv stops sending this client its events)
+            sock.shutdown(socket.SHUT_RDWR)
+            wfile.close()
+            sock.close()
+        except OSError:
+            pass
+        return kept
+
+    def adopt(self, kept: dict | None) -> bool:
+        """Take back the mpv a reload kept: only this process's own child, on its own
+        socket. False (and nothing changed) when it's gone."""
+        try:
+            pid, path = int(kept["pid"]), Path(kept["path"])
+        except (KeyError, TypeError, ValueError):
+            return False
+        if path.name != f"{self.name}-{os.getpid()}.sock" or not path.exists():
+            return False
+        try:
+            if os.waitpid(pid, os.WNOHANG)[0]:
+                return False                    # it has just exited (and is reaped now)
+        except ChildProcessError:
+            return False                        # not ours
+        self._pid, self._path = pid, path
+        try:
+            self._connect("mpv went away during the reload.")
+        except MpvError:
+            self.close()
+            return False
+        return True
+
+    def _connect(self, gone: str) -> None:
         deadline = time.monotonic() + 5
         while time.monotonic() < deadline:
-            if self._proc.poll() is not None:
-                raise MpvError("mpv exited at once; try running `mpv` in a terminal to see why.")
+            if not self._running():
+                raise MpvError(gone)
             if self._path.exists():
                 try:
                     s = socket.socket(socket.AF_UNIX)
@@ -117,11 +183,14 @@ class Mpv:
         if self._sock is None:
             raise MpvError("mpv didn't open its control socket.")
         self._wfile = self._sock.makefile("wb")
-        threading.Thread(target=self._read, args=(self._sock,), daemon=True, name="mpv-ipc").start()
+        events: queue.SimpleQueue = queue.SimpleQueue()
+        threading.Thread(target=self._dispatch, args=(events,), daemon=True, name=f"{self.name}-events").start()
+        threading.Thread(target=self._read, args=(self._sock, events), daemon=True, name="mpv-ipc").start()
         for i, prop in enumerate(OBSERVED, 1):
             self.command("observe_property", i, prop)
 
-    def _read(self, sock: socket.socket) -> None:
+    def _read(self, sock: socket.socket, events: queue.SimpleQueue) -> None:
+        """Answers go to whoever is waiting for them; events go to `_dispatch`."""
         f = sock.makefile("rb")
         try:
             for line in f:
@@ -136,10 +205,7 @@ class Mpv:
                         slot[1] = msg
                         slot[0].set()
                     continue
-                try:
-                    self.on_event(msg)
-                except Exception:  # an event handler must never kill the reader
-                    pass
+                events.put(msg)
         except OSError:
             pass
         finally:
@@ -149,9 +215,18 @@ class Mpv:
             self._pending.clear()
             if self._sock is sock:
                 self._sock = None
+            if self._letting_go is not sock:     # kept for a reload: mpv plays on
+                events.put({"event": "mpv-exit"})
+            events.put(None)
+
+    def _dispatch(self, events: queue.SimpleQueue) -> None:
+        while True:
+            msg = events.get()
+            if msg is None:
+                return
             try:
-                self.on_event({"event": "mpv-exit"})
-            except Exception:
+                self.on_event(msg)
+            except Exception:  # an event handler must never stop the events
                 pass
 
     def command(self, *args, timeout: float = 5.0):
@@ -207,7 +282,16 @@ class Mpv:
                 self._proc.wait(3)
             except subprocess.TimeoutExpired:
                 self._proc.terminate()
-        if self._path is not None and self._path.exists() and (self._proc is None or self._proc.poll() is not None):
+        elif quit and self._pid is not None:
+            deadline = time.monotonic() + 3
+            while self._running() and time.monotonic() < deadline:
+                time.sleep(0.05)
+            if self._pid is not None:
+                try:
+                    os.kill(self._pid, 15)
+                except OSError:
+                    pass
+        if self._path is not None and self._path.exists() and not self._running():
             try:
                 self._path.unlink()
             except OSError:

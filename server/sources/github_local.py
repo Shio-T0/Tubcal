@@ -37,6 +37,13 @@ _ENV = {
     "GIT_SSH_COMMAND": "ssh -o BatchMode=yes -o ConnectTimeout=15",
     "LC_ALL": "C",
 }
+# A checkout in the workspace may be one that was downloaded rather than cloned
+# here, and git runs commands a repo's *own* .git/config names while merely
+# reading it (core.fsmonitor on `status`, diff.external / textconv on `diff`).
+# A command-line -c overrides the repo's config, so these turn those off: scanning
+# an untrusted clone can't run its code. See server/api/editor.py:GIT_SAFE.
+_SAFE = ["-c", "core.fsmonitor=", "-c", "core.hooksPath=/dev/null",
+         "-c", "core.alternateRefsCommand=", "-c", "protocol.ext.allow=never"]
 _SKIP = {"node_modules", "target", "dist", "build", "venv", ".venv", "__pycache__"}
 MAX_CLONES = 200
 
@@ -46,8 +53,8 @@ def available():
 
 
 def _git(path, *args, timeout=6):
-    r = subprocess.run(["git", "-C", str(path), *args], capture_output=True, text=True, timeout=timeout,
-                       env={**os.environ, **_ENV})
+    r = subprocess.run(["git", *_SAFE, "-C", str(path), *args], capture_output=True, text=True,
+                       timeout=timeout, env={**os.environ, **_ENV})
     return r.returncode, r.stdout, r.stderr
 
 
@@ -330,7 +337,7 @@ def start_clone(repo, private=False):
 
 def _run_clone(job, url, dest):
     try:
-        proc = subprocess.Popen(["git", "clone", "--progress", "--filter=blob:none", url, str(dest)],
+        proc = subprocess.Popen(["git", *_SAFE, "clone", "--progress", "--filter=blob:none", url, str(dest)],
                                 stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, env={**os.environ, **_ENV})
     except OSError as e:
         job.update(state="failed", error=str(e))

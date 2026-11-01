@@ -1,7 +1,7 @@
 """What Settings in the web interface does, from the terminal: following channels and
-subreddits, linking accounts, switching rooms on and off, and the sheet that shows
-them (`Space ,` when there's no web interface, `:settings` any time). An install
-with only the terminal interface depends on these.
+subreddits, linking accounts, switching rooms on and off. The Settings page
+(tui/pages/settings.py: `Space ,`, `:settings`) shows them and runs these; an install
+with only the terminal interface depends on them.
 
     :follow @name | link | r/sub | owner/repo   (alone: the selected video's channel
                                                   or post's subreddit)
@@ -10,7 +10,6 @@ with only the terminal interface depends on these.
     :link github [token]                        (alone: the GitHub CLI's sign-in)
     :unlink anilist|reddit|github
     :room on|off <room>
-    :about                                      (the licence and what Tubcal builds on)
 
 Every call is a thread worker; results come back with `call_from_thread`.
 """
@@ -21,13 +20,9 @@ import re
 import time
 from typing import TYPE_CHECKING
 
-from rich.text import Text
-
 from . import links
 from .api import ApiError
-from .bootstrap import REPO
 from .rooms import ALL_ROOMS, ROOM_BY_ID
-from .ui.paint import style
 
 if TYPE_CHECKING:
     from .app import TubcalApp
@@ -90,6 +85,10 @@ def follow(app: TubcalApp, arg: str) -> None:
         name = raw
     else:
         platform, raw, name = from_selection(app)
+        if not platform:   # nothing selected to follow: what you follow, and how
+            app.open_following()
+            app.say("`:follow @channel`, `:follow r/subreddit` or `:follow owner/repo`.")
+            return
     if not platform:
         app.say("`:follow` takes @channel or a YouTube link, r/subreddit, or owner/repo "
                 "(alone: the selected video's channel or post's subreddit).", "warn")
@@ -125,9 +124,8 @@ def unfollow(app: TubcalApp, arg: str) -> None:
         name = raw
     else:
         platform, raw, name = from_selection(app)
-        if not platform:
-            app.say("`:unfollow` takes the name of a channel, r/subreddit or owner/repo "
-                    "(alone: the selected video's channel or post's subreddit).", "warn")
+        if not platform:   # nothing selected: the list, where dd unfollows
+            app.open_following()
             return
 
     def work():
@@ -173,7 +171,7 @@ def match_subscription(subs: dict, platform: str | None, raw: str) -> dict | Non
 def link(app: TubcalApp, arg: str) -> None:
     parts = arg.split()
     if not parts:
-        settings_sheet(app)
+        app.open_settings("accounts")
         return
     who = parts[0].lower()
     if who == "github":
@@ -235,26 +233,15 @@ def _link_oauth(app: TubcalApp, provider: str, creds: list[str]) -> None:
 
 
 def _oauth_steps(app: TubcalApp, provider: str) -> None:
+    from .pages.info import steps_page
     label, where, _ = OAUTH[provider]
-    r = app.roles
-    t = Text()
-    t.append(f"Linking {label}", style(r, "fg+bold"))
-    t.append("   q closes this\n\n", style(r, "dim"))
-    t.append(f"{label} wants an API client of your own, as in the web interface's Settings → Accounts.\n\n",
-             style(r, "fg"))
-    t.append("1  ", style(r, "hue:yellow"))
-    t.append(f"Make one at {where}\n", style(r, "fg"))
-    t.append("2  ", style(r, "hue:yellow"))
-    t.append("Give it this redirect URL: ", style(r, "fg"))
-    t.append(app.api.url(f"/api/oauth/{provider}/callback") + "\n", style(r, "fg+bold"))
-    t.append("3  ", style(r, "hue:yellow"))
-    t.append(f":link {provider} <client id> <client secret>\n", style(r, "fg+bold"))
-    t.append("\nThen your browser asks you to approve Tubcal, and you come back here.\n", style(r, "dim"))
-    app._show_info(t)
+    app.open_page(steps_page(app, provider, label, where))
 
 
 def _linked(app: TubcalApp, room_id: str, msg: str, level: str) -> None:
     app.say(msg, level)
+    if app.page is not None and app.page.id == "settings":
+        app.page.reload()
     if level == "info":
         if room_id == "anime":
             app.anime.loaded_at = 0
@@ -272,7 +259,8 @@ def unlink(app: TubcalApp, arg: str) -> None:
     def work():
         try:
             app.api.delete("/github/account" if who == "github" else f"/oauth/{who}")
-            app.call_from_thread(app.say, f"{OAUTH.get(who, ('GitHub',))[0]} isn't linked any more.")
+            label, _, room_id = OAUTH.get(who, ("GitHub", "", "github"))
+            app.call_from_thread(_linked, app, room_id, f"{label} isn't linked any more.", "info")
         except ApiError as e:
             app.call_from_thread(app.say, str(e), "error")
     app.run_worker(work, thread=True, group="link")
@@ -315,102 +303,5 @@ def _rooms_changed(app: TubcalApp, active: list[str], msg: str) -> None:
     if app.registry:
         app.registry.active = set(active)
     app.say(msg)
+    app.repaint_page()
     app.refresh_chrome()
-
-
-# ── the sheets ───────────────────────────────────────────────────────────────
-
-def settings_sheet(app: TubcalApp) -> None:
-    """Accounts, what you follow and the rooms, with the commands that change them."""
-    app.say("Reading the settings…")
-
-    def work():
-        got = {}
-        for key, path in (("oauth", "/oauth/status"), ("subs", "/subscriptions"), ("settings", "/settings")):
-            try:
-                got[key] = app.api.get(path, timeout=20) or {}
-            except ApiError:
-                got[key] = None
-        if app.registry and app.registry.has("github"):
-            try:
-                got["github"] = app.api.get("/github/account", timeout=20) or {}
-            except ApiError:
-                got["github"] = None
-        app.call_from_thread(_show_settings, app, got)
-    app.run_worker(work, thread=True, group="settings", exclusive=True)
-
-
-def _show_settings(app: TubcalApp, got: dict) -> None:
-    r = app.roles
-    reg = app.registry
-    t = Text()
-    t.append("Settings", style(r, "fg+bold"))
-    t.append("   from the terminal · q closes\n", style(r, "dim"))
-
-    def row(label: str, state: str, ok: bool, how: str) -> None:
-        t.append(f"  {label:<14}", style(r, "fg"))
-        t.append(f"{state:<30}", style(r, "fg" if ok else "dim"))
-        t.append(f"{how}\n", style(r, "hue:yellow"))
-
-    t.append("\nAccounts\n", style(r, "fg+bold"))
-    oauth = got.get("oauth") or {}
-    for provider, (label, _, room_id) in OAUTH.items():
-        if reg and not reg.has(room_id):
-            continue
-        on = (oauth.get(provider) or {}).get("connected")
-        row(label, "connected" if on else "not connected", bool(on),
-            f":unlink {provider}" if on else f":link {provider}")
-    gh = got.get("github")
-    if gh is not None:
-        on = gh.get("linked")
-        row("GitHub", f"linked as {gh.get('login')}" if on else "not linked", bool(on),
-            ":unlink github" if on else ":link github")
-
-    t.append("\nFollowing\n", style(r, "fg+bold"))
-    subs = got.get("subs") or {}
-    for platform, label in (("youtube", "YouTube"), ("reddit", "Reddit"), ("github", "GitHub")):
-        if reg and not reg.has(PLATFORM_ROOM[platform]):
-            continue
-        rows = subs.get(platform) or []
-        names = ", ".join(str(x.get("display_name")) for x in rows[:6]) + (" …" if len(rows) > 6 else "")
-        n = len(rows)
-        word = WORD[platform] + ("s" if n != 1 and platform != "github" else "")
-        row(label, f"{n} {word}" if platform != "github" else f"{n} followed", bool(n),
-            ":follow …  :unfollow …")
-        if names:
-            t.append(f"  {'':<14}{names}\n", style(r, "dim"))
-
-    t.append("\nRooms in the tabs\n", style(r, "fg+bold"))
-    active = set((got.get("settings") or {}).get("active_rooms") or (reg.active if reg else []))
-    for rm in ALL_ROOMS:
-        if reg and not reg.has(rm.id):
-            continue
-        on = rm.fixed or rm.id in active
-        row(rm.label, "always on" if rm.fixed else ("on" if on else "off"), on,
-            "" if rm.fixed else f":room {'off' if on else 'on'} {rm.id}")
-
-    t.append("\nThe rest of Settings (playback, subtitles, quiet hours, your data) is in the web "
-             "interface", style(r, "dim"))
-    t.append(".\n" if app.web else ", which this install doesn't have: tubcal add web\n", style(r, "dim"))
-    app.say("")
-    app._show_info(t)
-
-
-def about(app: TubcalApp) -> None:
-    """The legal notices (GPL §5d): the licence, and what Tubcal builds on."""
-    r = app.roles
-    t = Text()
-    t.append("Tubcal", style(r, "fg+bold"))
-    t.append("   q closes this\n\n", style(r, "dim"))
-    t.append("Tubcal is free software: you can redistribute it and/or modify it under the terms of the "
-             "GNU General Public License as published by the Free Software Foundation, either version 3 "
-             "of the License, or (at your option) any later version. It comes with ABSOLUTELY NO WARRANTY.\n\n",
-             style(r, "fg"))
-    t.append(f"The licence: {REPO / 'LICENSE'}\n\n", style(r, "dim"))
-    try:
-        notices = (REPO / "THIRD_PARTY_NOTICES.md").read_text()
-    except OSError:
-        notices = "THIRD_PARTY_NOTICES.md is missing from this copy."
-    t.append(notices, style(r, "fg"))
-    app._show_info(t)
-

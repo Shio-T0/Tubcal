@@ -468,3 +468,34 @@ def test_writes_must_be_json_so_other_sites_cannot_forge_them(gh_db, monkeypatch
     r = gh_db.post("/api/github/account", data="method=gh", content_type="application/x-www-form-urlencoded")
     assert r.status_code == 415
     assert gh_db.get("/api/github/budget").status_code == 200
+
+
+@pytest.mark.skipif(not _git_ok(), reason="git not installed")
+def test_scanning_a_hostile_clone_does_not_run_its_config(tmp_path, monkeypatch):
+    """A downloaded checkout can carry a .git/config that names a command for git
+    to run while reading the repo (core.fsmonitor on status). Scanning the
+    workspace must never run it."""
+    import os
+
+    from server import config
+    from server.sources import github_local
+
+    monkeypatch.setattr(config, "EDITOR_ROOT", tmp_path.resolve())
+    github_local._scan.update(at=0, items=None)
+    repo = tmp_path / "evil"
+    repo.mkdir()
+    env = {**os.environ, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t",
+           "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t", "GIT_TERMINAL_PROMPT": "0"}
+    run = lambda *a: subprocess.run(["git", "-C", str(repo), *a], check=True,  # noqa: E731
+                                    capture_output=True, env=env)
+    run("init", "-q", "-b", "main")
+    (repo / "README.md").write_text("hi\n")
+    run("add", "README.md")
+    run("commit", "-qm", "first")
+    run("remote", "add", "origin", "git@github.com:astral-sh/uv.git")
+    marker = tmp_path / "RAN"
+    run("config", "core.fsmonitor", f"sh -c 'echo x > {marker}' #")
+
+    items = github_local.clones(force=True)
+    assert not marker.exists(), "a clone's own git config ran a command during a scan"
+    assert items and items[0]["repo"] == "astral-sh/uv"  # still scanned correctly

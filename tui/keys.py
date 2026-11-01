@@ -6,7 +6,8 @@ is unfinished (the which-key popup shows what can follow), or nothing. No sequen
 that runs an action is also the start of a longer one, so there is never a timeout
 to wait out: `g` waits for its letter, `gg` runs at once.
 
-Rooms add their own sequences on top of the global table (`Keys.push`).
+Rooms add their own sequences on top of the global table (`Keys.push`). Backspace
+takes the last key of an unfinished chord back, as which-key.nvim does.
 
 Your own keys come from `[keys]` in tui.toml, in vim's notation (`remap`).
 """
@@ -14,6 +15,8 @@ Your own keys come from `[keys]` in tui.toml, in vim's notation (`remap`).
 from __future__ import annotations
 
 from dataclasses import dataclass
+
+from .rooms import ROOM_BY_ID
 
 
 @dataclass(frozen=True)
@@ -30,6 +33,17 @@ class Hit:
     keys: tuple[str, ...] = ()
 
 
+@dataclass(frozen=True)
+class Hint:
+    """One line of which-key: the key, what it does (or the group it opens), how many
+    keys the group holds, and whether it is the room's (or a page's) own."""
+    key: str
+    label: str
+    group: bool = False
+    count: int = 0
+    own: bool = False
+
+
 # Groups shown by which-key for a pending prefix.
 GROUPS = {
     ("space",): "leader",
@@ -38,10 +52,12 @@ GROUPS = {
     ("space", "r"): "radio",
     ("space", "t"): "toggle",
     ("g",): "go",
-    ("z",): "view",
+    ("z",): "view and fold",
     ("y",): "copy",
     ("d",): "delete",
-    ("Z",): "quit",
+    ("Z",): "quit or reload",
+    ("[",): "previous",
+    ("]",): "next",
 }
 
 GLOBAL = [
@@ -62,9 +78,10 @@ GLOBAL = [
     Bind(("ctrl+o",), "jump_back", "jump back"),
     Bind(("/",), "search", "search this list"), Bind(("n",), "search_next", "next match"),
     Bind(("N",), "search_prev", "previous match"),
-    Bind((":",), "command", "command line"), Bind(("?",), "help", "keys"),
+    Bind((":",), "command", "command line"), Bind(("?",), "help", "every key"),
     Bind(("escape",), "escape", "cancel"), Bind(("q",), "close", "close"),
     Bind(("Z", "Z"), "quit", "quit"), Bind(("Z", "Q"), "quit", "quit"),
+    Bind(("Z", "R"), "reload", "reload: start again here"),
     Bind(("r",), "refresh", "refresh"),
     Bind(("o",), "open_browser", "open in the browser"), Bind(("O",), "open_web", "open in Tubcal's web UI"),
     Bind(("y", "y"), "copy_link", "copy the link"), Bind(("y", "t"), "copy_link_time", "copy the link at this second"),
@@ -76,7 +93,7 @@ GLOBAL = [
     Bind(("space", "g", "h"), "room:home", "Home"),
     Bind(("space", "1"), "channel_n:1", "channel 1"), Bind(("space", "2"), "channel_n:2", "channel 2"),
     Bind(("space", "3"), "channel_n:3", "channel 3"),
-    Bind(("space", "s"), "saved", "Saved"), Bind(("space", ","), "settings", "Settings ↗"),
+    Bind(("space", "s"), "saved", "Saved"), Bind(("space", ","), "settings", "Settings"),
     Bind(("space", "/"), "search_platform", "search the platform"),
     Bind(("space", "f"), "find", "find anything"),
     Bind(("space", "P"), "private", "private session"),
@@ -86,7 +103,7 @@ GLOBAL = [
     Bind(("space", "p", "z"), "sleep_prompt", "sleep timer"),
     Bind(("space", "r", "r"), "radio_pause", "pause / play"), Bind(("space", "r", "l"), "radio_forward", "forward 30 s"),
     Bind(("space", "r", "h"), "radio_back", "back 15 s"), Bind(("space", "r", "x"), "radio_off", "switch off"),
-    Bind(("space", "q"), "queue", "the queue"),
+    Bind(("space", "q"), "queue", "what's playing and the queue"),
     Bind(("g", "h"), "room:home", "Home"),
 ]
 
@@ -103,7 +120,33 @@ VISUAL = [
 # `g` + letter: the web's room keys
 for _letter, _room in (("e", "edition"), ("y", "youtube"), ("r", "reddit"), ("n", "hackernews"),
                        ("w", "hackernews"), ("c", "editor"), ("a", "anime"), ("d", "dev"), ("s", "saved")):
-    GLOBAL.append(Bind(("g", _letter), f"room:{_room}", _room))
+    GLOBAL.append(Bind(("g", _letter), f"room:{_room}", ROOM_BY_ID[_room].label if _room in ROOM_BY_ID else "Saved"))
+
+# The keys page (`?`) puts the global keys under these headings, in this order.
+SECTIONS = [
+    ("Moving", {"down", "up", "left", "right", "top", "bottom", "half_down", "half_up", "page_down", "page_up",
+                "center", "to_top", "to_bottom", "jump_back"}),
+    ("Rooms and views", {"next_room", "prev_room", "next_view", "prev_view"}),
+    ("Finding", {"search", "search_next", "search_prev", "search_platform", "find"}),
+    ("What you're on", {"open_browser", "open_web", "copy_link", "copy_link_time", "details", "refresh", "visual"}),
+    ("Pages and drawers", {"command", "help", "saved", "settings", "queue", "private"}),
+    ("The player", {"sleep_prompt"}),
+    ("The radio", set()),
+    ("Closing", {"escape", "close", "quit", "reload"}),
+]
+
+
+def section_of(action: str) -> str:
+    if action.startswith(("room:", "channel:", "channel_n:")):
+        return "Rooms and views"
+    if action.startswith("player_"):
+        return "The player"
+    if action.startswith("radio_"):
+        return "The radio"
+    for title, actions in SECTIONS:
+        if action in actions:
+            return title
+    return "Other"
 
 
 class Keys:
@@ -144,6 +187,12 @@ class Keys:
 
     def feed(self, token: str) -> Hit | str | None:
         """An action to run, "pending", or None (the key means nothing here)."""
+        if self.pending and token == "backspace":    # one key back up the chord
+            self.pending = self.pending[:-1]
+            if self.pending:
+                return "pending"
+            self.reset()
+            return None
         if not self.pending and token.isdigit() and (self.count or token != "0"):
             self.count += token
             return "pending"
@@ -171,6 +220,27 @@ class Keys:
                 elif k not in seen:
                     seen[k] = "+" + GROUPS.get(keys[:n + 1], "more")
         return sorted(seen.items(), key=lambda kv: (kv[1].startswith("+"), kv[0].lower(), kv[0]))
+
+    def next_hints(self) -> list[Hint]:
+        """next_keys with more to say: how big each group is, and which keys are the
+        room's own (a later layer's) rather than everywhere's."""
+        n = len(self.pending)
+        everywhere = self.layers[0]
+        groups: dict[str, list[Bind]] = {}
+        out: dict[str, Hint] = {}
+        for keys, b in self._table().items():
+            if len(keys) <= n or keys[:n] != self.pending:
+                continue
+            k = keys[n]
+            if len(keys) == n + 1:
+                out[k] = Hint(k, b.help or b.action, own=b not in everywhere)
+            else:
+                groups.setdefault(k, []).append(b)
+        for k, members in groups.items():
+            if k not in out:
+                out[k] = Hint(k, GROUPS.get(self.pending + (k,), "more"), group=True, count=len(members),
+                              own=all(b not in everywhere for b in members))
+        return sorted(out.values(), key=lambda h: (h.group, h.key.lower(), h.key))
 
     def describe(self) -> str:
         return (self.count + " ".join(self.pending)).strip()
@@ -211,6 +281,34 @@ def parse(notation: str) -> tuple[str, ...] | None:
         out.append("space" if ch == " " else ch)
         i += 1
     return tuple(out) or None
+
+
+# How a key is written for people (the keys page, which-key): words for the named
+# keys, arrows for the arrow keys, single characters as they are.
+SHOWN = {"space": "Space", "enter": "Enter", "escape": "Esc", "tab": "Tab", "shift+tab": "S-Tab",
+         "backspace": "Bksp", "up": "↑", "down": "↓", "left": "←", "right": "→", "pageup": "PgUp",
+         "pagedown": "PgDn", "home": "Home", "end": "End"}
+SHOWN_ASCII = {**SHOWN, "up": "Up", "down": "Down", "left": "Left", "right": "Right"}
+
+
+def shown(token: str, ascii_only: bool = False) -> str:
+    names = SHOWN_ASCII if ascii_only else SHOWN
+    if token in names:
+        return names[token]
+    if token.startswith("ctrl+"):
+        return f"C-{token[5:]}"
+    return token
+
+
+def written(keys: tuple[str, ...], ascii_only: bool = False) -> str:
+    """A sequence as people read it: "Space pz", "gg", "C-d", "]n", "S-Tab"."""
+    out = ""
+    for i, k in enumerate(keys):
+        word = shown(k, ascii_only)
+        if i and (len(word) > 1 or len(shown(keys[i - 1], ascii_only)) > 1):
+            out += " "
+        out += word
+    return out
 
 
 def notation(keys: tuple[str, ...]) -> str:

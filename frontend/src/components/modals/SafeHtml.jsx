@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 
 import { sanitizeHtml } from '../../lib/format.js';
 
@@ -14,6 +14,7 @@ export default function SafeHtml({ html, className }) {
     });
   }, [html]);
 
+  const clean = useMemo(() => sanitizeHtml(html), [html]);
   if (!html) return null;
-  return <div ref={ref} className={className} dangerouslySetInnerHTML={{ __html: sanitizeHtml(html) }} />;
+  return <div ref={ref} className={className} dangerouslySetInnerHTML={{ __html: clean }} />;
 }

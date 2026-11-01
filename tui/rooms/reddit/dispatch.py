@@ -346,6 +346,18 @@ class Dispatch(RoomView):
             self.reload()
             self.app.refresh_chrome()
 
+    def show_subreddit(self, name: str) -> None:
+        """One subreddit's posts (the Following page's Enter)."""
+        self.sub = name or None
+        self.focus_pane = "list"
+        if self.view == "search":
+            self.set_view(SORTS[0][0])
+        else:
+            self._layout()
+            self._show_index()
+            self.reload()
+        self.app.refresh_chrome()
+
     def handle(self, action: str, count: int | None) -> bool:
         app = self.app
         pane = self.focus_pane
