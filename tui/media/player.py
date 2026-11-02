@@ -64,8 +64,9 @@ class Player:
         self.api = api
         self.notify = notify            # (text, level) from any thread; the app marshals
         self.changed = changed          # the now-state changed (statusline repaint)
-        self.settings = settings or {}
-        self.config = config or {}
+        # the app's own dicts, filled in after this is made: kept, not copied
+        self.settings = settings if settings is not None else {}
+        self.config = config if config is not None else {}
         self.mpv = Mpv(self._on_event, extra_args=self.config.get("mpv_args") or [],
                        mpris=self.config.get("mpris", True))
         self.queue: list[dict] = []
@@ -124,6 +125,12 @@ class Player:
         self._tell_has_next()
         self.changed()
         return len(self.queue)
+
+    def queue_changed(self) -> None:
+        """The queue was cut or reordered from outside (the Playing page)."""
+        self.now.queue = len(self.queue)
+        self._tell_has_next()
+        self.changed()
 
     def next(self) -> bool:
         if not self.queue:
@@ -393,7 +400,7 @@ class Player:
             self.now = NowState(queue=len(self.queue))
             self.changed()
 
-    def _post_progress(self, final: bool = False) -> None:
+    def _post_progress(self, final: bool = False, *, wait: bool = False) -> None:
         p = self.playing
         if not p or p.kind == "live":
             return
@@ -410,7 +417,10 @@ class Player:
                 self.api.record_progress(item_id, pos, dur)
             except ApiError:
                 pass
-        threading.Thread(target=send, daemon=True).start()
+        if wait:
+            send()
+        else:
+            threading.Thread(target=send, daemon=True).start()
 
     def flush(self) -> None:
         self._post_progress()
@@ -418,3 +428,42 @@ class Player:
     def shutdown(self) -> None:
         self._post_progress(final=False)
         self.mpv.close(quit=True)
+
+    # ── a reload (`ZR`): what's playing goes on in the next run ─────────────
+
+    def hand_over(self) -> dict | None:
+        """What the next run needs to carry on: the item, the queue, and mpv itself,
+        which plays on through the restart. With nothing playing, mpv stops (the next
+        play starts one) and there's nothing to hand over."""
+        p = self.playing
+        if not (p and self.mpv.alive):
+            self.shutdown()
+            return None
+        self._post_progress(wait=True)      # the restart comes next: no thread would finish
+        kept = self.mpv.keep()
+        if not kept:
+            return None
+        return {"mpv": kept, "item": p.item, "url": p.url, "kind": p.kind, "itag": p.itag,
+                "heights": p.heights, "quality": p.quality, "queue": self.queue}
+
+    def take_over(self, data: dict | None) -> bool:
+        """Carry on with what the last run handed over (`hand_over`)."""
+        if not isinstance(data, dict) or not isinstance(data.get("item"), dict):
+            return False
+        item = data["item"]
+        self.queue = [q for q in data.get("queue") or [] if isinstance(q, dict)]
+        # current before mpv's first events arrive: they follow it
+        self.playing = Playing(item=item, url=str(data.get("url") or ""), kind=str(data.get("kind") or "youtube"),
+                               itag=data.get("itag"), heights=[int(h) for h in data.get("heights") or []],
+                               quality=str(data.get("quality") or ""))
+        self.now = NowState(title=item.get("title") or "", quality=self.playing.quality,
+                            queue=len(self.queue), active=True)
+        self._last_post = time.monotonic()
+        if not self.mpv.adopt(data.get("mpv")):
+            self.playing = None
+            self.now = NowState(queue=len(self.queue))
+            self.changed()
+            return False
+        self._tell_has_next()
+        self.changed()
+        return True

@@ -80,6 +80,31 @@ def _run(cmd, cwd=None, timeout=None):
     )
 
 
+# A repository in the workspace may be one that was downloaded, not cloned here,
+# and git runs commands named in a repo's *own* .git/config while merely reading
+# it: core.fsmonitor on `status`, diff.external / a textconv filter on `diff`.
+# These -c settings (a command line -c overrides the repo's config) and the diff
+# flags neutralise those, so reading an untrusted checkout can't run its code.
+# GIT_OPTIONAL_LOCKS=0 keeps a read from writing the index (which can run hooks).
+GIT_SAFE = ["-c", "core.fsmonitor=", "-c", "core.hooksPath=/dev/null",
+            "-c", "core.alternateRefsCommand=", "-c", "protocol.ext.allow=never"]
+_GIT_ENV = {"GIT_OPTIONAL_LOCKS": "0", "GIT_TERMINAL_PROMPT": "0", "GIT_CONFIG_COUNT": "0"}
+
+
+def _git(repo, *args, diff=False):
+    """A read-only git command in `repo`, hardened against a hostile checkout's
+    own config (see GIT_SAFE). `diff=True` also bars external/textconv diff drivers."""
+    exe = shutil.which("git")
+    if not exe:
+        raise RuntimeError("git not found on PATH")
+    extra = ["--no-ext-diff", "--no-textconv"] if diff else []
+    return subprocess.run(
+        [exe, *GIT_SAFE, "-C", str(repo), args[0], *extra, *args[1:]],
+        cwd=None, capture_output=True, text=True, timeout=config.EDITOR_SUBPROC_TIMEOUT,
+        env={**os.environ, **_GIT_ENV},
+    )
+
+
 # ---------------------------------------------------------------- status
 
 @editor_bp.get("/status")
@@ -329,7 +354,7 @@ def _search_walk(q, base, cap):
 def _repo_of(p: Path):
     """The git worktree containing p, or None — contained to the workspace."""
     probe = p if p.is_dir() else p.parent
-    proc = _run(["git", "-C", str(probe), "rev-parse", "--show-toplevel"])
+    proc = _git(probe, "rev-parse", "--show-toplevel")
     if proc.returncode != 0:
         return None
     top = Path(proc.stdout.strip())
@@ -347,8 +372,8 @@ def git_status():
     repo = _repo_of(p)
     if not repo:
         return ok({"repo": None})
-    branch = _run(["git", "-C", str(repo), "rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip()
-    porcelain = _run(["git", "-C", str(repo), "status", "--porcelain"]).stdout
+    branch = _git(repo, "rev-parse", "--abbrev-ref", "HEAD").stdout.strip()
+    porcelain = _git(repo, "status", "--porcelain").stdout
     changes = []
     for line in porcelain.splitlines():
         if len(line) < 4:
@@ -372,8 +397,8 @@ def git_diff():
     repo = _repo_of(p)
     if not repo:
         return ok({"marks": []})
-    proc = _run(["git", "-C", str(repo), "diff", "--no-color", "--unified=0",
-                 "--", str(p.relative_to(repo))])
+    proc = _git(repo, "diff", "--no-color", "--unified=0",
+                "--", str(p.relative_to(repo)), diff=True)
     marks = []
     for line in proc.stdout.splitlines():
         if not line.startswith("@@"):

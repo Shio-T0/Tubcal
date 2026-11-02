@@ -255,11 +255,25 @@ don't name: use `--all-extras`); install.sh adds `--group tui` with its `tui` op
   surface it sits on (dim 4.5, faint 3, rule 1.6, surfaces 1.15/1.28; hues lifted in
   OKLab until readable), never a fixed mix. No palette → ANSI names, reverse, bold.
   A rice switch recolours st live (`xrdb -merge`, USR1), so focus-in re-reads xrdb.
+  Each hue also has tinted surfaces (`wash:`/`wash2:` in `ui/paint.style`, as light as
+  surface/surface2, so the tones solved for those still read) and a tinted rule
+  (`rule:<hue>`): the selection band takes the room's tint, headings its hue. Names
+  (channels, subreddits, sites, repos, commenters) get a steady hue of their own
+  (`theme.source_hue`, `paint.who(name)`). Spacing is `spacing` in tui.toml: comfy (the
+  default: a blank line after each two-line item, under the tabline and the winbars,
+  over the statusline, padding in panes) or compact; `paint.LOOK`, set by the app.
 - **Keys** (`keys.py`): one table of sequences → actions, counts, no prefix that is
-  also an action (so nothing waits for a timeout), which-key after 300 ms, rooms push
-  a layer. Textual's own bindings are off (`inherit_bindings=False`, no palette). Don't
-  name things after Textual internals: `App._ready`, `App.run_action`,
-  `Widget.loading`, `Widget.query` all broke something once.
+  also an action (so nothing waits for a timeout), rooms push a layer. Textual's own
+  bindings are off (`inherit_bindings=False`, no palette). Don't name things after
+  Textual internals: `App._ready`, `App.run_action`, `Widget.loading`, `Widget.query`
+  all broke something once. The layers are rebuilt in one place, `app._rebuild_keys`:
+  global, then the room's (with the Saved drawer's over it), or a page's instead.
+  - which-key (`ui/chrome.WhichKey`, after 300 ms): every key that can follow, from
+    `Keys.next_hints()` (group sizes; a room's own keys in its hue), in columns across
+    the bottom with the chord in the top edge. Backspace takes a key of the chord back;
+    `?` mid-chord opens the keys page on that chord. `keys.written()` is how keys are
+    shown to people ("Space pz", "gg", "C-d"); `SECTIONS`/`section_of` sort the global
+    keys for the keys page (tested: every global action has a section).
   - VISUAL (`V`/`v` in an `ItemList`): `anchor` + cursor make the range, movement
     stretches it, any other key ends it first. `s` saves (or, all saved, unsaves),
     `a` queues (`room.playable_of`), `y` copies links, and `d`/`x` run what `dd`/`x`
@@ -269,6 +283,31 @@ don't name: use `--all-extras`); install.sh adds `--group tui` with its `tui` op
   - Your keys: `[keys]` in tui.toml (vim notation, `""` unbinds), `[keys.<room id>]`,
     `[keys.saved]`, `[keys.visual]`; `keys.remap` checks them (unknown action, digits,
     a key that hides or is hidden by another) and the app says what was wrong.
+- **Pages** (`tui/pages/`, drawn by `ui/sheet.py`): a page over the room, in a stack
+  (`app.open_page`, `q`/`h` back to the one before, a room jump closes all). A page
+  gives `rows()` (`Section`, `Entry` with a key column, figure, a second line and
+  `more` shown while selected, `Note`), its own keys (`binds()` over `pages.COMMON`:
+  Enter `activate`, `+`/`-`) and `handle()`; the sheet's body has ItemList's methods
+  (move, go, page, search…), so the app's movement code moves it, Tab jumps sections and
+  `/` filters as you type (Esc clears). The pages: Keys (`?`, `:keys`, `:map`: here,
+  everywhere's by section, VISUAL, the drawer, pages, the command line, the finder,
+  mpv, every room's own, built unmounted to ask; Enter runs a key), Commands (`:help`,
+  `:help <cmd>`), Settings (`Space ,`, `:settings`, `:set` alone), Playing (`Space q`,
+  `:queue`, `:sleep` alone: queue `dd`/`u`/`J`/`K`, quality, the radio, the timer),
+  Following (`:following`, `:follow`/`:unfollow` with nothing selected: `dd`/`u`/`a`),
+  and Messages, checkhealth, About and the OAuth steps (`pages/info.py`).
+  - `tui/commands.py` is the one list of `:` commands (`:help`, Tab, the hint on the
+    right of the command line); a test checks `run_command` runs every name and alias.
+  - `tui/prefs.py` is the one list of settings for the Settings page and `:set`
+    (`name=value`, `name`, `noname`, `name!`, `name?`): the server's (speed, volume,
+    subtitles, quiet hours, the Anime's sub/dub/skip/sync, where the Wire and the
+    Dispatch open; `PUT /settings`, put back if refused) and tui.toml's
+    (`config.write_value` changes one line, keeps comments and `[keys]`, checks the file
+    still parses). `app.pref_changed` applies speed, volume and subtitles to what's
+    playing. The player keeps the app's own `settings`/`cfg` dicts (it once got an
+    empty copy, so none of the server's playback settings reached mpv).
+  - Tests: `tests/test_tui_pages.py`; snapshots `keys-`, `help-`, `settings-`,
+    `whichkey-`.
 - **Rooms** (`rooms/__init__.py`) mirror `lib/rooms.js` (ids, channels, order, so the
   numbers match; tested). A room with a terminal screen has `tui/rooms/<id>/` in its
   module's `paths` and is imported through importlib only when `/api/health` lists
@@ -349,6 +388,26 @@ don't name: use `--all-extras`); install.sh adds `--group tui` with its `tui` op
   progress every 5 s and on pause/end; resume at pos−2 under 95 %. `tubcal.lua` sets
   chapters, shows the skip-opening cue (binds `s` only while shown) and sends `N` back.
   The user's mpv config and MPRIS script stay; mpv keeps no watch records of its own.
+  `Mpv` reads answers on one thread and hands events, in order, to another (`_dispatch`),
+  so a handler may ask mpv something and wait (the player sets force-window on `idle`;
+  the video and the radio pause each other). Handling them on the reader once made it
+  wait 5 s for an answer only it could read: "mpv didn't answer observe_property" or a
+  late first play. Tests: `tests/test_tui_mpv.py` (a stand-in mpv over the socket).
+- **Reload** (`ZR`, `:reload`; `tui/reload.py`): starts again in place and reads
+  everything again, with what's playing still playing.
+  - The app has the sleep timer, the radio and the player hand over (`hand_over`: a
+    fade gives the volume back, progress is posted synchronously, `Mpv.keep` shuts the
+    socket down without quitting mpv), writes a 0600 note beside the sockets (room,
+    private, the item, the queue, the radio episode, the timer) and exits with `Reload`.
+  - `__main__` then `execv`s `python -m tui` from the package's folder (as the launcher
+    runs it). Same pid: mpv stays its child, and its socket name stays.
+  - The next run reads the note once (path in `TUBCAL_HANDOFF`, popped at once), takes
+    the players back (`Mpv.adopt`: only its own child, on its own socket name), and
+    asks the server to mark YouTube's and the Anime's caches out of date
+    (`/refresh?scope=youtube|anime&keep=1`), so lists, episodes and your AniList list
+    are fetched again while the old copies stay as the fallback. Watched marks, Saved
+    and settings are read at start anyway.
+  - Tests: `tests/test_tui_reload.py`, the `ZR` pilot test in `tests/test_tui_app.py`.
 - **The radio** (`media/radio.py`): podcasts on a second, window-less mpv
   (`Mpv(name="radio")`, its own socket), audio straight from the podcast's host
   (http(s) only), as the browser's `<audio>` does. Places as `lib/radio.js` keeps
@@ -357,8 +416,7 @@ don't name: use `--all-extras`); install.sh adds `--group tui` with its `tui` op
 - **The sleep timer** (`media/sleep.py`): one for both players. `:sleep 30|1h30|end|off`,
   `Space p z`. Minutes: the audible mpv fades over the last 12 s (a thread steps the
   volume), then everything pauses and the volume goes back. `end`: a player's
-  `on_end` returns True and nothing follows (pausing the others from a new thread:
-  an mpv's reader thread can't wait on its own mpv).
+  `on_end` returns True, nothing follows and the others pause.
 - Local files: `~/.config/tubcal/tui.toml` (terminal-only options), `$XDG_STATE_HOME/
   tubcal/tui.json` (room, views, seen marks, `wire_seen`, `edition_read`, `radio`; no
   titles; a key must be in `State`'s defaults to be read back). `:history clear` forgets
@@ -392,14 +450,38 @@ re-execs itself from `sh`, and it keeps its own state in `$TUBCAL_HOME`
 
 The menu lists the rooms by channel (from `modules.ini`; piped from curl, from the
 copy in `embedded_manifest` at the end of install.sh, which must match) and the
-options `desktop`/`autostart`/`extras`/`3d`/`tui`. Picking a room brings what it needs; dropping
+options `web`/`tui`/`desktop`/`autostart`/`extras`/`3d`. Picking a room brings what it needs; dropping
 one drops what needs it. Defaults: every room but the Archive, and GitHub is off in a
 clone (on in your own checkout). Flags: `--rooms LIST` (exact), `--with`/`--without`
 (rooms or options), `--add`/`--remove` (what `tubcal add/remove` run), `--list`. The
 `tui` option (record `TUI`; on by default where mpv already is) adds `--group tui` to
 the sync, mpv to the extras (`extras_packages`; not on EL, where it's third-party
 only) and a `check_tui` step that imports textual, Pillow and httpx but only looks
-textual-image up (importing it queries the terminal). The files:
+textual-image up (importing it queries the terminal).
+
+**Only the terminal interface** (`--tui-only` = `--with tui --without web`; record
+`WEB=0`; a record without `WEB` had the web interface):
+- `interfaces()` keeps one of `web`/`tui` on (in the menu, switching one off brings
+  the other back; `tubcal remove` refuses instead) and locks `3d` off without web.
+- No frontend build; the sparse patterns leave out `frontend/` but
+  `frontend/public/icon.svg` (the menu entry's icon); in a clone the git-ignored
+  `node_modules`/`dist` go too (`remove_web_build`).
+- Node.js only when `needs_node` (web, or the Screening Room's yt-dlp, whose YouTube
+  challenges run on it); a private Node nothing needs is removed.
+- The launcher exports `TUBCAL_WEB=0`: `config.WEB` is False, every non-API path is a
+  short page pointing at `tubcal tui` (also where `:link`'s OAuth lands,
+  `/settings?connected=`), and `/api/health` has `web: false`. Plain `tubcal` runs
+  `tubcal tui`, `tubcal open` says why not, and the menu entry is `tubcal tui` with
+  `Terminal=true` (`@OPEN@`/`@TERMINAL@` in the template).
+- `tubcal add|remove` take the options too (`web`, `tui`, `desktop`…; `option_id`).
+- Settings' essentials are in the terminal (`tui/accounts.py`): `:follow`/`:unfollow`,
+  `:link`/`:unlink` (AniList, Reddit: OAuth through the browser; GitHub: the gh CLI or
+  a token), `:room on|off`, the Settings page (`Space ,`, with or without the web
+  interface; its "The rest of Settings ↗" row opens the web's) and `:about` (the
+  licence and THIRD_PARTY_NOTICES.md, for GPL §5d).
+  Tests: `tests/test_terminal_only.py` and the pilot tests in `tests/test_tui_app.py`.
+
+The files:
 - A clone is `git clone --filter=blob:none --no-checkout --depth 1`, then
   `apply_rooms` writes non-cone sparse patterns (`/*` minus each left-out room's
   paths, minus `[elsewhere]` = android/ and docs/) and checks out. Adding a room
@@ -459,7 +541,8 @@ on a phone over adb:
   base for the same code).
 
 `packaging/linux/` holds the templates it renders (`@TUBCAL_HOME@`, `@BIN@`):
-- `tubcal` is the launcher: open/start/stop/status/logs/update/rooms/add/remove/tui/play/
+- `tubcal` is the launcher (plain `tubcal`: `open`, or `tui` without the web interface):
+  open/start/stop/status/logs/update/rooms/add/remove/tui/play/
   phone/autostart/uninstall/run. It exports `TUBCAL_MODULES` from the record for the server.
   It uses systemd `--user` when available (`TUBCAL_SYSTEMD=0` opts out), else a
   pidfile plus `setsid`. It identifies a running Tubcal by `/api/health`.
@@ -523,7 +606,9 @@ midnight; Settings → Playback → Night) it keeps quiet and lets that stream g
 **Caching (`server/cache.py`) is central.** Two layers (a bounded in-memory LRU,
 `CACHE_MEM_MAX` entries, in front of a `cache` table in SQLite) so caches survive
 restarts and a long-running server doesn't grow. Key functions: `cached(key, ttl,
-fetcher)`, `cached_swr(...)` (stale-while-revalidate), `warm(...)`, `invalidate(prefix)`.
+fetcher)`, `cached_swr(...)` (stale-while-revalidate), `warm(...)`, `invalidate(prefix)`, and
+`expire(prefix)`, which marks entries out of date but keeps them as the fallback
+(`/refresh?keep=1`).
 Expired rows are kept deliberately: if an upstream fetch fails, the stale payload is
 served instead of erroring — this is what keeps Reddit's aggressive rate limiting from
 breaking the app. TTLs live in `server/config.py`. When adding a source call, wrap it
@@ -1230,13 +1315,42 @@ floats/rails otherwise.
 - **Only this machine's pages.** Binding to 127.0.0.1 keeps other machines out,
   not other websites. `server/localguard.py` runs before every request (a
   `before_request` in `create_app`) and refuses a `Host` that isn't a loopback name
-  or in `TUBCAL_ALLOWED_HOSTS` (DNS rebinding), an `Origin` that isn't this machine
-  (WebSockets ignore CORS, and `/api/editor/pty` is a shell), and `/api/` subresources
-  marked `Sec-Fetch-Site: cross-site`. Top-level navigations into a tab pass (OAuth
-  callbacks; not a cross-site frame), so a GET under `/api/` must never change
-  anything. Requests with none of those headers (curl, the launcher, the phone's
-  Kotlin, tests) pass. Every response carries `frame-ancestors 'self'`. Never add CORS
-  headers or a route that sidesteps it. Tests: `tests/test_localguard.py`.
+  or in `TUBCAL_ALLOWED_HOSTS` (DNS rebinding), an `Origin` that isn't Tubcal's own
+  page (this machine at `config.PORT` or a Vite dev port, `TUBCAL_DEV_PORTS`; another
+  local server's page is another site. WebSockets ignore CORS, and `/api/editor/pty`
+  is a shell), and `/api/` subresources marked `Sec-Fetch-Site: cross-site`. Top-level
+  navigations into a tab pass (OAuth callbacks; not a cross-site frame), so a GET
+  under `/api/` must never change anything, and every `/api/` response is a sandboxed,
+  script-less document if opened (`default-src 'none'; sandbox`, `nosniff`, set in
+  `create_app`). Requests with none of those headers (curl, the launcher, the TUI,
+  tests) pass. Every response carries `frame-ancestors 'self'` and `Referrer-Policy:
+  no-referrer`. Never add CORS headers or a route that sidesteps it. Tests:
+  `tests/test_localguard.py`, `tests/test_hardening.py`.
+- **Only this account.** Every account on the computer can open 127.0.0.1 too, so
+  `server/peers.py`'s `OwnUserOnly` (main.py's `request_handler`) asks the kernel who
+  owns each accepted connection (netlink sock_diag, else `/proc/net/tcp`; ~50 µs, once
+  per kept-alive connection) and answers anyone but this user or root with a 403;
+  `TUBCAL_PEER_CHECK=0` turns it off. On the phone every app shares 127.0.0.1 and
+  can't ask the kernel, so there the API wants the app's access key instead:
+  `TubcalService.KEY` (new per process) → `android_main.start(key)` →
+  `config.ACCESS_KEY`; the WebView has it as the `tubcal_key` cookie, Kotlin sends
+  `X-Tubcal-Key`, only the OAuth callbacks go without. The WebView never requests
+  another loopback port (`shouldInterceptRequest`), follows only its own server's
+  pages and opens outside only web/mail/tel/geo/market links; a notification's route
+  is followed only with the key in its intent. Tests: `tests/test_peers.py`,
+  `tests/test_localguard.py`.
+- **Remote HTML and links.** `sanitizeHtml` (`lib/format.js`) is a DOM allow-list:
+  tags, attributes, links to the web or relative, pictures only from the web, ids
+  prefixed `user-content-`; AniList's HTML goes through `sanitizeAniHtml`, synopses
+  included. A URL from content reaches `window.open` only through `openWeb`/`webUrl`
+  (the phone's `openExternal` checks the same), the server keeps only http(s)/in-app
+  links on saved entries and feed items, and the TUI hands a browser only http(s)/
+  mailto (`links.web`: a link starting with `-` would be a browser option).
+- **Text in the terminal.** `tui/safetext.harden()` (run when `tui/app.py` loads)
+  widens Rich's and Textual's control-code tables to all C0 but tab/newline, DEL and
+  C1, so a title or comment can't write the clipboard (OSC 52), fake a link (OSC 8)
+  or retitle the window; `safetext.plain` for anything printed outside Textual.
+  Tests: `tests/test_tui_safetext.py`.
 - **Cookie containment.** `httpc`'s `session` is shared process-wide, so its jar
   accumulates whatever hosts set — scraping a YouTube channel page seeds
   `VISITOR_INFO1_LIVE`/`YSC`/`__Secure-YNID`, which requests then merges into every
@@ -1249,7 +1363,10 @@ floats/rails otherwise.
   carries the user's own OAuth bearer token. Playback (googlevideo) is anonymous
   too, defensively: that's a different domain so the youtube.com jar never reached
   it, but the property shouldn't depend on that. `tests/test_httpc_anon.py` AST-sweeps
-  `youtube.py` and fails if any call site is neither anonymous nor authenticated. Every yt-dlp
+  `youtube.py` and fails if any call site is neither anonymous nor authenticated, and
+  sweeps Reddit, HN, the Workbench, AnimeThemes, AniList, InnerTube and the Archive's
+  audio download for anonymous/public-only calls (Reddit's `loid` would otherwise tie
+  logged-out reads together and to a later login). Every yt-dlp
   command line carries `YTDLP_ANON` (`--no-cookies --no-cookies-from-browser
   --no-mark-watched`), so a user yt-dlp config with browser cookies can't sign
   Tubcal's resolves in (`tests/test_server_privacy.py`).
@@ -1259,7 +1376,11 @@ floats/rails otherwise.
   each new connection resolves the host, refuses unless every address is public
   (`httpc.public`) and connects to an address it checked, redirect hops included. A
   refusal raises at once (`httpc.refused(e)`) and the proxy answers 403. A request
-  through the user's own proxy is left to that proxy. Tests: `tests/test_public_fetch.py`.
+  through the user's own proxy is left to that proxy. `relay()` keeps the upstream's
+  `Content-Type` only when it names media (else the endpoint's own), with `nosniff`
+  and a sandbox CSP: a link anywhere can open `/api/anime/sub?u=<their page>` in a tab,
+  and relaying `text/html` would run it as Tubcal. Tests: `tests/test_public_fetch.py`,
+  `tests/test_hardening.py`.
 - Configuration is env-driven through `server/config.py` (all optional, `.env` copied
   from `.env.example`); user-facing settings that can change at runtime are stored in the
   DB `settings` table and read via `db.get_setting()`.

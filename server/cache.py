@@ -274,6 +274,27 @@ def peek_many(keys):
     return {k: e["payload"] for k, e in _load_entries(keys).items()}
 
 
+def expire(prefix=""):
+    """Mark entries whose key starts with prefix out of date, without dropping them:
+    the next read fetches again and, if that fails, still has the old copy to serve
+    (`invalidate` loses it). Each is dated just past its own TTL, so the week-old
+    pruning doesn't take it any sooner. Returns how many were marked."""
+    now = int(time.time())
+    with _lock:
+        for k, entry in _mem.items():
+            if k.startswith(prefix):
+                entry["fetched_at"] = min(entry["fetched_at"], now - entry["ttl"] - 1)
+    con = db.connect()
+    with con:
+        cur = con.execute(
+            "UPDATE cache SET fetched_at = MIN(fetched_at, ? - ttl - 1) WHERE substr(key, 1, ?) = ?",
+            (now, len(prefix), prefix),
+        )
+        n = cur.rowcount
+    con.close()
+    return n
+
+
 def invalidate(prefix=""):
     """Drop cache entries whose key starts with prefix. Returns count removed."""
     with _lock:

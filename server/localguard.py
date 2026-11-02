@@ -18,13 +18,23 @@ open in the browser can address http://127.0.0.1:5000. Three ways in, three chec
   link to Tubcal from another app opens it. That is why a GET under /api/ must
   never change anything.
 
+- **Other local servers' pages.** A page that Jupyter, some project's dev server or
+  `python -m http.server` shows is on 127.0.0.1 too, so an `Origin` counts as
+  Tubcal's own only at Tubcal's port or a Vite dev server's (config.DEV_PORTS).
+
 Requests with none of these headers (curl, the launcher's health check, the
-phone app's own code, tests) come from this machine by construction and pass.
+terminal interface, tests) pass: what keeps other accounts' programs out is
+server/peers.py, which checks who owns each connection. On the phone every app
+shares 127.0.0.1, so there the API also wants the app's access key (a cookie in
+its WebView, a header from its Kotlin; config.ACCESS_KEY).
 `create_app` also sends `frame-ancestors 'self'`, so no other site can show
-Tubcal in a frame and steer clicks in it.
+Tubcal in a frame and steer clicks in it, and a sandbox policy on every /api/
+response, so nothing there runs as a page when a link opens it in a tab.
 """
 
+import hmac
 import ipaddress
+import re
 from urllib.parse import urlsplit
 
 from . import config
@@ -60,17 +70,44 @@ def is_loopback_host(hostport):
 
 
 def is_local_origin(origin):
-    """True for an Origin header from a page this machine serves (any port, so
-    the Vite dev server on :5173 counts). "null" (sandboxed frames, file://) and
-    anything else does not."""
+    """True for an Origin header from Tubcal's own pages: this machine at Tubcal's
+    port or a Vite dev server's (config.DEV_PORTS), or a name in
+    TUBCAL_ALLOWED_HOSTS at any port. A page another local server shows (Jupyter,
+    some project's dev server, `python -m http.server` over a downloaded file) is
+    another site, and "null" (sandboxed frames, file://) is nobody's."""
     parts = urlsplit(origin or "")
-    return parts.scheme in ("http", "https") and is_loopback_host(parts.netloc)
+    if parts.scheme not in ("http", "https") or not is_loopback_host(parts.netloc):
+        return False
+    if _strip_port(parts.netloc).rstrip(".") in config.ALLOWED_HOSTS:
+        return True
+    try:
+        port = parts.port or (443 if parts.scheme == "https" else 80)
+    except ValueError:
+        return False
+    return port == config.PORT or port in config.DEV_PORTS
 
 
-def refusal(path, headers):
-    """Why this request may not proceed ("host", "origin" or "cross-site"), or
-    None when it may. `headers` is any case-insensitive mapping (Flask's
-    request.headers)."""
+KEY_COOKIE = "tubcal_key"
+KEY_HEADER = "X-Tubcal-Key"
+# An OAuth provider sends the browser back here, and on the phone that's the
+# system browser, which has no key. The callback checks its own one-time state.
+_KEYLESS = re.compile(r"/api/oauth/[a-z]+/callback")
+
+
+def has_key(headers, cookies):
+    """Whether a request carries the phone's access key (config.ACCESS_KEY)."""
+    want = config.ACCESS_KEY or ""
+    got = headers.get(KEY_HEADER) or (cookies or {}).get(KEY_COOKIE) or ""
+    return bool(want) and hmac.compare_digest(got.encode(), want.encode())
+
+
+def refusal(path, headers, cookies=None):
+    """Why this request may not proceed ("host", "origin", "cross-site" or, on the
+    phone, "key"), or None when it may. `headers` is any case-insensitive mapping
+    (Flask's request.headers), `cookies` the request's cookies."""
+    if (config.ACCESS_KEY and path.startswith("/api/") and not _KEYLESS.fullmatch(path)
+            and not has_key(headers, cookies)):
+        return "key"
     host = headers.get("Host")
     if host and not is_loopback_host(host):
         return "host"
@@ -91,4 +128,7 @@ def message(why):
     if why == "host":
         return (f"Tubcal only answers at 127.0.0.1 or localhost. Open http://{config.HOST}:{config.PORT}, "
                 "or add the name you used to TUBCAL_ALLOWED_HOSTS in Tubcal's .env file.")
-    return "This request came from another website, so Tubcal turned it down."
+    if why == "key":
+        return "Only the Tubcal app on this phone can use its server."
+    return ("This request came from another website, so Tubcal turned it down. "
+            f"Open Tubcal at http://{config.HOST}:{config.PORT}.")

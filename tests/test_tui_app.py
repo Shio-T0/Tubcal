@@ -2,6 +2,7 @@
 app on a throwaway DB through httpx's WSGI transport. YouTube itself is stubbed."""
 
 import asyncio
+import json
 import time
 
 import httpx
@@ -128,10 +129,10 @@ def test_views_chords_and_the_command_line(make_app):
             await pilot.press("escape")
             assert not app.whichkey.display and app.keys.pending == ()
             await pilot.press(":", "c", "h", "e", "c", "k", "h", "e", "a", "l", "t", "h", "enter")
-            await pilot.pause(0.5)
-            assert app.info.display and "checkhealth" in str(app.info.render())
+            await until(pilot, lambda: "Tubcal server" in app.sheet.body.text())
+            assert app.sheet.display and app.page.title == "checkhealth"
             await pilot.press("q")
-            assert not app.info.display
+            assert not app.sheet.display
             await pilot.press("q")  # nothing open: q only says how to quit
             assert "Type :q" in app.statusline.message.text
     run(go())
@@ -822,11 +823,168 @@ def test_map_lists_the_keys_with_their_action_names(make_app):
         async with app.run_test(size=(140, 36)) as pilot:
             await ready(app, pilot)
             await pilot.press(":", *"map", "enter")
-            assert app.info.display
-            text = str(app.info.render())
-            assert "<leader>f" in text and "find" in text           # everywhere
+            assert app.sheet.display and app.page.id == "keys"
+            text = app.sheet.body.text()
+            assert "Space f find anything find" in text              # everywhere
             assert "[keys.youtube]" in text and "toggle_watched" in text
             assert "[keys.visual]" in text and "visual_save" in text
             await pilot.press("q")
-            assert not app.info.display
+            assert not app.sheet.display
     run(go())
+
+
+# ── an install with only the terminal interface ─────────────────────────────
+
+def test_without_the_web_interface_settings_is_a_sheet_and_O_says_why(make_app, monkeypatch):
+    from server import config as server_config
+    monkeypatch.setattr(server_config, "WEB", False)
+    opened = []
+    from tui import links
+    monkeypatch.setattr(links, "open_url", lambda url, browser="": opened.append(url))
+
+    async def go():
+        app = make_app()
+        async with app.run_test(size=(140, 40)) as pilot:
+            await ready(app, pilot)
+            assert app.web is False
+            assert next(b.help for b in app.global_binds if b.action == "settings") == "Settings"
+            await pilot.press("O")
+            assert "no web interface" in app.statusline.message.text and opened == []
+            await pilot.press("space", ",")
+            await until(pilot, lambda: "1 channel" in app.sheet.body.text())
+            text = app.sheet.body.text()
+            assert "Accounts" in text and ":link anilist" in text and "Following" in text
+            assert "1 channel" in text and "Channel 1" in text and ":room on github" in text
+            assert "tubcal add web" in text
+            await pilot.press("q")
+            await pilot.press(":", *"about", "enter")
+            assert "GNU General Public License" in app.sheet.body.text()
+    run(go())
+
+
+def test_follow_and_unfollow_from_the_terminal(make_app, monkeypatch):
+    from server.sources import reddit, youtube
+    monkeypatch.setattr(youtube, "resolve_channel", lambda raw: {"channel_id": "UCnewnewnewnewnewnewnew1",
+                                                                  "title": "New Channel", "thumbnail": None})
+    monkeypatch.setattr(reddit, "validate_subreddit", lambda raw: {"name": "linux", "title": "r/linux", "icon": None})
+
+    async def go():
+        app = make_app()
+        async with app.run_test(size=(140, 40)) as pilot:
+            await ready(app, pilot)
+            subs = lambda: app.api.get("/subscriptions")   # noqa: E731
+            await pilot.press(":", *"follow @newchannel", "enter")
+            await until(pilot, lambda: any(s["display_name"] == "New Channel" for s in subs()["youtube"]))
+            await until(pilot, lambda: "Following New Channel" in app.statusline.message.text)
+            await pilot.press(":", *"follow r/linux", "enter")
+            await until(pilot, lambda: [s["source_id"] for s in subs()["reddit"]] == ["linux"])
+            await pilot.press(":", *"follow r/linux", "enter")
+            await until(pilot, lambda: "already follow" in app.statusline.message.text)
+            # alone: the selected video's channel (Channel 1 is followed, from the fixture)
+            lst = app.room.list
+            n = next(i for i, it in enumerate(lst.items) if it["extra"]["channel_id"] == "UC1")
+            lst.go(n)
+            await pilot.press(":", *"unfollow", "enter")
+            await until(pilot, lambda: not any(s["source_id"] == "UC1" for s in subs()["youtube"]))
+            await pilot.press(":", *"unfollow new channel", "enter")
+            await until(pilot, lambda: subs()["youtube"] == [])
+            await pilot.press(":", *"unfollow nobody", "enter")
+            await until(pilot, lambda: "don't follow" in app.statusline.message.text)
+    run(go())
+
+
+def test_linking_accounts_and_rooms_from_the_terminal(make_app, monkeypatch):
+    import time as real_time
+
+    from server import db
+    from server.sources import github
+    from tui import accounts, links
+    opened = []
+    monkeypatch.setattr(links, "open_url", lambda url, browser="": opened.append(url))
+    nap = real_time.sleep
+    monkeypatch.setattr(accounts.time, "sleep", lambda s: nap(0.05))
+    monkeypatch.setattr(github, "link_gh_cli", lambda: {"linked": True, "login": "me"})
+
+    async def go():
+        app = make_app()
+        async with app.run_test(size=(140, 40)) as pilot:
+            await ready(app, pilot)
+            # no API client yet: the steps, with this server's redirect URL
+            await pilot.press(":", *"link anilist", "enter")
+            await until(pilot, lambda: app.sheet.display)
+            assert "/api/oauth/anilist/callback" in app.sheet.body.text()
+            await pilot.press("q")
+            await pilot.press(":", *"link anilist abc s3cret", "enter")
+            await until(pilot, lambda: opened)
+            assert opened[0].endswith("/api/oauth/anilist/start")
+            assert db.get_oauth("anilist")["client_id"] == "abc"
+            db.set_oauth_tokens("anilist", "tok", None, int(real_time.time()) + 86400)   # approved in the browser
+            await until(pilot, lambda: "AniList is connected" in app.statusline.message.text)
+            await pilot.press(":", *"link github", "enter")
+            await until(pilot, lambda: "GitHub linked as me" in app.statusline.message.text)
+            await pilot.press(":", *"room on github", "enter")
+            await until(pilot, lambda: "github" in app.api.get("/settings")["active_rooms"])
+            assert "github" in app.registry.active
+            await pilot.press(":", *"room off wire", "enter")
+            await until(pilot, lambda: "hackernews" not in app.api.get("/settings")["active_rooms"])
+            await pilot.press(":", *"room on anime", "enter")
+            assert "always on" in app.statusline.message.text
+    run(go())
+
+
+def test_a_visual_range_survives_its_list_refreshing(make_app):
+    """A list reloaded in the background (the drawer fetching what's saved) keeps the
+    range when its first row is still there, and drops it when it isn't."""
+    async def go():
+        app = make_app()
+        async with app.run_test(size=(140, 36)) as pilot:
+            await ready(app, pilot)
+            lst = app.room.list
+            await pilot.press("j", "V", "j", "j")
+            lst.set_rows(list(lst.rows))
+            assert app.mode == "VISUAL" and lst.visual_range() == (1, 3)
+            lst.set_rows([r for r in lst.rows if not (isinstance(r, dict) and r is lst.items[1])])
+            assert lst.anchor is None
+            await pilot.press("s")
+            assert app.mode == "NORMAL" and "range is gone" in app.statusline.message.text
+    run(go())
+
+
+def test_zr_reloads_in_place_and_the_next_run_reads_everything_again(make_app, tmp_path, monkeypatch):
+    """`ZR` leaves a note and asks to be run again; the run that reads it opens in the
+    same room and has the server mark what it keeps of YouTube and the Anime out of date."""
+    from server import cache
+    from tui import reload
+
+    run_dir = tmp_path / "run"
+    run_dir.mkdir(mode=0o700)
+    monkeypatch.setenv("XDG_RUNTIME_DIR", str(run_dir))
+
+    async def first():
+        app = make_app()
+        async with app.run_test(size=(120, 32)) as pilot:
+            await ready(app, pilot)
+            await pilot.press("Z", "R")
+            await pilot.pause(0.1)
+        return app
+
+    app = run(first())
+    result = app.return_value
+    assert isinstance(result, reload.Reload) and result.private is False
+    note = json.loads(open(result.note).read())
+    assert note["room"] == "youtube" and note["player"] is None and note["sleep"] is None
+
+    cache.cached("anime:info:5", 600, lambda: {"episodes": [1, 2]})
+    cache.cached("anilist:lists:9", 60, lambda: ["list"])
+
+    async def second():
+        again = make_app(start_room=None, handoff=note)
+        async with again.run_test(size=(120, 32)) as pilot:
+            await ready(again, pilot)
+            assert again.room_id == "youtube"
+        return again
+
+    run(second())
+    for key in ("anime:info:5", "anilist:lists:9"):
+        entry = cache._load_entry(key)
+        assert entry and time.time() - entry["fetched_at"] >= entry["ttl"]   # out of date, still kept

@@ -28,6 +28,7 @@ import {
   useExtras,
 } from '@pc/components/anime/DetailExtras.jsx';
 import { ForumList } from '@pc/components/anime/Forum.jsx';
+import { sanitizeAniHtml } from '@pc/components/anime/RichText.jsx';
 import {
   airingDateLabel, discoverHref, FavToggle, fmtCountdown, MEDIA_STATUS, personalScore, SCORE_MAX, SCORE_STEP, seasonLabel,
   STATUS_META, SyncBadge, trailerItem, useCountdownTick, useParamState,
@@ -479,7 +480,7 @@ function About({ m, ext }) {
     <div className={t.tabBody}>
       {m.description && (
         <>
-          <div className={`${t.synopsis} ${long && !open ? t.clamp : ''}`} dangerouslySetInnerHTML={{ __html: m.description }} />
+          <div className={`${t.synopsis} ${long && !open ? t.clamp : ''}`} dangerouslySetInnerHTML={{ __html: sanitizeAniHtml(m.description) }} />
           {long && <button type="button" className={t.readMore} onClick={() => setOpen((v) => !v)}>{open ? 'Show less' : 'Read more'}</button>}
         </>
       )}

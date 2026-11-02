@@ -16,6 +16,7 @@ import { addCommand, hasModule, moduleLazy, moduleLazyNamed } from '../../lib/mo
 import { anyRoomOfPath, getRoomById, roomOfPath } from '../../lib/rooms.js';
 import { usePlayer, useToast } from '../../state.jsx';
 import { itemPath } from '../../lib/gh.js';
+import { openWeb } from '../../lib/format.js';
 
 // The readers belong to the Dispatch and the Wire (lib/modules.js).
 const RedditPostModal = moduleLazy('reddit', () => import('../modals/RedditPostModal.jsx'));
@@ -46,8 +47,7 @@ export function useOpenSaved() {
     const needs = NEEDS[kindOf(item)];
     if (needs && !hasModule(needs)) {
       const url = webUrl(item);
-      if (url) window.open(url, '_blank', 'noopener');
-      else absent(getRoomById(needs) || { label: needs, id: needs });
+      if (!openWeb(url)) absent(getRoomById(needs) || { label: needs, id: needs });
       return;
     }
     switch (kindOf(item)) {
@@ -72,12 +72,12 @@ export function useOpenSaved() {
       case 'event': {
         const to = itemPath(item);
         if (to) navigate(to);
-        else if (item.url) window.open(item.url, '_blank', 'noopener');
+        else openWeb(item.url);
         return;
       }
       case 'podcast':
         if (item.extra?.audio) tune(podcastEpisode(item));
-        else if (item.url) window.open(item.url, '_blank', 'noopener');
+        else openWeb(item.url);
         return;
       default:
         if (item.url?.startsWith('/')) {
@@ -86,7 +86,7 @@ export function useOpenSaved() {
           const room = anyRoomOfPath(path);
           if (room && !roomOfPath(path)) absent(room);
           else navigate(item.url);
-        } else if (item.url) window.open(item.url, '_blank', 'noopener');
+        } else openWeb(item.url);
     }
   }, [navigate, play, toast]);
 

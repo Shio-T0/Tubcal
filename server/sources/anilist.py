@@ -96,7 +96,8 @@ def _post(query, variables=None, token=None):
     if token:
         headers["Authorization"] = f"Bearer {token}"
     try:
-        resp = httpc.post(GQL, headers=headers, json={"query": query, "variables": variables or {}}, timeout=20)
+        resp = httpc.post(GQL, headers=headers, json={"query": query, "variables": variables or {}}, timeout=20,
+                          anonymous=True)
         _note_rate(resp.headers)
         body = resp.json()
     except requests.HTTPError as e:

@@ -1,0 +1,40 @@
+ ❯ Tubcal.   1 Social  2 Coding  3 Video  │  1 Screening Room   2 The Anime   3 The Archive
+
+  Commands   Type : and a command; Tab completes it.
+  ⏎ runs it   Tab next section   / filter   ? the keys   q close
+
+   Finding and opening  6 │  :following                                                                                             page  │
+                          │                Everything you follow, by platform                                                             │
+   Playing              4 │                                                                                                               │
+                          │▎ :follow       [@name | r/sub | owner/repo | link]                                                            │
+ ▎ Following and acco…  6 │▎               Follow a channel, subreddit, repo or person                                                    │
+                          │▎               Alone: the selected video's channel, or the subreddit you're in.                               │
+   Settings             2 │▎               :follow @veritasium, :follow r/linux, :follow torvalds/linux.                                  │
+                          │                                                                                                               │
+   Pages                5 │  :unfollow     [name]                                                                                         │
+                          │                Stop following it                                                                              │
+   This terminal        6 │                                                                                                               │
+                          │  :link         anilist | reddit | github [token]                                                              ┃
+   Keys                   │                Link an account                                                                                ┃
+                          │                                                                                                               ┃
+                          │  :unlink       anilist | reddit | github                                                                      ┃
+                          │                Unlink an account                                                                              ┃
+                          │                                                                                                               ┃
+                          │  :room         on | off <room>                                                                                ┃
+                          │                Put a room in the tabs, or take it out                                                         ┃
+                          │                                                                                                               ┃
+                          │                                                                                                               ┃
+                          │  Settings ──────────────────────────────────────────────────────────────────────────────────────────────── 2  │
+                          │                                                                                                               │
+                          │  :settings                                                                                              page  │
+                          │                Accounts, playback, rooms, and this terminal's own settings                                    │
+                          │                                                                                                               │
+                          │  :set          [name=value | name | noname | name?]                                                           │
+                          │                Change a setting                                                                               │
+                          │                                                                                                               │
+                          │                                                                                                               │
+                          │  Pages ─────────────────────────────────────────────────────────────────────────────────────────────────── 5  │
+                          │                                                                                                               │
+                          │  :help         [command]                                                                                page  │
+
+NORMAL  Commands › Following and accounts                                                                                   12/29  12:00

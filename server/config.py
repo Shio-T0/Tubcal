@@ -26,6 +26,10 @@ TTL_BRAIN_DIGEST = 1800  # digest is expensive — cache it (SWR)
 # TUBCAL_3D=1 or 0). Unset when Tubcal wasn't started by the launcher: then the
 # setting is whatever Settings → Appearance says. db.note_install applies it.
 INSTALL_3D = {"1": True, "0": False}.get(os.environ.get("TUBCAL_3D", "").strip())
+# The web interface. An install with only the terminal one (install.sh's `web`
+# option off; the launcher sets TUBCAL_WEB=0) serves a short page instead of the
+# app, and /api/health says so, so the terminal can tell you rather than open it.
+WEB = os.environ.get("TUBCAL_WEB", "1").strip() != "0"
 
 HOST = "127.0.0.1"
 PORT = int(os.environ.get("TUBCAL_PORT", "5000"))
@@ -34,6 +38,19 @@ PORT = int(os.environ.get("TUBCAL_PORT", "5000"))
 ALLOWED_HOSTS = {
     h.strip().lower() for h in os.environ.get("TUBCAL_ALLOWED_HOSTS", "").split(",") if h.strip()
 }
+# Pages on this machine that may drive Tubcal besides its own: the Vite dev servers'
+# ports (frontend/ and android/phone/ both start at 5173). A page some other local
+# server shows (a notebook, a project's dev server) is another site.
+DEV_PORTS = {
+    int(p) for p in os.environ.get("TUBCAL_DEV_PORTS", "5173,5174").split(",") if p.strip().isdigit()
+}
+# Other accounts on this computer get no answer (server/peers.py). 0 turns that off,
+# for a proxy that runs as another user in front of Tubcal.
+PEER_CHECK = os.environ.get("TUBCAL_PEER_CHECK", "1").strip() != "0"
+# The phone sets this (android_main.start): every app on a phone can reach its
+# 127.0.0.1, so there the API answers only requests that carry this key (the app's
+# WebView has it as a cookie, its own Kotlin as a header). None on the desktop.
+ACCESS_KEY = None
 
 # How many cache entries stay in memory (the rest are one SQLite read away).
 CACHE_MEM_MAX = int(os.environ.get("TUBCAL_CACHE_MEM_MAX", "1500"))

@@ -30,6 +30,7 @@ from ...images import youtube_thumb
 from ...keys import Bind
 from ...media.player import COMPLETE
 from ...ui.itemlist import Head, ItemList, RowParts
+from ...theme import CHANNEL_HUES
 from ...ui.paint import style
 from ...ui.picture import Well
 from ...ui.preview import well_size
@@ -320,8 +321,8 @@ class Home(RoomView):
         c = self._counts()
         t = Text()
         rule = g.rule_h * max(4, (self.size.width or 100) - 16)
-        t.append("Channels ", style(r, "fg+bold"))
-        t.append(rule + "\n", style(r, "rule"))
+        t.append("Channels ", style(r, "hue:blue+bold"))
+        t.append(rule + "\n", style(r, "rule:blue"))
         for n, (cid, label, _rooms) in enumerate(reg.channels(), 1):
             bits = []
             if cid == "social":
@@ -341,9 +342,10 @@ class Home(RoomView):
                     bits.append(f"{c['new']} new upload{'s' if c['new'] != 1 else ''}")
                 if c["airing_week"]:
                     bits.append(f"{c['airing_week']} show{'s' if c['airing_week'] != 1 else ''} on your list air this week")
-            t.append(f"  {n} ", style(r, "faint"))
-            t.append(f"{label:<8}", style(r, "fg+bold"))
-            t.append(f" {g.dot} ".join(bits) if bits else "", style(r, "dim"))
+            hue = CHANNEL_HUES.get(cid, "blue")
+            t.append(f"  {n} ", style(r, f"hue:{hue}"))
+            t.append(f"{label:<8}", style(r, f"hue:{hue}+bold"))
+            t.append(f" {g.dot} ".join(bits) if bits else "", style(r, "fg" if bits else "dim"))
             t.append("\n")
         self.channels_line.update(t)
 

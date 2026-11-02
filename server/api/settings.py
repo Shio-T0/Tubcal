@@ -4,7 +4,7 @@ import time
 from flask import Blueprint, request
 
 from . import err, ok
-from .. import config, db
+from .. import THEME_NAME, config, db
 
 settings_bp = Blueprint("settings", __name__, url_prefix="/api")
 
@@ -93,6 +93,10 @@ def put_settings():
     for key in ("fast_mode", "objects_3d"):
         if key in body and not isinstance(body[key], bool):
             return err(f"{key} must be true or false")
+
+    # The skin's name goes into the page's <html> before anything runs.
+    if "theme" in body and not (isinstance(body["theme"], str) and THEME_NAME.fullmatch(body["theme"])):
+        return err("theme must be a skin's name (lowercase letters, digits, dashes)")
 
     if "quiet_hours" in body:
         val = body["quiet_hours"]

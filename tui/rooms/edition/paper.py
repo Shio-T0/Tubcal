@@ -22,6 +22,7 @@ import time
 from ... import fmt
 from ...api import ApiError
 from ...keys import Bind
+from ...ui.paint import who
 from ...ui.units import UnitView
 from ..base import RoomView
 
@@ -166,7 +167,7 @@ class Edition(RoomView):
         line = []
         for n, it in enumerate(items[:6], 1):
             line.append((f"{n} ", "faint"))
-            line.append((fmt.cut(source_name(it), 22) + "  ", "dim"))
+            line.append((fmt.cut(source_name(it), 22) + "  ", who(source_name(it))))
         if len(items) > 6:
             line.append((f"+{len(items) - 6}  ", "faint"))
         if read:

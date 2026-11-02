@@ -12,6 +12,7 @@ import time
 from .api import Api, ApiError, seg, server_port
 from .bootstrap import REPO
 from .media.player import Player
+from .safetext import plain
 
 
 def play_cli(words: list[str], *, private: bool = False) -> int:
@@ -26,7 +27,7 @@ def play_cli(words: list[str], *, private: bool = False) -> int:
     try:
         path = (api.get("/youtube/link", url=url) or {}).get("path") or ""
     except ApiError as e:
-        print(e, file=sys.stderr)
+        print(plain(str(e)), file=sys.stderr)
         return 1
     if not path.startswith("/youtube/open?v="):
         print("Not a YouTube video link Tubcal can play.", file=sys.stderr)
@@ -50,7 +51,7 @@ def play_cli(words: list[str], *, private: bool = False) -> int:
     started = threading.Event()
 
     def notify(text: str, level: str) -> None:
-        print(text, file=sys.stderr)
+        print(plain(str(text)), file=sys.stderr)
         if level == "error":
             done.set()
 
@@ -62,7 +63,7 @@ def play_cli(words: list[str], *, private: bool = False) -> int:
 
     player = Player(api, notify=notify, changed=changed, settings=settings)
     player.load_progress()
-    print(f"▶ {item['title']}" + ("  (private: not recorded)" if private else ""))
+    print(f"▶ {plain(str(item['title']))}" + ("  (private: not recorded)" if private else ""))
     player.play(item)
     try:
         while not done.wait(0.5):

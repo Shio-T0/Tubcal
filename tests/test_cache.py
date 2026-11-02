@@ -1,4 +1,4 @@
-"""cache.invalidate: a prefix is a literal prefix, not a LIKE pattern."""
+"""The cache: invalidate and expire take a literal prefix (not a LIKE pattern); expire keeps\nthe old copy to fall back on."""
 
 from collections import OrderedDict
 
@@ -74,3 +74,47 @@ def test_cached_many_reads_and_writes_in_batches(client, monkeypatch):
     assert again["many:3"] == {"n": "many:3"} and again["many:5"] == {"n": "refetched"}
     assert len(connects) == 2  # one read pass + one write for the single miss
     assert cache.peek_many(["many:1", "nope"]) == {"many:1": {"n": "many:1"}}
+
+
+def test_expire_fetches_again_but_keeps_the_old_copy(client, monkeypatch):
+    monkeypatch.setattr(cache, "_mem", OrderedDict())
+    cache.cached("anime:info:1", 600, lambda: "old")
+    cache.cached("anime:info_2", 600, lambda: "other")       # `_` is not a wildcard
+    assert cache.expire("anime:info:") == 1
+    assert cache.cached("anime:info_2", 600, lambda: "new") == ("other", False)
+    assert cache.cached("anime:info:1", 600, lambda: "new") == ("new", False)   # fetched again
+
+    cache.expire("anime:info:")
+
+    def boom():
+        raise RuntimeError("the source is down")
+
+    assert cache.cached("anime:info:1", 600, boom) == ("new", True)            # still there
+    cache._mem.clear()                                                          # and in SQLite
+    assert cache.expire("anime:info:") == 1
+    assert cache.cached("anime:info:1", 600, boom) == ("new", True)
+
+
+def test_expire_dates_an_entry_just_past_its_ttl(client, monkeypatch):
+    """Pruning drops rows a week past their fetch: expiring mustn't bring that closer."""
+    import time
+    monkeypatch.setattr(cache, "_mem", OrderedDict())
+    cache.cached("yt:rss:UC1", 600, lambda: [1])
+    cache.expire("yt:")
+    con = cache.db.connect()
+    fetched = con.execute("SELECT fetched_at FROM cache WHERE key='yt:rss:UC1'").fetchone()[0]
+    con.close()
+    assert time.time() - 700 < fetched < time.time() - 600
+
+
+def test_refresh_keep_marks_a_scope_out_of_date(client, monkeypatch):
+    monkeypatch.setattr(cache, "_mem", OrderedDict())
+    cache.cached("anime:info:7", 600, lambda: "eps")
+    cache.cached("anilist:lists:42", 60, lambda: "list")
+    cache.cached("anilist:genres:v2", 86400, lambda: "genres")
+    r = client.post("/api/refresh?scope=anime&keep=1").get_json()
+    assert r["ok"] and r["data"]["cleared"] == 2
+    assert cache.peek("anime:info:7") == "eps"                     # kept
+    assert cache.cached("anilist:lists:42", 60, lambda: "fresh") == ("fresh", False)
+    assert cache.cached("anilist:genres:v2", 86400, lambda: "x") == ("genres", False)   # untouched
+    assert client.post("/api/refresh?scope=nope").get_json()["ok"] is False

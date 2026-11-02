@@ -12,6 +12,7 @@ import { hasModule } from '../../lib/modules.js';
 import { usePlayer, useSaved, useSettings } from '../../state.jsx';
 import { openPocket } from '../channels/common.jsx';
 import { repoPath } from '../../lib/gh.js';
+import { openWeb } from '../../lib/format.js';
 import { KindIcon, kindLine } from '../saved/kinds.jsx';
 import { useOpenSaved } from '../saved/useOpenSaved.jsx';
 import s from './CommandPalette.module.css';
@@ -125,7 +126,7 @@ export default function CommandPalette() {
         sub: item.source,
         icon: item.platform === 'reddit' ? <Radio size={14} /> : <Hash size={14} />,
         hint: 'Open',
-        run: () => window.open(item.url, '_blank', 'noopener'),
+        run: () => openWeb(item.url),
       }),
     );
     (results.github || []).forEach((item) =>

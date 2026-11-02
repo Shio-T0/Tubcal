@@ -27,6 +27,7 @@ import { ErrorBox } from '../components/layout/Section.jsx';
 import { hasModule, moduleLazy, moduleLazyNamed } from '../lib/modules.js';
 import { Briefs, Lede, Story } from '../components/edition/Stories.jsx';
 import { useReadMarks } from '../components/edition/readMarks.js';
+import { openWeb } from '../lib/format.js';
 import { isStill, scrollMotion } from '../lib/motion.js';
 import { useParamState } from '../lib/urlState.js';
 import { usePlayer } from '../state.jsx';
@@ -41,7 +42,7 @@ function openOutside(it) {
   const url = it.platform === 'hackernews'
     ? `https://news.ycombinator.com/item?id=${it.extra?.hn_id || String(it.id).replace(/^hn:/, '')}`
     : it.url;
-  if (url) window.open(url, '_blank', 'noopener');
+  openWeb(url);
 }
 
 // ── dates ────────────────────────────────────────────────────────────────────

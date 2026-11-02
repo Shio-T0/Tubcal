@@ -11,16 +11,15 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass
 
-from rich.text import Text
 from textual import events
 from textual.app import App
 from textual.containers import Container
 from textual.screen import Screen
 from textual.theme import Theme
-from textual.widgets import Static
 
+from . import accounts, commands, fmt, links, prefs, safetext
+from . import reload as reload_mod
 from . import config as config_mod
-from . import fmt, links
 from .api import Api, ApiError, seg, server_port
 from .bootstrap import REPO, log_path, start_server
 from .glyphs import choose as choose_glyphs
@@ -35,16 +34,19 @@ from .rooms import CHANNELS, HOME, ROOM_BY_ID, Registry, load_screen
 from .rooms.base import RoomView, WebRoom
 from .state import State
 from .terminal import TermInfo
-from .theme import gamma_ok, solve, textual_variables
+from .theme import ROOM_HUES, solve, textual_variables
 from .saved import kind_of
 from .ui.chrome import Statusline, Tabline, WhichKey
 from .ui.drawer import VIEWS, SavedDrawer
 from .ui.finder import Finder
 from .ui.itemlist import ItemList
-from .ui.paint import style
+from .ui import paint
+from .ui.sheet import Sheet
+from .pages import COMMON, Page
 
-COMMANDS = ["q", "quit", "qa", "open", "play", "yt", "hn", "r", "ar", "ask", "sleep", "radio", "private",
-            "checkhealth", "messages", "map", "theme", "refresh", "set", "cache", "history"]
+# other people's words never reach the terminal as escape sequences (tui/safetext.py)
+safetext.harden()
+
 SEARCH_ROOMS = {"yt": "youtube", "hn": "hackernews", "r": "reddit", "ar": "archive"}
 # the keys that stretch a VISUAL range instead of ending it
 MOVES = {"down", "up", "top", "bottom", "half_down", "half_up", "page_down", "page_up", "center", "to_top",
@@ -55,11 +57,6 @@ MOVES = {"down", "up", "top", "bottom", "half_down", "half_up", "page_down", "pa
 class Jump:
     room: str
     view: str
-
-
-class Info(Static):
-    """A full-page sheet over the room (`:checkhealth`, `:messages`, `?`); q closes it."""
-    DEFAULT_CSS = "Info { height: 1fr; padding: 1 2; overflow-y: auto; display: none; }"
 
 
 class Main(Screen, inherit_bindings=False):
@@ -73,7 +70,7 @@ class Main(Screen, inherit_bindings=False):
         app: TubcalApp = self.app  # type: ignore[assignment]
         yield app.tabline
         yield Container(id="body")
-        yield app.info
+        yield app.sheet
         yield app.drawer
         yield app.finder
         yield app.statusline
@@ -92,10 +89,12 @@ class TubcalApp(App, inherit_bindings=False):
     TITLE = "Tubcal"
 
     def __init__(self, term: TermInfo, *, start_room: str | None = None, url: str | None = None,
-                 private: bool = False, base: str | None = None, transport=None):
+                 private: bool = False, base: str | None = None, transport=None,
+                 handoff: dict | None = None):
         # the colour roles first: Textual reads our CSS variables inside App.__init__
         self.term = term
         self.cfg, cfg_problem = config_mod.load()
+        paint.LOOK["comfy"] = self.cfg["spacing"] != "compact"   # before any widget is made
         self.glyphs = choose_glyphs(self.cfg["icons"])
         self.roles = solve(term.palette)
         super().__init__()
@@ -130,6 +129,7 @@ class TubcalApp(App, inherit_bindings=False):
         self.rooms: dict[str, RoomView] = {}
         self.room_id = start_room or self.state.data.get("room") or "home"
         self.start_url = url
+        self.handoff = handoff or {}      # after a reload: what to carry on with
         self._key_problems: list[str] = []
         self.global_binds = self._layer("keys", GLOBAL)
         self.visual_binds = self._layer("visual", VISUAL)
@@ -141,12 +141,15 @@ class TubcalApp(App, inherit_bindings=False):
         self.jumps: list[Jump] = []
         self.messages: list[tuple[float, str, str]] = []
         self.live = 0
+        self.web = True   # the server has the web interface (/api/health says)
         self.ready = False
         self._whichkey_timer = None
         self.tabline = Tabline(self.roles, self.glyphs)
         self.statusline = Statusline(self.roles, self.glyphs)
-        self.whichkey = WhichKey(self.roles)
-        self.info = Info("")
+        self.whichkey = WhichKey(self.roles, self.glyphs)
+        self.sheet = Sheet(self.roles, self.glyphs)
+        self.pages: list[Page] = []    # the pages open over the room, the one on top last
+        self._room_layer: list = []
         self.drawer = SavedDrawer(self.roles, self.glyphs)
         self.finder = Finder(self.roles, self.glyphs)
         self._find_timer = None
@@ -181,6 +184,8 @@ class TubcalApp(App, inherit_bindings=False):
         self.run_worker(self._boot, thread=True, group="boot")
 
     def _boot(self) -> None:
+        if self.handoff:
+            self._take_over(self.handoff)      # first: it's playing
         api = self.api
         health = api.health()
         if health is None:
@@ -194,6 +199,8 @@ class TubcalApp(App, inherit_bindings=False):
             if health is None:
                 self.call_from_thread(self._server_down, f"The Tubcal server didn't start. Its log: {log_path()}")
                 return
+        if self.handoff:
+            self._fresh_after_reload()
         try:
             self.settings.update(api.get("/settings") or {})
         except ApiError:
@@ -221,6 +228,7 @@ class TubcalApp(App, inherit_bindings=False):
         self.say(text, "error")
 
     def _on_server_ready(self, health: dict) -> None:
+        self.web = health.get("web", True) is not False
         self.registry = Registry(health.get("modules"), self.settings.get("active_rooms"))
         self.tabline.registry = self.registry
         self.tabline.built = {r.id for r in ROOM_BY_ID.values() if r.built and self.registry.has(r.id)}
@@ -267,7 +275,7 @@ class TubcalApp(App, inherit_bindings=False):
             self.open_drawer()
             return
         if room_id == "settings":
-            self._open_web("/settings")
+            self.open_settings()
             return
         if not self.registry:
             return
@@ -295,11 +303,11 @@ class TubcalApp(App, inherit_bindings=False):
             body.mount(view)
         view = self.rooms[room_id]
         view.display = True
-        self.keys = Keys(self.global_binds)
-        self.keys.push(self._layer(room_id, view.binds()))
+        self._room_layer = self._layer(room_id, view.binds())
+        self.close_pages(rebuild=False)
+        self._rebuild_keys()
         self._say_key_problems()
         self.tabline.room_id = room_id
-        self.close_info()
         view.activate()
         self.refresh_chrome()
 
@@ -318,15 +326,21 @@ class TubcalApp(App, inherit_bindings=False):
         sl = self.statusline
         sl.mode = self.mode
         sl.crumbs = room.crumbs() if room else []
+        sl.hue = "blue" if self.drawer.display else ROOM_HUES.get(self.room_id, "blue")
         if self.drawer.display:
             sl.crumbs = ["Saved", dict(VIEWS).get(self.drawer.view, "")]
+        page = self.page
+        if page is not None:
+            body = self.sheet.body
+            sl.crumbs = [page.title, f"/{body.filter}" if body.filter else body.section_of(body.selected)]
+            sl.hue = page.hue
         lst = self.active_list()
         sl.position = lst.position if lst else (0, 0)
         rng = self._visual_list.visual_range() if self.mode == "VISUAL" and self._visual_list else None
         if rng:
             sl.pending = f"{rng[1] - rng[0] + 1} rows"
-        stale = getattr(room, "stale", {}).get(getattr(room, "view", ""), False) if room else False
-        loading = room and getattr(room, "view", None) in getattr(room, "busy", set())
+        stale = getattr(room, "stale", {}).get(getattr(room, "view", ""), False) if room and not page else False
+        loading = room and not page and getattr(room, "view", None) in getattr(room, "busy", set())
         sl.stale = "loading" if loading else ("cached" if stale else "")
         sl.now = self.player.now
         sl.refresh()
@@ -340,6 +354,8 @@ class TubcalApp(App, inherit_bindings=False):
         self.statusline.sleep = self.sleep.label()
         self.statusline.clear_message()
         self.statusline.refresh()
+        if self.page is not None and self.mode == "NORMAL":
+            self.page.tick()
 
     def say(self, text: str, level: str = "info") -> None:
         if text:
@@ -396,6 +412,13 @@ class TubcalApp(App, inherit_bindings=False):
         if self.mode == "FIND":
             self._edit_find(token, event.character)
             return
+        if self.keys.pending and token == "?":   # which-key's "? every key": the keys page, on this chord
+            chord = self.keys.pending
+            self.keys.reset()
+            self._hide_whichkey()
+            self.statusline.pending = ""
+            self.open_keys(chord)
+            return
         hit = self.keys.feed(token)
         if hit == "pending":
             self.statusline.pending = self.keys.describe()
@@ -439,12 +462,18 @@ class TubcalApp(App, inherit_bindings=False):
         if self._whichkey_timer:
             self._whichkey_timer.stop()
         if self.keys.pending:
-            self._whichkey_timer = self.set_timer(0.3, self._show_whichkey)
+            if self.whichkey.display:   # already up: follow the chord at once
+                self._show_whichkey()
+            else:
+                self._whichkey_timer = self.set_timer(0.3, self._show_whichkey)
 
     def _show_whichkey(self) -> None:
         if self.keys.pending:
-            title = " ".join(k.replace("space", "Space") for k in self.keys.pending)
-            self.whichkey.show_keys(title, self.keys.next_keys())
+            here = self.page.title if self.page else ("Saved" if self.drawer.display else
+                                                      (self.room.room.label if self.room else ""))
+            hue = self.page.hue if self.page else ("blue" if self.drawer.display else
+                                                   ROOM_HUES.get(self.room_id, "blue"))
+            self.whichkey.show_keys(self.keys.pending, self.keys.next_hints(), here=here, hue=hue)
 
     def _hide_whichkey(self) -> None:
         if self._whichkey_timer:
@@ -453,11 +482,15 @@ class TubcalApp(App, inherit_bindings=False):
         self.whichkey.display = False
 
     def active_list(self):
+        if self.page is not None:
+            return self.sheet.body
         if self.drawer.display:
             return self.drawer.list
         return self.room.active_list() if self.room else None
 
     def selected_item(self) -> dict | None:
+        if self.page is not None:
+            return self.page.item_of(self.sheet.body.selected)
         if self.drawer.display:
             return self.drawer.list.selected
         return self.room.selected() if self.room else None
@@ -468,24 +501,18 @@ class TubcalApp(App, inherit_bindings=False):
             self.refresh_chrome()
             return
         room = self.room
-        if self.drawer.display:
+        if self.page is not None:
+            if self._page_action(action, count):
+                self.refresh_chrome()
+                return
+            room = None
+        elif self.drawer.display:
             if self._drawer_action(action, count):
                 self.refresh_chrome()
                 return
             room = None
         lst = room.active_list() if room else self.active_list()
         n = count or 1
-        info_open = self.info.display
-        # the info sheet takes the movement keys while it's open
-        if info_open and action in ("down", "up", "half_down", "half_up", "page_down", "page_up", "top", "bottom"):
-            step = {"down": 1, "up": -1, "half_down": 10, "half_up": -10, "page_down": 20, "page_up": -20}
-            if action == "top":
-                self.info.scroll_home(animate=False)
-            elif action == "bottom":
-                self.info.scroll_end(animate=False)
-            else:
-                self.info.scroll_relative(y=step[action] * n, animate=False)
-            return
         if room and room.handle(action, count):
             self.refresh_chrome()
             return
@@ -550,14 +577,13 @@ class TubcalApp(App, inherit_bindings=False):
         elif action == "find":
             self.open_finder()
         elif action == "help":
-            self._help()
-        elif action in ("escape", "close"):
-            if self.info.display:
-                self.close_info()
-            elif action == "close":
-                self.say("Type :q and press Enter to quit Tubcal.")
+            self.open_keys()
+        elif action == "close":
+            self.say("Type :q and press Enter to quit Tubcal.")
         elif action == "quit":
             self.quit()
+        elif action == "reload":
+            self.reload()
         elif action == "refresh" and room:
             room.reload()
         elif action == "open_browser":
@@ -566,7 +592,7 @@ class TubcalApp(App, inherit_bindings=False):
                 problem = links.open_url(links.clean(item["url"]), self.cfg["browser"])
                 self.say(problem or "Opened in the browser.", "error" if problem else "info")
         elif action == "open_web":
-            self._open_web(room.web_route() if room else "/")
+            self.open_web(room.web_route() if room else "/")
         elif action in ("copy_link", "copy_link_time"):
             item = self.selected_item()
             if item and item.get("url"):
@@ -582,7 +608,7 @@ class TubcalApp(App, inherit_bindings=False):
         elif action == "saved":
             self.open_drawer()
         elif action == "settings":
-            self._open_web("/settings")
+            self.open_settings()
         elif action.startswith("player_"):
             self._player_action(action)
         elif action.startswith("radio_"):
@@ -591,11 +617,188 @@ class TubcalApp(App, inherit_bindings=False):
             self._start_line("COMMAND", ":", "sleep ")
             self.say("Minutes (30, 1h30), `end` for the end of what's playing, or `off`.")
         elif action == "queue":
-            q = self.player.queue
-            if not q:
-                self.say("The queue is empty. `a` on a video adds it.")
+            self.open_playing()
+
+    # ── pages (Settings, the keys, the commands, what's playing…) ────────────
+
+    @property
+    def page(self) -> Page | None:
+        return self.pages[-1] if self.pages else None
+
+    def open_page(self, page: Page) -> None:
+        """A page over the room (over the page you're on: q comes back to it). The
+        same page again is shown again, not stacked."""
+        if self.mode == "VISUAL":
+            self.end_visual()
+        self.close_drawer()
+        if self.finder.display:
+            self.close_finder()
+        self.pages = [p for p in self.pages if p.id != page.id or p is page]
+        if not self.pages or self.pages[-1] is not page:
+            self.pages.append(page)
+        del self.pages[:-6]
+        self._show_page(page)
+        page.opened()
+
+    def _show_page(self, page: Page) -> None:
+        self.screen.query_one("#body").display = False
+        self.sheet.display = True
+        self.sheet.show(page)
+        self._hide_whichkey()
+        self._rebuild_keys()
+        self.refresh_chrome()
+
+    def close_page(self) -> None:
+        """Back: the page before, or the room."""
+        if not self.pages:
+            return
+        self.pages.pop()
+        if self.pages:
+            self._show_page(self.pages[-1])
+            self.pages[-1].reload()
+        else:
+            self.close_pages()
+
+    def close_pages(self, *, rebuild: bool = True) -> None:
+        self.pages = []
+        if self.sheet.display:
+            self.sheet.display = False
+            self.sheet.page = None
+            self.screen.query_one("#body").display = True
+        if rebuild:
+            self._rebuild_keys()
+            self.refresh_chrome()
+
+    def repaint_page(self) -> None:
+        if self.page is not None:
+            self.page.repaint()
+
+    def _rebuild_keys(self) -> None:
+        """The key layers for where you are: everywhere's, then the room's (with the
+        Saved drawer's over it), or a page's instead of both."""
+        self.keys = Keys(self.global_binds)
+        if self.page is not None:
+            self.keys.push(COMMON + self.page.binds())
+        else:
+            if self._room_layer:
+                self.keys.push(self._room_layer)
+            if self.drawer.display:
+                self.keys.push(self._drawer_layer)
+        if self.mode == "VISUAL":
+            self.keys.push(self.visual_binds)
+
+    def _page_action(self, action: str, count: int | None) -> bool:
+        """What every page does with a key; the page itself has the first say."""
+        page, body = self.page, self.sheet.body
+        entry = body.selected
+        if page.handle(action, entry, count):
+            return True
+        if action in ("activate", "right"):
+            if entry is not None and entry.act is not None:
+                entry.act()
+            return True
+        if action in ("increase", "decrease"):
+            return True
+        if action == "left":
+            self.close_page()
+        elif action in ("next_view", "prev_view"):
+            body.next_section(1 if action == "next_view" else -1)
+        elif action == "escape":
+            if body.filter:
+                body.search("")
             else:
-                self.say("Up next: " + " · ".join(fmt.cut(fmt.clean(i.get("title")), 30) for i in q[:4]))
+                self.close_page()
+        elif action == "close":
+            self.close_page()
+        elif action == "refresh":
+            page.reload()
+        elif action == "open_web":
+            if page.route:
+                self.open_web(page.route)
+            else:
+                self.say("This page is the terminal's own: the web interface has no page like it.")
+        else:
+            return False
+        return True
+
+    def open_keys(self, chord: tuple[str, ...] = ()) -> None:
+        """`?`: every key, the ones of where you are first (only a chord's, when `?`
+        comes in the middle of one)."""
+        from .pages.keys import KeysPage
+        page = self.page
+        if page is not None and page.id != "keys":
+            binds = COMMON + page.binds()
+            here = (page.title, "", page.hue, binds, binds)
+        elif page is not None:
+            here = page.here
+        elif self.drawer.display:
+            here = ("the Saved drawer", "saved", "blue", self._drawer_layer, self.drawer.binds())
+        elif self.room is not None:
+            here = (self.room.room.label, self.room_id, ROOM_HUES.get(self.room_id, "blue"), self._room_layer,
+                    self.room.binds())
+        else:
+            here = None
+        self.open_page(KeysPage(self, here, chord))
+
+    def open_help(self, topic: str = "") -> None:
+        from .pages.help import HelpPage
+        self.open_page(HelpPage(self, topic))
+
+    def open_settings(self, start: str = "") -> None:
+        from .pages.settings import SettingsPage
+        self.open_page(SettingsPage(self, start))
+
+    def open_playing(self, start: str = "") -> None:
+        from .pages.playing import PlayingPage
+        self.open_page(PlayingPage(self, start))
+
+    def open_following(self, platform: str = "") -> None:
+        from .pages.following import FollowingPage
+        self.open_page(FollowingPage(self, platform))
+
+    def run_key(self, action: str, keys: tuple[str, ...] = ()) -> None:
+        """What a key does, run from a page: the page closes first unless it only
+        plays, seeks or pauses."""
+        if not action.startswith(("player_", "radio_")):
+            self.close_pages()
+        self.dispatch_hit(Hit(action, None, keys))
+        self.refresh_chrome()
+
+    def start_command(self, text: str = "") -> None:
+        self._start_line("COMMAND", ":", text)
+
+    def pref_changed(self, p) -> None:
+        """A setting changed on the Settings page or with :set: what can follow at once."""
+        mpv = self.player.mpv
+        if not mpv.alive or self.player.playing is None:
+            return
+        try:
+            if p.key == "playback_rate":
+                mpv.set("speed", float(self.settings.get("playback_rate") or 1))
+            elif p.key == "player_volume":
+                mpv.set("volume", round(float(self.settings.get("player_volume") or 1) * 100))
+            elif p.key == "subtitle_style" and p.sub == "show":
+                mpv.set("sub-visibility", bool((self.settings.get("subtitle_style") or {}).get("show", True)))
+        except Exception:
+            pass
+
+    def reload_config(self) -> None:
+        """tui.toml again, after you edited it: what can change while running does."""
+        cfg, problem = config_mod.load()
+        if problem:
+            self.say(problem, "error")
+            return
+        for k in ("youtube_player", "video_max_height", "browser", "editor", "mpv_args"):
+            self.cfg[k] = cfg[k]
+        later = [k for k in ("spacing", "icons", "images", "mpris", "keys") if cfg[k] != self.cfg.get(k)]
+        self.say("tui.toml read again" + (f"; {', '.join(later)} from the next start." if later else "."))
+
+    def copy(self, text: str) -> None:
+        self._copy(text)
+
+    def open_link(self, url: str) -> None:
+        problem = links.open_url(links.clean(url), self.cfg["browser"])
+        self.say(problem or "Opened in the browser.", "error" if problem else "info")
 
     # ── VISUAL: a range of rows ──────────────────────────────────────────────
 
@@ -682,7 +885,9 @@ class TubcalApp(App, inherit_bindings=False):
     def save_many(self, items: list[dict]) -> None:
         """`s` on a range: saves the ones not saved yet, or, when every one already is,
         takes them all out. One `u` takes it back."""
-        clean = [{k: v for k, v in i.items() if not k.startswith("_")} for i in items]
+        now = int(time.time())
+        clean = [{**{k: v for k, v in i.items() if not k.startswith("_")}, "saved_at": i.get("saved_at") or now}
+                 for i in items]
         clean = list({i["id"]: i for i in clean}.values())
         if not clean:
             return
@@ -738,9 +943,16 @@ class TubcalApp(App, inherit_bindings=False):
                                 "_web": not room.built, "_sub": f"{label} {k}",
                                 "_match": f"{room.label} {room.short} {room.id} {label}".lower()})
         out += [{"id": "place:saved", "title": "Saved", "_place": True, "_go": "saved", "_sub": "drawer",
-                 "_match": "saved bookmarks later"},
-                {"id": "place:settings", "title": "Settings", "_place": True, "_go": "settings", "_web": True,
-                 "_sub": "in the web UI", "_match": "settings preferences options"}]
+                 "_match": "saved bookmarks later"}]
+        for pid, title, sub, words in (
+                ("settings", "Settings", "accounts, playback, rooms, this terminal",
+                 "settings preferences options accounts follow set"),
+                ("keys", "Keys", "every key", "keys keybindings shortcuts map help"),
+                ("help", "Commands", "every : command", "commands help colon"),
+                ("queue", "Playing", "the queue, the radio, the sleep timer", "queue playing radio sleep timer next"),
+                ("following", "Following", "channels, subreddits, repos", "following subscriptions channels")):
+            out.append({"id": f"place:{pid}", "title": title, "_place": True, "_go": f"page:{pid}", "_sub": sub,
+                        "_match": words})
         return out
 
     def open_finder(self) -> None:
@@ -773,7 +985,9 @@ class TubcalApp(App, inherit_bindings=False):
             self.close_finder()
             if not x:
                 return
-            if x.get("_place"):
+            if x.get("_place") and x["_go"].startswith("page:"):
+                self.run_command(x["_go"][5:])
+            elif x.get("_place"):
                 self.go_room(x["_go"])
             else:
                 self.open_item({k: v for k, v in x.items() if not k.startswith("_")})
@@ -821,10 +1035,12 @@ class TubcalApp(App, inherit_bindings=False):
     # ── the Saved drawer ─────────────────────────────────────────────────────
 
     def open_drawer(self) -> None:
+        self.close_pages(rebuild=False)
         if not self.drawer.display:
             self.drawer.display = True
             self.drawer.styles.width = max(40, min(70, self.size.width // 2))
-            self.keys.push(self._layer("saved", self.drawer.binds()))
+            self._drawer_layer = self._layer("saved", self.drawer.binds())
+            self._rebuild_keys()
             self._say_key_problems()
         self.drawer.show_items(sorted(self.saved.values(), key=lambda i: -(i.get("saved_at") or 0)))
 
@@ -837,6 +1053,9 @@ class TubcalApp(App, inherit_bindings=False):
 
             def show():
                 self.saved = {i["id"]: i for i in items}
+                shown = [i.get("id") for i in self.drawer.items]
+                if set(shown) == set(self.saved):   # the same things: no reshuffle under the cursor
+                    items[:] = [self.saved[i] for i in shown]
                 self.drawer.show_items(items)
             self.call_from_thread(show)
         self.run_worker(fetch, thread=True, group="saved", exclusive=True)
@@ -845,7 +1064,7 @@ class TubcalApp(App, inherit_bindings=False):
     def close_drawer(self) -> None:
         if self.drawer.display:
             self.drawer.display = False
-            self.keys.pop()
+            self._rebuild_keys()
             self.refresh_chrome()
 
     def _drawer_action(self, action: str, count: int | None) -> bool:
@@ -934,10 +1153,9 @@ class TubcalApp(App, inherit_bindings=False):
         elif kind == "file" and extra.get("path") and has("editor"):
             self.in_room("editor", lambda room: room.open_path(extra["path"]))
         elif url.startswith("/"):
-            self._open_web(url)
+            self.open_web(url)
         elif url.startswith(("http://", "https://")):
-            problem = links.open_url(links.clean(url), self.cfg["browser"])
-            self.say(problem or "Opened in the browser.", "error" if problem else "info")
+            self.open_link(url)
         else:
             self.say("Nothing to open for this one.", "warn")
 
@@ -1021,7 +1239,11 @@ class TubcalApp(App, inherit_bindings=False):
             self.copy_to_clipboard(text)
         self.say(said or f"Copied {fmt.cut(text, 60)}")
 
-    def _open_web(self, route: str) -> None:
+    def open_web(self, route: str) -> None:
+        if not self.web:
+            self.say("This Tubcal has no web interface (tubcal add web adds it); o opens a thing on its "
+                     "own site.", "warn")
+            return
         problem = links.open_url(self.api.url(route), self.cfg["browser"])
         self.say(problem or f"Opened {route} in the web UI {self.glyphs.web}", "error" if problem else "info")
 
@@ -1033,7 +1255,7 @@ class TubcalApp(App, inherit_bindings=False):
         self._hist_i = len(self.cmd_history)
         sl = self.statusline
         sl.mode, sl.prompt, sl.buffer, sl.cursor = mode, prompt, self.buffer, self.cursor
-        sl.search_info = ""
+        sl.search_info = self._command_hint(text) if mode == "COMMAND" else ""
         sl.refresh()
 
     def _end_line(self) -> None:
@@ -1044,7 +1266,10 @@ class TubcalApp(App, inherit_bindings=False):
 
     def _edit_line(self, token: str, char: str | None) -> None:
         b, c = self.buffer, self.cursor
+        several: list[str] = []
         if token in ("escape", "ctrl+c"):
+            if self.mode == "SEARCH" and self.page is not None:   # a page's filter goes too
+                self.sheet.body.search("")
             self._end_line()
             return
         if token == "enter":
@@ -1060,6 +1285,8 @@ class TubcalApp(App, inherit_bindings=False):
             return
         if token == "backspace":
             if not b:
+                if self.mode == "SEARCH" and self.page is not None:
+                    self.sheet.body.search("")
                 self._end_line()
                 return
             if c:
@@ -1084,12 +1311,11 @@ class TubcalApp(App, inherit_bindings=False):
             c = len(b)
         elif token == "tab" and self.mode == "COMMAND":
             word = b.split(" ")[0]
-            options = [cmd for cmd in COMMANDS if cmd.startswith(word)]
+            options = commands.completions(word)
             if " " not in b and options:
                 b = options[0] + " "
                 c = len(b)
-                if len(options) > 1:
-                    self.statusline.search_info = " ".join(options)
+                several = options if len(options) > 1 else []
         elif char and char.isprintable() and len(char) == 1:
             b, c = b[:c] + char + b[c:], c + 1
         elif token == "space":
@@ -1102,7 +1328,26 @@ class TubcalApp(App, inherit_bindings=False):
             if lst is not None and b:
                 found = lst.search(b, from_next=False)
                 sl.search_info = f"{len(lst.matches)} found" if found else "not found"
+            elif lst is self.sheet.body and lst is not None:
+                lst.search("")
+                sl.search_info = ""
+        else:
+            sl.search_info = "  ".join(several) if several else self._command_hint(b, tabbed=token == "tab")
         sl.refresh()
+
+    def _command_hint(self, b: str, *, tabbed: bool = False) -> str:
+        """While you type a command: how it's written and what it does, or what the
+        word so far could become."""
+        word = b.split(" ")[0]
+        if not word:
+            return "Tab completes · :help lists them all"
+        c = commands.find(word)
+        if c is not None and (" " in b or tabbed or not commands.completions(word)[1:]):
+            return f"{commands.usage(c)}  {c.help}"
+        options = commands.completions(word)
+        if not options:
+            return "not a command · :help lists them"
+        return "  ".join(options[:12]) + (" …" if len(options) > 12 else "")
 
     def _do_search(self, text: str) -> None:
         self.search_term = text
@@ -1115,10 +1360,20 @@ class TubcalApp(App, inherit_bindings=False):
             self.say(f"Not found: {text}", "warn")
 
     def run_command(self, text: str) -> None:
-        cmd, _, arg = text.strip().partition(" ")
+        cmd, _, arg = text.strip().lstrip(":").partition(" ")
         arg = arg.strip()
         if cmd in ("q", "quit", "qa", "q!", "qa!", "wq", "x"):
             self.quit()
+        elif cmd in ("reload", "restart"):
+            self.reload()
+        elif cmd in ("help", "h"):
+            self.open_help(arg)
+        elif cmd in ("keys", "map"):
+            self.open_keys()
+        elif cmd in ("queue", "playing"):
+            self.open_playing()
+        elif cmd == "following":
+            self.open_following(arg)
         elif cmd in ("open", "play"):
             if arg:
                 self.run_worker(lambda: self._open_url(arg), thread=True)
@@ -1137,7 +1392,10 @@ class TubcalApp(App, inherit_bindings=False):
         elif cmd == "private":
             self.set_private(arg != "off")
         elif cmd == "sleep":
-            self._sleep_command(arg)
+            if arg:
+                self._sleep_command(arg)
+            else:
+                self.open_playing("sleep")
         elif cmd == "radio":
             if arg in ("off", "stop"):
                 self._radio_action("radio_off")
@@ -1156,24 +1414,45 @@ class TubcalApp(App, inherit_bindings=False):
             self.state.forget_marks()
             self.say("Forgot the terminal's read marks and podcast places. Your watch history is the "
                      "server's: Settings → Your data, in the web UI.")
+            self.repaint_page()
         elif cmd == "checkhealth":
-            self.run_worker(self._checkhealth, thread=True)
+            from .pages.info import HealthPage
+            self.open_page(HealthPage(self))
         elif cmd == "messages":
-            self._show_messages()
-        elif cmd == "map":
-            self._show_map()
+            from .pages.info import MessagesPage
+            self.open_page(MessagesPage(self))
         elif cmd == "theme":
             self._theme_reload()
         elif cmd == "cache" and arg == "clear":
             n = self.pictures.clear()
             self.say(f"Picture cache emptied ({n} files).")
+            self.repaint_page()
         elif cmd == "refresh":
             if self.room:
                 self.room.reload(force=True)
         elif cmd == "set":
             self._set(arg)
+        elif cmd == "follow":
+            accounts.follow(self, arg)
+        elif cmd == "unfollow":
+            accounts.unfollow(self, arg)
+        elif cmd == "link":
+            accounts.link(self, arg)
+        elif cmd == "unlink":
+            accounts.unlink(self, arg)
+        elif cmd == "room":
+            accounts.room(self, arg)
+        elif cmd == "settings":
+            self.open_settings(arg)
+        elif cmd == "about":
+            from .pages.info import AboutPage
+            self.open_page(AboutPage(self))
+        elif cmd in ("history", "cache"):
+            self.say(f"`:{cmd} clear` is the one there is.", "warn")
         elif cmd:
-            self.say(f"Not a command: {cmd}", "error")
+            close = commands.completions(cmd)
+            self.say(f"Not a command: {cmd}" + (f" (did you mean :{close[0]}?)" if close else
+                                                 " · :help lists them"), "error")
 
     def _sleep_command(self, arg: str) -> None:
         what = parse_sleep(arg)
@@ -1196,16 +1475,59 @@ class TubcalApp(App, inherit_bindings=False):
         self._player_repaint()
 
     def _set(self, arg: str) -> None:
-        key, _, val = arg.partition("=")
-        key, val = key.strip(), val.strip()
-        if key == "quality" and val.isdigit():
-            self.player.set_quality(int(val))
-            self.say(f"Switching to {val}p…")
-        elif key == "ytdl":
-            self.cfg["youtube_player"] = "ytdl" if val in ("on", "yes", "1", "") else "server"
-            self.say(f"YouTube plays through {'mpv’s own yt-dlp' if self.cfg['youtube_player'] == 'ytdl' else 'the Tubcal server'}.")
+        """vim's :set over the settings (tui/prefs.py): `name=value`, `name` (a switch on,
+        anything else said), `noname`, `name!`, `name?`; alone, the Settings page."""
+        if not arg:
+            self.open_settings()
+            return
+        name, eq, val = arg.partition("=")
+        name, val = name.strip(), val.strip()
+        if name == "quality":   # what's playing, now (not a setting)
+            if val.rstrip("p").isdigit():
+                self.player.set_quality(int(val.rstrip("p")))
+                self.say(f"Switching to {val.rstrip('p')}p…")
+            else:
+                hs = self.player.playing.heights if self.player.playing else []
+                self.say("`:set quality=720`" + (f": {', '.join(map(str, hs))}" if hs else ""), "warn")
+            return
+        if name == "ytdl":      # the old name for `player`
+            name, eq, val = "player", "=", "ytdl" if val.lower() in prefs.ON else "server"
+        flip = name.endswith("!") or name.startswith("inv")
+        ask = name.endswith("?")
+        off = not eq and name.startswith("no") and name[2:] in prefs.BY_NAME
+        bare = name.rstrip("!?").removeprefix("inv") if (flip or ask) else (name[2:] if off else name)
+        p = prefs.BY_NAME.get(bare)
+        if p is None or p not in prefs.shown(self):
+            close = [q.name for q in prefs.shown(self) if q.name.startswith(bare[:2])]
+            self.say(f"No setting called {bare}" + (f" (:set {close[0]}?)" if close else "; :set alone lists them"),
+                     "error")
+            return
+        v = prefs.value(self, p)
+        if ask or (not eq and not off and not flip and p.kind != "switch"):
+            self.say(f":set {p.name}={prefs.label_of(p, v) if p.kind != 'text' else (v or '')}  ({p.hint})")
+            return
+        if off or flip:
+            if p.kind != "switch":
+                self.say(f"`{p.name}` isn't on or off: :set {p.name}=…", "warn")
+                return
+            new = not v if flip else False
+        elif not eq:
+            new = True
         else:
-            self.say("`:set quality=720` or `:set ytdl=on|off`.", "warn")
+            try:
+                new = prefs.parse(p, val)
+            except ValueError as e:
+                self.say(str(e), "warn")
+                return
+
+        def done(problem):
+            if problem:
+                self.say(problem, "error")
+            else:
+                self.say(prefs.said(p, new))
+                self.pref_changed(p)
+            self.repaint_page()
+        prefs.put(self, p, new, done=done)
 
     def _open_url(self, url: str) -> None:
         """A link → the room/item it is. YouTube videos play; others open on the web."""
@@ -1253,6 +1575,7 @@ class TubcalApp(App, inherit_bindings=False):
             self.say("Removed from Saved · u undo")
         else:
             clean = {k: v for k, v in item.items() if not k.startswith("_")}
+            clean.setdefault("saved_at", int(time.time()))   # listed newest first at once
             self.saved[iid] = clean
             self.undo_stack.append(("save", clean))
             self.run_worker(lambda: self._api_quiet("post", "/saved", {"item": clean}), thread=True)
@@ -1306,148 +1629,6 @@ class TubcalApp(App, inherit_bindings=False):
         self.say("Private session: nothing you play is recorded, no resume points, AniList isn't updated, "
                  "and pictures stay in memory." if on else "Private session off: plays are recorded again.")
 
-    # ── sheets ───────────────────────────────────────────────────────────────
-
-    def _show_info(self, text: Text) -> None:
-        self.info.update(text)
-        self.info.display = True
-        body = self.screen.query_one("#body")
-        body.display = False
-        self._hide_whichkey()
-
-    def close_info(self) -> None:
-        if self.info.display:
-            self.info.display = False
-            self.screen.query_one("#body").display = True
-
-    def _help(self) -> None:
-        r = self.roles
-        t = Text()
-        t.append("Keys", style(r, "fg+bold"))
-        t.append("   q closes this\n\n", style(r, "dim"))
-        rows = []
-        for b in self.global_binds + (self.keys.layers[-1] if len(self.keys.layers) > 1 else []):
-            rows.append((" ".join(k.replace("space", "Space") for k in b.keys), b.help or b.action))
-        seen = set()
-        for keys, label in rows:
-            if keys in seen:
-                continue
-            seen.add(keys)
-            t.append(f"  {keys:<14}", style(r, "hue:yellow"))
-            t.append(f"{label}\n", style(r, "fg"))
-        t.append("\nIn VISUAL", style(r, "fg+bold"))
-        t.append("   V in a list; j k G and counts stretch the range\n", style(r, "dim"))
-        for b in self.visual_binds:
-            if b.keys != ("v",):
-                t.append(f"  {' '.join(b.keys):<14}", style(r, "hue:yellow"))
-                t.append(f"{b.help}\n", style(r, "fg"))
-        t.append("\nCommands\n", style(r, "fg+bold"))
-        for c, what in (("q", "quit"), ("open <link>", "play a YouTube link"), ("yt <words>", "search YouTube"),
-                        ("hn <words>", "search Hacker News"), ("r <words>", "search Reddit"),
-                        ("ar <words>", "search what was said in your videos"),
-                        ("private", "a session that records nothing"), ("checkhealth", "what works here"),
-                        ("messages", "this session's messages"), ("map", "every key with its action's name"),
-                        ("theme", "read the terminal's colours again"),
-                        ("set quality=720", "another quality for what's playing"),
-                        ("set ytdl=on", "YouTube through mpv's own yt-dlp"),
-                        ("sleep 30 | end | off", "the sleep timer"), ("radio off", "switch the radio off"),
-                        ("ask <question>", "ask the Archive"),
-                        ("history clear", "forget the terminal's read marks and podcast places")):
-            t.append(f"  :{c:<18}", style(r, "hue:yellow"))
-            t.append(f"{what}\n", style(r, "fg"))
-        self._show_info(t)
-
-    def _show_map(self) -> None:
-        """vim's :map: every key in force here, with its action's name (what tui.toml's
-        [keys] takes) and what it does."""
-        from .keys import notation
-        r = self.roles
-        t = Text()
-        t.append("Keys in force", style(r, "fg+bold"))
-        t.append("   the action names are what [keys] in ~/.config/tubcal/tui.toml takes · q closes\n", style(r, "dim"))
-        layers = [("everywhere", self.keys.layers[0], "keys")]
-        if len(self.keys.layers) > 1:
-            name = "saved" if self.drawer.display else self.room_id
-            layers.append((f"here ([keys.{name}])", self.keys.layers[-1], name))
-        layers.append(("in VISUAL ([keys.visual])", self.visual_binds, "visual"))
-        for title, layer, _ in layers:
-            t.append(f"\n{title}\n", style(r, "fg+bold"))
-            for b in sorted(layer, key=lambda b: (b.action, b.keys)):
-                t.append(f"  {notation(b.keys):<14}", style(r, "hue:yellow"))
-                t.append(f"{b.action:<20}", style(r, "fg"))
-                t.append(f"{b.help}\n" if b.help and b.help != b.action else "\n", style(r, "dim"))
-        self._show_info(t)
-
-    def _show_messages(self) -> None:
-        r = self.roles
-        t = Text()
-        t.append("Messages", style(r, "fg+bold"))
-        t.append("   this session only · q closes\n\n", style(r, "dim"))
-        for ts, level, text in self.messages[-100:]:
-            t.append(time.strftime("%H:%M:%S ", time.localtime(ts)), style(r, "faint"))
-            t.append(text + "\n", style(r, {"error": "hue:red", "warn": "hue:yellow"}.get(level, "fg")))
-        if not self.messages:
-            t.append("No messages yet.\n", style(r, "dim"))
-        self._show_info(t)
-
-    def _checkhealth(self) -> None:
-        import shutil
-        r, g, term = self.roles, self.glyphs, self.term
-        checks: list[tuple[str, str, str]] = []  # (state ok|warn|error, title, detail)
-        h = self.api.health()
-        checks.append(("ok", "Tubcal server", f"{self.api.base} · modules: {', '.join(h.get('modules') or [])}")
-                      if h else ("error", "Tubcal server", f"not answering at {self.api.base}"))
-        mpv = shutil.which("mpv")
-        checks.append(("ok", "mpv", mpv) if mpv else ("error", "mpv", "not installed: videos can't play here"))
-        checks.append(("ok" if self.image_backend != "off" else "warn", "Pictures",
-                       {"kitty": "kitty graphics (sharp, in the terminal itself)",
-                        "sixel": "sixel graphics", "halfcell": "coloured half-blocks (this terminal draws no pictures)",
-                        "off": "off (`images` in the config)"}.get(self.image_backend, self.image_backend)
-                       + (" · kept in memory only (private)" if self.private else "")))
-        checks.append(("ok" if term.palette else "warn", "Colours",
-                       f"from {term.palette.source} ({term.took_ms} ms)" if term.palette
-                       else "the terminal didn't say; using its named colours"))
-        checks.append(("ok", "Cell size", f"{term.cell_px[0]}×{term.cell_px[1]} px" if all(term.cell_px) else "unknown"))
-        checks.append(("ok", "Glyphs", g.kind))
-        checks.append(("ok", "YouTube plays through", "mpv's own yt-dlp" if self.cfg["youtube_player"] == "ytdl"
-                       else "the Tubcal server (one extraction, mpv only talks to 127.0.0.1)"))
-        from . import editor
-        argv = editor.resolve(self.cfg.get("editor") or "")
-        checks.append(("ok", "Writing", f"in {' '.join(argv)} (notes, questions, comments)") if argv else
-                      ("warn", "Writing", "no editor found: set `editor` in the config, or $VISUAL"))
-        checks.append(("ok" if mpv else "warn", "The radio", "podcasts on a second mpv, without a window" if mpv
-                       else "needs mpv too"))
-        checks.append(("warn" if self.private else "ok", "Private session", "on" if self.private else "off"))
-        missed = gamma_ok(r)
-
-        def show():
-            t = Text()
-            t.append("checkhealth", style(r, "fg+bold"))
-            t.append("   q closes this\n\n", style(r, "dim"))
-            for state, title, detail in checks:
-                mark, role = {"ok": ("✓ ok", "hue:green"), "warn": ("! warning", "hue:yellow"),
-                              "error": ("✗ error", "hue:red")}[state]
-                t.append(f"  {mark:<10}", style(r, role))
-                t.append(f"{title}: ", style(r, "fg+bold"))
-                t.append(f"{detail}\n", style(r, "fg"))
-            if r.truecolor:
-                t.append("\nThe palette, solved for contrast\n", style(r, "fg+bold"))
-                for name in ("fg", "dim", "faint", "rule", "surface", "surface2",
-                             "hue.red", "hue.yellow", "hue.green", "hue.blue", "hue.magenta", "hue.cyan", "hue.dispatch"):
-                    hexv = r.hex.get(name, "")
-                    ratio = r.ratios.get(name)
-                    sample = style(r, "fg")
-                    from rich.style import Style
-                    sample = Style(color=hexv) if hexv else sample
-                    t.append(f"  {name:<12}", style(r, "dim"))
-                    t.append("████ ", sample)
-                    t.append(f"{hexv}  {ratio}:1\n" if ratio else f"{hexv}\n", style(r, "fg"))
-                if missed:
-                    t.append(f"\n  ! {', '.join(missed)} couldn't reach their contrast target on this palette.\n",
-                             style(r, "hue:yellow"))
-            self._show_info(t)
-        self.call_from_thread(show)
-
     def _theme_reload(self) -> None:
         from .terminal import probe, xrdb_palette
         if self.term.term.startswith("st"):
@@ -1469,6 +1650,7 @@ class TubcalApp(App, inherit_bindings=False):
         self.roles = roles
         for w in (self.tabline, self.statusline, self.whichkey):
             w.roles = roles
+        self.sheet.set_roles(roles)
         for room in self.rooms.values():
             for lst in room.query("ItemList"):
                 lst.roles = roles
@@ -1507,3 +1689,46 @@ class TubcalApp(App, inherit_bindings=False):
             except Exception:
                 pass
         self.exit()
+
+    # ── starting again in place (`ZR`, `:reload`; tui/reload.py) ────────────
+
+    def reload(self) -> None:
+        """The new code, tui.toml and colours, back in this room; what's playing plays
+        on: the players hand their mpv over, and __main__ runs the interface again."""
+        self.state.save()
+        note = {"room": self.room_id, "private": self.private,
+                "sleep": self.sleep.hand_over()}    # first: a fade under way gives the volume back
+        note["radio"] = self.radio.hand_over()
+        note["player"] = self.player.hand_over()
+        try:
+            path = reload_mod.write(note)
+        except OSError as e:
+            self._take_over(note)                   # take them back: nothing changes
+            self.say(f"Couldn't reload: {e}", "error")
+            return
+        self.exit(result=reload_mod.Reload(path, private=self.private))
+
+    def _take_over(self, note: dict) -> None:
+        """After a reload: the video, the radio and the sleep timer carry on."""
+        self.sleep.take_over(note.get("sleep"))
+        self.radio.take_over(note.get("radio"))
+        self.player.take_over(note.get("player"))
+
+    def _fresh_after_reload(self) -> None:
+        """A reload reads everything again: this run starts with nothing in memory (what
+        you've watched, the shows' episodes, your AniList list, Saved), and the server
+        marks what it keeps of YouTube and the Anime out of date, so the rooms fetch it
+        again (keeping the old copy if a platform refuses)."""
+        for scope in ("youtube", "anime"):
+            try:
+                self.api.post(f"/refresh?scope={scope}&keep=1")
+            except ApiError:
+                pass
+        item = self.player.playing.item if self.player.playing else {}
+        mid = (item.get("extra") or {}).get("anilist_id")
+        if str(item.get("id", "")).startswith("anime:") and mid:
+            # the next episode follows from the show's list, which this run hasn't read yet
+            media = self.anime.detail(mid)
+            if media:
+                self.anime.episode_list(media)
+                self.player.queue_changed()

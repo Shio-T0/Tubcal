@@ -22,7 +22,10 @@ its core (and main.py, as desktop_main.py) into the build each time
      entrypoint synced alongside; the notify-send notifier no-ops here (the
      Kotlin service posts native notifications instead), and the anipy
      self-updater is skipped (an APK can't pip-install; anipy is vendored, see
-     app/src/main/python/anipy_api/NOTICE).
+     app/src/main/python/anipy_api/NOTICE);
+  5. every app on a phone can reach its 127.0.0.1, so the API wants the app's access
+     key (config.ACCESS_KEY, server/localguard.py), which TubcalService makes anew
+     each time the app starts.
 """
 
 import os
@@ -57,8 +60,10 @@ def add_rooms(rooms_dir):
     return [r.name for r in rooms]
 
 
-def start(data_dir, web_dir, port=5000, rooms_dir=None):
-    """Boot the Flask server (blocking — call me on a background thread)."""
+def start(data_dir, web_dir, port=5000, rooms_dir=None, key=None):
+    """Boot the Flask server (blocking — call me on a background thread). `key`:
+    the access key the app's WebView and Kotlin send (TubcalService.KEY); every app
+    on the phone can reach 127.0.0.1, so the API answers nothing without it."""
     from server import config
 
     config.DATA_DIR = Path(data_dir)
@@ -67,6 +72,7 @@ def start(data_dir, web_dir, port=5000, rooms_dir=None):
     config.FRONTEND_DIST = Path(web_dir)
     config.HOST = "127.0.0.1"
     config.PORT = int(port)
+    config.ACCESS_KEY = key or None
     config.DATA_DIR.mkdir(parents=True, exist_ok=True)
 
     # weeb-cli (the anime fallback) computes Path.home()/.weeb-cli at import time;

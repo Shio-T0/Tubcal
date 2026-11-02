@@ -2,7 +2,7 @@ import logging
 import os
 import re
 
-from server import brain, cache, config, db, housekeeping, modules
+from server import brain, cache, config, db, housekeeping, modules, peers
 from server import create_app
 
 
@@ -55,7 +55,11 @@ class _QuietAccessLog:
     are, without their query strings. TUBCAL_ACCESS_LOG=1 keeps the full log."""
 
     def filter(self, record):
-        if record.msg != '"%s" %s %s' or not isinstance(record.args, tuple) or len(record.args) != 3:
+        # Werkzeug writes the address and the date into the format itself:
+        # '127.0.0.1 - - [date] "%s" %s %s\n', with the request line as the first arg.
+        msg = record.msg if isinstance(record.msg, str) else ""
+        if not msg.rstrip("\n").endswith('"%s" %s %s') or not isinstance(record.args, tuple) \
+                or len(record.args) != 3:
             return True
         line, code, size = record.args
         if str(code)[:1] in "123":
@@ -91,7 +95,8 @@ def main():
     housekeeping.start()
     print(f"\n  Tubcal — private social hub")
     print(f"  http://{config.HOST}:{config.PORT}\n")
-    app.run(host=config.HOST, port=config.PORT, debug=False, threaded=True)
+    # only this user's programs get an answer (server/peers.py)
+    app.run(host=config.HOST, port=config.PORT, debug=False, threaded=True, request_handler=peers.OwnUserOnly)
 
 
 if __name__ == "__main__":

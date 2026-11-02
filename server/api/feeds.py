@@ -19,7 +19,7 @@ feeds_bp = Blueprint("feeds", __name__, url_prefix="/api")
 
 @feeds_bp.get("/health")
 def health():
-    return ok({"status": "ok", "version": "0.1.0", "modules": modules.installed()})
+    return ok({"status": "ok", "version": "0.1.0", "modules": modules.installed(), "web": config.WEB})
 
 
 def _source(module_id):
@@ -204,7 +204,7 @@ def _safe_link(value):
     if not isinstance(value, str):
         return None
     v = value.strip()
-    if v.startswith("/") and not v.startswith("//"):
+    if v.startswith("/") and v[1:2] not in ("/", "\\"):  # a browser reads /\host as //host
         return v
     return v if v.lower().startswith(("http://", "https://")) else None
 
@@ -350,8 +350,15 @@ def feed_foryou():
 
 @feeds_bp.post("/refresh")
 def refresh():
+    """Fetch a scope's cached data again. With `keep=1` it's only marked out of date
+    (`cache.expire`): every next read fetches again, and still has the old copy if the
+    platform refuses. The terminal does that when it reloads (`ZR`)."""
     scope = request.args.get("scope", "")
-    prefixes = {"": "", "all": "", "reddit": "reddit:", "youtube": "yt:", "hackernews": "hn:", "github": "github:"}
+    prefixes = {"": ("",), "all": ("",), "reddit": ("reddit:",), "youtube": ("yt:",), "hackernews": ("hn:",),
+                "github": ("github:",),
+                # the shows' episode lists and your AniList list (where you are in each)
+                "anime": ("anime:info:", "anilist:lists:")}
     if scope not in prefixes:
         return err("invalid scope")
-    return ok({"cleared": cache.invalidate(prefixes[scope])})
+    drop = cache.expire if request.args.get("keep") == "1" else cache.invalidate
+    return ok({"cleared": sum(drop(p) for p in prefixes[scope])})

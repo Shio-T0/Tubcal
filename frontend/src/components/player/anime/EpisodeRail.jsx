@@ -8,6 +8,7 @@
 import { useEffect, useRef } from 'react';
 import { Check, ExternalLink, X } from 'lucide-react';
 
+import { openWeb } from '../../../lib/format.js';
 import { COMPLETE_RATIO, useProgress } from '../../../state.jsx';
 import a from './anime.module.css';
 
@@ -71,7 +72,7 @@ export default function EpisodeRail({ item, show, onEpisode, onClose, className,
               <button
                 type="button"
                 className={a.railItem}
-                onClick={() => (playable ? onEpisode(e) : e.url && window.open(e.url, '_blank', 'noopener'))}
+                onClick={() => (playable ? onEpisode(e) : openWeb(e.url))}
                 disabled={here || (!playable && !e.url)}
                 aria-current={here ? 'true' : undefined}
               >

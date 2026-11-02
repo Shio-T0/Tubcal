@@ -36,7 +36,7 @@ from .. import fmt
 from ..glyphs import Glyphs
 from ..theme import Roles
 from .html import parse, wrap
-from .paint import style
+from .paint import style, who
 
 RAIL_HUES = ["blue", "magenta", "cyan", "green", "yellow", "red"]
 Line = list[tuple[str, str]]
@@ -148,7 +148,7 @@ class ThreadView(Widget, can_focus=False):
             if self.is_new(c):
                 head.append((g.new + " ", "mark:blue"))
             author = c.get("author") or "[deleted]"
-            head.append((author, "fg+bold"))
+            head.append((author, who(author, "+bold")))
             if self.op and author == self.op:
                 head.append((" OP", "hue:blue"))
             bits = [fmt.ago(c.get("created_at"))]

@@ -8,6 +8,13 @@ from server import config, localguard
 EVIL = "https://evil.example"
 
 
+@pytest.fixture(autouse=True)
+def _ports(monkeypatch):
+    # whatever TUBCAL_PORT / TUBCAL_DEV_PORTS the shell running the tests has
+    monkeypatch.setattr(config, "PORT", 5000)
+    monkeypatch.setattr(config, "DEV_PORTS", {5173, 5174})
+
+
 @pytest.mark.parametrize("host", [
     "127.0.0.1:5000", "localhost:5173", "LOCALHOST", "[::1]:5000", "::1", "127.8.9.10", "localhost.",
     "tubcal.localhost:5000",
@@ -124,5 +131,58 @@ def test_app_lets_a_link_in_but_not_a_probe(client):
 
 
 def test_no_other_site_may_frame_tubcal(client):
+    assert client.get("/").headers["Content-Security-Policy"] == "frame-ancestors 'self'"
+    assert client.get("/api/health").headers["Content-Security-Policy"].endswith("; frame-ancestors 'self'")
+
+
+def test_nothing_under_api_runs_as_a_page(client):
+    # A link anywhere can open an /api/ address in a tab; it must be inert there.
+    r = client.get("/api/health")
+    assert r.headers["Content-Security-Policy"].startswith("default-src 'none'; sandbox")
+    assert r.headers["X-Content-Type-Options"] == "nosniff"
+    assert client.get("/api/no/such/thing").headers["Content-Security-Policy"].startswith("default-src 'none'")
+
+
+def test_no_referrer_leaves_tubcal(client):
     for path in ("/", "/api/health"):
-        assert client.get(path).headers["Content-Security-Policy"] == "frame-ancestors 'self'"
+        assert client.get(path).headers["Referrer-Policy"] == "no-referrer"
+
+
+@pytest.mark.parametrize("origin, ok", [
+    ("http://localhost:8888", False),      # a notebook, another project's dev server
+    ("http://127.0.0.1:8000", False),
+    ("http://localhost", False),
+    ("http://127.0.0.1:5000", True),
+    ("http://localhost:5174", True),       # Vite, when 5173 is taken
+])
+def test_other_local_servers_pages_are_other_sites(origin, ok):
+    assert localguard.is_local_origin(origin) is ok
+
+
+def test_an_allowed_name_may_come_through_a_proxy_port(monkeypatch):
+    monkeypatch.setattr(config, "ALLOWED_HOSTS", {"tubcal.lan"})
+    assert localguard.is_local_origin("http://tubcal.lan")
+
+
+def test_app_refuses_writes_from_another_local_server(client):
+    r = client.put("/api/settings", json={"reddit_sort": "new"}, headers={"Origin": "http://localhost:8888"})
+    assert r.status_code == 403
+
+
+def test_the_phone_wants_its_key(client, monkeypatch):
+    monkeypatch.setattr(config, "ACCESS_KEY", "s3cret-key")
+    assert client.get("/api/health").status_code == 403          # another app on the phone
+    assert client.get("/api/health", headers={"X-Tubcal-Key": "wrong"}).status_code == 403
+    assert client.get("/api/health", headers={"X-Tubcal-Key": "s3cret-key"}).status_code == 200
+    client.set_cookie("tubcal_key", "s3cret-key")
+    assert client.get("/api/health").status_code == 200         # the app's WebView
+    client.delete_cookie("tubcal_key")
+    # the page itself is public; an OAuth provider's way back checks its own state
+    assert client.get("/").status_code == 200
+    r = client.get("/api/oauth/anilist/callback?state=x&code=y")
+    assert r.status_code == 400 and "state" in r.get_json()["error"]
+
+
+def test_no_key_no_check_on_the_desktop(client):
+    assert config.ACCESS_KEY is None
+    assert client.get("/api/health").status_code == 200

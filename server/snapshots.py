@@ -60,7 +60,7 @@ def list_snapshots():
     d = folder()
     if not d.is_dir():
         return []
-    out = [_entry(p) for p in d.iterdir() if p.is_file() and _NAME.match(p.name)]
+    out = [_entry(p) for p in d.iterdir() if p.is_file() and _NAME.fullmatch(p.name)]
     out.sort(key=lambda e: (e.pop("_order"), e["name"]), reverse=True)
     return out
 
@@ -144,7 +144,7 @@ def daily(now=None):
 def restore(name):
     """Put a snapshot back as the live database. Returns the safety snapshot
     taken of what was there before."""
-    if not isinstance(name, str) or not _NAME.match(name):
+    if not isinstance(name, str) or not _NAME.fullmatch(name):
         raise ValueError("not a snapshot name")
     path = folder() / name
     if not path.is_file():

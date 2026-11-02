@@ -152,3 +152,46 @@ def test_status_reports_capabilities(client, workspace):
     d = client.get("/api/editor/status").get_json()["data"]
     assert d["root_exists"] is True
     assert set(d["lsp"]) >= {"python", "typescript", "rust"}
+
+
+# ---------------------------------------------------------------- git safety
+
+import shutil  # noqa: E402
+import subprocess  # noqa: E402
+
+
+def _make_repo(root, env):
+    """A real git repo under the workspace with one committed file and a pending edit."""
+    def git(*args):
+        subprocess.run(["git", *args], cwd=root, check=True, capture_output=True, env=env)
+    git("init", "-q")
+    git("config", "user.email", "t@t")
+    git("config", "user.name", "t")
+    (root / "file.txt").write_text("one\n")
+    git("add", "file.txt")
+    git("commit", "-qm", "init")
+    (root / "file.txt").write_text("two\n")
+
+
+@pytest.mark.skipif(not shutil.which("git"), reason="git not installed")
+def test_hostile_repo_config_is_not_executed(client, workspace, tmp_path, monkeypatch):
+    """A checkout can carry its own .git/config, and git runs commands it names
+    while merely reading the repo (core.fsmonitor on status, diff.external on
+    diff). The editor must read such a checkout without running its code."""
+    env = {**os.environ, "GIT_TERMINAL_PROMPT": "0"}
+    _make_repo(workspace, env)
+    marker = tmp_path / "RAN"
+    payload = f"sh -c 'echo x > {marker}' #"
+    subprocess.run(["git", "config", "core.fsmonitor", payload], cwd=workspace, check=True,
+                   capture_output=True, env=env)
+    subprocess.run(["git", "config", "diff.external", payload], cwd=workspace, check=True,
+                   capture_output=True, env=env)
+
+    # Both endpoints read the repo; neither may run the config's command.
+    assert client.get("/api/editor/git/status?path=file.txt").status_code == 200
+    assert client.get("/api/editor/git/diff?path=file.txt").status_code == 200
+    assert not marker.exists(), "a repo's own git config ran a command"
+
+    # And the endpoints still do their job on a benign repo.
+    status = client.get("/api/editor/git/status?path=file.txt").get_json()["data"]
+    assert any(c["path"] == "file.txt" for c in status["changes"])

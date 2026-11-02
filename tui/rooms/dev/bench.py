@@ -20,7 +20,7 @@ from ...keys import Bind
 from ...media.radio import podcast_item
 from ...ui.chrome import Winbar
 from ...ui.itemlist import Head, ItemList, RowParts
-from ...ui.paint import style
+from ...ui.paint import style, who
 from ...ui.preview import Preview
 from ..base import RoomView
 
@@ -262,7 +262,7 @@ class Workbench(RoomView):
                 sign = (" ", "fg")
             figure = [(f"{fmt.duration(left)} left", "dim")] if left else \
                 [(fmt.duration(it.get("duration")), "dim")] if it.get("duration") else []
-            meta = [(fmt.clean(it.get("show")), "dim")]
+            meta = [(fmt.clean(it.get("show")), who(fmt.clean(it.get("show"))))]
             if it.get("published_at"):
                 meta.append((f" {g.dot} {fmt.ago(it['published_at'])}", "faint"))
             return RowParts(sign=sign, title=[(fmt.clean(it.get("title")), "fg")], figure=figure, meta=meta, mark=saved)
@@ -271,7 +271,7 @@ class Workbench(RoomView):
             frac = app.player.fraction(it.get("id") or "")
             sign = (g.watched, "faint") if frac and frac >= 0.95 else \
                 (g.partial(frac), f"mark:{HUE}") if frac else (" ", "fg")
-            meta = [(fmt.clean(it.get("source")), "dim")]
+            meta = [(fmt.clean(it.get("source")), who(fmt.clean(it.get("source"))))]
             if extra.get("view_count"):
                 meta.append((f" {g.dot} {fmt.compact(extra['view_count'])} views", "faint"))
             if it.get("published_at"):
@@ -281,14 +281,14 @@ class Workbench(RoomView):
         if self.view == "updates":
             release = it.get("type") == "release"
             title = it.get("tag") or it.get("title") if release else it.get("title")
-            meta = [(fmt.clean(it.get("source") or ""), "dim")]
+            meta = [(fmt.clean(it.get("source") or ""), who(fmt.clean(it.get("source") or "")))]
             if it.get("published_at"):
                 meta.append((f" {g.dot} {fmt.ago(it['published_at'])}", "faint"))
             return RowParts(sign=("◆" if release else " ", f"mark:{HUE}"), title=[(fmt.clean(title), "fg")],
                             figure=[("release", f"hue:{HUE}")] if release else [], meta=meta, mark=saved)
         if self.view == "repos":
             extra = it.get("extra") or {}
-            figure = [(f"★ {fmt.compact(extra.get('stars'))}", "dim")] if extra.get("stars") else []
+            figure = [(f"{fmt.compact(extra.get('stars'))} stars", "dim")] if extra.get("stars") else []
             if extra.get("stars_gained"):
                 figure.append((f" +{fmt.compact(extra['stars_gained'])}", f"hue:{HUE}"))
             meta = [(fmt.clean(extra.get("description") or ""), "dim")]
@@ -372,7 +372,7 @@ class Workbench(RoomView):
         elif self.view == "repos":
             extra = it.get("extra") or {}
             t.append((it.get("title") or "") + "\n", style(r, "fg+bold"))
-            bits = [extra.get("language") or "", f"★ {fmt.compact(extra.get('stars'))}" if extra.get("stars") else "",
+            bits = [extra.get("language") or "", f"{fmt.compact(extra.get('stars'))} stars" if extra.get("stars") else "",
                     f"+{fmt.compact(extra.get('stars_gained'))} lately" if extra.get("stars_gained") else "",
                     f"{fmt.compact(extra.get('forks'))} forks" if extra.get("forks") else ""]
             t.append(f" {g.dot} ".join(b for b in bits if b) + "\n\n", style(r, "dim"))

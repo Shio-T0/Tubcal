@@ -14,3 +14,15 @@ def client(tmp_path, monkeypatch):
     app = create_app()
     app.config.update(TESTING=True)
     return app.test_client()
+
+
+@pytest.fixture(autouse=True)
+def _tui_spacing_back_to_comfy():
+    """The terminal's spacing is module state (`tui.ui.paint.LOOK`), set by each app it
+    makes: a test that asks for compact doesn't leave it compact for the next one."""
+    yield
+    try:
+        from tui.ui import paint
+    except ImportError:
+        return
+    paint.LOOK["comfy"] = True

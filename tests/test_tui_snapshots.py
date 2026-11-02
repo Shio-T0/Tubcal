@@ -224,3 +224,39 @@ def test_the_wire_reading_a_thread(make_app, palette):
             return capture(app, palette)
     compare(f"wire-{palette}", *asyncio.run(go()))
 
+
+
+def test_compact_spacing(make_app, tmp_path):
+    """`spacing = "compact"`: no blank lines between items, under the bars or around
+    the panes."""
+    (tmp_path / "xdg_config_home" / "tubcal" / "tui.toml").write_text('images = "off"\nspacing = "compact"\n')
+    compare("screening-compact-everforest", *screening("everforest", make_app))
+
+
+def test_which_key_after_g_without_a_palette(make_app):
+    compare("whichkey-g-ansi", *screening("ansi", make_app, keys=("g",)))
+
+
+def page(palette, make_app, keys, ready=lambda app: True, size=(140, 40)):
+    async def go():
+        app = make_app(palette)
+        async with app.run_test(size=size) as pilot:
+            await until(pilot, lambda: app.ready and app.room is not None and app.room.list.items, "a feed")
+            for k in keys:
+                await pilot.press(k)
+            await until(pilot, lambda: ready(app), "the page")
+            return capture(app, palette)
+    return asyncio.run(go())
+
+
+def test_the_keys_page(make_app):
+    compare("keys-macchiato", *page("macchiato", make_app, ["?"]))
+
+
+def test_the_commands_page(make_app):
+    compare("help-aline", *page("aline", make_app, [":", *"help follow", "enter"]))
+
+
+def test_the_settings_page(make_app):
+    compare("settings-everforest", *page("everforest", make_app, ["space", ","],
+                                         ready=lambda app: "3 channels" in app.sheet.body.text()))

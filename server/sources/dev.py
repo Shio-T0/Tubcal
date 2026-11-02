@@ -274,7 +274,14 @@ def _entry_common(el, is_atom):
         url = _child_text(el, "link")
         published = _child_text(el, "pubDate") or _child_text(el, "date")
         summary = _child_text(el, "description")
-    return title, url, _parse_date(published), summary
+    return title, _web(url), _parse_date(published), summary
+
+
+def _web(url):
+    """A feed's link when it's a web address, else None: a feed can say anything,
+    and these end up in links, the radio's <audio> and the terminal's browser."""
+    url = (url or "").strip()
+    return url if url.lower().startswith(("https://", "http://")) else None
 
 
 def _strip_html(text, limit=280):
@@ -306,7 +313,7 @@ def parse_feed(xml_text):
         name = _local(c.tag)
         if name == "image":
             # itunes:image carries href; RSS <image> nests a <url>
-            feed_image = c.get("href") or _child_text(c, "url") or feed_image
+            feed_image = _web(c.get("href") or _child_text(c, "url")) or feed_image
             if feed_image:
                 break
 
@@ -324,11 +331,11 @@ def parse_feed(xml_text):
             if name == "enclosure" and c.get("url"):
                 mime = c.get("type") or ""
                 if not mime or mime.startswith("audio"):
-                    audio = c.get("url")
+                    audio = _web(c.get("url"))
             elif name == "duration":
                 duration = _parse_duration(c.text)
             elif name == "image":
-                image = c.get("href") or image
+                image = _web(c.get("href")) or image
         entries.append({
             "title": title,
             "url": url,
@@ -342,7 +349,7 @@ def parse_feed(xml_text):
 
 
 def _fetch_feed(url):
-    return parse_feed(httpc.get(url).text)
+    return parse_feed(httpc.get(url, anonymous=True).text)
 
 
 # ---------------------------------------------------------------------------
@@ -489,7 +496,7 @@ def release(lang_id):
     def fetch():
         if lang.get("version_url"):
             try:
-                data = httpc.get(lang["version_url"]).json()
+                data = httpc.get(lang["version_url"], anonymous=True).json()
                 stable = next(
                     (d for d in data if d.get("stable") and d.get("version")), None
                 )

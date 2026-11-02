@@ -9,9 +9,13 @@ one of ten. The room says what each row reads (`RowParts`); this widget lays it 
            the second line: dim meta, and a right-aligned mark (◆ saved, ≡1 queued)
     last   the pane divider, ┃ over the part of the list that is on screen
 
-Selection is a band in `surface2` (this pane has the keys) or `surface` (it doesn't).
-In VISUAL (`anchor` set) every row from the anchor to the cursor has the band and the
-bar; the cursor's row alone is bold.
+Selection is a band tinted with the room's hue (this pane has the keys) or plain
+`surface` (it doesn't). In VISUAL (`anchor` set) every row from the anchor to the
+cursor has the band and the bar; the cursor's row alone is bold. Headings take the
+room's hue, their rule a tint of it.
+
+Comfy spacing (the default, `paint.comfy()`) leaves a blank line after each two-line
+item and two before a heading, and a cell of room on the left.
 """
 
 from __future__ import annotations
@@ -29,7 +33,7 @@ from textual.widget import Widget
 from .. import fmt
 from ..glyphs import Glyphs
 from ..theme import Roles
-from .paint import Span, style
+from .paint import Span, comfy, style
 
 
 @dataclass
@@ -84,6 +88,8 @@ class ItemList(Widget, can_focus=False):
                  lines_per_item: int = 2, **kw):
         super().__init__(**kw)
         self.lpi = lines_per_item
+        self.gap = 1 if comfy() and lines_per_item >= 2 else 0   # blank lines after an item
+        self.pad = 1 if comfy() else 0                          # room on the left
         self.render_item = render_item
         self.roles = roles
         self.glyphs = glyphs
@@ -106,6 +112,9 @@ class ItemList(Widget, can_focus=False):
 
     def set_rows(self, rows: list[Row], *, keep: str | None = None) -> None:
         keep = keep or (self.selected or {}).get("id")
+        anchor_id = None
+        if self.visual_range() is not None:
+            anchor_id = self.rows[self._items[min(self.anchor, len(self._items) - 1)]].get("id")
         self.rows = rows
         self._lines, self._first_line, self._items = [], {}, []
         for i, r in enumerate(rows):
@@ -117,7 +126,7 @@ class ItemList(Widget, can_focus=False):
             else:
                 self._first_line[i] = len(self._lines)
                 self._items.append(i)
-                self._lines += [(i, k) for k in range(self.lpi)]
+                self._lines += [(i, k) for k in range(self.lpi)] + [(-1, 0)] * self.gap
         self.cursor = 0
         if keep:
             for n, ri in enumerate(self._items):
@@ -126,7 +135,10 @@ class ItemList(Widget, can_focus=False):
                     break
         self.cursor = min(self.cursor, max(0, len(self._items) - 1))
         self._item_no = {ri: n for n, ri in enumerate(self._items)}
-        self.anchor = None   # new rows: a range over the old ones means nothing
+        # a VISUAL range keeps its start when that item is still here (a list refreshed
+        # in the background); otherwise it's gone with the rows it covered
+        self.anchor = next((n for n, ri in enumerate(self._items) if anchor_id is not None
+                            and self.rows[ri].get("id") == anchor_id), None)
         self.virtual_size = Size(self.size.width, len(self._lines))
         self._keep_visible()
         self.refresh()
@@ -186,7 +198,7 @@ class ItemList(Widget, can_focus=False):
         self.move(index - self.cursor)
 
     def page(self, fraction: float) -> None:
-        rows = max(1, int(self.size.height * abs(fraction) / 2))
+        rows = max(1, int(self.size.height * abs(fraction) / (self.lpi + self.gap)))
         self.move(rows if fraction > 0 else -rows)
 
     def place(self, where: str) -> None:
@@ -242,7 +254,7 @@ class ItemList(Widget, can_focus=False):
 
     def render_line(self, y: int) -> Strip:
         width = self.size.width
-        inner = width - (1 if self.divider else 0)
+        inner = width - (1 if self.divider else 0) - self.pad
         line_no = self.top + y
         if not self._items and not any(isinstance(r, Head) for r in self.rows):
             segs = [Segment(" " * inner)]
@@ -261,7 +273,7 @@ class ItemList(Widget, can_focus=False):
         selected = bool(self._items) and self._items[self.cursor] == ri
         rng = self.visual_range()
         banded = selected or (rng is not None and rng[0] <= self._item_no.get(ri, -1) <= rng[1])
-        surface = ("surface2" if self.active else "surface") if banded else None
+        surface = (f"wash2:{self.hue}" if self.active else "surface") if banded else None
         parts = self.render_item(row)
         return self._finish(self._item_line(parts, sub, inner, banded, surface, ri, bold=selected), y)
 
@@ -270,9 +282,9 @@ class ItemList(Widget, can_focus=False):
         count = f" {head.count} " if head.count is not None else " "
         rule = self.glyphs.rule_h * max(0, inner - cell_len(label) - cell_len(count) - 2)
         return Strip([
-            Segment(label, style(self.roles, "fg+bold")),
-            Segment(rule, style(self.roles, "rule")),
-            Segment(count, style(self.roles, "dim")),
+            Segment(label, style(self.roles, f"hue:{self.hue}+bold")),
+            Segment(rule, style(self.roles, f"rule:{self.hue}")),
+            Segment(count, style(self.roles, f"hue:{self.hue}")),
             Segment("  "),
         ]).adjust_cell_length(inner)
 
@@ -290,7 +302,7 @@ class ItemList(Widget, can_focus=False):
         else:
             left = [("  ", "fg")]
             body, right = p.meta, p.mark
-        gutter = 2
+        gutter = 3 if self.pad else 2
         room = inner - 1 - _width(left) - gutter
         right_w = _width(right)
         body = _fit(body, max(0, room - (right_w + 2 if right_w else 0)))
@@ -308,6 +320,8 @@ class ItemList(Widget, can_focus=False):
         return Strip(segs).adjust_cell_length(inner)
 
     def _finish(self, strip: Strip, y: int) -> Strip:
+        if self.pad:
+            strip = Strip([Segment(" " * self.pad), *strip])
         if not self.divider:
             return strip
         total, h = len(self._lines), self.size.height

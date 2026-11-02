@@ -35,6 +35,8 @@ ROOM_HUES = {
     "home": "blue", "saved": "blue", "settings": "blue",
 }
 CHANNEL_HUES = {"social": "yellow", "coding": "green", "video": "red"}
+# The hues a name can take (a channel, a subreddit, a site, a person): `source_hue`.
+SOURCE_HUES = ("red", "green", "yellow", "blue", "magenta", "cyan")
 MODE_HUES = {
     "NORMAL": "blue", "INSERT": "green", "VISUAL": "magenta",
     "COMMAND": "yellow", "SEARCH": "yellow", "FIND": "yellow",
@@ -184,6 +186,11 @@ class Roles:
     ratios: dict[str, float] = field(default_factory=dict)
     _hue: dict[str, Color] = field(default_factory=dict)
     _mark: dict[str, Color] = field(default_factory=dict)
+    # a hue's tinted surfaces (as light as `surface` / `surface2`, so every text tone
+    # solved for those reads the same on them) and its tinted rule
+    _wash: dict[str, Color] = field(default_factory=dict)
+    _wash2: dict[str, Color] = field(default_factory=dict)
+    _rule: dict[str, Color] = field(default_factory=dict)
     _c: dict[str, Color | None] = field(default_factory=dict)
 
     @property
@@ -198,6 +205,10 @@ class Roles:
         """A room/mode hue: 'red', 'dispatch', … readable as text (or as a mark)."""
         table = self._mark if mark else self._hue
         return table.get(name) or Color.parse(name if name in ANSI_NAMES else "default")
+
+    def tint(self, kind: str, name: str) -> Color | None:
+        """A hue's `wash`, `wash2` (tinted surfaces) or `rule`; None without a palette."""
+        return {"wash": self._wash, "wash2": self._wash2, "rule": self._rule}[kind].get(name)
 
     def room(self, room_id: str, *, mark: bool = False) -> Color:
         return self.hue(ROOM_HUES.get(room_id, "blue"), mark=mark)
@@ -255,9 +266,20 @@ def solve(palette: Palette | None) -> Roles:
         mark = rgb if contrast(rgb, bg) >= MARK else lift_hue(rgb, bg, fg, MARK)
         roles._hue[name] = Color.from_rgb(*text)
         roles._mark[name] = Color.from_rgb(*mark)
+        roles._wash[name] = Color.from_rgb(*solve_toward(bg, text, SURFACE))
+        roles._wash2[name] = Color.from_rgb(*solve_toward(bg, text, SURFACE2))
+        roles._rule[name] = Color.from_rgb(*solve_toward(bg, text, RULE))
         roles.hex[f"hue.{name}"] = to_hex(text)
         roles.ratios[f"hue.{name}"] = round(contrast(text, bg), 2)
     return roles
+
+
+def source_hue(name: str) -> str:
+    """A steady hue for a name: the same channel, subreddit or site is always the same
+    colour, wherever it shows. (The name is written beside it, so colour is never the
+    only way to tell two apart.)"""
+    h = hashlib.sha1((name or "").strip().lower().encode()).digest()
+    return SOURCE_HUES[int.from_bytes(h[:8], "big") % len(SOURCE_HUES)]
 
 
 def textual_variables(roles: Roles) -> dict[str, str]:

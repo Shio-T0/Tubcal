@@ -1,9 +1,13 @@
 import json
 import logging
+import re
 
 from flask import Flask, request, send_from_directory
 
 from . import config, localguard, modules
+
+# A skin's name (lib/themes.js): what may go into <html data-theme="…">.
+THEME_NAME = re.compile(r"[a-z0-9-]{1,32}")
 
 
 def create_app():
@@ -13,7 +17,7 @@ def create_app():
     def only_this_machine():
         # Other websites open in the browser can address 127.0.0.1 too; see
         # server/localguard.py for what this refuses and why.
-        why = localguard.refusal(request.path, request.headers)
+        why = localguard.refusal(request.path, request.headers, request.cookies)
         if why is None:
             return None
         logging.getLogger("tubcal").warning(
@@ -45,8 +49,16 @@ def create_app():
             resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
         # No other site may show Tubcal in a frame and steer clicks in it. A response
         # with a policy of its own (/api/img's sandbox) keeps it, with this added.
+        # Nothing under /api/ is a page: opened in a tab (a link anywhere can do that),
+        # it is a sandboxed document with no scripts and an origin of its own.
         own = resp.headers.get("Content-Security-Policy")
+        if not own and request.path.startswith("/api/"):
+            own = "default-src 'none'; sandbox"
         resp.headers["Content-Security-Policy"] = f"{own}; frame-ancestors 'self'" if own else "frame-ancestors 'self'"
+        resp.headers.setdefault("X-Content-Type-Options", "nosniff")
+        # The sites Tubcal shows pictures and links from never learn they were opened
+        # from a Tubcal on this machine's port.
+        resp.headers.setdefault("Referrer-Policy", "no-referrer")
         return resp
 
     def serve_index(dist):
@@ -54,7 +66,7 @@ def create_app():
         from . import db
         html = (dist / "index.html").read_text()
         theme = db.get_setting("theme", "dark")
-        if theme != "dark":
+        if theme != "dark" and isinstance(theme, str) and THEME_NAME.fullmatch(theme):
             html = html.replace('data-theme="dark"', f'data-theme="{theme}"')
         # Fast mode is on <html> before the bundle runs, so the first paint is
         # already still (styles/base.css holds the rule).
@@ -67,9 +79,32 @@ def create_app():
         # The modules this server has, before the bundle runs: the page leaves out
         # a room the build has but the server doesn't (frontend/src/lib/modules.js).
         if modules.known():
-            stamp = json.dumps(modules.installed())
+            stamp = json.dumps(modules.installed()).replace("<", "\\u003c")
             html = html.replace("</head>", f"<script>window.__TUBCAL_MODULES__={stamp}</script></head>", 1)
         return html, 200, {"Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store"}
+
+    def terminal_only_page():
+        """The page of an install without the web interface. An account connected
+        from the terminal (`:link`) lands here too, on /settings?connected=…"""
+        from html import escape
+        connected, failed = request.args.get("connected"), request.args.get("oauth_error")
+        if connected:
+            news = f"<p><b>{escape(connected.capitalize())} is connected.</b> You can close this tab.</p>"
+        elif failed:
+            news = f"<p><b>That didn't connect</b> ({escape(failed)}). Try <code>:link</code> again.</p>"
+        else:
+            news = ""
+        body = (
+            "<!doctype html><html lang=en><meta charset=utf-8><title>Tubcal</title>"
+            "<meta name=viewport content='width=device-width'>"
+            "<style>body{font:16px/1.5 system-ui,sans-serif;max-width:34em;margin:4em auto;padding:0 1em;"
+            "color:#222;background:#fafafa}@media(prefers-color-scheme:dark){body{color:#ddd;background:#1b1b1b}}"
+            "code{font-size:.95em}</style>"
+            f"<h1>Tubcal</h1>{news}"
+            "<p>This Tubcal has only the terminal interface. Open it with <code>tubcal tui</code>.</p>"
+            "<p>To use it in the browser as well: <code>tubcal add web</code>.</p></html>"
+        )
+        return body, 200, {"Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store"}
 
     @app.route("/", defaults={"path": ""})
     @app.route("/<path:path>")
@@ -79,6 +114,8 @@ def create_app():
         if path == "api" or path.startswith("api/"):
             from .api import err
             return err(f"no such endpoint: /{path}", 404)
+        if not config.WEB:
+            return terminal_only_page()
         dist = config.FRONTEND_DIST
         if path and (dist / path).is_file():
             return send_from_directory(dist, path)

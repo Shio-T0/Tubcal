@@ -3,6 +3,7 @@ goes live, via `notify-send` (no-op if it isn't installed). Best-effort, local.
 Inside the `quiet_hours` setting nothing pings; a stream starting then is let go
 rather than announced in the morning."""
 
+import html
 import shutil
 import subprocess
 import threading
@@ -31,8 +32,11 @@ def _notify(item):
     source = item.get("source") or "A channel"
     title = "Tubcal — going live soon"
     body = f"{source} goes live in ~10 min:\n{item.get('title') or ''}"
+    # A channel's name and title are the channel's words: never options to
+    # notify-send, never markup for the notification daemon.
+    body = html.escape(body, quote=False)
     try:
-        subprocess.run([exe, "-a", "Tubcal", title, body], timeout=10)
+        subprocess.run([exe, "-a", "Tubcal", "--", title, body], timeout=10)
     except Exception:
         pass
 

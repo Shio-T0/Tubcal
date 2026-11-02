@@ -51,7 +51,7 @@ def validate_subreddit(raw):
         resp = httpc.get(
             f"{OAUTH_BASE}/r/{name}/about?raw_json=1",
             ua=config.REDDIT_UA,
-            headers={"Authorization": f"Bearer {token}"},
+            headers={"Authorization": f"Bearer {token}"}, anonymous=True
         )
         data = resp.json().get("data") or {}
         display = data.get("display_name")
@@ -63,7 +63,7 @@ def validate_subreddit(raw):
         return {"name": display.lower(), "title": f"r/{display}", "icon": icon or None}
 
     try:
-        rss = httpc.get(f"{BASE}/r/{name}/.rss?limit=3").text
+        rss = httpc.get(f"{BASE}/r/{name}/.rss?limit=3", anonymous=True).text
     except httpc.RateLimited as e:
         raise LookupError(f"Reddit rate-limited us — try again in ~{e.retry_after:.0f}s")
     except Exception:
@@ -222,7 +222,7 @@ def get_feed(sub_names, sort="hot"):
         def fetch():
             url = f"{OAUTH_BASE}/r/{subs}/{sort}?limit=50&raw_json=1"
             return httpc.get(url, ua=config.REDDIT_UA,
-                             headers={"Authorization": f"Bearer {token}"}).json()
+                             headers={"Authorization": f"Bearer {token}"}, anonymous=True).json()
 
         data, stale = cache.cached(key, config.TTL_REDDIT_LISTING, fetch)
         children = (data.get("data") or {}).get("children") or []
@@ -235,7 +235,7 @@ def get_feed(sub_names, sort="hot"):
 
     def fetch():
         url = f"{BASE}/r/{subs}/{sort_path}.rss?limit=50{suffix}"
-        return httpc.get(url).text
+        return httpc.get(url, anonymous=True).text
 
     rss, stale = cache.cached(key, config.TTL_REDDIT_LISTING, fetch)
     parsed = feedparser.parse(rss)
@@ -256,7 +256,7 @@ def search(query, sub=None):
             else:
                 url = f"{OAUTH_BASE}/search?q={quote(query)}&limit=30&raw_json=1"
             return httpc.get(url, ua=config.REDDIT_UA,
-                             headers={"Authorization": f"Bearer {token}"}).json()
+                             headers={"Authorization": f"Bearer {token}"}, anonymous=True).json()
 
         data, stale = cache.cached(key, 300, fetch)
         children = (data.get("data") or {}).get("children") or []
@@ -270,7 +270,7 @@ def search(query, sub=None):
             url = f"{BASE}/r/{sub}/search.rss?q={quote(query)}&restrict_sr=on&limit=30"
         else:
             url = f"{BASE}/search.rss?q={quote(query)}&limit=30"
-        return httpc.get(url).text
+        return httpc.get(url, anonymous=True).text
 
     rss, stale = cache.cached(key, 300, fetch)
     parsed = feedparser.parse(rss)
@@ -312,7 +312,7 @@ def get_post(sub, post_id):
         def fetch():
             url = f"{OAUTH_BASE}/r/{sub}/comments/{post_id}?raw_json=1&limit=80&depth=8"
             return httpc.get(url, ua=config.REDDIT_UA,
-                             headers={"Authorization": f"Bearer {token}"}).json()
+                             headers={"Authorization": f"Bearer {token}"}, anonymous=True).json()
 
         data, stale = cache.cached(key, config.TTL_REDDIT_COMMENTS, fetch)
         post_data = data[0]["data"]["children"][0]["data"]
@@ -333,7 +333,7 @@ def get_post(sub, post_id):
 
     def fetch():
         url = f"{BASE}/r/{sub}/comments/{post_id}/.rss?limit=80"
-        return httpc.get(url).text
+        return httpc.get(url, anonymous=True).text
 
     rss, stale = cache.cached(key, config.TTL_REDDIT_COMMENTS, fetch)
     parsed = feedparser.parse(rss)
@@ -381,7 +381,7 @@ def get_account_feed(token, limit=50):
     def fetch():
         url = f"{OAUTH_BASE}/best?limit={limit}&raw_json=1"
         return httpc.get(url, ua=config.REDDIT_UA,
-                         headers={"Authorization": f"Bearer {token}"}).json()
+                         headers={"Authorization": f"Bearer {token}"}, anonymous=True).json()
 
     data, stale = cache.cached(key, config.TTL_REDDIT_LISTING, fetch)
     children = (data.get("data") or {}).get("children") or []

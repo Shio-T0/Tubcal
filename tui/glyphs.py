@@ -24,6 +24,8 @@ UNICODE = {
     "playing": "▶", "paused": "‖", "web": "↗", "prompt": "❯", "dot": "·",
     "block_l": "", "block_r": "",
     "private": "", "radio": "", "sleep": "",
+    # pages and which-key: a switch, the choice you're on, what a key leads to
+    "on": "●", "off": "○", "choice_l": "‹", "choice_r": "›", "arrow": "→",
 }
 
 NERD = dict(UNICODE)
@@ -42,6 +44,7 @@ ASCII = {
     "tape_unaired": ".", "levels": ".-+*#", "select": "|", "rule_v": "|", "rule_v_on": "|", "rule_h": "-",
     "rule_double": "=", "playing": ">", "paused": "=", "web": "^", "prompt": ">", "dot": "-",
     "block_l": "", "block_r": "", "private": "", "radio": "", "sleep": "",
+    "on": "[x]", "off": "[ ]", "choice_l": "<", "choice_r": ">", "arrow": "->",
 }
 
 SETS = {"nerd": NERD, "unicode": UNICODE, "ascii": ASCII}

@@ -16,9 +16,28 @@ import requests
 from flask import Response, stream_with_context
 
 # Headers worth relaying from the upstream CDN response to the browser.
-PASS_HEADERS = ("Content-Type", "Content-Length", "Content-Range", "Accept-Ranges")
+PASS_HEADERS = ("Content-Length", "Content-Range", "Accept-Ranges")
 
 _CONTENT_RANGE = re.compile(r"bytes\s+(\d+)-(\d+)/(\d+|\*)")
+
+# The upstream's Content-Type is kept only when it names media (some anime CDNs label
+# their segments as pictures). Anything else, HTML above all, gets the endpoint's own
+# type: the anime proxies fetch whatever a source's playlist names, and a link on any
+# website can open /api/anime/sub?u=… in a tab, so relaying text/html would run a
+# stranger's page as Tubcal itself. nosniff and the sandbox keep even a mislabelled
+# body inert.
+_MEDIA_TYPE = re.compile(
+    r"(video|audio)/[\w.+-]+|application/(vnd\.apple\.mpegurl|x-mpegurl|octet-stream|mp4)"
+    r"|binary/octet-stream|text/(vtt|plain)|image/(png|jpeg|gif|webp|avif)",
+    re.I,
+)
+INERT = {"X-Content-Type-Options": "nosniff", "Content-Security-Policy": "default-src 'none'; sandbox"}
+
+
+def media_type(upstream_type, default):
+    """`upstream_type` when it names media, else `default`."""
+    base = (upstream_type or "").split(";", 1)[0].strip()
+    return upstream_type if base and _MEDIA_TYPE.fullmatch(base) else default
 
 
 def body_span(upstream):
@@ -71,9 +90,10 @@ def relay(upstream, *, reopen=None, default_ct="application/octet-stream"):
     mid-way be resumed (see `resumable_chunks`)."""
     headers = {k: upstream.headers[k] for k in PASS_HEADERS if k in upstream.headers}
     headers.setdefault("Accept-Ranges", "bytes")
+    headers.update(INERT)
     return Response(
         stream_with_context(resumable_chunks(upstream, reopen)),
         status=upstream.status_code,
         headers=headers,
-        content_type=upstream.headers.get("Content-Type", default_ct),
+        content_type=media_type(upstream.headers.get("Content-Type"), default_ct),
     )
