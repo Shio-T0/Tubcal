@@ -1,0 +1,265 @@
+/* Tubcal's showcase page. The page is a living room at night: a wooden TV set that
+   stays in view and a programme guide beside it. Colours come from Tubcal's own
+   Shōwa set (walnut cabinet, amber tube); type is Fraunces for names and numbers,
+   Schibsted Grotesk for reading. */
+
+@font-face { font-family: 'Fraunces'; font-style: normal; font-display: swap; font-weight: 100 900; src: url('../fonts/fraunces.woff2') format('woff2-variations'); }
+@font-face { font-family: 'Schibsted Grotesk'; font-style: normal; font-display: swap; font-weight: 400 900; src: url('../fonts/schibsted-grotesk.woff2') format('woff2-variations'); }
+
+:root {
+  --room: #1b110b;
+  --room-2: #23170f;
+  --ink: #f1e4c9;
+  --ink-2: #cdb994;
+  --ink-3: #a08c6b;
+  --amber: #f3a64a;
+  --amber-soft: #f3a64a33;
+  --lamp: #ef5a3c;
+  --wood-1: #7a4a28;
+  --wood-2: #55311a;
+  --wood-3: #33200f;
+  --bakelite: #160e09;
+  --brass-1: #e8c47c;
+  --brass-2: #9a6d2c;
+  --line: #3a2a1d;
+  --serif: 'Fraunces', 'Iowan Old Style', Georgia, serif;
+  --sans: 'Schibsted Grotesk', system-ui, sans-serif;
+  --gutter: clamp(16px, 4vw, 48px);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background:
+    radial-gradient(1200px 700px at 30% 18%, #2a1b10 0%, transparent 70%),
+    var(--room);
+  color: var(--ink);
+  font: 400 1.0625rem/1.6 var(--sans);
+  font-feature-settings: 'ss01';
+  overflow-x: hidden;
+}
+a { color: inherit; text-decoration-color: color-mix(in srgb, var(--amber) 60%, transparent); text-underline-offset: 3px; }
+a:hover { color: var(--amber); }
+:focus-visible { outline: 2px solid var(--amber); outline-offset: 3px; border-radius: 4px; }
+button { font: inherit; color: inherit; }
+
+.skip { position: absolute; left: 12px; top: -60px; z-index: 50; background: var(--amber); color: var(--room); padding: 8px 14px; border-radius: 8px; text-decoration: none; font-weight: 600; }
+.skip:focus { top: 12px; }
+
+/* ── top line ───────────────────────────────────────────────────────────── */
+.top {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 16px;
+  max-width: 1480px; margin: 0 auto; padding: 22px var(--gutter) 0;
+}
+.mark { font: 700 1.6rem/1 var(--serif); letter-spacing: -0.01em; text-decoration: none; font-variation-settings: 'opsz' 72, 'SOFT' 30; }
+.mark i { font-style: normal; color: var(--amber); }
+.top nav { display: flex; gap: 22px; font-size: 0.98rem; }
+.top nav a { text-decoration: none; color: var(--ink-2); }
+.top nav a:hover { color: var(--amber); }
+
+/* ── intro (top of the right-hand column) ───────────────────────────────── */
+.intro { padding: 0 0 clamp(20px, 4vh, 40px); }
+.intro h1 {
+  font: 600 clamp(2rem, 1.1rem + 2.1vw, 3.4rem)/1.05 var(--serif);
+  font-variation-settings: 'opsz' 144, 'SOFT' 40;
+  letter-spacing: -0.02em;
+  margin: 0 0 0.5em; text-wrap: balance;
+}
+.lede { font-size: 1.12rem; max-width: 60ch; margin: 0 0 0.9em; color: var(--ink); }
+.how { max-width: 60ch; margin: 0; color: var(--ink-2); }
+
+/* ── the studio: the set beside the guide ───────────────────────────────── */
+.studio {
+  display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(330px, 1fr);
+  gap: clamp(28px, 4vw, 64px); align-items: start;
+  max-width: 1480px; margin: 0 auto; padding: clamp(24px, 5vh, 56px) var(--gutter) 0;
+}
+.setwrap { position: sticky; top: 20px; z-index: 5; }
+.col { min-width: 0; }
+
+/* the cabinet */
+.set { margin: 0; }
+.cab {
+  position: relative; border-radius: 28px; padding: clamp(12px, 1.4vw, 22px) clamp(12px, 1.4vw, 22px) 14px;
+  background:
+    linear-gradient(180deg, rgba(255, 226, 180, 0.10), rgba(255, 226, 180, 0) 22%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='600' height='300'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.004 0.09' numOctaves='4' seed='7'/%3E%3CfeColorMatrix values='0 0 0 0 0.12 0 0 0 0 0.06 0 0 0 0 0.02 0 0 0 0.55 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E"),
+    linear-gradient(165deg, var(--wood-1), var(--wood-2) 55%, var(--wood-3));
+  background-size: auto, 600px 300px, auto;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 228, 190, 0.22),
+    inset 0 -3px 0 rgba(0, 0, 0, 0.45),
+    0 50px 90px -40px rgba(0, 0, 0, 0.9),
+    0 0 160px -40px rgba(243, 166, 74, var(--glow, 0.22));
+  transition: box-shadow 0.6s ease;
+}
+.bezel {
+  border-radius: 20px; padding: clamp(6px, 0.7vw, 10px);
+  background: linear-gradient(180deg, #120b07, #24160d);
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.8), 0 1px 0 rgba(255, 225, 180, 0.12);
+}
+.screen {
+  position: relative; aspect-ratio: 16 / 9; border-radius: 14px / 16px; overflow: hidden;
+  background: #050302;
+}
+.screen video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; background: #050302; }
+.static { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; pointer-events: none; mix-blend-mode: screen; }
+.static.on { opacity: 0.85; }
+.glass {
+  position: absolute; inset: 0; pointer-events: none; border-radius: inherit;
+  background:
+    radial-gradient(120% 90% at 22% 8%, rgba(255, 245, 225, 0.09), transparent 45%),
+    radial-gradient(140% 120% at 50% 50%, transparent 62%, rgba(0, 0, 0, 0.45) 100%);
+  box-shadow: inset 0 0 0 1px rgba(255, 240, 210, 0.05);
+}
+.bigplay {
+  position: absolute; inset: 0; display: grid; place-items: center; border: 0; cursor: pointer;
+  background: rgba(10, 6, 3, 0.35);
+}
+.bigplay[hidden] { display: none; }
+.bigplay span { background: var(--amber); color: var(--room); font-weight: 650; padding: 12px 22px; border-radius: 999px; }
+
+/* the deck under the screen */
+.deck { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 16px; padding: 14px 6px 2px; }
+.dial {
+  width: 58px; height: 58px; border-radius: 50%; display: grid; place-items: center; flex: none;
+  background: radial-gradient(circle at 35% 30%, var(--brass-1), var(--brass-2) 70%, #5e3f15);
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.45), inset 0 -2px 3px rgba(0, 0, 0, 0.35), inset 0 2px 2px rgba(255, 245, 210, 0.5);
+}
+.dial span { font: 700 1.5rem/1 var(--serif); color: #2b1a0c; font-variant-numeric: lining-nums; }
+.readout { min-width: 0; }
+.chname { margin: 0; font: 600 1.15rem/1.25 var(--serif); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.beat { margin: 2px 0 0; min-height: 1.5em; color: var(--ink-2); font-size: 0.95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bar { height: 3px; margin-top: 8px; background: rgba(0, 0, 0, 0.35); border-radius: 2px; overflow: hidden; }
+.bar i { display: block; height: 100%; width: 0; background: var(--amber); box-shadow: 0 0 8px var(--amber); }
+.keys { display: flex; gap: 8px; }
+.keys button {
+  width: 44px; height: 44px; border-radius: 50%; border: 0; cursor: pointer; display: grid; place-items: center;
+  background: radial-gradient(circle at 40% 30%, #3a2617, var(--bakelite));
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 230, 190, 0.15);
+}
+.keys button:hover { background: radial-gradient(circle at 40% 30%, #4a311d, #1d130c); }
+.keys button:active { transform: translateY(2px); box-shadow: 0 1px 0 rgba(0, 0, 0, 0.5); }
+.keys svg { width: 20px; height: 20px; fill: none; stroke: var(--ink); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.keys .i-play { fill: var(--ink); stroke-width: 1.5; }
+#pp .i-play { display: none; }
+#pp.paused .i-play { display: block; }
+#pp.paused .i-pause { display: none; }
+.lamp { position: absolute; right: 6px; top: 4px; width: 7px; height: 7px; border-radius: 50%; background: #4a2015; }
+.lamp.on { background: var(--lamp); box-shadow: 0 0 8px var(--lamp), 0 0 2px #ffd0c0 inset; }
+
+/* ── the guide ──────────────────────────────────────────────────────────── */
+.guide { padding-bottom: 30vh; }
+.block + .block { margin-top: 12vh; }
+.blockhead {
+  font: italic 500 1.05rem/1.3 var(--serif); color: var(--ink-3); margin: 0 0 4px;
+  padding-bottom: 10px; border-bottom: 1px solid var(--line);
+}
+.block ol { list-style: none; margin: 0; padding: 0; }
+.prog { padding: 9vh 0 2vh; border-bottom: 1px solid var(--line); }
+.block:first-child .prog:first-child { padding-top: 2vh; }
+.prog h3 { margin: 0 0 0.5em; font: inherit; }
+.tune {
+  display: grid; grid-template-columns: 3.1rem 1fr; align-items: baseline; gap: 0 10px;
+  width: 100%; padding: 0; border: 0; background: none; text-align: left; cursor: pointer;
+}
+.tune .no {
+  font: 600 2.2rem/1 var(--serif); color: var(--ink-3); font-variant-numeric: lining-nums tabular-nums;
+  transition: color 0.3s ease, text-shadow 0.3s ease;
+}
+.tune .name {
+  font: 600 clamp(1.35rem, 1.1rem + 0.7vw, 1.75rem)/1.15 var(--serif); letter-spacing: -0.01em;
+  font-variation-settings: 'opsz' 72; text-wrap: balance;
+}
+.tune:hover .name { color: var(--amber); }
+.prog > p { margin: 0 0 1em 3.1rem; padding-left: 10px; color: var(--ink-2); max-width: 58ch; transition: color 0.3s ease; }
+.prog .beats { list-style: none; margin: 0 0 0 3.1rem; padding: 0 0 0 10px; display: grid; gap: 2px; }
+.beats button {
+  display: grid; grid-template-columns: 12px 1fr; gap: 10px; align-items: baseline;
+  width: 100%; border: 0; background: none; padding: 5px 8px 5px 0; text-align: left; cursor: pointer;
+  color: var(--ink-3); font-size: 0.94rem; line-height: 1.4; border-radius: 6px;
+}
+.beats button::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: currentColor; opacity: 0.45; transform: translateY(-1px); }
+.beats button:hover { color: var(--ink); }
+
+/* the programme on the set right now */
+.prog.on .no { color: var(--amber); text-shadow: 0 0 18px rgba(243, 166, 74, 0.55); }
+.prog.on > p { color: var(--ink); }
+.prog.on .beats button { color: var(--ink-2); }
+.prog.on .beats button.now { color: var(--ink); }
+.prog.on .beats button.now::before { background: var(--amber); opacity: 1; box-shadow: 0 0 8px var(--amber); }
+
+/* ── get Tubcal ─────────────────────────────────────────────────────────── */
+.get { margin-top: 6vh; background: var(--room-2); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.getin { max-width: 1000px; margin: 0 auto; padding: clamp(48px, 9vh, 96px) var(--gutter); }
+.get h2, .facts h2 { font: 600 clamp(2rem, 1.4rem + 2vw, 3rem)/1.05 var(--serif); letter-spacing: -0.02em; margin: 0 0 0.4em; font-variation-settings: 'opsz' 144; }
+.getin > p { color: var(--ink-2); max-width: 60ch; margin: 0 0 1.6em; }
+.steps { counter-reset: s; list-style: none; padding: 0; margin: 0 0 2em; display: grid; gap: 22px; }
+.steps li { counter-increment: s; display: grid; grid-template-columns: 2.6rem 1fr; gap: 4px 14px; }
+.steps li::before { content: counter(s); grid-row: span 2; font: 600 1.9rem/1 var(--serif); color: var(--amber); }
+.steps h3 { margin: 0; font: 600 1.2rem/1.3 var(--sans); }
+.steps p { margin: 0; color: var(--ink-2); max-width: 60ch; }
+.cmd { display: flex; align-items: stretch; margin-top: 8px; border-radius: 12px; overflow: hidden; background: #0d0805; box-shadow: inset 0 0 0 1px var(--line); }
+.cmd code { flex: 1; min-width: 0; padding: 14px 16px; font: 500 0.92rem/1.5 ui-monospace, 'JetBrains Mono', 'DejaVu Sans Mono', monospace; color: var(--ink); overflow-x: auto; white-space: nowrap; }
+.cmd button { border: 0; padding: 0 18px; cursor: pointer; background: var(--amber); color: var(--room); font-weight: 650; }
+.cmd button:hover { background: #ffbb66; }
+.phone { color: var(--ink-2); max-width: 60ch; margin: 0; }
+
+/* ── good to know ───────────────────────────────────────────────────────── */
+.facts { max-width: 1000px; margin: 0 auto; padding: clamp(48px, 9vh, 96px) var(--gutter) clamp(24px, 5vh, 48px); }
+.facts dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px 48px; margin: 1.2em 0 0; }
+.facts dt { font: 600 1.15rem/1.3 var(--serif); margin-bottom: 4px; }
+.facts dd { margin: 0; color: var(--ink-2); }
+
+.foot { max-width: 1000px; margin: 0 auto; padding: 24px var(--gutter) 56px; color: var(--ink-3); font-size: 0.92rem; border-top: 1px solid var(--line); }
+.foot p { max-width: 70ch; }
+.foot a + a { margin-left: 18px; }
+
+/* ── wide screens: the set stays in the middle of the window ────────────── */
+/* The top line floats over the page so the set's column starts at the very top; the
+   set then sits centred in a window-tall sticky box from the first frame on, and is
+   kept small enough to leave room for the top line above it. */
+@media (min-width: 981px) {
+  .top { position: absolute; top: 0; left: 0; right: 0; z-index: 6; }
+  .studio { padding-top: 0; }
+  .setwrap {
+    top: 0; height: 100vh; height: 100svh;
+    display: flex; flex-direction: column; justify-content: center;
+  }
+  .set { width: 100%; max-width: calc((100svh - 280px) * 16 / 9 + 64px); margin: 0 auto; }
+  .col { padding-top: calc(72px + clamp(24px, 5vh, 56px)); }
+}
+
+/* ── narrow screens: the set rides along at the top ─────────────────────── */
+@media (max-width: 980px) {
+  .studio { grid-template-columns: 1fr; gap: 0; padding: 0; }
+  .setwrap { top: 0; padding: 8px var(--gutter) 10px; background: linear-gradient(var(--room) 85%, rgba(27, 17, 11, 0)); }
+  .cab { border-radius: 18px; padding: 8px 8px 6px; }
+  .bezel { border-radius: 13px; padding: 4px; }
+  .screen { border-radius: 9px / 10px; }
+  .deck { gap: 10px; padding: 8px 2px 0; }
+  .dial { width: 40px; height: 40px; }
+  .dial span { font-size: 1.1rem; }
+  .chname { font-size: 1rem; }
+  .beat { display: none; }
+  .bar { margin-top: 6px; }
+  .keys button { width: 38px; height: 38px; }
+  .keys svg { width: 17px; height: 17px; }
+  .col { padding: 22px var(--gutter) 0; }
+  .guide { padding: 0 0 30vh; }
+  .prog { padding: 6vh 0 2vh; }
+  .facts dl { grid-template-columns: 1fr; }
+}
+@media (max-width: 520px) {
+  .top nav a[href^='https'] { display: none; }
+  .tune { grid-template-columns: 2.4rem 1fr; }
+  .tune .no { font-size: 1.7rem; }
+  .prog > p, .prog .beats { margin-left: 0; padding-left: 0; }
+  .keys #prev, .keys #next { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; animation: none !important; }
+}

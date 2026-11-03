@@ -19,7 +19,7 @@ One Flask app, bound to `127.0.0.1`.
 *You don't need an account except for the anime part (AniList). There's no cloud and no
 telemetry: Tubcal only connects to the sites you use through it.*
 
-**[The tour and the manual](https://shio-t0.github.io/Tubcal/)** ·
+**[See it in short videos](https://shio-t0.github.io/Tubcal/)** ·
 [Quick start](#-quick-start) ·
 [Installation](#-installation) ·
 [Three channels](#-three-channels) ·
