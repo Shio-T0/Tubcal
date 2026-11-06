@@ -31,7 +31,9 @@ import Schedule from '../components/anime/Schedule.jsx';
 import Ledger from '../components/anime/Ledger.jsx';
 import Community from '../components/anime/Community.jsx';
 import { PeopleGrid } from '../components/anime/People.jsx';
-import { AdvancedFilters, advancedPills, useAdvancedFilters } from '../components/anime/Filters.jsx';
+import {
+  AdvancedFilters, TagFloor, advancedPills, useAdvancedFilters, useTagFloor,
+} from '../components/anime/Filters.jsx';
 import {
   BulkBar, ExportMenu, GatheringDust, LIST_SORTS, SequelRadar, TonightsPick, matchesText, sortEntries,
 } from '../components/anime/ListTools.jsx';
@@ -242,8 +244,27 @@ function SpotlightCarousel({ items, kind, ranked, label, scoreFormat }) {
 
 /** Richer poster tile for Browse & Search: hover lifts, the cover breathes,
  *  and a veil rises to show the genre dyes. `rank` is set only for true orderings. */
+/** How well a title fits the tags you chose (the discover payload's `tag_match`):
+ *  the weakest chosen tag's % as a bar and a number, each tag's % in the tooltip. */
+function TagMatch({ match }) {
+  const names = Object.keys(match.ranks);
+  const one = names.length === 1;
+  const each = names.map((n) => `${n}: ${match.ranks[n]}%`).join('\n');
+  const title = one
+    ? `${each}\nThe share of AniList voters who say the tag fits.`
+    : `${each}\nA title matches only as well as its weakest tag.`;
+  return (
+    <div className={s.pcardMatch} title={title} style={{ '--m': `${match.min}%` }}>
+      <span className={s.pcardMatchBar} aria-hidden="true" />
+      <span className={s.pcardMatchText}>{one ? `${match.min}% ${names[0]}` : `${match.min}% match`}</span>
+    </div>
+  );
+}
+
 function BrowseCard({ media, rank, index = 0, scoreFormat }) {
   const { hoverProps } = useAnimeCalc();
+  const match = media.tag_match;
+  const several = match && Object.keys(match.ranks).length > 1;
   return (
     <Link
       to={`/anime/${media.id}`}
@@ -263,7 +284,11 @@ function BrowseCard({ media, rank, index = 0, scoreFormat }) {
         <CoverRatings media={media} scoreFormat={scoreFormat} className={s.ratingsTR} />
         <NextEpBadge media={media} />
         <CalcCue />
-        {media.genres?.length > 0 && (
+        {several ? (
+          <div className={s.pcardReveal}>
+            {Object.entries(match.ranks).map(([t, r]) => <span key={t}>{t} {r}%</span>)}
+          </div>
+        ) : media.genres?.length > 0 && (
           <div className={s.pcardReveal}>
             {media.genres.slice(0, 3).map((g) => <span key={g}>{g}</span>)}
           </div>
@@ -271,6 +296,7 @@ function BrowseCard({ media, rank, index = 0, scoreFormat }) {
       </div>
       <div className={s.pcardTitle}>{media.title}</div>
       <div className={s.pcardMeta}>{metaLine(media)}</div>
+      {match && <TagMatch match={match} />}
     </Link>
   );
 }
@@ -279,11 +305,14 @@ function BrowseCard({ media, rank, index = 0, scoreFormat }) {
 // quiet caption so the shelf explains what it's showing, the way the browse dials do.
 const DISCOVER_SORTS = [
   { value: 'popular', label: 'Most popular', caption: 'the best-loved matches first' },
+  // Only with tags chosen: sorted by the weakest chosen tag's % (anilist.discover_by_match).
+  { value: 'match', label: 'Best tag match', caption: 'highest tag % first', needsTags: true },
   { value: 'trending', label: 'Trending now', caption: 'what the house is watching right now' },
   { value: 'score', label: 'Highest rated', caption: 'the highest scored of the lot' },
   { value: 'newest', label: 'Newest first', caption: 'freshest premieres up top' },
   { value: 'oldest', label: 'Oldest first', caption: 'from the very beginning' },
   { value: 'title', label: 'Title A–Z', caption: 'alphabetical, front to back' },
+  { value: 'favourites', label: 'Most favourited', caption: 'most favourited first' },
 ];
 
 // AniList files tags under "Category-Subcategory" ("Cast-Main Cast", "Theme-Action").
@@ -316,7 +345,9 @@ function TagChip({ tag, state, onToggle }) {
 /** The finder: the full genre roster as chips, then AniList's tag vocabulary grouped
  *  by category into collapsible sections with an in-panel search. Selected tags are
  *  pinned to the top so a choice buried in a collapsed category is always reachable. */
-function AnimeFinder({ coll, genres, tags, xGenres, xTags, toggleGenre, toggleTag, clearGenres, clearTags }) {
+function AnimeFinder({
+  coll, genres, tags, xGenres, xTags, toggleGenre, toggleTag, clearGenres, clearTags, tagFloor, setTagFloor,
+}) {
   const [tagQuery, setTagQuery] = useState('');
   const [openCats, setOpenCats] = useState(() => new Set());
   const tq = tagQuery.trim().toLowerCase();
@@ -410,6 +441,7 @@ function AnimeFinder({ coll, genres, tags, xGenres, xTags, toggleGenre, toggleTa
               );
             })}
             <button className={s.finderMini} onClick={clearTags}>clear</button>
+            {tags.size > 0 && <TagFloor value={tagFloor} onChange={setTagFloor} />}
           </div>
         )}
 
@@ -538,7 +570,10 @@ function BrowseTab() {
   const [xGenres, setXGenres] = useParamState('xg', EMPTY_SET, SET_PARAM);
   const [xTags, setXTags] = useParamState('xt', EMPTY_SET, SET_PARAM);
   const [rawSort, setSort] = useParamState('sort', 'popular');
-  const dsort = DISCOVER_SORTS.some((o) => o.value === rawSort) ? rawSort : 'popular';
+  const [tagFloor, setTagFloor] = useTagFloor();
+  // Best tag match needs tags; without them the shelf falls back to the default dial.
+  const sorts = DISCOVER_SORTS.filter((o) => !o.needsTags || tags.size > 0);
+  const dsort = sorts.some((o) => o.value === rawSort) ? rawSort : 'popular';
   const af = useAdvancedFilters();
   const [panel, setPanel] = useState(null); // 'finder' | 'more' | null
   const chipCount = genres.size + tags.size + xGenres.size + xTags.size;
@@ -560,7 +595,9 @@ function BrowseTab() {
   const without = (key) => (prev) => { const n = new Set(prev); n.delete(key); return n; };
   const dropGenre = (g) => { setGenres(without(g)); setXGenres(without(g)); };
   const dropTag = (t) => { setTags(without(t)); setXTags(without(t)); };
-  const clearChips = () => { setGenres(new Set()); setTags(new Set()); setXGenres(new Set()); setXTags(new Set()); };
+  const clearChips = () => {
+    setGenres(new Set()); setTags(new Set()); setXGenres(new Set()); setXTags(new Set()); setTagFloor('');
+  };
   const clearAll = () => { clearChips(); af.clear(); };
 
   // The input keeps its own state so a keystroke is never a history write (browsers
@@ -588,23 +625,24 @@ function BrowseTab() {
   const tcsv = csv(tags);
   const xgcsv = csv(xGenres);
   const xtcsv = csv(xTags);
+  const floorArg = tags.size && tagFloor ? `&min_tag_rank=${tagFloor}` : '';
   // A fingerprint of everything that changes the result set — changing it resets the
   // scroll to page one; scrolling alone (which only bumps the page arg) does not.
   const sig = mode === 'discover'
-    ? `d|${gcsv}|${tcsv}|${xgcsv}|${xtcsv}|${af.query}|${dsort}|${dq}`
+    ? `d|${gcsv}|${tcsv}|${xgcsv}|${xtcsv}|${floorArg}|${af.query}|${dsort}|${dq}`
     : mode === 'search'
       ? `s|${dq}`
       : `b|${kind}`;
   const buildUrl = useCallback(
     (p) => {
       if (mode === 'discover') {
-        return `/anime/discover?genres=${gcsv}&tags=${tcsv}&xg=${xgcsv}&xt=${xtcsv}${af.query ? `&${af.query}` : ''}`
+        return `/anime/discover?genres=${gcsv}&tags=${tcsv}&xg=${xgcsv}&xt=${xtcsv}${floorArg}${af.query ? `&${af.query}` : ''}`
           + `&sort=${dsort}&q=${encodeURIComponent(dq)}&page=${p}`;
       }
       if (mode === 'search') return `/anime/search?q=${encodeURIComponent(dq)}&page=${p}`;
       return `/anime/browse?kind=${kind}&page=${p}`;
     },
-    [mode, gcsv, tcsv, xgcsv, xtcsv, af.query, dsort, dq, kind],
+    [mode, gcsv, tcsv, xgcsv, xtcsv, floorArg, af.query, dsort, dq, kind],
   );
   const feed = useInfinite(sig, buildUrl, { enabled: mode !== 'people' });
   const me = useApi('/anime/me'); // viewer score format (for "your rating"); 401 when not connected
@@ -616,7 +654,10 @@ function BrowseTab() {
 
   const items = feed.items || [];
   const activeKind = BROWSE_KINDS.find((k) => k.value === kind) || BROWSE_KINDS[0];
-  const activeSort = DISCOVER_SORTS.find((o) => o.value === dsort) || DISCOVER_SORTS[0];
+  const activeSort = sorts.find((o) => o.value === dsort) || sorts[0];
+  // How far a Best tag match shelf reaches (anilist.discover_by_match's `match`).
+  const reach = mode === 'discover' && dsort === 'match' ? feed.extra?.match : null;
+  const shownCount = reach ? reach.total : items.length;
 
   // The spotlight reel is a feature of the plain browse wall — a filtered or searched
   // result has no canonical "top 5" to romanticize, so it drops to a clean grid.
@@ -690,7 +731,7 @@ function BrowseTab() {
                 <span className={s.sortLabel}>Order</span>
                 <div className={s.sortSelectWrap}>
                   <select className={s.sortSelect} value={dsort} onChange={(e) => setSort(e.target.value)}>
-                    {DISCOVER_SORTS.map((o) => (
+                    {sorts.map((o) => (
                       <option key={o.value} value={o.value}>{o.label}</option>
                     ))}
                   </select>
@@ -707,7 +748,7 @@ function BrowseTab() {
 
             <span className={s.browseCaption}>
               {caption}
-              {items.length ? <em className={s.browseCount}>{items.length} titles</em> : null}
+              {shownCount ? <em className={s.browseCount}>{shownCount} titles</em> : null}
             </span>
           </div>
 
@@ -721,7 +762,9 @@ function BrowseTab() {
               toggleGenre={toggleGenre}
               toggleTag={toggleTag}
               clearGenres={() => { setGenres(new Set()); setXGenres(new Set()); }}
-              clearTags={() => { setTags(new Set()); setXTags(new Set()); }}
+              clearTags={() => { setTags(new Set()); setXTags(new Set()); setTagFloor(''); }}
+              tagFloor={tagFloor}
+              setTagFloor={setTagFloor}
             />
           )}
           {panel === 'more' && <AdvancedFilters af={af} services={services} />}
@@ -734,7 +777,12 @@ function BrowseTab() {
               xTags={xTags}
               dropGenre={dropGenre}
               dropTag={dropTag}
-              extra={advancedPills(af, services)}
+              extra={[
+                ...(tags.size && tagFloor
+                  ? [{ key: 'tr', label: `tags ≥ ${tagFloor}%`, remove: () => setTagFloor('') }]
+                  : []),
+                ...advancedPills(af, services),
+              ]}
               clearAll={clearAll}
             />
           )}
@@ -789,7 +837,15 @@ function BrowseTab() {
                 </div>
               )}
               {!feed.hasMore && !feed.loadingMore && (
-                <p className={s.endNote}>· that’s every title in this shelf ·</p>
+                <p className={reach && !reach.everything ? `${s.endNote} ${s.endNoteLong}` : s.endNote}>
+                  {!reach || reach.everything
+                    ? '· that’s every title in this shelf ·'
+                    : reach.cut
+                      ? 'AniList’s rate limit stopped the fetch early, so this list is short. Come back in a couple of minutes for the rest.'
+                      : reach.floor != null
+                        ? `Every title with a match of ${reach.floor}% or more is here. Below that, only the best-known titles are listed; order by Most popular to see them all.`
+                        : 'Too many titles match to fetch them all, so these are the best-known ones, sorted by tag %. Add a tag or a filter to narrow them down.'}
+                </p>
               )}
             </>
           )}

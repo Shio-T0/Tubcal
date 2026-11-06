@@ -1,7 +1,7 @@
 // The finder's advanced drawer: every media filter AniList's search accepts —
 // format, airing status, season, a year range, a score floor, episode count and
-// length, country, source material, the services it streams on, and whether it's
-// on your list. All state lives in the URL (see useParamState), so back restores
+// length, country, source material, the services it streams on, how many AniList
+// users have it listed, and whether it's on your list. All state lives in the URL (see useParamState), so back restores
 // it and a link reproduces it.
 //
 // Number fields commit after a pause, not per keystroke: every commit is an
@@ -27,6 +27,11 @@ const LENGTH_PRESETS = [
   ['Standard', '20', '30'],
   ['Long', '31', ''],
 ];
+// AniList's "popularity" is how many users have a title on their list.
+const POPULARITY_PRESETS = [['', 'Any'], ['1000', '1k+'], ['10000', '10k+'], ['50000', '50k+'], ['100000', '100k+']];
+const popularityLabel = (n) => (POPULARITY_PRESETS.find(([v]) => v === n)?.[1] || `${n}+`);
+// Floors for a tag's % (AniList's tag rank: the share of voters who say it fits).
+export const TAG_FLOORS = ['', '50', '60', '75', '90'];
 
 /** Every advanced filter, read from (and written to) the URL. */
 export function useAdvancedFilters() {
@@ -45,15 +50,16 @@ export function useAdvancedFilters() {
   const [dmax, setDmax] = useParamState('dmax', '');
   const [country, setCountry] = useParamState('country', '');
   const [onlist, setOnlist] = useParamState('onlist', '');
+  const [pmin, setPmin] = useParamState('pmin', '');
 
-  const v = { fmt, st, src, svc, season, year, yf, yt, smin, emin, emax, dmin, dmax, country, onlist };
+  const v = { fmt, st, src, svc, season, year, yf, yt, smin, emin, emax, dmin, dmax, country, onlist, pmin };
   const set = {
     fmt: setFmt, st: setSt, src: setSrc, svc: setSvc, season: setSeason, year: setYear, yf: setYf,
     yt: setYt, smin: setSmin, emin: setEmin, emax: setEmax, dmin: setDmin, dmax: setDmax,
-    country: setCountry, onlist: setOnlist,
+    country: setCountry, onlist: setOnlist, pmin: setPmin,
   };
   const sets = [fmt, st, src, svc];
-  const scalars = [season, year, yf, yt, smin, emin, emax, dmin, dmax, country, onlist];
+  const scalars = [season, year, yf, yt, smin, emin, emax, dmin, dmax, country, onlist, pmin];
   const count = sets.reduce((n, x) => n + x.size, 0) + scalars.filter(Boolean).length;
 
   const csv = (x) => encodeURIComponent([...x].sort().join(','));
@@ -63,11 +69,12 @@ export function useAdvancedFilters() {
     yf && `year_from=${yf}`, yt && `year_to=${yt}`, smin && `score_min=${smin}`,
     emin && `episodes_min=${emin}`, emax && `episodes_max=${emax}`, dmin && `duration_min=${dmin}`,
     dmax && `duration_max=${dmax}`, country && `country=${country}`, onlist && `on_list=${onlist}`,
+    pmin && `popularity_min=${pmin}`,
   ].filter(Boolean).join('&');
 
   const clear = () => {
     for (const k of ['fmt', 'st', 'src', 'svc']) set[k](new Set());
-    for (const k of ['season', 'year', 'yf', 'yt', 'smin', 'emin', 'emax', 'dmin', 'dmax', 'country', 'onlist']) set[k]('');
+    for (const k of ['season', 'year', 'yf', 'yt', 'smin', 'emin', 'emax', 'dmin', 'dmax', 'country', 'onlist', 'pmin']) set[k]('');
   };
 
   return { v, set, count, query: q, clear };
@@ -97,6 +104,7 @@ export function advancedPills(af, services = []) {
     pills.push({ key: 'dur', label: v.dmin && v.dmax ? `${v.dmin}–${v.dmax} min eps` : v.dmin ? `≥ ${v.dmin} min eps` : `≤ ${v.dmax} min eps`, remove: () => { set.dmin(''); set.dmax(''); } });
   }
   if (v.country) pills.push({ key: 'c', label: COUNTRY_LABEL[v.country] || v.country, remove: () => set.country('') });
+  if (v.pmin) pills.push({ key: 'p', label: `on ${popularityLabel(v.pmin)} lists`, remove: () => set.pmin('') });
   if (v.onlist) pills.push({ key: 'l', label: v.onlist === '1' ? 'only my list' : 'not on my list', remove: () => set.onlist('') });
   return pills;
 }
@@ -240,6 +248,17 @@ export function AdvancedFilters({ af, services = [] }) {
         </div>
       </Drawer>
 
+      <Drawer title="On AniList lists">
+        <div className={f.chips}>
+          {POPULARITY_PRESETS.map(([n, label]) => (
+            <button key={n || 'any'} type="button" className={v.pmin === n ? f.chipOn : f.chip} onClick={() => set.pmin(n)}
+                    aria-pressed={v.pmin === n} title={n ? `Only titles at least ${Number(n).toLocaleString()} AniList users have listed` : undefined}>
+              {label}
+            </button>
+          ))}
+        </div>
+      </Drawer>
+
       <Drawer title="Adapted from" wide>
         <Chips options={SOURCES} selected={v.src} onToggle={toggleInSet(set.src)} label={(x) => SOURCE_LABEL[x]} />
       </Drawer>
@@ -274,6 +293,31 @@ export function AdvancedFilters({ af, services = [] }) {
           )}
         </div>
       </Drawer>
+    </div>
+  );
+}
+
+/** The tag % floor: hide titles where any chosen tag is below it. It's its own
+ *  param (`tr`), sent only while tags are chosen (it means nothing without them). */
+export function useTagFloor() {
+  const [raw, set] = useParamState('tr', '');
+  const value = TAG_FLOORS.includes(raw) ? raw : '';
+  return [value, set];
+}
+
+export function TagFloor({ value, onChange }) {
+  return (
+    <div className={f.tagFloor} role="group" aria-label="Tag % at least">
+      <span className={f.tagFloorLabel}
+            title="AniList users vote on how well each tag fits a title; the result is the tag's %. This hides titles where a chosen tag's % is lower.">
+        Tag % at least
+      </span>
+      {TAG_FLOORS.map((n) => (
+        <button key={n || 'any'} type="button" className={value === n ? f.chipOn : f.chip} onClick={() => onChange(n)}
+                aria-pressed={value === n}>
+          {n ? `${n}%` : 'Any'}
+        </button>
+      ))}
     </div>
   );
 }

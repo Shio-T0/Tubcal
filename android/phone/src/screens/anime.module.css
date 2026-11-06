@@ -325,6 +325,14 @@
   gap: 16px 10px;
   padding: 12px 12px 8px;
 }
+/* a Best tag match shelf that stops short says where */
+.matchNote {
+  margin: 4px 16px 20px;
+  color: var(--paper-dim);
+  font-size: 13px;
+  line-height: 1.5;
+  text-align: center;
+}
 .posterCell {
   position: relative;
   border-radius: 10px;

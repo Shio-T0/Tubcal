@@ -112,8 +112,13 @@ def discover():
     genre_list = _csv("genres")
     tag_list = _csv("tags")
     sort = request.args.get("sort") or "popular"
+    if sort not in anilist.DISCOVER_SORT_KEYS:
+        sort = "popular"
     q = (request.args.get("q") or "").strip() or None
-    page = int(request.args.get("page") or 1)
+    try:
+        page = max(int(request.args.get("page") or 1), 1)
+    except ValueError:
+        return err("page must be a number", 400)
     a = request.args
     filters = {
         "formats": _csv("formats"), "statuses": _csv("statuses"), "sources": _csv("sources"),
@@ -124,8 +129,13 @@ def discover():
         "episodes_min": a.get("episodes_min") or None, "episodes_max": a.get("episodes_max") or None,
         "duration_min": a.get("duration_min") or None, "duration_max": a.get("duration_max") or None,
         "min_tag_rank": a.get("min_tag_rank") or None,
+        "popularity_min": a.get("popularity_min") or None,
         "on_list": {"1": True, "0": False}.get(a.get("on_list")),
     }
+    if not tag_list:  # a tag floor and a tag match mean nothing without tags
+        filters["min_tag_rank"] = None
+        if sort == "match":
+            sort = "popular"
     # Nothing selected and no query is just the trending wall — let /browse own that
     # so a stray /discover call doesn't fan out into an unfiltered fetch.
     if not genre_list and not tag_list and not q and not anilist.filter_signature(filters):

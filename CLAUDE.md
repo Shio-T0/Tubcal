@@ -751,6 +751,17 @@ own `<db>.bak-<stamp>` copies beside the DB. Tests: `tests/test_snapshots.py`.
   AniList `pageInfo.hasNextPage`) so the Browse wall can infinite-scroll, and each
   caches via `cache.cached_dynamic` with a short `TTL_ANILIST_EMPTY` on an *empty*
   page so a transient rate-limit can't strand a shelf blank for the full window.
+  With tags chosen, every discover item carries `tag_match` (each chosen tag's rank,
+  the weakest = `min`, the mean) and the client shows it under the card. Sort `match`
+  (Best tag match, offered only with tags) isn't an AniList sort, and AniList's page
+  totals are fake (always 5000): `discover_by_match` collects titles with
+  `gather_matches` (one page at your Tag % floor `min_tag_rank`; a bigger set
+  walks the `minimumTagRank` bands 90/75/60 down to your floor, each band whole,
+  ≤ `MATCH_REQUESTS` calls of 50, stopping early when `_budget()` is low), sorts by
+  `match_order`, caches the whole list in one row and serves pages from it. Its
+  `match` says down to which % it's complete (`floor`; below, only the best-known),
+  which the end of the shelf explains. Also `popularity_min` (on N+ lists) and sort
+  `favourites`. Tests: `tests/test_anilist.py`.
   **Rate budget:** AniList currently allows 30 requests/min (not the documented 90).
   `_post` records `X-RateLimit-Remaining` and, on a 429, starts a cooldown during
   which calls fail fast (so stale cache is served at once); the fan-out walkers

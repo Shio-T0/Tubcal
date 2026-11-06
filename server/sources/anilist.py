@@ -571,7 +571,10 @@ _DISCOVER_SORTS = {
     "newest": "START_DATE_DESC",
     "oldest": "START_DATE",
     "title": "TITLE_ROMAJI",
+    "favourites": "FAVOURITES_DESC",
 }
+# "match" (best tag match) isn't one of AniList's sorts: see discover_by_match.
+DISCOVER_SORT_KEYS = frozenset(_DISCOVER_SORTS) | {"match"}
 
 
 def genre_collection():
@@ -713,6 +716,9 @@ def build_media_filter(f):
     score_min = _int_or_none(f.get("score_min"))
     if score_min:
         add("scoreMin", "Int", "averageScore_greater", score_min - 1)
+    pop_min = _int_or_none(f.get("popularity_min"))
+    if pop_min and pop_min > 0:
+        add("popMin", "Int", "popularity_greater", pop_min - 1)
     ep_min, ep_max = _int_or_none(f.get("episodes_min")), _int_or_none(f.get("episodes_max"))
     if ep_min:
         add("epMin", "Int", "episodes_greater", ep_min - 1)
@@ -745,27 +751,86 @@ def filter_signature(f):
     return "|".join(parts)
 
 
-def discover(genres=None, tags=None, sort="popular", search=None,
-             page=1, per_page=30, token=None, filters=None):
-    """Browse anime filtered by any mix of AniList's media filters and a text query.
+def tag_match(media_tags, chosen):
+    """How strongly a title carries the tags you chose. AniList gives every tag on a
+    title a rank, 0-100: the share of voters who agree the tag fits. `ranks` is each
+    chosen tag's, `min` the weakest of them (a title fits all of them only as well as
+    its weakest, and it's what `minimumTagRank` filters on), `avg` their mean. A
+    chosen tag the title doesn't carry counts as 0. None without chosen tags."""
+    if not chosen:
+        return None
+    have = {}
+    for t in media_tags or []:
+        if t and t.get("name"):
+            have[t["name"].lower()] = int(t.get("rank") or 0)
+    ranks = {name: have.get(name.lower(), 0) for name in chosen}
+    vals = list(ranks.values())
+    return {"ranks": ranks, "min": min(vals), "avg": round(sum(vals) / len(vals))}
 
-    Genres and tags are ANDed by AniList (genre_in + tag_in narrow together), which
-    is the intuitive reading of picking several: "slice-of-life *and* iyashikei",
-    not "either". `isAdult:false` keeps the shelf SFW to match the picker. When a
-    search term rides along, we still honour the chosen sort unless it's the default
-    popularity dial, in which case relevance (SEARCH_MATCH) wins — a typed query
-    wants its best match first. `filters` carries everything else the finder offers
-    (see build_media_filter).
+
+def match_order(items):
+    """Best match first: the weakest chosen tag's rank, then the average, then the
+    better-known title (AniList's popularity: how many people have it listed)."""
+    return sorted(items, key=lambda m: (
+        -m["tag_match"]["min"], -m["tag_match"]["avg"], -(m.get("popularity") or 0), m["id"]))
+
+
+# The Best match order walks down these tag-rank bands (see gather_matches).
+MATCH_FLOORS = (90, 75, 60)
+MATCH_PER_PAGE = 50  # AniList's largest page
+MATCH_REQUESTS = 6   # AniList calls one Best match shelf may spend (of 30 a minute)
+
+
+def gather_matches(fetch_page, floor=0, requests=MATCH_REQUESTS, room=lambda: True):
+    """Collect the titles for the Best match order.
+
+    AniList can't sort by a tag's rank, and its page totals are made up (always
+    5000), but it can filter on one: `minimumTagRank` keeps titles whose every
+    chosen tag is at least that rank. So one page at your own floor answers a small
+    set whole. A bigger set is walked from the top band down (90%, 75%, 60%, then
+    your floor), each band fetched whole before the next, so the head of the order
+    never misses a strong match just because it's less known. A band repeats the
+    titles of the bands above it: AniList has no upper bound to stop that.
+
+    `fetch_page(floor, page)` returns (raw media, has_next). `requests` caps the
+    walk and `room()` stops it early when AniList's budget runs low. Returns
+    {"pool": raw media by id, "floor": every title at this rank or more is in the
+    pool (None when even the top band was too big to fetch whole), "cut": room()
+    stopped it}. Below "floor" the pool holds only the best-known titles.
     """
-    f = dict(filters or {})
-    f["genres"] = [g for g in (genres or f.get("genres") or []) if g]
-    f["tags"] = [t for t in (tags or f.get("tags") or []) if t]
-    search = (search or "").strip() or None
-    sort_key = "SEARCH_MATCH" if (search and sort == "popular") else _DISCOVER_SORTS.get(sort, "POPULARITY_DESC")
+    pool = {}
 
+    def take(media):
+        for m in media or []:
+            if m and m.get("id") is not None:
+                pool.setdefault(m["id"], m)
+
+    media, more = fetch_page(floor, 1)
+    take(media)
+    if not more:
+        return {"pool": pool, "floor": floor, "cut": False}
+    used, whole_to = 1, None
+    for band in [b for b in MATCH_FLOORS if b > floor] + [floor]:
+        page = 2 if band == floor else 1  # your floor's first page is in already
+        while True:
+            short = not room()
+            if used >= requests or short:
+                return {"pool": pool, "floor": whole_to, "cut": short}
+            media, more = fetch_page(band, page)
+            used += 1
+            take(media)
+            if not more:
+                break
+            page += 1
+        whole_to = band
+    return {"pool": pool, "floor": floor, "cut": False}
+
+
+def _discover_query(f, search, sort_key, with_tags):
+    """The Page{media} document for a discover read, with its variables."""
     decl = ["$page:Int", "$perPage:Int", "$sort:[MediaSort]"]
     args = ["type:ANIME", "isAdult:false", "sort:$sort"]
-    variables = {"page": page, "perPage": per_page, "sort": [sort_key]}
+    variables = {"sort": [sort_key]}
     fd, fa, fv = build_media_filter(f)
     decl += fd
     args += fa
@@ -776,16 +841,99 @@ def discover(genres=None, tags=None, sort="popular", search=None,
         "query (" + ",".join(decl) + "){"
         " Page(page:$page,perPage:$perPage){ pageInfo{ hasNextPage }"
         " media(" + ",".join(args) + "){"
-        + _MEDIA + "} } }"
+        + _MEDIA + (" tags { name rank }" if with_tags else "") + "} } }"
     )
+    return query, variables
+
+
+def _with_match(media, tags):
+    """norm_media, plus how well the title fits the chosen tags."""
+    item = norm_media(media)
+    if item and tags:
+        item["tag_match"] = tag_match(media.get("tags"), tags)
+    return item
+
+
+def discover(genres=None, tags=None, sort="popular", search=None,
+             page=1, per_page=30, token=None, filters=None):
+    """Browse anime filtered by any mix of AniList's media filters and a text query.
+
+    Genres and tags are ANDed by AniList (genre_in + tag_in narrow together), which
+    is the intuitive reading of picking several: "slice-of-life *and* iyashikei",
+    not "either". `isAdult:false` keeps the shelf SFW to match the picker. When a
+    search term rides along, we still honour the chosen sort unless it's the default
+    popularity dial, in which case relevance (SEARCH_MATCH) wins — a typed query
+    wants its best match first. `filters` carries everything else the finder offers
+    (see build_media_filter). With tags chosen every item carries `tag_match`, and
+    sort "match" orders by it (discover_by_match).
+    """
+    f = dict(filters or {})
+    f["genres"] = [g for g in (genres or f.get("genres") or []) if g]
+    f["tags"] = [t for t in (tags or f.get("tags") or []) if t]
+    search = (search or "").strip() or None
+    if sort == "match" and f["tags"]:
+        return discover_by_match(f, search, page, per_page, token)
+    if sort == "match":
+        sort = "popular"  # no tags, nothing to match: the default dial
+    sort_key = "SEARCH_MATCH" if (search and sort == "popular") else _DISCOVER_SORTS.get(sort, "POPULARITY_DESC")
+    query, variables = _discover_query(f, search, sort_key, bool(f["tags"]))
+    variables.update(page=page, perPage=per_page)
 
     def fetch():
         d = _post(query, variables, token=token)
-        return _page_payload(d.get("Page") or {}, config.TTL_ANILIST_BROWSE)
+        pg = d.get("Page") or {}
+        items = [i for i in (_with_match(m, f["tags"]) for m in (pg.get("media") or [])) if i]
+        payload = {"items": items, "has_next": bool((pg.get("pageInfo") or {}).get("hasNextPage"))}
+        return payload, (config.TTL_ANILIST_BROWSE if items else config.TTL_ANILIST_EMPTY)
 
     auth = "auth" if token else "anon"
     ck = filter_signature(f) + f"|s:{sort}|q:{(search or '').lower()}|p:{page}"
-    return cache.cached_dynamic(f"anilist:discover:{auth}:{ck}", fetch)
+    # v2: items gained tag_match
+    return cache.cached_dynamic(f"anilist:discover:v2:{auth}:{ck}", fetch)
+
+
+def discover_by_match(f, search, page, per_page, token):
+    """The Best match order: the matching titles, strongest fit to the chosen tags
+    first, served a page at a time from one gathered, sorted list (gather_matches).
+    The payload's `match` says how complete it is: every title whose weakest chosen
+    tag is at `floor`% or more is in it (below that, only the best-known; None: only
+    the best-known at all), `everything` when nothing was left out, `total` titles,
+    `cut` when AniList's rate limit stopped the gathering early."""
+    tags = f["tags"]
+    floor = min(max(_int_or_none(f.get("min_tag_rank")) or 0, 0), 100)
+    # Two shapes of the query: one declaring $minTagRank (any band above 0), one not.
+    plain = _discover_query(dict(f, min_tag_rank=None), search, "POPULARITY_DESC", True)
+    banded = _discover_query(dict(f, min_tag_rank=100), search, "POPULARITY_DESC", True)
+
+    def fetch_page(band, page_no):
+        query, base = banded if band else plain
+        v = dict(base, page=page_no, perPage=MATCH_PER_PAGE)
+        if band:
+            v["minTagRank"] = band
+        pg = _post(query, v, token=token).get("Page") or {}
+        return pg.get("media") or [], bool((pg.get("pageInfo") or {}).get("hasNextPage"))
+
+    def fetch():
+        got = gather_matches(fetch_page, floor=floor, room=_budget)
+        items = match_order([i for i in (_with_match(m, tags) for m in got["pool"].values()) if i])
+        payload = {"items": items, "match": {
+            "floor": got["floor"], "everything": got["floor"] == floor, "total": len(items),
+            "cut": got["cut"],
+        }}
+        if not items:
+            return payload, config.TTL_ANILIST_EMPTY
+        # A walk the budget cut short is filled in on a later look.
+        return payload, (config.TTL_ANILIST_MATCH_CUT if got["cut"] else config.TTL_ANILIST_BROWSE)
+
+    auth = "auth" if token else "anon"
+    ck = filter_signature(dict(f, min_tag_rank=floor or None)) + f"|q:{(search or '').lower()}"
+    whole = cache.cached_dynamic(f"anilist:discover:match:{auth}:{ck}", fetch)
+    start = max(page - 1, 0) * per_page
+    return {
+        "items": whole["items"][start:start + per_page],
+        "has_next": start + per_page < len(whole["items"]),
+        "match": whole["match"],
+    }
 
 
 def media(media_id, token=None):

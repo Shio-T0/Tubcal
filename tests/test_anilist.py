@@ -60,6 +60,130 @@ def test_filter_signature_is_order_stable():
     assert anilist.filter_signature({"formats": [], "year": None}) == ""
 
 
+def test_filter_popularity_floor_is_inclusive():
+    assert _filter(popularity_min=10000)["popularity_greater"] == 9999
+    assert "popularity_greater" not in _filter(popularity_min=0)
+    assert "popularity_greater" not in _filter(popularity_min="lots")
+
+
+# ── the Best match order ─────────────────────────────────────────────────────
+
+def test_tag_match_takes_the_weakest_chosen_tag():
+    tags = [{"name": "Iyashikei", "rank": 88}, {"name": "Cute Girls Doing Cute Things", "rank": 61},
+            {"name": "Rural", "rank": 99}]
+    got = anilist.tag_match(tags, ["iyashikei", "Cute Girls Doing Cute Things"])
+    assert got == {"ranks": {"iyashikei": 88, "Cute Girls Doing Cute Things": 61}, "min": 61, "avg": 74}
+    # a chosen tag the title doesn't carry counts as nothing
+    assert anilist.tag_match(tags, ["Iyashikei", "Mecha"])["min"] == 0
+    assert anilist.tag_match(tags, []) is None
+
+
+def test_match_order_weakest_then_average_then_popularity():
+    def item(i, lo, avg, pop):
+        return {"id": i, "popularity": pop, "tag_match": {"min": lo, "avg": avg}}
+    got = anilist.match_order([item(1, 70, 80, 5), item(2, 90, 90, 1), item(3, 70, 85, 1),
+                               item(4, 70, 80, 9)])
+    assert [m["id"] for m in got] == [2, 3, 4, 1]
+
+
+def _catalogue(n_by_rank):
+    """Fake AniList: titles with a rank each, popularity falling with the id, served
+    the way Page{media(minimumTagRank, sort:POPULARITY_DESC)} would, ten a page."""
+    titles = []
+    for rank, n in n_by_rank.items():
+        titles += [{"id": len(titles) + k, "rank": rank} for k in range(n)]
+    calls = []
+
+    def fetch_page(floor, page):
+        calls.append((floor, page))
+        hits = [t for t in titles if t["rank"] >= floor]  # sorted by id = by popularity
+        chunk = hits[(page - 1) * 10:page * 10]
+        return chunk, page * 10 < len(hits)
+    return titles, fetch_page, calls
+
+
+def test_gather_answers_a_small_set_in_one_request():
+    titles, fetch_page, calls = _catalogue({95: 3, 40: 4})
+    got = anilist.gather_matches(fetch_page)
+    assert calls == [(0, 1)]
+    assert got["floor"] == 0 and len(got["pool"]) == 7
+
+
+def test_gather_walks_the_bands_down_so_strong_unknowns_are_kept():
+    # the strong matches are the least known: a popularity cut would lose them
+    titles, fetch_page, calls = _catalogue({30: 25, 92: 4, 80: 4, 65: 1})
+    got = anilist.gather_matches(fetch_page, requests=6)
+    # your floor's first page, each band whole, then your floor's next pages to the cap
+    assert calls == [(0, 1), (90, 1), (75, 1), (60, 1), (0, 2), (0, 3)]
+    assert got == {**got, "floor": 60, "cut": False}
+    assert {t["id"] for t in titles if t["rank"] >= 60} <= set(got["pool"])
+    # given the requests, it reaches the bottom
+    titles, fetch_page, calls = _catalogue({30: 25, 92: 4, 80: 4, 65: 1})
+    got = anilist.gather_matches(fetch_page, requests=10)
+    assert got["floor"] == 0 and len(got["pool"]) == len(titles)
+
+
+def test_gather_stops_at_the_cap_and_says_how_far_it_got():
+    titles, fetch_page, calls = _catalogue({30: 50, 92: 6, 80: 10})
+    got = anilist.gather_matches(fetch_page, requests=4)
+    # 0/p1, 90/p1 (whole), 75/p1, 75/p2 (whole) — then the cap
+    assert calls == [(0, 1), (90, 1), (75, 1), (75, 2)]
+    assert got == {**got, "floor": 75, "cut": False}
+    assert {t["id"] for t in titles if t["rank"] >= 75} <= set(got["pool"])
+
+
+def test_gather_a_top_band_too_big_to_fetch_is_not_whole():
+    titles, fetch_page, calls = _catalogue({99: 80})
+    got = anilist.gather_matches(fetch_page, requests=3)
+    assert calls == [(0, 1), (90, 1), (90, 2)]
+    assert got["floor"] is None and len(got["pool"]) == 20
+
+
+def test_gather_starts_from_your_floor_and_stops_when_the_budget_is_low():
+    titles, fetch_page, calls = _catalogue({95: 15, 82: 15})
+    got = anilist.gather_matches(fetch_page, floor=80)
+    assert calls == [(80, 1), (90, 1), (90, 2), (80, 2), (80, 3)]
+    assert got["floor"] == 80
+    _, fetch_page, calls = _catalogue({95: 15, 82: 15})
+    got = anilist.gather_matches(fetch_page, floor=80, room=lambda: False)
+    assert calls == [(80, 1)] and got["cut"] and got["floor"] is None
+
+
+def test_discover_by_match_sorts_pages_and_declares_the_floor(client, monkeypatch):
+    def media(i, rank, pop):
+        return {"id": i, "title": {"romaji": f"t{i}"}, "popularity": pop,
+                "tags": [{"name": "Iyashikei", "rank": rank}]}
+    shows = [media(1, 62, 900), media(2, 97, 50), media(3, 81, 400), media(4, 97, 70), media(5, 20, 999)]
+    seen = []
+
+    def fake_post(query, variables=None, token=None):
+        seen.append((query, dict(variables)))
+        floor = variables.get("minTagRank", 0)
+        assert ("$minTagRank:Int" in query) == bool(floor)
+        assert "tags { name rank }" in query and variables["sort"] == ["POPULARITY_DESC"]
+        hits = sorted([m for m in shows if m["tags"][0]["rank"] >= floor], key=lambda m: -m["popularity"])
+        return {"Page": {"media": hits[:2] if variables["page"] == 1 else hits[2:4],
+                         "pageInfo": {"hasNextPage": variables["page"] == 1 and len(hits) > 2}}}
+
+    monkeypatch.setattr(anilist, "_post", fake_post)
+    monkeypatch.setattr(anilist, "_budget", lambda min_left=8: True)
+    r = client.get("/api/anime/discover?tags=Iyashikei&sort=match&page=1")
+    d = r.get_json()["data"]
+    order = [m["id"] for m in d["items"]]
+    assert order == [4, 2, 3, 1, 5]  # 97 (better known), 97, 81, 62, 20
+    assert d["items"][0]["tag_match"]["min"] == 97
+    # six requests reach the 60% band whole; the 20% one came in as a best-known title
+    assert d["match"] == {"floor": 60, "everything": False, "total": 5, "cut": False}
+    calls = len(seen)
+    # the next page comes from the same gathered list, no new requests
+    r2 = client.get("/api/anime/discover?tags=Iyashikei&sort=match&page=2&").get_json()["data"]
+    assert len(seen) == calls and r2["items"] == []
+    # sort=match with nothing to match falls back to the ordinary dial
+    monkeypatch.setattr(anilist, "_post", lambda q, v=None, token=None: {"Page": {"media": []}})
+    assert client.get("/api/anime/discover?formats=TV&sort=match").get_json()["data"]["sort"] == "popular"
+    assert client.get("/api/anime/discover?formats=TV&sort=bogus").get_json()["data"]["sort"] == "popular"
+
+
 # ── seasons ──────────────────────────────────────────────────────────────────
 
 def test_december_is_next_years_winter():

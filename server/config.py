@@ -95,6 +95,9 @@ TTL_ANILIST_LIST = 60  # short so list/progress edits reflect quickly
 # An empty browse/search/discover page is almost always a transient rate-limit,
 # not the truth — cache it only briefly so a blank shelf self-heals on the next look.
 TTL_ANILIST_EMPTY = 30
+# A Best match shelf whose walk AniList's budget cut short (anilist.gather_matches):
+# kept briefly, so a later look fills in the rest.
+TTL_ANILIST_MATCH_CUT = 120
 TTL_ANILIST_THREADS = 300
 # The genre list + tag vocabulary is effectively static (AniList adds a tag every
 # few months), so hold it for a day — it drives the discover picker.

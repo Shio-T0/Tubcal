@@ -647,6 +647,17 @@
   color: var(--paper-faint);
   opacity: 0.7;
 }
+/* a Best tag match shelf that stops short says where, in a sentence you can read */
+.endNoteLong {
+  max-width: 60ch;
+  margin-inline: auto;
+  font-family: var(--font-body, inherit);
+  font-size: 12.5px;
+  letter-spacing: normal;
+  line-height: 1.5;
+  color: var(--paper-dim);
+  opacity: 1;
+}
 @media (prefers-reduced-motion: reduce) {
   .moreDot { animation: none; opacity: 0.7; }
 }
@@ -1168,6 +1179,29 @@
   font-family: var(--font-mono);
   font-size: 11px;
   color: var(--paper-faint);
+}
+/* how well the title fits the chosen tags: the weakest tag's % */
+.pcardMatch {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  margin-top: -2px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--paper-dim);
+  cursor: help;
+}
+.pcardMatchBar {
+  flex: 0 0 34px;
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--c-anime) var(--m), var(--rule) var(--m));
+}
+.pcardMatchText {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* ── cover rating chips (global average + your rating) ────────────────────── */

@@ -134,3 +134,21 @@
     animation: none;
   }
 }
+
+/* the tag % floor, a line under the chosen tags */
+.tagFloor {
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+}
+.tagFloorLabel {
+  margin-right: 4px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--paper-faint);
+  cursor: help;
+}

@@ -23,7 +23,9 @@ import {
 
 import { useApi } from '@pc/api/client.js';
 import { useDebounced } from '@pc/components/layout/Section.jsx';
-import { AdvancedFilters, advancedPills, useAdvancedFilters } from '@pc/components/anime/Filters.jsx';
+import {
+  AdvancedFilters, TagFloor, advancedPills, useAdvancedFilters, useTagFloor,
+} from '@pc/components/anime/Filters.jsx';
 import {
   BulkBar, ExportMenu, GatheringDust, LIST_SORTS, matchesText, SequelRadar, sortEntries, TonightsPick,
 } from '@pc/components/anime/ListTools.jsx';
@@ -393,10 +395,29 @@ const KINDS = [
   { key: 'seasonal', label: 'This season', ranked: false },
   { key: 'top', label: 'Top rated', ranked: true },
 ];
+// 'match' (highest tag % first) only while tags are chosen.
 const SORTS = [
-  ['popular', 'Most popular'], ['trending', 'Trending now'], ['score', 'Highest rated'],
-  ['newest', 'Newest first'], ['oldest', 'Oldest first'], ['title', 'Title A–Z'],
+  ['popular', 'Most popular'], ['match', 'Best tag match'], ['trending', 'Trending now'], ['score', 'Highest rated'],
+  ['newest', 'Newest first'], ['oldest', 'Oldest first'], ['title', 'Title A–Z'], ['favourites', 'Most favourited'],
 ];
+const sortsFor = (tags) => SORTS.filter(([k]) => k !== 'match' || tags.size > 0);
+
+/** The line under a poster when tags are chosen: the weakest chosen tag's %. */
+function matchLine(m) {
+  const t = m.tag_match;
+  if (!t) return undefined;
+  const names = Object.keys(t.ranks);
+  return names.length === 1 ? `${t.min}% ${names[0]}` : `${t.min}% tag match`;
+}
+
+/** Why a Best tag match shelf ends where it does, when it isn't every title. */
+function reachNote(r) {
+  if (r.cut) return 'AniList’s rate limit stopped the fetch early, so this list is short. Come back in a couple of minutes for the rest.';
+  if (r.floor != null) {
+    return `Every title with a match of ${r.floor}% or more is here. Below that, only the best-known titles are listed; order by Most popular to see them all.`;
+  }
+  return 'Too many titles match to fetch them all, so these are the best-known ones, sorted by tag %. Add a tag or a filter to narrow them down.';
+}
 const SEARCH_IN = [
   { key: 'anime', label: 'Anime' },
   { key: 'characters', label: 'Characters' },
@@ -415,7 +436,7 @@ function Tri({ label, state, onTap }) {
   );
 }
 
-function Finder({ open, onClose, coll, sel, cycle, af, services, sort, setSort, onClear, total }) {
+function Finder({ open, onClose, coll, sel, cycle, af, services, sort, setSort, onClear, total, tagFloor, setTagFloor }) {
   const [tq, setTq] = useState('');
   const [openCat, setOpenCat] = useState(null);
   const data = coll.data;
@@ -440,7 +461,7 @@ function Finder({ open, onClose, coll, sel, cycle, af, services, sort, setSort, 
       {data && (
         <>
           <h3 className={a.finderHead}>Order</h3>
-          <Chips items={SORTS.map(([key, label]) => ({ key, label }))} value={sort} onChange={setSort} className={a.finderChips} />
+          <Chips items={sortsFor(sel.tags).map(([key, label]) => ({ key, label }))} value={sort} onChange={setSort} className={a.finderChips} />
           <h3 className={a.finderHead}>Genres <em>tap to require · again to exclude</em></h3>
           <div className={a.triWrap}>
             {(data.genres || []).map((g) => <Tri key={g} label={g} state={st(g, sel.genres, sel.xGenres)} onTap={() => cycle.genre(g)} />)}
@@ -455,6 +476,9 @@ function Finder({ open, onClose, coll, sel, cycle, af, services, sort, setSort, 
             <div className={a.triWrap}>
               {[...sel.tags, ...sel.xTags].sort().map((t) => <Tri key={t} label={t} state={st(t, sel.tags, sel.xTags)} onTap={() => cycle.tag(t)} />)}
             </div>
+          )}
+          {sel.tags.size > 0 && (
+            <div className="ph-reuse ph-tight ph-filters"><TagFloor value={tagFloor} onChange={setTagFloor} /></div>
           )}
           {matches ? (
             <div className={a.triWrap}>
@@ -498,7 +522,9 @@ function Browse() {
   const [tags, setTags] = useParamState('t', EMPTY_SET, SET_PARAM);
   const [xGenres, setXGenres] = useParamState('xg', EMPTY_SET, SET_PARAM);
   const [xTags, setXTags] = useParamState('xt', EMPTY_SET, SET_PARAM);
-  const [sort, setSort] = useParamState('sort', 'popular');
+  const [rawSort, setSort] = useParamState('sort', 'popular');
+  const sort = sortsFor(tags).some(([k]) => k === rawSort) ? rawSort : 'popular';
+  const [tagFloor, setTagFloor] = useTagFloor();
   const af = useAdvancedFilters();
   const [finder, setFinder] = useState(false);
   const [text, setText] = useState(urlQ);
@@ -513,16 +539,19 @@ function Browse() {
     else setInc((p) => new Set(p).add(key));
   };
   const cycle = { genre: cycleOf(genres, setGenres, xGenres, setXGenres), tag: cycleOf(tags, setTags, xTags, setXTags) };
-  const clearAll = () => { setGenres(new Set()); setTags(new Set()); setXGenres(new Set()); setXTags(new Set()); af.clear(); };
+  const clearAll = () => {
+    setGenres(new Set()); setTags(new Set()); setXGenres(new Set()); setXTags(new Set()); setTagFloor(''); af.clear();
+  };
 
   const mode = searchIn !== 'anime' ? 'people' : filtering ? 'discover' : dq ? 'search' : 'browse';
   const csv = (set) => encodeURIComponent([...set].sort().join(','));
+  const floorArg = tags.size && tagFloor ? `&min_tag_rank=${tagFloor}` : '';
   const sig = mode === 'discover'
-    ? `d|${csv(genres)}|${csv(tags)}|${csv(xGenres)}|${csv(xTags)}|${af.query}|${sort}|${dq}`
+    ? `d|${csv(genres)}|${csv(tags)}|${csv(xGenres)}|${csv(xTags)}|${floorArg}|${af.query}|${sort}|${dq}`
     : mode === 'search' ? `s|${dq}` : `b|${kind.key}`;
   const buildUrl = useCallback((p) => {
     if (mode === 'discover') {
-      return `/anime/discover?genres=${csv(genres)}&tags=${csv(tags)}&xg=${csv(xGenres)}&xt=${csv(xTags)}${af.query ? `&${af.query}` : ''}&sort=${sort}&q=${encodeURIComponent(dq)}&page=${p}`;
+      return `/anime/discover?genres=${csv(genres)}&tags=${csv(tags)}&xg=${csv(xGenres)}&xt=${csv(xTags)}${floorArg}${af.query ? `&${af.query}` : ''}&sort=${sort}&q=${encodeURIComponent(dq)}&page=${p}`;
     }
     if (mode === 'search') return `/anime/search?q=${encodeURIComponent(dq)}&page=${p}`;
     return `/anime/browse?kind=${kind.key}&page=${p}`;
@@ -533,12 +562,15 @@ function Browse() {
   const coll = useApi('/anime/genres', finder || af.v.svc.size > 0);
 
   const items = feed.items || [];
+  // How far a Best tag match shelf reaches (anilist.discover_by_match's `match`).
+  const reach = mode === 'discover' && sort === 'match' ? feed.extra?.match : null;
   const without = (setter, key) => () => setter((p) => { const n = new Set(p); n.delete(key); return n; });
   const pills = [
     ...[...genres].map((g) => ({ k: `g:${g}`, label: g, drop: without(setGenres, g) })),
     ...[...xGenres].map((g) => ({ k: `xg:${g}`, label: `not ${g}`, x: true, drop: without(setXGenres, g) })),
     ...[...tags].map((t) => ({ k: `t:${t}`, label: t, drop: without(setTags, t) })),
     ...[...xTags].map((t) => ({ k: `xt:${t}`, label: `not ${t}`, x: true, drop: without(setXTags, t) })),
+    ...(tags.size && tagFloor ? [{ k: 'tr', label: `tags ≥ ${tagFloor}%`, drop: () => setTagFloor('') }] : []),
   ];
   const extra = advancedPills(af, coll.data?.services || []);
 
@@ -587,11 +619,14 @@ function Browse() {
           {!feed.loading && !feed.error && !items.length && <Empty Icon={Search} title="No anime" text={filtering ? 'Nothing matches this combination — loosen a filter.' : `Nothing matches “${dq}”.`} />}
           <div className={a.wall}>
             {items.map((m, i) => (
-              <Poster key={m.id} media={m} scoreFormat={me.data?.score_format} rank={mode === 'browse' && kind.ranked ? i + 1 : null} />
+              <Poster key={m.id} media={m} scoreFormat={me.data?.score_format} rank={mode === 'browse' && kind.ranked ? i + 1 : null} sub={matchLine(m)} />
             ))}
           </div>
           <Sentinel onReach={feed.loadMore} active={items.length > 0 && feed.hasMore && !feed.error} />
           {feed.loadingMore && <Loading label="dealing more titles" />}
+          {reach && !reach.everything && items.length > 0 && !feed.hasMore && !feed.loadingMore && (
+            <p className={a.matchNote}>{reachNote(reach)}</p>
+          )}
         </>
       )}
 
@@ -607,6 +642,8 @@ function Browse() {
         setSort={setSort}
         onClear={clearAll}
         total={chipCount + af.count}
+        tagFloor={tagFloor}
+        setTagFloor={setTagFloor}
       />
     </>
   );
