@@ -13,10 +13,10 @@ android {
         applicationId = "com.tubcal.app"
         minSdk = 26          // Android 8.0 — needed for notification channels & modern WebView
         targetSdk = 34
-        // 16 / 0.6.0: the first build split into a core APK and one APK per room
-        // (install.sh's PHONE_SPLIT_SINCE)
-        versionCode = 16
-        versionName = "0.6.0"
+        // 16 / 0.6.0 was the first build split into a core APK and one APK per
+        // room (install.sh's PHONE_SPLIT_SINCE)
+        versionCode = 17
+        versionName = "0.7.0"
 
         // Chaquopy must build for the ABIs you'll run on. arm64 covers every
         // modern phone; x86_64 covers the emulator. (More ABIs = bigger APK.)
